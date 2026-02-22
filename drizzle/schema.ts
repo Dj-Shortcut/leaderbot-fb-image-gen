@@ -1,9 +1,8 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, bigint, json } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
+ * Extended with fields for tracking image generation quota.
  */
 export const users = mysqlTable("users", {
   /**
@@ -25,4 +24,73 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+/**
+ * Image generation requests table.
+ * Tracks each image generation request with metadata and status.
+ */
+export const imageRequests = mysqlTable("imageRequests", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  prompt: text("prompt").notNull(),
+  imageUrl: varchar("imageUrl", { length: 2048 }), // S3 URL for generated image
+  imageKey: varchar("imageKey", { length: 512 }), // S3 key for storage reference
+  status: mysqlEnum("status", ["pending", "completed", "failed"]).default("pending").notNull(),
+  errorMessage: text("errorMessage"), // Error details if generation failed
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"), // When image generation completed
+});
+
+export type ImageRequest = typeof imageRequests.$inferSelect;
+export type InsertImageRequest = typeof imageRequests.$inferInsert;
+
+/**
+ * Daily usage quota tracking table.
+ * Tracks the count of images generated per user per day.
+ * Reset at midnight UTC.
+ */
+export const dailyQuota = mysqlTable("dailyQuota", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(), // One entry per user per day (composite key with date)
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD format in UTC
+  imagesGenerated: int("imagesGenerated").default(0).notNull(),
+  lastGeneratedAt: timestamp("lastGeneratedAt"), // Timestamp of last generation
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type DailyQuota = typeof dailyQuota.$inferSelect;
+export type InsertDailyQuota = typeof dailyQuota.$inferInsert;
+
+/**
+ * Usage statistics and analytics table.
+ * Aggregated daily statistics for admin dashboard.
+ */
+export const usageStats = mysqlTable("usageStats", {
+  id: int("id").autoincrement().primaryKey(),
+  date: varchar("date", { length: 10 }).notNull().unique(), // YYYY-MM-DD format in UTC
+  totalImagesGenerated: int("totalImagesGenerated").default(0).notNull(),
+  totalUsersActive: int("totalUsersActive").default(0).notNull(),
+  totalFailedRequests: int("totalFailedRequests").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type UsageStats = typeof usageStats.$inferSelect;
+export type InsertUsageStats = typeof usageStats.$inferInsert;
+
+/**
+ * System notifications log.
+ * Tracks owner notifications sent for milestones and alerts.
+ */
+export const notificationLog = mysqlTable("notificationLog", {
+  id: int("id").autoincrement().primaryKey(),
+  type: mysqlEnum("type", ["milestone", "error", "quota_warning", "system_alert"]).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  metadata: json("metadata"), // Additional context as JSON
+  sent: int("sent").default(0).notNull(), // Boolean: 1 = sent, 0 = failed
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type NotificationLog = typeof notificationLog.$inferSelect;
+export type InsertNotificationLog = typeof notificationLog.$inferInsert;
