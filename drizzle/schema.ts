@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, bigint, json } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, uniqueIndex } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -48,15 +48,24 @@ export type InsertImageRequest = typeof imageRequests.$inferInsert;
  * Tracks the count of images generated per user per day.
  * Reset at midnight UTC.
  */
-export const dailyQuota = mysqlTable("dailyQuota", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().unique(), // One entry per user per day (composite key with date)
-  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD format in UTC
-  imagesGenerated: int("imagesGenerated").default(0).notNull(),
-  lastGeneratedAt: timestamp("lastGeneratedAt"), // Timestamp of last generation
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+export const dailyQuota = mysqlTable(
+  "dailyQuota",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD format in UTC
+    imagesGenerated: int("imagesGenerated").default(0).notNull(),
+    lastGeneratedAt: timestamp("lastGeneratedAt"), // Timestamp of last generation
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => ({
+    userDateUnique: uniqueIndex("dailyQuota_userId_date_unique").on(
+      table.userId,
+      table.date
+    ),
+  })
+);
 
 export type DailyQuota = typeof dailyQuota.$inferSelect;
 export type InsertDailyQuota = typeof dailyQuota.$inferInsert;

@@ -5,7 +5,8 @@ import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import {
   canUserGenerateImage,
-  incrementUserQuota,
+  reserveUserDailyQuota,
+  releaseUserDailyQuota,
   createImageRequest,
   updateImageRequest,
   getUserImageRequests,
@@ -45,9 +46,9 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const userId = ctx.user.id;
 
-        // Check if user has quota remaining
-        const canGenerate = await canUserGenerateImage(userId);
-        if (!canGenerate) {
+        // Atomically reserve quota to avoid concurrent double generation.
+        const hasQuotaReserved = await reserveUserDailyQuota(userId);
+        if (!hasQuotaReserved) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: "You have reached your daily image generation limit. Please try again tomorrow.",
@@ -85,10 +86,6 @@ export const appRouter = router({
             status: "completed",
             completedAt: new Date(),
           });
-
-          // Increment user's daily quota
-          await incrementUserQuota(userId);
-
           // Update today's usage statistics
           const todayStats = await getTodayStats();
           if (todayStats) {
@@ -126,6 +123,9 @@ export const appRouter = router({
           };
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+          // Release reserved quota if generation failed.
+          await releaseUserDailyQuota(userId);
 
           // Log failed request
           if (requestId) {

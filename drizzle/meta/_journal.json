@@ -15,6 +15,13 @@
       "when": 1771792056712,
       "tag": "0001_big_the_phantom",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1771798491450,
+      "tag": "0002_fix_daily_quota_unique",
+      "breakpoints": true
     }
   ]
 }

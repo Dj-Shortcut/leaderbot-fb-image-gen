@@ -1,4 +1,4 @@
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, imageRequests, dailyQuota, usageStats, notificationLog, InsertImageRequest, InsertDailyQuota, InsertUsageStats, InsertNotificationLog } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -170,6 +170,67 @@ export async function incrementUserQuota(userId: number): Promise<void> {
       lastGeneratedAt: now,
     });
   }
+}
+
+/**
+ * Atomically reserve daily quota for a user.
+ * Returns true only when quota is successfully claimed for the current day.
+ */
+export async function reserveUserDailyQuota(userId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot reserve quota: database not available");
+    return false;
+  }
+
+  const today = getTodayUTC();
+  const now = new Date();
+
+  try {
+    await db.insert(dailyQuota).values({
+      userId,
+      date: today,
+      imagesGenerated: 1,
+      lastGeneratedAt: now,
+    });
+    return true;
+  } catch {
+    // Row likely already exists for (userId, today). Continue with conditional update.
+  }
+
+  const result = await db.execute(sql`
+    UPDATE dailyQuota
+    SET imagesGenerated = imagesGenerated + 1,
+        lastGeneratedAt = ${now},
+        updatedAt = NOW()
+    WHERE userId = ${userId}
+      AND date = ${today}
+      AND imagesGenerated < 1
+  `);
+
+  const affectedRows = Number((result as any)?.[0]?.affectedRows ?? (result as any)?.affectedRows ?? 0);
+  return affectedRows > 0;
+}
+
+/**
+ * Releases one reserved daily quota slot when an operation fails after reservation.
+ */
+export async function releaseUserDailyQuota(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot release quota: database not available");
+    return;
+  }
+
+  const today = getTodayUTC();
+  await db.execute(sql`
+    UPDATE dailyQuota
+    SET imagesGenerated = GREATEST(imagesGenerated - 1, 0),
+        updatedAt = NOW()
+    WHERE userId = ${userId}
+      AND date = ${today}
+      AND imagesGenerated > 0
+  `);
 }
 
 /**
