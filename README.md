@@ -1,5 +1,32 @@
 # leaderbot-fb-image-gen
 
+## Package manager (pnpm)
+
+This project uses **pnpm** via **Corepack** (not npm).
+
+### Local development
+
+```bash
+corepack enable
+pnpm install
+pnpm dev
+```
+
+### Build
+
+```bash
+pnpm build
+```
+
+### If you accidentally ran `npm install`
+
+- Delete `package-lock.json` (if it was created).
+- Run pnpm commands again (`pnpm install`, then `pnpm dev` or `pnpm build`).
+
+### Fly build note
+
+Fly build runs with `pnpm --frozen-lockfile` and will fail if `pnpm-lock.yaml` is not in sync with `package.json`.
+
 Deploy this repository to the existing Fly app **groepsscore** so the Meta callback URL remains unchanged:
 
 - https://groepsscore.fly.dev/webhook/facebook
