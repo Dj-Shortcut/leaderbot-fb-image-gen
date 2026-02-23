@@ -1,16 +1,6 @@
 import express from "express";
-import {
-  sendGenericTemplate,
-  sendImage,
-  sendQuickReplies,
-  sendText,
-  safeLog,
-  type GenericTemplateElement,
-} from "./messengerApi";
-import { canGenerate, increment } from "./messengerQuota";
-import { getOrCreateState, pruneOldState, setLastGenerated, setPendingImage } from "./messengerState";
-import { isStylePayload, STYLE_CONFIGS, type StyleId } from "./messengerStyles";
-import { getMockGeneratedImage } from "./imageService";
+import { sendQuickReplies, sendText, safeLog } from "./messengerApi";
+import { pruneOldState, setChosenStyle, setFlowState, setPendingImage, getOrCreateState } from "./messengerState";
 
 type FacebookWebhookEvent = {
   sender?: { id?: string };
@@ -26,107 +16,101 @@ type FacebookWebhookEvent = {
   };
 };
 
-function buildStyleElements(): GenericTemplateElement[] {
-  return STYLE_CONFIGS.map(style => ({
-    title: style.label,
-    subtitle: "Kies deze stijl",
-    image_url: style.demoThumbnailUrl,
-    buttons: [
-      {
-        type: "postback",
-        title: "Kies stijl",
-        payload: style.payload,
-      },
-    ],
-  }));
-}
+const STYLE_OPTIONS = ["Disco", "Anime", "Gold", "Clouds", "Cinematic", "Pixel"] as const;
+const STYLE_PAYLOAD_PREFIX = "STYLE_";
 
-async function sendStylePicker(psid: string): Promise<void> {
-  await sendGenericTemplate(psid, buildStyleElements());
-}
-
-async function processGeneration(psid: string, styleId: StyleId): Promise<void> {
-  const state = getOrCreateState(psid);
-
-  if (!state.pendingImageUrl) {
-    await sendText(psid, "Stuur eerst een foto om te starten 📸");
-    return;
+function stylePayloadToLabel(payload: string): string | undefined {
+  if (!payload.startsWith(STYLE_PAYLOAD_PREFIX)) {
+    return undefined;
   }
 
-  if (!canGenerate(psid)) {
-    await sendText(psid, "Je gratis limiet is bereikt (1 per dag). Kom morgen terug of upgrade.");
-    return;
-  }
+  const name = payload.slice(STYLE_PAYLOAD_PREFIX.length).toLowerCase();
+  return STYLE_OPTIONS.find(style => style.toLowerCase() === name);
+}
 
-  increment(psid);
-  await sendText(psid, "Bezig… ⏳");
-
-  const variant = getMockGeneratedImage(styleId, 0);
-  await sendImage(psid, variant.imageUrl);
-
-  state.lastVariantCursor = variant.nextCursor;
-  setLastGenerated(psid, styleId, variant.imageUrl);
-
-  await sendQuickReplies(psid, "Klaar! Wil je nog een versie?", [
-    { content_type: "text", title: "🔁 Variatie", payload: "VARIATION" },
-    { content_type: "text", title: "💥 Sterker", payload: "STRONGER" },
-    { content_type: "text", title: "🎨 Nieuwe stijl", payload: "NEW_STYLE" },
+async function sendStartMenu(psid: string): Promise<void> {
+  await sendQuickReplies(psid, "Welcome 👋 Pick a quick start:", [
+    { content_type: "text", title: "📸 Send photo", payload: "SEND_PHOTO" },
+    { content_type: "text", title: "✨ Choose style", payload: "CHOOSE_STYLE" },
+    { content_type: "text", title: "🔥 Trending", payload: "TRENDING" },
+    { content_type: "text", title: "❓ Help", payload: "HELP" },
   ]);
 }
 
-async function processVariation(psid: string): Promise<void> {
+async function sendStylePicker(psid: string): Promise<void> {
+  await sendQuickReplies(psid, "Pick a style:", STYLE_OPTIONS.map(style => ({
+    content_type: "text" as const,
+    title: style,
+    payload: `${STYLE_PAYLOAD_PREFIX}${style.toUpperCase()}`,
+  })));
+}
+
+async function sendTrending(psid: string): Promise<void> {
+  await sendText(psid, "Trending now: Disco, Anime, Gold.");
+  await sendText(psid, "Send a photo and I’ll apply your pick.");
+}
+
+async function sendHelp(psid: string): Promise<void> {
+  await sendText(psid, "Quick flow: send a photo, pick a style, get your result.");
+  await sendQuickReplies(psid, "What do you want to do next?", [
+    { content_type: "text", title: "📸 Send photo", payload: "SEND_PHOTO" },
+    { content_type: "text", title: "✨ Choose style", payload: "CHOOSE_STYLE" },
+  ]);
+}
+
+async function handleStyleSelection(psid: string, style: string): Promise<void> {
   const state = getOrCreateState(psid);
+  setChosenStyle(psid, style);
 
-  if (!state.lastStyle || !state.lastImageUrl) {
-    await sendText(psid, "Stuur een foto en kies een stijl om te beginnen.");
+  if (!state.lastPhotoUrl) {
+    setFlowState(psid, "awaiting_photo");
+    await sendText(psid, `Nice choice: ${style}. Now send a photo 📸`);
     return;
   }
 
-  if (!canGenerate(psid)) {
-    await sendText(psid, "Je gratis limiet is bereikt (1 per dag). Kom morgen terug of upgrade.");
-    return;
-  }
-
-  increment(psid);
-  await sendText(psid, "Bezig… ⏳");
-
-  const variant = getMockGeneratedImage(state.lastStyle, state.lastVariantCursor ?? 1);
-  await sendImage(psid, variant.imageUrl);
-
-  state.lastVariantCursor = variant.nextCursor;
-  setLastGenerated(psid, state.lastStyle, variant.imageUrl);
-
-  await sendQuickReplies(psid, "Nog eentje?", [
-    { content_type: "text", title: "🔁 Variatie", payload: "VARIATION" },
-    { content_type: "text", title: "💥 Sterker", payload: "STRONGER" },
-    { content_type: "text", title: "🎨 Nieuwe stijl", payload: "NEW_STYLE" },
+  setFlowState(psid, "processing");
+  await sendText(psid, "Got it — processing…");
+  await sendQuickReplies(psid, "Want to try another style too?", [
+    { content_type: "text", title: "✨ Choose style", payload: "CHOOSE_STYLE" },
+    { content_type: "text", title: "📸 Send new photo", payload: "SEND_PHOTO" },
   ]);
 }
 
 async function handlePayload(psid: string, payload: string): Promise<void> {
-  if (payload === "TRENDING") {
-    await sendGenericTemplate(psid, buildStyleElements());
-    await sendText(psid, "Stuur je foto om te starten.");
-    return;
-  }
-
   if (payload === "SEND_PHOTO") {
-    await sendText(psid, "Top! Stuur nu je foto 📸");
+    setFlowState(psid, "awaiting_photo");
+    await sendText(psid, "Great — send your photo now 📸");
     return;
   }
 
-  if (payload === "NEW_STYLE") {
+  if (payload === "CHOOSE_STYLE") {
+    const state = getOrCreateState(psid);
+    if (!state.lastPhotoUrl) {
+      setFlowState(psid, "awaiting_photo");
+      await sendStylePicker(psid);
+      await sendText(psid, "Pick any style, then send your photo 📸");
+      return;
+    }
+
+    setFlowState(psid, "awaiting_style");
     await sendStylePicker(psid);
     return;
   }
 
-  if (payload === "VARIATION" || payload === "STRONGER") {
-    await processVariation(psid);
+  if (payload === "TRENDING") {
+    setFlowState(psid, "awaiting_photo");
+    await sendTrending(psid);
     return;
   }
 
-  if (isStylePayload(payload)) {
-    await processGeneration(psid, payload);
+  if (payload === "HELP") {
+    await sendHelp(psid);
+    return;
+  }
+
+  const selectedStyle = stylePayloadToLabel(payload);
+  if (selectedStyle) {
+    await handleStyleSelection(psid, selectedStyle);
     return;
   }
 
@@ -147,25 +131,32 @@ async function handleMessage(psid: string, event: FacebookWebhookEvent): Promise
   }
 
   const imageAttachment = message.attachments?.find(att => att.type === "image" && att.payload?.url);
-
   if (imageAttachment?.payload?.url) {
     setPendingImage(psid, imageAttachment.payload.url);
+    await sendText(psid, "Photo received ✅");
     await sendStylePicker(psid);
     return;
   }
 
-  if (typeof message.text === "string" && message.text.trim().length > 0) {
-    await sendQuickReplies(psid, "Welkom! Klaar om je foto te transformeren?", [
-      { content_type: "text", title: "📸 Stuur foto", payload: "SEND_PHOTO" },
-      { content_type: "text", title: "🔥 Trending", payload: "TRENDING" },
-    ]);
-    await sendText(psid, "Je kan ook meteen een foto sturen.");
+  const text = message.text?.trim().toLowerCase();
+  if (!text) {
+    return;
   }
+
+  const state = getOrCreateState(psid);
+  if (state.state === "new" || text === "start" || text === "hi") {
+    await sendStartMenu(psid);
+    return;
+  }
+
+  await sendQuickReplies(psid, "Next step:", [
+    { content_type: "text", title: "📸 Send photo", payload: "SEND_PHOTO" },
+    { content_type: "text", title: "✨ Choose style", payload: "CHOOSE_STYLE" },
+  ]);
 }
 
 async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
   const psid = event.sender?.id;
-
   if (!psid) {
     return;
   }

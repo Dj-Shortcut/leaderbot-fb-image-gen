@@ -1,11 +1,17 @@
 import type { StyleId } from "./messengerStyles";
 
+export type MessengerFlowState = "new" | "awaiting_photo" | "awaiting_style" | "processing";
+
 type QuotaState = {
   dayKey: string;
   count: number;
 };
 
 export type MessengerUserState = {
+  state: MessengerFlowState;
+  lastPhotoUrl?: string;
+  chosenStyle?: string;
+  // legacy fields kept to avoid breaking current modules
   pendingImageUrl?: string;
   pendingImageAt?: number;
   lastImageUrl?: string;
@@ -32,6 +38,7 @@ export function getOrCreateState(psid: string): MessengerUserState {
   }
 
   const created: MessengerUserState = {
+    state: "new",
     quota: {
       dayKey: DEFAULT_DAY_KEY,
       count: 0,
@@ -43,10 +50,25 @@ export function getOrCreateState(psid: string): MessengerUserState {
   return created;
 }
 
+export function setFlowState(psid: string, nextState: MessengerFlowState, now = Date.now()): MessengerUserState {
+  const state = getOrCreateState(psid);
+  state.state = nextState;
+  state.updatedAt = now;
+  return state;
+}
+
 export function setPendingImage(psid: string, imageUrl: string, now = Date.now()): void {
   const state = getOrCreateState(psid);
+  state.lastPhotoUrl = imageUrl;
   state.pendingImageUrl = imageUrl;
   state.pendingImageAt = now;
+  state.state = "awaiting_style";
+  state.updatedAt = now;
+}
+
+export function setChosenStyle(psid: string, style: string, now = Date.now()): void {
+  const state = getOrCreateState(psid);
+  state.chosenStyle = style;
   state.updatedAt = now;
 }
 
@@ -68,4 +90,8 @@ export function pruneOldState(maxAgeMs = 1000 * 60 * 60 * 24 * 7, now = Date.now
       stateByPsid.delete(psid);
     }
   }
+}
+
+export function resetStateStore(): void {
+  stateByPsid.clear();
 }
