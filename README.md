@@ -22,14 +22,63 @@ fly secrets list -a groepsscore
 fly logs -a groepsscore
 ```
 
-## Webhook behavior
+## Webhook paths (unchanged)
 
 - `GET /webhook/facebook`
   - returns `200` with `hub.challenge` if `hub.verify_token` matches `FB_VERIFY_TOKEN` (or `VERIFY_TOKEN` fallback)
   - returns `403` otherwise
 - `POST /webhook/facebook`
   - returns `200` immediately
-  - logs minimal event metadata (event type, sender id, content kind)
+  - processes Messenger events asynchronously
+
+## Messenger UX flow (mock image generation)
+
+1. Send `hi` (or any text) to the page:
+   - Bot replies with quick replies:
+     - `📸 Stuur foto`
+     - `🔥 Trending`
+   - Then sends: `Je kan ook meteen een foto sturen.`
+
+2. Send a photo:
+   - Bot stores the image as pending state for your PSID
+   - Bot sends a 4-card style picker carousel:
+     - `STYLE_DISCO`
+     - `STYLE_CINEMATIC`
+     - `STYLE_ANIME`
+     - `STYLE_MEME`
+
+3. Pick a style:
+   - Bot sends `Bezig… ⏳`
+   - Bot sends a mock generated image (static URL per style)
+   - Bot sends follow-up quick replies:
+     - `🔁 Variatie`
+     - `💥 Sterker`
+     - `🎨 Nieuwe stijl`
+
+4. Tap `🔥 Trending`:
+   - Bot sends the same style carousel with demo thumbnails
+   - Bot then says: `Stuur je foto om te starten.`
+
+5. Tap `🔁 Variatie` or `💥 Sterker`:
+   - If prior context exists, bot generates another mock image variant
+   - If no context exists, bot asks for photo/style first
+
+## Daily quota (current tier)
+
+- Tier: `free`
+- Limit: **1 generation per PSID per day**
+- Extra requests return:
+  - `Je gratis limiet is bereikt (1 per dag). Kom morgen terug of upgrade.`
+
+Quota and session state are stored in memory and keyed by PSID.
+
+## Where to plug in OpenAI later
+
+Current generation is mocked in:
+
+- `server/_core/imageService.ts` (`getMockGeneratedImage`)
+
+When ready for production generation, replace this implementation and keep the Messenger UX + webhook handlers unchanged.
 
 ## Deployment verification checklist
 
@@ -41,10 +90,10 @@ fly logs -a groepsscore
 
    The response body should be `123`.
 
-2. Send a message to the connected Facebook Page and confirm POST delivery in Fly logs:
+2. Send Messenger events and inspect logs:
 
    ```bash
    fly logs -a groepsscore
    ```
 
-   You should see `[facebook-webhook] event` log lines.
+   Confirm no webhook processing errors are reported.

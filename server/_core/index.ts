@@ -7,67 +7,7 @@ import { registerChatRoutes } from "./chat";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-
-type FacebookWebhookEvent = {
-  sender?: { id?: string };
-  message?: {
-    text?: string;
-    attachments?: Array<{ type?: string }>;
-  };
-  postback?: {
-    title?: string;
-    payload?: string;
-  };
-};
-
-function registerMetaWebhookRoutes(app: express.Express) {
-  app.get("/webhook/facebook", (req, res) => {
-    const mode = req.query["hub.mode"];
-    const token = req.query["hub.verify_token"];
-    const challenge = req.query["hub.challenge"];
-    const verifyToken = process.env.FB_VERIFY_TOKEN || process.env.VERIFY_TOKEN;
-
-    if (mode === "subscribe" && token === verifyToken && typeof challenge === "string") {
-      return res.status(200).send(challenge);
-    }
-
-    return res.sendStatus(403);
-  });
-
-  app.post("/webhook/facebook", (req, res) => {
-    const payload = req.body;
-    res.sendStatus(200);
-
-    setImmediate(() => {
-      try {
-        const entries = Array.isArray(payload?.entry) ? payload.entry : [];
-
-        for (const entry of entries) {
-          const events: FacebookWebhookEvent[] = [
-            ...(Array.isArray(entry?.messaging) ? entry.messaging : []),
-          ];
-
-          for (const event of events) {
-            const senderId = event.sender?.id ?? "unknown";
-            const eventType = event.postback ? "postback" : event.message ? "message" : "unknown";
-            const hasImageAttachment = Boolean(
-              event.message?.attachments?.some(attachment => attachment.type === "image")
-            );
-            const hasText = typeof event.message?.text === "string" && event.message.text.length > 0;
-
-            console.log("[facebook-webhook] event", {
-              eventType,
-              senderId,
-              content: hasImageAttachment ? "image" : hasText ? "text" : "other",
-            });
-          }
-        }
-      } catch (error) {
-        console.error("[facebook-webhook] failed to process event", error);
-      }
-    });
-  });
-}
+import { registerMetaWebhookRoutes } from "./messengerWebhook";
 
 async function startServer() {
   const app = express();
