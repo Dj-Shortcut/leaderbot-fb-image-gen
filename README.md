@@ -38,6 +38,7 @@ Copy `.env.example` to `.env` for local development and set:
 - `FB_VERIFY_TOKEN`
 - `FB_PAGE_ACCESS_TOKEN`
 - `FB_APP_SECRET` (optional)
+- `ADMIN_TOKEN` (optional, required for `GET /debug/build`)
 
 Do not commit secrets.
 
@@ -58,11 +59,14 @@ curl https://<host>/healthz
 ## Webhook paths (unchanged)
 
 - `GET /webhook/facebook`
-  - returns `200` with `hub.challenge` if `hub.verify_token` matches `FB_VERIFY_TOKEN` (or `VERIFY_TOKEN` fallback)
+  - returns `200` with `hub.challenge` as `text/plain` if `hub.verify_token` matches `FB_VERIFY_TOKEN`
   - returns `403` otherwise
 - `POST /webhook/facebook`
   - returns `200` immediately
   - processes Messenger events asynchronously
+- `GET /debug/build`
+  - requires header `X-Admin-Token` to match `ADMIN_TOKEN`
+  - returns build/runtime metadata without secrets
 
 ## Messenger UX flow (mock image generation)
 
