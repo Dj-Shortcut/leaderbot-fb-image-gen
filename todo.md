@@ -37,5 +37,5 @@
 - [x] Error handling and edge cases
 
 ## Deployment
-- [ ] Final checkpoint and review
-- [ ] Deliver to user with instructions
+- [x] Final checkpoint and review
+- [x] Deliver to user with instructions
