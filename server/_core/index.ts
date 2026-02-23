@@ -1,7 +1,6 @@
 import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
-import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerChatRoutes } from "./chat";
@@ -9,36 +8,82 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 
-function isPortAvailable(port: number): Promise<boolean> {
-  return new Promise(resolve => {
-    const server = net.createServer();
-    server.listen(port, () => {
-      server.close(() => resolve(true));
-    });
-    server.on("error", () => resolve(false));
-  });
-}
+type FacebookWebhookEvent = {
+  sender?: { id?: string };
+  message?: {
+    text?: string;
+    attachments?: Array<{ type?: string }>;
+  };
+  postback?: {
+    title?: string;
+    payload?: string;
+  };
+};
 
-async function findAvailablePort(startPort: number = 3000): Promise<number> {
-  for (let port = startPort; port < startPort + 20; port++) {
-    if (await isPortAvailable(port)) {
-      return port;
+function registerMetaWebhookRoutes(app: express.Express) {
+  app.get("/webhook/facebook", (req, res) => {
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+    const verifyToken = process.env.FB_VERIFY_TOKEN || process.env.VERIFY_TOKEN;
+
+    if (mode === "subscribe" && token === verifyToken && typeof challenge === "string") {
+      return res.status(200).send(challenge);
     }
-  }
-  throw new Error(`No available port found starting from ${startPort}`);
+
+    return res.sendStatus(403);
+  });
+
+  app.post("/webhook/facebook", (req, res) => {
+    const payload = req.body;
+    res.sendStatus(200);
+
+    setImmediate(() => {
+      try {
+        const entries = Array.isArray(payload?.entry) ? payload.entry : [];
+
+        for (const entry of entries) {
+          const events: FacebookWebhookEvent[] = [
+            ...(Array.isArray(entry?.messaging) ? entry.messaging : []),
+          ];
+
+          for (const event of events) {
+            const senderId = event.sender?.id ?? "unknown";
+            const eventType = event.postback ? "postback" : event.message ? "message" : "unknown";
+            const hasImageAttachment = Boolean(
+              event.message?.attachments?.some(attachment => attachment.type === "image")
+            );
+            const hasText = typeof event.message?.text === "string" && event.message.text.length > 0;
+
+            console.log("[facebook-webhook] event", {
+              eventType,
+              senderId,
+              content: hasImageAttachment ? "image" : hasText ? "text" : "other",
+            });
+          }
+        }
+      } catch (error) {
+        console.error("[facebook-webhook] failed to process event", error);
+      }
+    });
+  });
 }
 
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
+
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // OAuth callback under /api/oauth/callback
+
+  app.get("/healthz", (_req, res) => {
+    res.status(200).send("ok");
+  });
+
+  registerMetaWebhookRoutes(app);
+
   registerOAuthRoutes(app);
-  // Chat API with streaming and tool calling
   registerChatRoutes(app);
-  // tRPC API
   app.use(
     "/api/trpc",
     createExpressMiddleware({
@@ -46,22 +91,18 @@ async function startServer() {
       createContext,
     })
   );
-  // development mode uses Vite, production mode uses static files
+
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
+  const port = parseInt(process.env.PORT || "8080", 10);
+  const host = process.env.HOST || "0.0.0.0";
 
-  if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
-  }
-
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+  server.listen(port, host, () => {
+    console.log(`Server running on http://${host}:${port}/`);
   });
 }
 

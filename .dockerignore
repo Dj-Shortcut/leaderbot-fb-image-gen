@@ -1,0 +1,10 @@
+node_modules
+.pnpm-store
+dist
+.git
+.gitignore
+.vscode
+.idea
+.env
+.env.*
+coverage
