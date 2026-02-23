@@ -49,6 +49,12 @@ fly secrets list -a groepsscore
 fly logs -a groepsscore
 ```
 
+Health check:
+
+```bash
+curl https://<host>/healthz
+```
+
 ## Webhook paths (unchanged)
 
 - `GET /webhook/facebook`

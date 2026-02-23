@@ -9,6 +9,8 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { registerMetaWebhookRoutes } from "./messengerWebhook";
 
+const appVersion = process.env.GIT_SHA || process.env.SOURCE_VERSION || "dev";
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
@@ -17,7 +19,12 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   app.get("/healthz", (_req, res) => {
-    res.status(200).send("ok");
+    res.status(200).json({
+      ok: true,
+      name: "leaderbot-images",
+      version: appVersion,
+      time: new Date().toISOString(),
+    });
   });
 
   registerMetaWebhookRoutes(app);
@@ -42,7 +49,7 @@ async function startServer() {
   const host = process.env.HOST || "0.0.0.0";
 
   server.listen(port, host, () => {
-    console.log(`Server running on http://${host}:${port}/`);
+    console.log(`Server listening on port ${port} (${host})`);
   });
 }
 
