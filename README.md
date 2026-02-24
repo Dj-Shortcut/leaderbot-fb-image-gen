@@ -50,6 +50,19 @@ fly secrets list -a groepsscore
 fly logs -a groepsscore
 ```
 
+### prod keep-alive settings
+
+Set in `fly.toml` under `[http_service]`:
+
+- `auto_stop_machines = false`
+- `min_machines_running = 1`
+
+Verify active config:
+
+```bash
+fly config show -a groepsscore
+```
+
 Health check:
 
 ```bash
