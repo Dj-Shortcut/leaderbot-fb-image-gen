@@ -89,6 +89,31 @@ async function startServer() {
     });
   });
 
+  app.get("/privacy", (_req, res) => {
+    res.type("html").send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Privacy Policy – Leaderbot</title>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <style>
+        body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; line-height: 1.6; padding: 0 20px; }
+        h1 { color: #222; }
+      </style>
+    </head>
+    <body>
+      <h1>Privacy Policy – Leaderbot</h1>
+      <p>Leaderbot processes user-submitted images solely for AI-based image transformation.</p>
+      <p>We do not sell, store long-term, or share user data with third parties.</p>
+      <p>Images are processed temporarily and deleted after transformation.</p>
+      <p>We only access messaging data required to provide this service.</p>
+      <p>For questions, contact: shortcutcomputerguy@gmail.com</p>
+    </body>
+    </html>
+  `);
+  });
+
   registerMetaWebhookRoutes(app);
 
   registerOAuthRoutes(app);
