@@ -64,12 +64,7 @@ async function startServer() {
   });
 
   app.get("/healthz", (_req, res) => {
-    res.status(200).json({
-      ok: true,
-      name: "leaderbot-images",
-      version: appVersion,
-      time: new Date().toISOString(),
-    });
+    res.status(200).type("text/plain").send("ok");
   });
 
   app.get("/debug/build", (req, res) => {
@@ -112,8 +107,9 @@ async function startServer() {
     serveStatic(app);
   }
 
-  const port = parseInt(process.env.PORT || "8080", 10);
-  const host = process.env.HOST || "0.0.0.0";
+  const configuredPort = Number(process.env.PORT);
+  const port = Number.isInteger(configuredPort) && configuredPort > 0 ? configuredPort : 8080;
+  const host = "0.0.0.0";
 
   server.listen(port, host, () => {
     console.log(`Server listening on port ${port} (${host})`);
