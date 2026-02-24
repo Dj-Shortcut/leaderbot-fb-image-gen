@@ -174,9 +174,8 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
     const mode = req.query["hub.mode"];
     const verifyToken = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
-    const expectedVerifyToken = process.env.FB_VERIFY_TOKEN;
 
-    if (mode === "subscribe" && verifyToken === expectedVerifyToken && typeof challenge === "string") {
+    if (mode === "subscribe" && verifyToken === process.env.FB_VERIFY_TOKEN) {
       return res.status(200).type("text/plain").send(challenge);
     }
 
