@@ -153,6 +153,45 @@ async function startServer() {
   `);
   });
 
+  app.get("/data-deletion", (_req, res) => {
+    res.type("html").send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>User Data Deletion Instructions – Leaderbot</title>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <style>
+        body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; line-height: 1.6; padding: 0 20px; color: #1a1a1a; }
+        h1, h2 { color: #222; }
+        ul { padding-left: 20px; }
+      </style>
+    </head>
+    <body>
+      <h1>User Data Deletion Instructions – Leaderbot</h1>
+      <p>If you want your data removed from Leaderbot, you can request deletion at any time.</p>
+
+      <h2>Data that can be deleted</h2>
+      <ul>
+        <li>Conversation identifiers and message logs associated with your interaction history</li>
+        <li>Retained images and generated outputs, if any are still stored</li>
+      </ul>
+
+      <h2>How to request deletion</h2>
+      <p>Email your request to: <strong>shortcutcomputerguy@gmail.com</strong></p>
+      <p>To help us identify your records accurately, include:</p>
+      <ul>
+        <li>Your Facebook profile name</li>
+        <li>The approximate time you messaged the Page</li>
+      </ul>
+
+      <h2>Processing timeframe</h2>
+      <p>After we verify your request details, deletion is completed within a reasonable timeframe.</p>
+    </body>
+    </html>
+  `);
+  });
+
   registerMetaWebhookRoutes(app);
 
   registerOAuthRoutes(app);
