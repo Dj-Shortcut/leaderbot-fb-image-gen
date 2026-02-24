@@ -6,7 +6,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerChatRoutes } from "./chat";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
+import { serveStatic } from "./vite";
 import { registerMetaWebhookRoutes } from "./messengerWebhook";
 
 const appVersion = process.env.GIT_SHA || process.env.SOURCE_VERSION || "dev";
@@ -101,8 +101,12 @@ async function startServer() {
     })
   );
 
-  if (process.env.NODE_ENV === "development") {
-    await setupVite(app, server);
+  if (process.env.NODE_ENV !== "production") {
+    const [{ setupVite }, { createServer }] = await Promise.all([
+      import("./vite"),
+      import("vite"),
+    ]);
+    await setupVite(app, server, createServer);
   } else {
     serveStatic(app);
   }
