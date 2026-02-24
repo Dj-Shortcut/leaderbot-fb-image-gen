@@ -170,18 +170,21 @@ async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
 }
 
 export function registerMetaWebhookRoutes(app: express.Express): void {
-  app.get("/webhook/facebook", (req, res) => {
+  const handleVerification: express.RequestHandler = (req, res) => {
     const mode = req.query["hub.mode"];
-    const token = req.query["hub.verify_token"];
+    const verifyToken = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
-    const verifyToken = process.env.FB_VERIFY_TOKEN;
+    const expectedVerifyToken = process.env.FB_VERIFY_TOKEN;
 
-    if (mode === "subscribe" && token === verifyToken && typeof challenge === "string") {
+    if (mode === "subscribe" && verifyToken === expectedVerifyToken && typeof challenge === "string") {
       return res.status(200).type("text/plain").send(challenge);
     }
 
     return res.sendStatus(403);
-  });
+  };
+
+  app.get("/webhook", handleVerification);
+  app.get("/webhook/facebook", handleVerification);
 
   app.post("/webhook/facebook", (req, res) => {
     const payload = req.body;
