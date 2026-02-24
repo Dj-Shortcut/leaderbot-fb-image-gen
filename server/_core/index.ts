@@ -98,17 +98,56 @@ async function startServer() {
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <style>
-        body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; line-height: 1.6; padding: 0 20px; }
-        h1 { color: #222; }
+        body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; line-height: 1.6; padding: 0 20px; color: #1a1a1a; }
+        h1, h2 { color: #222; }
+        ul { padding-left: 20px; }
       </style>
     </head>
     <body>
       <h1>Privacy Policy – Leaderbot</h1>
-      <p>Leaderbot processes user-submitted images solely for AI-based image transformation.</p>
-      <p>We do not sell, store long-term, or share user data with third parties.</p>
-      <p>Images are processed temporarily and deleted after transformation.</p>
-      <p>We only access messaging data required to provide this service.</p>
-      <p>For questions, contact: shortcutcomputerguy@gmail.com</p>
+      <p><strong>Last updated:</strong> 2026-02-24</p>
+      <p>Leaderbot ("we", "our") is a Messenger-based service that transforms user-submitted images using AI styles.</p>
+
+      <h2>What data we collect</h2>
+      <p>When you interact with Leaderbot through Facebook Messenger, we may receive:</p>
+      <ul>
+        <li>Messages you send to the Page</li>
+        <li>Images you submit for transformation</li>
+        <li>Basic messaging metadata necessary to deliver the service (e.g., sender ID, timestamps)</li>
+      </ul>
+      <p>We do not request your password or access your private Facebook profile data beyond what Messenger delivers for this integration.</p>
+
+      <h2>How we use data</h2>
+      <p>We use your data only to:</p>
+      <ul>
+        <li>Receive your request</li>
+        <li>Process and transform your submitted image</li>
+        <li>Send the transformed image back to you in Messenger</li>
+        <li>Maintain service reliability, prevent abuse, and troubleshoot issues</li>
+      </ul>
+
+      <h2>Image handling and retention</h2>
+      <p>Images are processed for the purpose of generating the requested transformation.</p>
+      <p>We do not sell your images.</p>
+      <p>We do not use your images to market to you.</p>
+      <p>We do not share your images with third parties except as required to provide the service (e.g., image processing providers).</p>
+      <p>Images and generated outputs are retained only as long as needed to deliver the result and ensure basic operational stability, then deleted or anonymized.</p>
+
+      <h2>Sharing and third parties</h2>
+      <p>We may use third-party infrastructure providers (hosting, logging, and image processing) solely to operate the service. We do not share personal data for advertising purposes.</p>
+
+      <h2>Security</h2>
+      <p>We take reasonable measures to protect data in transit and at rest. No system is 100% secure, but we aim to minimize data exposure and access.</p>
+
+      <h2>Your choices</h2>
+      <p>You can stop using the service at any time by not messaging the Page.</p>
+
+      <h2>Data deletion requests</h2>
+      <p>If you want us to delete data associated with your interactions, contact us at: shortcutcomputerguy@gmail.com</p>
+      <p>Include your Facebook profile name and the approximate time you messaged the Page so we can locate your conversation context.</p>
+
+      <h2>Contact</h2>
+      <p>Email: shortcutcomputerguy@gmail.com</p>
     </body>
     </html>
   `);
@@ -136,7 +175,7 @@ async function startServer() {
     serveStatic(app);
   }
 
-  const PORT = process.env.PORT || 8080;
+  const PORT = Number(process.env.PORT || 8080);
   const HOST = "0.0.0.0";
 
   server.listen(PORT, HOST, () => {
