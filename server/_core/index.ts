@@ -11,26 +11,6 @@ import { registerMetaWebhookRoutes } from "./messengerWebhook";
 
 const appVersion = process.env.GIT_SHA || process.env.SOURCE_VERSION || "dev";
 
-function extractWebhookEventTypes(body: unknown): string[] {
-  const unique = new Set<string>();
-  const payload = body as { entry?: Array<{ messaging?: Array<{ message?: unknown; postback?: unknown }> }> };
-  const entries = Array.isArray(payload?.entry) ? payload.entry : [];
-
-  for (const entry of entries) {
-    const events = Array.isArray(entry?.messaging) ? entry.messaging : [];
-    for (const event of events) {
-      if (event?.message) {
-        unique.add("messages");
-      }
-      if (event?.postback) {
-        unique.add("postbacks");
-      }
-    }
-  }
-
-  return Array.from(unique);
-}
-
 async function startServer() {
   const app = express();
   const server = createServer(app);
@@ -43,19 +23,12 @@ async function startServer() {
 
     res.on("finish", () => {
       const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
-      const log: Record<string, unknown> = {
+      const log = {
         method: req.method,
         path: req.path,
         status: res.statusCode,
-        latency_ms: Number(durationMs.toFixed(1)),
+        ms: Number(durationMs.toFixed(1)),
       };
-
-      if (req.method === "POST" && req.path === "/webhook/facebook") {
-        const eventTypes = extractWebhookEventTypes(req.body);
-        if (eventTypes.length > 0) {
-          log.event_types = eventTypes;
-        }
-      }
 
       console.log(JSON.stringify(log));
     });
