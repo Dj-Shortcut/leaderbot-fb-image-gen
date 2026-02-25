@@ -11,8 +11,18 @@ import { registerMetaWebhookRoutes } from "./messengerWebhook";
 
 const appVersion = process.env.GIT_SHA || process.env.SOURCE_VERSION || "dev";
 
+function buildVersionPayload() {
+  return {
+    gitSha: process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? null,
+    nodeEnv: process.env.NODE_ENV,
+    appVersion,
+    timestamp: new Date().toISOString(),
+  };
+}
+
 async function startServer() {
   console.log("BOOT", { pid: process.pid });
+  console.log("VERSION", buildVersionPayload());
 
   const app = express();
   const server = createServer(app);
@@ -40,6 +50,10 @@ async function startServer() {
 
   app.get("/healthz", (_req, res) => {
     res.status(200).send("ok");
+  });
+
+  app.get("/__version", (_req, res) => {
+    res.status(200).json(buildVersionPayload());
   });
 
   app.get("/debug/build", (req, res) => {
