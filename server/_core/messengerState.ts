@@ -47,8 +47,8 @@ const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
   ],
   PROCESSING: [],
   RESULT_READY: [
-    { title: "Choose style", payload: "CHOOSE_STYLE" },
-    { title: "Send new photo", payload: "SEND_PHOTO" },
+    { title: "Try another style", payload: "CHOOSE_STYLE" },
+    { title: "New photo", payload: "SEND_PHOTO" },
   ],
 };
 
