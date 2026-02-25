@@ -12,6 +12,8 @@ import { registerMetaWebhookRoutes } from "./messengerWebhook";
 const appVersion = process.env.GIT_SHA || process.env.SOURCE_VERSION || "dev";
 
 async function startServer() {
+  console.log("BOOT", { pid: process.pid });
+
   const app = express();
   const server = createServer(app);
 
