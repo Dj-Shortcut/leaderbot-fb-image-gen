@@ -46,6 +46,87 @@ describe("messenger webhook dedupe", () => {
     expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
   });
 
+
+
+  it("sends photo confirmation once and then style quick replies", async () => {
+    const payload = {
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "psid-photo" },
+              message: {
+                mid: "m_photo_1",
+                attachments: [{ type: "image", payload: { url: "https://img.example/c.jpg" } }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    await processFacebookWebhookPayload(payload);
+
+    expect(sendTextMock).toHaveBeenCalledWith("psid-photo", "Photo received ✅");
+    expect(sendTextMock).toHaveBeenCalledTimes(1);
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      "psid-photo",
+      "What style should I use?",
+      expect.arrayContaining([
+        expect.objectContaining({ title: "Disco", payload: "STYLE_DISCO" }),
+        expect.objectContaining({ title: "Gold", payload: "STYLE_GOLD" }),
+      ]),
+    );
+  });
+
+  it('handles IDLE quick reply payloads for help and starting photo flow', async () => {
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "psid-help" },
+              message: {
+                quick_reply: { payload: "WHAT_IS_THIS" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      "psid-help",
+      "I turn photos into stylized images. Send me a picture to start.",
+      expect.arrayContaining([
+        expect.objectContaining({ title: "Send photo", payload: "START_PHOTO" }),
+        expect.objectContaining({ title: "What is this?", payload: "WHAT_IS_THIS" }),
+      ]),
+    );
+
+    sendQuickRepliesMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "psid-help" },
+              message: {
+                quick_reply: { payload: "START_PHOTO" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      "psid-help",
+      "Send a photo when you’re ready 📸",
+      [{ content_type: "text", title: "Send photo", payload: "SEND_PHOTO" }],
+    );
+  });
   it("falls back to sender+timestamp dedupe when mid is missing", async () => {
     const payload = {
       entry: [
