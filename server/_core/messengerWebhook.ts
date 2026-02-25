@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import express from "express";
+import { TtlDedupeSet } from "./dedupe";
 import { sendQuickReplies, sendText, safeLog } from "./messengerApi";
 import { recordImageJob } from "./messengerJobStore";
 import {
@@ -16,6 +17,7 @@ import {
 type FacebookWebhookEvent = {
   sender?: { id?: string };
   message?: {
+    mid?: string;
     is_echo?: boolean;
     text?: string;
     quick_reply?: { payload?: string };
@@ -25,7 +27,26 @@ type FacebookWebhookEvent = {
     title?: string;
     payload?: string;
   };
+  timestamp?: number;
 };
+
+const incomingEventDedupe = new TtlDedupeSet(10 * 60 * 1000);
+
+function getEventDedupeKey(event: FacebookWebhookEvent): string | undefined {
+  const messageId = event.message?.mid?.trim();
+  if (messageId) {
+    return `mid:${messageId}`;
+  }
+
+  const senderId = event.sender?.id?.trim();
+  const timestamp = event.timestamp;
+
+  if (senderId && Number.isFinite(timestamp)) {
+    return `fallback:${senderId}:${timestamp}`;
+  }
+
+  return undefined;
+}
 
 const STYLE_OPTIONS = ["Disco", "Gold", "Anime", "Clouds"] as const;
 const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
@@ -174,6 +195,12 @@ async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
     return;
   }
 
+  const dedupeKey = getEventDedupeKey(event);
+  if (dedupeKey && incomingEventDedupe.seen(dedupeKey)) {
+    safeLog("duplicate_event_skipped", { dedupeKey });
+    return;
+  }
+
   const userId = anonymizePsid(psid);
 
   if (event.postback?.payload) {
@@ -182,6 +209,25 @@ async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
   }
 
   await handleMessage(psid, userId, event);
+}
+
+export async function processFacebookWebhookPayload(payload: unknown): Promise<void> {
+  pruneOldState();
+  const entries = Array.isArray((payload as { entry?: unknown[] } | null)?.entry)
+    ? (payload as { entry: Array<{ messaging?: unknown[] }> }).entry
+    : [];
+
+  for (const entry of entries) {
+    const events = Array.isArray(entry?.messaging) ? entry.messaging : [];
+
+    for (const event of events) {
+      await handleEvent((event ?? {}) as FacebookWebhookEvent);
+    }
+  }
+}
+
+export function resetMessengerEventDedupe(): void {
+  incomingEventDedupe.clear();
 }
 
 export function registerMetaWebhookRoutes(app: express.Express): void {
@@ -206,16 +252,7 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
 
     setImmediate(async () => {
       try {
-        pruneOldState();
-        const entries = Array.isArray(payload?.entry) ? payload.entry : [];
-
-        for (const entry of entries) {
-          const events: FacebookWebhookEvent[] = Array.isArray(entry?.messaging) ? entry.messaging : [];
-
-          for (const event of events) {
-            await handleEvent(event);
-          }
-        }
+        await processFacebookWebhookPayload(payload);
       } catch (error) {
         console.error("[facebook-webhook] failed to process event", error);
       }
