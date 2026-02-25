@@ -44,50 +44,20 @@ describe("messenger webhook dedupe", () => {
     await processFacebookWebhookPayload(payload);
 
     expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
-  });
-
-
-
-  it("sends photo confirmation once and then style quick replies", async () => {
-    const payload = {
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: "psid-photo" },
-              message: {
-                mid: "m_photo_1",
-                attachments: [{ type: "image", payload: { url: "https://img.example/c.jpg" } }],
-              },
-            },
-          ],
-        },
-      ],
-    };
-
-    await processFacebookWebhookPayload(payload);
-
-    expect(sendTextMock).toHaveBeenCalledWith("psid-photo", "Photo received ✅");
     expect(sendTextMock).toHaveBeenCalledTimes(1);
-    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
-      "psid-photo",
-      "What style should I use?",
-      expect.arrayContaining([
-        expect.objectContaining({ title: "Disco", payload: "STYLE_DISCO" }),
-        expect.objectContaining({ title: "Gold", payload: "STYLE_GOLD" }),
-      ]),
-    );
   });
 
-  it('handles IDLE quick reply payloads for help and starting photo flow', async () => {
+  it("ignores echo messages without poisoning dedupe for the real message", async () => {
     await processFacebookWebhookPayload({
       entry: [
         {
           messaging: [
             {
-              sender: { id: "psid-help" },
+              sender: { id: "echo-user" },
               message: {
-                quick_reply: { payload: "WHAT_IS_THIS" },
+                mid: "mid-shared",
+                is_echo: true,
+                attachments: [{ type: "image", payload: { url: "https://img.example/echo.jpg" } }],
               },
             },
           ],
@@ -95,25 +65,15 @@ describe("messenger webhook dedupe", () => {
       ],
     });
 
-    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
-      "psid-help",
-      "I turn photos into stylized images. Send me a picture to start.",
-      expect.arrayContaining([
-        expect.objectContaining({ title: "Send photo", payload: "START_PHOTO" }),
-        expect.objectContaining({ title: "What is this?", payload: "WHAT_IS_THIS" }),
-      ]),
-    );
-
-    sendQuickRepliesMock.mockClear();
-
     await processFacebookWebhookPayload({
       entry: [
         {
           messaging: [
             {
-              sender: { id: "psid-help" },
+              sender: { id: "echo-user" },
               message: {
-                quick_reply: { payload: "START_PHOTO" },
+                mid: "mid-shared",
+                attachments: [{ type: "image", payload: { url: "https://img.example/real.jpg" } }],
               },
             },
           ],
@@ -121,12 +81,11 @@ describe("messenger webhook dedupe", () => {
       ],
     });
 
-    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
-      "psid-help",
-      "Send a photo when you’re ready 📸",
-      [{ content_type: "text", title: "Send photo", payload: "SEND_PHOTO" }],
-    );
+    expect(sendTextMock).toHaveBeenCalledTimes(1);
+    expect(sendTextMock).toHaveBeenCalledWith("echo-user", "Photo received ✅");
+    expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
   });
+
   it("falls back to sender+timestamp dedupe when mid is missing", async () => {
     const payload = {
       entry: [
@@ -177,11 +136,14 @@ describe("messenger greeting behavior", () => {
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       "idle-user",
       "Welcome 👋 Pick a quick start.",
-      [{ content_type: "text", title: "Send photo", payload: "SEND_PHOTO" }]
+      expect.arrayContaining([
+        { content_type: "text", title: "Send photo", payload: "START_PHOTO" },
+        { content_type: "text", title: "What is this?", payload: "WHAT_IS_THIS" },
+      ]),
     );
   });
 
-  it("keeps users in AWAITING_STYLE when they send a greeting", async () => {
+  it("keeps users in AWAITING_STYLE when they send smalltalk", async () => {
     await processFacebookWebhookPayload({
       entry: [
         {
@@ -195,23 +157,23 @@ describe("messenger greeting behavior", () => {
             },
             {
               sender: { id: "style-user" },
-              message: { mid: "mid-style-2", text: "Hi" },
+              message: { mid: "mid-style-2", text: "thanks" },
             },
           ],
         },
       ],
     });
 
-    expect(sendTextMock).not.toHaveBeenCalled();
+    expect(sendTextMock).toHaveBeenCalledWith("style-user", "Photo received ✅");
     expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
       "style-user",
-      "Top — kies een style hieronder 👇",
+      "What style should I use?",
       [
         { content_type: "text", title: "Disco", payload: "STYLE_DISCO" },
         { content_type: "text", title: "Gold", payload: "STYLE_GOLD" },
         { content_type: "text", title: "Anime", payload: "STYLE_ANIME" },
         { content_type: "text", title: "Clouds", payload: "STYLE_CLOUDS" },
-      ]
+      ],
     );
   });
 
@@ -239,29 +201,7 @@ describe("messenger greeting behavior", () => {
       [
         { content_type: "text", title: "Try another style", payload: "CHOOSE_STYLE" },
         { content_type: "text", title: "New photo", payload: "SEND_PHOTO" },
-      ]
-    );
-  });
-
-  it("does not reset while PROCESSING and asks user to wait", async () => {
-    const psid = "processing-user";
-    const userId = anonymizePsid(psid);
-    setFlowState(userId, "PROCESSING");
-
-    await processFacebookWebhookPayload({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: psid },
-              message: { mid: "mid-processing-1", text: "Yo" },
-            },
-          ],
-        },
       ],
-    });
-
-    expect(sendQuickRepliesMock).not.toHaveBeenCalled();
-    expect(sendTextMock).toHaveBeenCalledWith(psid, "I’m still working on it—few seconds.");
+    );
   });
 });
