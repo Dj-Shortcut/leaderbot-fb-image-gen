@@ -85,8 +85,7 @@ async function sendStateQuickReplies(psid: string, state: ConversationState, tex
 }
 
 async function sendGreeting(psid: string): Promise<void> {
-  await sendText(psid, "Hey 👋");
-  await sendStateQuickReplies(psid, "IDLE", "Send me a photo and I’ll transform it into something special.");
+  await sendStateQuickReplies(psid, "IDLE", "Welcome 👋 Pick a quick start.");
 }
 
 async function sendStylePicker(psid: string): Promise<void> {
@@ -95,6 +94,32 @@ async function sendStylePicker(psid: string): Promise<void> {
 
 async function explainFlow(psid: string): Promise<void> {
   await sendStateQuickReplies(psid, "IDLE", "I turn photos into stylized images. Send me a picture to start.");
+}
+
+async function handleGreeting(psid: string, userId: string): Promise<void> {
+  const state = getOrCreateState(userId);
+
+  switch (state.stage) {
+    case "PROCESSING":
+      await sendText(psid, "I’m still working on it—few seconds.");
+      return;
+    case "AWAITING_STYLE":
+      await sendStylePicker(psid);
+      return;
+    case "RESULT_READY":
+      await sendStateQuickReplies(
+        psid,
+        "RESULT_READY",
+        "Yo 👋 Wil je nog een style proberen op dezelfde foto, of een nieuwe sturen?"
+      );
+      return;
+    case "AWAITING_PHOTO":
+      await sendStateQuickReplies(psid, "AWAITING_PHOTO", "Send a photo when you’re ready 📸");
+      return;
+    case "IDLE":
+    default:
+      await sendGreeting(psid);
+  }
 }
 
 async function runMockGeneration(psid: string, userId: string, style: string): Promise<void> {
@@ -188,7 +213,7 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
   }
 
   if (GREETINGS.has(text.toLowerCase())) {
-    await sendGreeting(psid);
+    await handleGreeting(psid, userId);
     return;
   }
 
