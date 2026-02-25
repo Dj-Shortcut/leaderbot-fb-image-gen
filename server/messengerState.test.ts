@@ -37,7 +37,10 @@ describe("messenger state flow", () => {
   });
 
   it("maps quick replies by state", () => {
-    expect(getQuickRepliesForState("IDLE")).toEqual([{ title: "Send photo", payload: "SEND_PHOTO" }]);
+    expect(getQuickRepliesForState("IDLE")).toEqual([
+      { title: "Send photo", payload: "START_PHOTO" },
+      { title: "What is this?", payload: "WHAT_IS_THIS" },
+    ]);
     expect(getQuickRepliesForState("AWAITING_PHOTO")).toEqual([{ title: "Send photo", payload: "SEND_PHOTO" }]);
     expect(getQuickRepliesForState("AWAITING_STYLE")).toEqual([
       { title: "Disco", payload: "STYLE_DISCO" },

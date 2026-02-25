@@ -37,7 +37,10 @@ const DEFAULT_HASH_SALT = "local-dev-salt";
 const stateByUserId = new Map<string, MessengerUserState>();
 
 const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
-  IDLE: [{ title: "Send photo", payload: "SEND_PHOTO" }],
+  IDLE: [
+    { title: "Send photo", payload: "START_PHOTO" },
+    { title: "What is this?", payload: "WHAT_IS_THIS" },
+  ],
   AWAITING_PHOTO: [{ title: "Send photo", payload: "SEND_PHOTO" }],
   AWAITING_STYLE: [
     { title: "Disco", payload: "STYLE_DISCO" },

@@ -90,7 +90,7 @@ async function sendGreeting(psid: string): Promise<void> {
 }
 
 async function sendStylePicker(psid: string): Promise<void> {
-  await sendStateQuickReplies(psid, "AWAITING_STYLE", "Nice, got it. What style should I use?");
+  await sendStateQuickReplies(psid, "AWAITING_STYLE", "What style should I use?");
 }
 
 async function explainFlow(psid: string): Promise<void> {
@@ -141,7 +141,12 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
     return;
   }
 
-  if (payload === "SEND_PHOTO") {
+  if (payload === "WHAT_IS_THIS") {
+    await explainFlow(psid);
+    return;
+  }
+
+  if (payload === "START_PHOTO" || payload === "SEND_PHOTO") {
     setFlowState(userId, "AWAITING_PHOTO");
     await sendStateQuickReplies(psid, "AWAITING_PHOTO", "Send a photo when you’re ready 📸");
     return;
@@ -165,6 +170,7 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
 
   const imageAttachment = message.attachments?.find(att => att.type === "image" && att.payload?.url);
   if (imageAttachment?.payload?.url) {
+    await sendText(psid, "Photo received ✅");
     setPendingImage(userId, imageAttachment.payload.url);
     await sendStylePicker(psid);
     return;
