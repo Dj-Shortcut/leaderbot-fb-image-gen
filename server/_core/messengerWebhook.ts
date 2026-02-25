@@ -2,7 +2,16 @@ import { randomUUID } from "crypto";
 import express from "express";
 import { sendQuickReplies, sendText, safeLog } from "./messengerApi";
 import { recordImageJob } from "./messengerJobStore";
-import { anonymizePsid, getOrCreateState, pruneOldState, setChosenStyle, setFlowState, setPendingImage } from "./messengerState";
+import {
+  anonymizePsid,
+  getOrCreateState,
+  getQuickRepliesForState,
+  pruneOldState,
+  setChosenStyle,
+  setFlowState,
+  setPendingImage,
+  type ConversationState,
+} from "./messengerState";
 
 type FacebookWebhookEvent = {
   sender?: { id?: string };
@@ -19,15 +28,14 @@ type FacebookWebhookEvent = {
 };
 
 const STYLE_OPTIONS = ["Disco", "Gold", "Anime", "Clouds"] as const;
-const STYLE_PAYLOAD_PREFIX = "STYLE_";
 const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
 
 function stylePayloadToLabel(payload: string): string | undefined {
-  if (!payload.startsWith(STYLE_PAYLOAD_PREFIX)) {
+  if (!payload.startsWith("STYLE_")) {
     return undefined;
   }
 
-  const name = payload.slice(STYLE_PAYLOAD_PREFIX.length).toLowerCase();
+  const name = payload.slice("STYLE_".length).toLowerCase();
   return STYLE_OPTIONS.find(style => style.toLowerCase() === name);
 }
 
@@ -36,27 +44,40 @@ function parseStyle(text: string): string | undefined {
   return STYLE_OPTIONS.find(style => style.toLowerCase() === normalized);
 }
 
+function toMessengerReplies(state: ConversationState) {
+  return getQuickRepliesForState(state).map(reply => ({
+    content_type: "text" as const,
+    title: reply.title,
+    payload: reply.payload,
+  }));
+}
+
+async function sendStateQuickReplies(psid: string, state: ConversationState, text: string): Promise<void> {
+  const replies = toMessengerReplies(state);
+
+  if (replies.length === 0) {
+    await sendText(psid, text);
+    return;
+  }
+
+  await sendQuickReplies(psid, text, replies);
+}
+
 async function sendGreeting(psid: string): Promise<void> {
   await sendText(psid, "Hey 👋");
-  await sendText(psid, "Send me a photo and I’ll transform it into something special.");
-  await sendText(psid, "Or tell me what vibe you want (disco, gold, anime, clouds…).");
+  await sendStateQuickReplies(psid, "IDLE", "Send me a photo and I’ll transform it into something special.");
 }
 
 async function sendStylePicker(psid: string): Promise<void> {
-  await sendQuickReplies(psid, "Nice, got it. What style should I use?", STYLE_OPTIONS.map(style => ({
-    content_type: "text" as const,
-    title: style,
-    payload: `${STYLE_PAYLOAD_PREFIX}${style.toUpperCase()}`,
-  })));
+  await sendStateQuickReplies(psid, "AWAITING_STYLE", "Nice, got it. What style should I use?");
 }
 
 async function explainFlow(psid: string): Promise<void> {
-  await sendText(psid, "I turn photos into stylized images.");
-  await sendText(psid, "Send me a picture and choose a vibe.");
+  await sendStateQuickReplies(psid, "IDLE", "I turn photos into stylized images. Send me a picture to start.");
 }
 
 async function runMockGeneration(psid: string, userId: string, style: string): Promise<void> {
-  setFlowState(userId, "processing");
+  setFlowState(userId, "PROCESSING");
   const imageJobId = randomUUID();
 
   recordImageJob({
@@ -68,9 +89,9 @@ async function runMockGeneration(psid: string, userId: string, style: string): P
 
   await sendText(psid, `Perfect — applying ${style} style now (mock) ✨`);
   await sendText(psid, `Job queued: ${imageJobId}`);
-  await sendText(psid, "You can send another photo any time.");
 
-  setFlowState(userId, "idle");
+  setFlowState(userId, "RESULT_READY");
+  await sendStateQuickReplies(psid, "RESULT_READY", "Done. What do you want next?");
 }
 
 async function handleStyleSelection(psid: string, userId: string, style: string): Promise<void> {
@@ -78,7 +99,8 @@ async function handleStyleSelection(psid: string, userId: string, style: string)
   setChosenStyle(userId, style);
 
   if (!state.lastPhoto) {
-    await sendText(psid, `Nice choice: ${style}. Send me a photo first 📸`);
+    setFlowState(userId, "AWAITING_PHOTO");
+    await sendStateQuickReplies(psid, "AWAITING_PHOTO", `Nice choice: ${style}. Send me a photo first 📸`);
     return;
   }
 
@@ -89,6 +111,18 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
   const selectedStyle = stylePayloadToLabel(payload);
   if (selectedStyle) {
     await handleStyleSelection(psid, userId, selectedStyle);
+    return;
+  }
+
+  if (payload === "CHOOSE_STYLE") {
+    setFlowState(userId, "AWAITING_STYLE");
+    await sendStylePicker(psid);
+    return;
+  }
+
+  if (payload === "SEND_PHOTO") {
+    setFlowState(userId, "AWAITING_PHOTO");
+    await sendStateQuickReplies(psid, "AWAITING_PHOTO", "Send a photo when you’re ready 📸");
     return;
   }
 

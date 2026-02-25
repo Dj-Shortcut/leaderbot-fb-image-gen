@@ -1,7 +1,13 @@
 import { createHash } from "crypto";
 import type { StyleId } from "./messengerStyles";
 
-export type MessengerFlowState = "idle" | "awaiting_style" | "processing";
+export type ConversationState = "IDLE" | "AWAITING_PHOTO" | "AWAITING_STYLE" | "PROCESSING" | "RESULT_READY";
+export type MessengerFlowState = ConversationState;
+
+export type StateQuickReply = {
+  title: string;
+  payload: string;
+};
 
 type QuotaState = {
   dayKey: string;
@@ -30,6 +36,26 @@ const DEFAULT_DAY_KEY = "1970-01-01";
 const DEFAULT_HASH_SALT = "local-dev-salt";
 const stateByUserId = new Map<string, MessengerUserState>();
 
+const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
+  IDLE: [{ title: "Send photo", payload: "SEND_PHOTO" }],
+  AWAITING_PHOTO: [{ title: "Send photo", payload: "SEND_PHOTO" }],
+  AWAITING_STYLE: [
+    { title: "Disco", payload: "STYLE_DISCO" },
+    { title: "Gold", payload: "STYLE_GOLD" },
+    { title: "Anime", payload: "STYLE_ANIME" },
+    { title: "Clouds", payload: "STYLE_CLOUDS" },
+  ],
+  PROCESSING: [],
+  RESULT_READY: [
+    { title: "Choose style", payload: "CHOOSE_STYLE" },
+    { title: "Send new photo", payload: "SEND_PHOTO" },
+  ],
+};
+
+export function getQuickRepliesForState(state: ConversationState): StateQuickReply[] {
+  return QUICK_REPLIES_BY_STATE[state];
+}
+
 export function anonymizePsid(psid: string): string {
   const salt = process.env.MESSENGER_PSID_SALT ?? DEFAULT_HASH_SALT;
   return createHash("sha256").update(`${psid}${salt}`).digest("hex");
@@ -48,8 +74,8 @@ export function getOrCreateState(userId: string): MessengerUserState {
   }
 
   const created: MessengerUserState = {
-    stage: "idle",
-    state: "idle",
+    stage: "IDLE",
+    state: "IDLE",
     lastPhoto: null,
     selectedStyle: null,
     quota: {
@@ -77,8 +103,8 @@ export function setPendingImage(userId: string, imageUrl: string, now = Date.now
   state.lastPhotoUrl = imageUrl;
   state.pendingImageUrl = imageUrl;
   state.pendingImageAt = now;
-  state.stage = "awaiting_style";
-  state.state = "awaiting_style";
+  state.stage = "AWAITING_STYLE";
+  state.state = "AWAITING_STYLE";
   state.updatedAt = now;
 }
 
