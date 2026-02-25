@@ -9,14 +9,13 @@ import { createContext } from "./context";
 import { serveStatic } from "./vite";
 import { registerMetaWebhookRoutes } from "./messengerWebhook";
 
-const appVersion = process.env.GIT_SHA || process.env.SOURCE_VERSION || "dev";
+const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
+const bootTimestamp = new Date().toISOString();
 
 function buildVersionPayload() {
   return {
-    gitSha: process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? null,
-    nodeEnv: process.env.NODE_ENV,
-    appVersion,
-    timestamp: new Date().toISOString(),
+    gitSha,
+    timestamp: bootTimestamp,
   };
 }
 
@@ -66,7 +65,7 @@ async function startServer() {
 
     return res.status(200).json({
       name: "leaderbot-images",
-      version: appVersion,
+      version: gitSha,
       uptime_s: Math.floor(process.uptime()),
       node: process.version,
       envFlags: {
