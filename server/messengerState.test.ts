@@ -1,5 +1,5 @@
-import { describe, expect, it, beforeEach } from "vitest";
-import { getOrCreateState, resetStateStore, setChosenStyle, setFlowState, setPendingImage } from "./_core/messengerState";
+import { beforeEach, describe, expect, it } from "vitest";
+import { anonymizePsid, getOrCreateState, resetStateStore, setChosenStyle, setFlowState, setPendingImage } from "./_core/messengerState";
 
 describe("messenger state flow", () => {
   beforeEach(() => {
@@ -7,24 +7,36 @@ describe("messenger state flow", () => {
   });
 
   it("handles photo-first transition", () => {
-    const psid = "photo-first-user";
+    const userId = "photo-first-user";
 
-    setPendingImage(psid, "https://img.example/pic.jpg", 1000);
+    setPendingImage(userId, "https://img.example/pic.jpg", 1000);
 
-    const state = getOrCreateState(psid);
-    expect(state.state).toBe("awaiting_style");
-    expect(state.lastPhotoUrl).toBe("https://img.example/pic.jpg");
+    const state = getOrCreateState(userId);
+    expect(state.stage).toBe("awaiting_style");
+    expect(state.lastPhoto).toBe("https://img.example/pic.jpg");
   });
 
   it("handles style-first transition", () => {
-    const psid = "style-first-user";
+    const userId = "style-first-user";
 
-    setFlowState(psid, "awaiting_photo", 1000);
-    setChosenStyle(psid, "Anime", 1001);
+    setFlowState(userId, "idle", 1000);
+    setChosenStyle(userId, "Anime", 1001);
 
-    const state = getOrCreateState(psid);
-    expect(state.state).toBe("awaiting_photo");
-    expect(state.chosenStyle).toBe("Anime");
-    expect(state.lastPhotoUrl).toBeUndefined();
+    const state = getOrCreateState(userId);
+    expect(state.stage).toBe("idle");
+    expect(state.selectedStyle).toBe("Anime");
+    expect(state.lastPhoto).toBeNull();
+  });
+
+  it("hashes PSID deterministically", () => {
+    process.env.MESSENGER_PSID_SALT = "test-salt";
+
+    const first = anonymizePsid("12345");
+    const second = anonymizePsid("12345");
+    const other = anonymizePsid("abcde");
+
+    expect(first).toHaveLength(64);
+    expect(first).toBe(second);
+    expect(first).not.toBe(other);
   });
 });
