@@ -84,51 +84,42 @@ async function sendStateQuickReplies(psid: string, state: ConversationState, tex
   await sendQuickReplies(psid, text, replies);
 }
 
-export type GreetingResponse =
-  | { mode: "text"; text: string }
-  | { mode: "quick_replies"; state: ConversationState; text: string };
-
-export function getGreetingResponse(state: ConversationState): GreetingResponse {
-  if (state === "PROCESSING") {
-    return { mode: "text", text: "I’m still working on it—few seconds." };
-  }
-
-  if (state === "AWAITING_STYLE") {
-    return { mode: "quick_replies", state: "AWAITING_STYLE", text: "Top — kies een style hieronder 👇" };
-  }
-
-  if (state === "RESULT_READY") {
-    return {
-      mode: "quick_replies",
-      state: "RESULT_READY",
-      text: "Yo 👋 Wil je nog een style proberen op dezelfde foto, of een nieuwe sturen?",
-    };
-  }
-
-  if (state === "AWAITING_PHOTO") {
-    return { mode: "quick_replies", state: "AWAITING_PHOTO", text: "Top — stuur een foto om verder te gaan 📸" };
-  }
-
-  return { mode: "quick_replies", state: "IDLE", text: "Welcome 👋 Pick a quick start." };
-}
-
-async function sendGreeting(psid: string, state: ConversationState): Promise<void> {
-  const response = getGreetingResponse(state);
-
-  if (response.mode === "text") {
-    await sendText(psid, response.text);
-    return;
-  }
-
-  await sendStateQuickReplies(psid, response.state, response.text);
+async function sendGreeting(psid: string): Promise<void> {
+  await sendStateQuickReplies(psid, "IDLE", "Welcome 👋 Pick a quick start.");
 }
 
 async function sendStylePicker(psid: string): Promise<void> {
-  await sendStateQuickReplies(psid, "AWAITING_STYLE", "Nice, got it. What style should I use?");
+  await sendStateQuickReplies(psid, "AWAITING_STYLE", "Top — kies een style hieronder 👇");
 }
 
 async function explainFlow(psid: string): Promise<void> {
   await sendStateQuickReplies(psid, "IDLE", "I turn photos into stylized images. Send me a picture to start.");
+}
+
+async function handleGreeting(psid: string, userId: string): Promise<void> {
+  const state = getOrCreateState(userId);
+
+  switch (state.stage) {
+    case "PROCESSING":
+      await sendText(psid, "I’m still working on it—few seconds.");
+      return;
+    case "AWAITING_STYLE":
+      await sendStylePicker(psid);
+      return;
+    case "RESULT_READY":
+      await sendStateQuickReplies(
+        psid,
+        "RESULT_READY",
+        "Yo 👋 Wil je nog een style proberen op dezelfde foto, of een nieuwe sturen?"
+      );
+      return;
+    case "AWAITING_PHOTO":
+      await sendStateQuickReplies(psid, "AWAITING_PHOTO", "Send a photo when you’re ready 📸");
+      return;
+    case "IDLE":
+    default:
+      await sendGreeting(psid);
+  }
 }
 
 async function runMockGeneration(psid: string, userId: string, style: string): Promise<void> {
@@ -216,8 +207,7 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
   }
 
   if (GREETINGS.has(text.toLowerCase())) {
-    const currentState = getOrCreateState(userId).stage;
-    await sendGreeting(psid, currentState);
+    await handleGreeting(psid, userId);
     return;
   }
 

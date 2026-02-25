@@ -47,8 +47,8 @@ describe("messenger state flow", () => {
     ]);
     expect(getQuickRepliesForState("PROCESSING")).toEqual([]);
     expect(getQuickRepliesForState("RESULT_READY")).toEqual([
-      { title: "Choose style", payload: "CHOOSE_STYLE" },
-      { title: "Send new photo", payload: "SEND_PHOTO" },
+      { title: "Try another style", payload: "CHOOSE_STYLE" },
+      { title: "New photo", payload: "SEND_PHOTO" },
     ]);
   });
 
