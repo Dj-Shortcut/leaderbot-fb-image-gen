@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { anonymizePsid, getOrCreateState, resetStateStore, setChosenStyle, setFlowState, setPendingImage } from "./_core/messengerState";
+import {
+  anonymizePsid,
+  getOrCreateState,
+  getQuickRepliesForState,
+  resetStateStore,
+  setChosenStyle,
+  setFlowState,
+  setPendingImage,
+} from "./_core/messengerState";
 
 describe("messenger state flow", () => {
   beforeEach(() => {
@@ -12,20 +20,36 @@ describe("messenger state flow", () => {
     setPendingImage(userId, "https://img.example/pic.jpg", 1000);
 
     const state = getOrCreateState(userId);
-    expect(state.stage).toBe("awaiting_style");
+    expect(state.stage).toBe("AWAITING_STYLE");
     expect(state.lastPhoto).toBe("https://img.example/pic.jpg");
   });
 
   it("handles style-first transition", () => {
     const userId = "style-first-user";
 
-    setFlowState(userId, "idle", 1000);
+    setFlowState(userId, "IDLE", 1000);
     setChosenStyle(userId, "Anime", 1001);
 
     const state = getOrCreateState(userId);
-    expect(state.stage).toBe("idle");
+    expect(state.stage).toBe("IDLE");
     expect(state.selectedStyle).toBe("Anime");
     expect(state.lastPhoto).toBeNull();
+  });
+
+  it("maps quick replies by state", () => {
+    expect(getQuickRepliesForState("IDLE")).toEqual([{ title: "Send photo", payload: "SEND_PHOTO" }]);
+    expect(getQuickRepliesForState("AWAITING_PHOTO")).toEqual([{ title: "Send photo", payload: "SEND_PHOTO" }]);
+    expect(getQuickRepliesForState("AWAITING_STYLE")).toEqual([
+      { title: "Disco", payload: "STYLE_DISCO" },
+      { title: "Gold", payload: "STYLE_GOLD" },
+      { title: "Anime", payload: "STYLE_ANIME" },
+      { title: "Clouds", payload: "STYLE_CLOUDS" },
+    ]);
+    expect(getQuickRepliesForState("PROCESSING")).toEqual([]);
+    expect(getQuickRepliesForState("RESULT_READY")).toEqual([
+      { title: "Choose style", payload: "CHOOSE_STYLE" },
+      { title: "Send new photo", payload: "SEND_PHOTO" },
+    ]);
   });
 
   it("hashes PSID deterministically", () => {
