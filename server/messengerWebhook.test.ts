@@ -14,7 +14,12 @@ vi.mock("./_core/messengerApi", () => ({
   safeLog: safeLogMock,
 }));
 
-import { processFacebookWebhookPayload, resetMessengerEventDedupe, summarizeWebhook } from "./_core/messengerWebhook";
+import {
+  isAckMessage,
+  processFacebookWebhookPayload,
+  resetMessengerEventDedupe,
+  summarizeWebhook,
+} from "./_core/messengerWebhook";
 import { anonymizePsid, resetStateStore, setFlowState } from "./_core/messengerState";
 
 
@@ -489,7 +494,7 @@ describe("messenger greeting behavior", () => {
     );
   });
 
-  it("keeps users in AWAITING_STYLE when they send smalltalk", async () => {
+  it("keeps users in AWAITING_STYLE when they send acknowledgement text", async () => {
     await processFacebookWebhookPayload({
       entry: [
         {
@@ -513,7 +518,7 @@ describe("messenger greeting behavior", () => {
     expect(sendTextMock).toHaveBeenCalledWith("style-user", "Photo received ✅");
     expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
       "style-user",
-      "What style should I use?",
+      "Pick a style using the buttons below 🙂",
       [
         { content_type: "text", title: "Caricature", payload: "caricature" },
         { content_type: "text", title: "Petals", payload: "petals" },
@@ -551,5 +556,105 @@ describe("messenger greeting behavior", () => {
         { content_type: "text", title: "New photo", payload: "SEND_PHOTO" },
       ],
     );
+  });
+});
+
+describe("acknowledgement edgecases", () => {
+  beforeEach(() => {
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+    safeLogMock.mockClear();
+    resetStateStore();
+    resetMessengerEventDedupe();
+  });
+
+  it("detects emoji-only and word acknowledgements", () => {
+    expect(isAckMessage(" 👍 ")).toEqual({ kind: "emoji" });
+    expect(isAckMessage("  Merci ")).toEqual({ kind: "word" });
+    expect(isAckMessage("disco")).toBeNull();
+  });
+
+  it("keeps style buttons visible when ack arrives in AWAITING_STYLE", async () => {
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "ack-style-user" },
+              message: {
+                mid: "mid-ack-style-photo",
+                attachments: [{ type: "image", payload: { url: "https://img.example/style.jpg" } }],
+              },
+            },
+            {
+              sender: { id: "ack-style-user" },
+              message: { mid: "mid-ack-style-emoji", text: "👍" },
+            },
+            {
+              sender: { id: "ack-style-user" },
+              message: { mid: "mid-ack-style-word", text: "ok" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      "ack-style-user",
+      "Pick a style using the buttons below 🙂",
+      [
+        { content_type: "text", title: "Caricature", payload: "caricature" },
+        { content_type: "text", title: "Petals", payload: "petals" },
+        { content_type: "text", title: "Gold", payload: "gold" },
+        { content_type: "text", title: "Cinematic", payload: "cinematic" },
+        { content_type: "text", title: "Disco", payload: "disco" },
+        { content_type: "text", title: "Clouds", payload: "clouds" },
+      ],
+    );
+    expect(safeLogMock).toHaveBeenCalledWith("edgecase_ack", { state: "AWAITING_STYLE", kind: "emoji" });
+    expect(safeLogMock).toHaveBeenCalledWith("edgecase_ack", { state: "AWAITING_STYLE", kind: "word" });
+  });
+
+  it("prompts for photo when ack arrives in AWAITING_PHOTO", async () => {
+    const psid = "ack-photo-user";
+    setFlowState(anonymizePsid(psid), "AWAITING_PHOTO");
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: { mid: "mid-ack-photo-emoji", text: "👍" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(psid, "Send a photo to start 📷");
+    expect(safeLogMock).toHaveBeenCalledWith("edgecase_ack", { state: "AWAITING_PHOTO", kind: "emoji" });
+  });
+
+  it("does not reply when ack arrives outside required-input states", async () => {
+    const psid = "ack-noop-user";
+    setFlowState(anonymizePsid(psid), "RESULT_READY");
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: { mid: "mid-ack-noop", text: "👍" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).not.toHaveBeenCalled();
+    expect(sendQuickRepliesMock).not.toHaveBeenCalled();
+    expect(safeLogMock).toHaveBeenCalledWith("edgecase_ack", { state: "RESULT_READY", kind: "emoji" });
   });
 });
