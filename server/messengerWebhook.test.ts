@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { sendQuickRepliesMock, sendTextMock, safeLogMock } = vi.hoisted(() => ({
+const { sendImageMock, sendQuickRepliesMock, sendTextMock, safeLogMock } = vi.hoisted(() => ({
+  sendImageMock: vi.fn(async () => undefined),
   sendQuickRepliesMock: vi.fn(async () => undefined),
   sendTextMock: vi.fn(async () => undefined),
   safeLogMock: vi.fn(),
 }));
 
 vi.mock("./_core/messengerApi", () => ({
+  sendImage: sendImageMock,
   sendQuickReplies: sendQuickRepliesMock,
   sendText: sendTextMock,
   safeLog: safeLogMock,
@@ -97,6 +99,8 @@ describe("webhook summary logging", () => {
 
 describe("messenger webhook dedupe", () => {
   beforeEach(() => {
+    process.env.MOCK_MODE = "true";
+    sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
     resetStateStore();
@@ -187,6 +191,52 @@ describe("messenger webhook dedupe", () => {
     await processFacebookWebhookPayload(payload);
 
     expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns a mock image attachment and follow-up after style selection", async () => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+
+    try {
+      const processing = processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "mock-image-user" },
+                message: {
+                  mid: "mid-photo-1",
+                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                },
+              },
+              {
+                sender: { id: "mock-image-user" },
+                message: { mid: "mid-style-1", text: "Disco" },
+              },
+            ],
+          },
+        ],
+      });
+
+      await vi.advanceTimersByTimeAsync(2000);
+      await processing;
+
+      expect(sendImageMock).toHaveBeenCalledWith(
+        "mock-image-user",
+        "https://picsum.photos/seed/disco-placeholder/1024/1024",
+      );
+      expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
+        "mock-image-user",
+        "Done. What do you want next?",
+        [
+          { content_type: "text", title: "Try another style", payload: "CHOOSE_STYLE" },
+          { content_type: "text", title: "New photo", payload: "SEND_PHOTO" },
+        ],
+      );
+    } finally {
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 });
 
