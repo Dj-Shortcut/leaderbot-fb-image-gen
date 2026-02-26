@@ -69,8 +69,15 @@ export function summarizeWebhook(body: unknown): WebhookSummary {
         .map(attachment => attachment?.type)
         .filter((type): type is string => typeof type === "string");
 
+      const type =
+        event.read ? "read" :
+        event.delivery ? "delivery" :
+        event.postback ? "postback" :
+        event.message ? "message" :
+        "other";
+
       summary.events.push({
-        type: event.postback ? "postback" : event.message ? "message" : "other",
+        type,
         hasText: typeof event.message?.text === "string",
         attachmentTypes,
         isEcho: Boolean(event.message?.is_echo),
