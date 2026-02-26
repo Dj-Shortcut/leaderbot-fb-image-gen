@@ -1,7 +1,14 @@
 import express from "express";
 import { TtlDedupeSet } from "./dedupe";
 import { sendImage, sendQuickReplies, sendText, safeLog } from "./messengerApi";
-import { STYLE_TO_DEMO_FILE, type Style } from "./messengerStyles";
+import { type Style } from "./messengerStyles";
+import {
+  createImageGenerator,
+  GenerationTimeoutError,
+  InvalidGenerationInputError,
+  MissingOpenAiApiKeyError,
+  OpenAiGenerationError,
+} from "./imageService";
 import {
   anonymizePsid,
   getOrCreateState,
@@ -139,6 +146,7 @@ const SMALLTALK = new Set([
   "thank you",
 ]);
 
+
 type GreetingResponse =
   | { mode: "text"; text: string }
   | { mode: "quick_replies"; state: ConversationState; text: string };
@@ -229,60 +237,50 @@ async function handleGreeting(psid: string, userId: string): Promise<void> {
   await sendStateQuickReplies(psid, response.state, response.text);
 }
 
-function isMockModeEnabled(): boolean {
-  return process.env.MOCK_MODE !== "false";
-}
-
-function getBaseUrl(): string {
-  const configuredBaseUrl = process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
-
-  if (configuredBaseUrl && /^https?:\/\//.test(configuredBaseUrl)) {
-    return configuredBaseUrl;
-  }
-
-  return "http://localhost:3000";
-}
-
-function getMockImageForStyle(style: string): string | undefined {
-  const normalizedStyle = normalizeStyle(style);
-
-  if (!normalizedStyle) {
-    return undefined;
-  }
-
-  const filename = STYLE_TO_DEMO_FILE[normalizedStyle];
-  return `${getBaseUrl()}/demo/${filename}`;
-}
-
-async function runMockGeneration(psid: string, userId: string, style: Style): Promise<void> {
-  setFlowState(userId, "PROCESSING");
-  await sendText(psid, `Processing ${STYLE_LABELS[style]} style ✨`);
-  const imageUrl = getMockImageForStyle(style);
-
-  if (!imageUrl) {
-    await sendText(psid, "Unknown style. Pick one from the quick replies.");
-    setFlowState(userId, "AWAITING_STYLE");
-    await sendStylePicker(psid);
-    return;
-  }
-
-  await sendImage(psid, imageUrl);
-
-  setFlowState(userId, "RESULT_READY");
-  await sendStateQuickReplies(psid, "RESULT_READY", "Done. What do you want next?");
-}
 
 async function runStyleGeneration(psid: string, userId: string, style: Style): Promise<void> {
-  if (isMockModeEnabled()) {
-    await runMockGeneration(psid, userId, style);
-    return;
-  }
+  const { mode, generator } = createImageGenerator();
 
   setFlowState(userId, "PROCESSING");
-  await sendText(psid, `Perfect — applying ${STYLE_LABELS[style]} style now ✨`);
-  await sendText(psid, "Real generation is not connected yet.");
-  setFlowState(userId, "AWAITING_STYLE");
-  await sendStylePicker(psid);
+  await sendText(
+    psid,
+    mode === "mock"
+      ? `Processing ${STYLE_LABELS[style]} style ✨`
+      : `Perfect — applying ${STYLE_LABELS[style]} style now ✨`,
+  );
+
+  const startedAt = Date.now();
+  safeLog("generation_start", { style, mode });
+
+  try {
+    const { imageUrl } = await generator.generate({
+      style,
+      sourceImageUrl: getOrCreateState(userId).lastPhoto ?? undefined,
+      psid,
+    });
+
+    safeLog("generation_success", { mode, ms: Date.now() - startedAt });
+    await sendImage(psid, imageUrl);
+    setFlowState(userId, "RESULT_READY");
+    await sendStateQuickReplies(psid, "RESULT_READY", "Done. What do you want next?");
+  } catch (error) {
+    const errorClass = error instanceof Error ? error.constructor.name : "UnknownError";
+    safeLog("generation_fail", { mode, errorClass, ms: Date.now() - startedAt });
+
+    if (error instanceof MissingOpenAiApiKeyError) {
+      safeLog("openai_not_configured", { mode });
+      await sendText(psid, "AI generation isn’t enabled yet.");
+    } else if (error instanceof GenerationTimeoutError) {
+      await sendText(psid, "This took too long — please try again.");
+    } else if (error instanceof InvalidGenerationInputError || error instanceof OpenAiGenerationError) {
+      await sendText(psid, "I couldn’t generate that image right now. Please try again.");
+    } else {
+      await sendText(psid, "I couldn’t generate that image right now. Please try again.");
+    }
+
+    setFlowState(userId, "AWAITING_STYLE");
+    await sendStylePicker(psid);
+  }
 }
 
 async function handleStyleSelection(psid: string, userId: string, style: Style): Promise<void> {

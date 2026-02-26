@@ -100,9 +100,12 @@ describe("webhook summary logging", () => {
 describe("messenger webhook dedupe", () => {
   beforeEach(() => {
     process.env.MOCK_MODE = "true";
+    process.env.GENERATOR_MODE = "mock";
+    delete process.env.OPENAI_API_KEY;
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
+    safeLogMock.mockClear();
     resetStateStore();
     resetMessengerEventDedupe();
   });
@@ -337,12 +340,126 @@ describe("messenger webhook dedupe", () => {
       vi.useRealTimers();
     }
   });
+
+  it("shows friendly message when GENERATOR_MODE=openai and OPENAI_API_KEY is missing", async () => {
+    process.env.GENERATOR_MODE = "openai";
+    delete process.env.OPENAI_API_KEY;
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "openai-missing-key-user" },
+              message: {
+                mid: "mid-photo-openai-missing",
+                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+              },
+            },
+            {
+              sender: { id: "openai-missing-key-user" },
+              message: { mid: "mid-style-openai-missing", text: "disco" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith("openai-missing-key-user", "AI generation isn’t enabled yet.");
+    expect(sendImageMock).not.toHaveBeenCalled();
+    expect(safeLogMock).toHaveBeenCalledWith("generation_start", expect.objectContaining({ style: "disco", mode: "openai" }));
+    expect(safeLogMock).toHaveBeenCalledWith("generation_fail", expect.objectContaining({ mode: "openai", errorClass: "MissingOpenAiApiKeyError" }));
+  });
+
+  it("reaches OpenAI generator path with GENERATOR_MODE=openai and API key", async () => {
+    process.env.GENERATOR_MODE = "openai";
+    process.env.OPENAI_API_KEY = "dummy-key";
+
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ data: [{ url: "https://cdn.example/generated.png" }] }),
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "openai-success-user" },
+                message: {
+                  mid: "mid-photo-openai-success",
+                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                },
+              },
+              {
+                sender: { id: "openai-success-user" },
+                message: { mid: "mid-style-openai-success", text: "gold" },
+              },
+            ],
+          },
+        ],
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(fetchMock).toHaveBeenCalled();
+    expect(sendImageMock).toHaveBeenCalledWith("openai-success-user", "https://cdn.example/generated.png");
+    expect(safeLogMock).toHaveBeenCalledWith("generation_start", expect.objectContaining({ style: "gold", mode: "openai" }));
+    expect(safeLogMock).toHaveBeenCalledWith("generation_success", expect.objectContaining({ mode: "openai" }));
+  });
+
+
+  it("shows timeout message when OpenAI generation exceeds timeout", async () => {
+    process.env.GENERATOR_MODE = "openai";
+    process.env.OPENAI_API_KEY = "dummy-key";
+
+    const timeoutError = new Error("aborted");
+    timeoutError.name = "AbortError";
+    const fetchMock = vi.fn(async () => {
+      throw timeoutError;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "openai-timeout-user" },
+                message: {
+                  mid: "mid-photo-openai-timeout",
+                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                },
+              },
+              {
+                sender: { id: "openai-timeout-user" },
+                message: { mid: "mid-style-openai-timeout", text: "clouds" },
+              },
+            ],
+          },
+        ],
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(sendTextMock).toHaveBeenCalledWith("openai-timeout-user", "This took too long — please try again.");
+    expect(safeLogMock).toHaveBeenCalledWith("generation_fail", expect.objectContaining({ mode: "openai", errorClass: "GenerationTimeoutError" }));
+  });
+
 });
 
 describe("messenger greeting behavior", () => {
   beforeEach(() => {
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
+    safeLogMock.mockClear();
     resetStateStore();
     resetMessengerEventDedupe();
   });
