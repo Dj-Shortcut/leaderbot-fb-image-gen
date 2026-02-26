@@ -12,8 +12,66 @@ vi.mock("./_core/messengerApi", () => ({
   safeLog: safeLogMock,
 }));
 
-import { processFacebookWebhookPayload, resetMessengerEventDedupe } from "./_core/messengerWebhook";
+import { processFacebookWebhookPayload, resetMessengerEventDedupe, summarizeWebhook } from "./_core/messengerWebhook";
 import { anonymizePsid, resetStateStore, setFlowState } from "./_core/messengerState";
+
+
+describe("webhook summary logging", () => {
+  it("summarizes event types and flags without including message contents", () => {
+    const summary = summarizeWebhook({
+      object: "page",
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "user-123" },
+              recipient: { id: "page-456" },
+              message: {
+                text: "super secret text",
+                is_echo: true,
+                attachments: [{ type: "image" }, { type: "audio" }, { payload: { url: "https://a" } }],
+              },
+            },
+            {
+              postback: { payload: "STYLE_DISCO" },
+              read: { watermark: 1 },
+              delivery: { mids: ["mid-1"] },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(summary).toEqual({
+      object: "page",
+      entryCount: 1,
+      events: [
+        {
+          type: "message",
+          hasText: true,
+          attachmentTypes: ["image", "audio"],
+          isEcho: true,
+          hasRead: false,
+          hasDelivery: false,
+          hasPostback: false,
+        },
+        {
+          type: "postback",
+          hasText: false,
+          attachmentTypes: [],
+          isEcho: false,
+          hasRead: true,
+          hasDelivery: true,
+          hasPostback: true,
+        },
+      ],
+    });
+
+    expect(JSON.stringify(summary)).not.toContain("super secret text");
+    expect(JSON.stringify(summary)).not.toContain("user-123");
+    expect(JSON.stringify(summary)).not.toContain("page-456");
+  });
+});
 
 describe("messenger webhook dedupe", () => {
   beforeEach(() => {

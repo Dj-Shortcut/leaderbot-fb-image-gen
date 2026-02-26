@@ -30,6 +30,60 @@ type FacebookWebhookEvent = {
   timestamp?: number;
 };
 
+type WebhookEventSummary = {
+  type: "message" | "postback" | "other";
+  hasText: boolean;
+  attachmentTypes: string[];
+  isEcho: boolean;
+  hasRead: boolean;
+  hasDelivery: boolean;
+  hasPostback: boolean;
+};
+
+type WebhookSummary = {
+  object: unknown;
+  entryCount: number;
+  events: WebhookEventSummary[];
+};
+
+export function summarizeWebhook(body: unknown): WebhookSummary {
+  const rawBody = (body ?? {}) as { object?: unknown; entry?: Array<{ messaging?: unknown[] }> };
+  const entries = Array.isArray(rawBody.entry) ? rawBody.entry : [];
+
+  const summary: WebhookSummary = {
+    object: rawBody.object,
+    entryCount: entries.length,
+    events: [],
+  };
+
+  for (const entry of entries) {
+    const messaging = Array.isArray(entry?.messaging) ? entry.messaging : [];
+
+    for (const rawEvent of messaging) {
+      const event = (rawEvent ?? {}) as FacebookWebhookEvent & {
+        delivery?: unknown;
+        read?: unknown;
+      };
+      const attachments = Array.isArray(event.message?.attachments) ? event.message.attachments : [];
+      const attachmentTypes = attachments
+        .map(attachment => attachment?.type)
+        .filter((type): type is string => typeof type === "string");
+
+      summary.events.push({
+        type: event.postback ? "postback" : event.message ? "message" : "other",
+        hasText: typeof event.message?.text === "string",
+        attachmentTypes,
+        isEcho: Boolean(event.message?.is_echo),
+        hasRead: Boolean(event.read),
+        hasDelivery: Boolean(event.delivery),
+        hasPostback: Boolean(event.postback),
+      });
+    }
+  }
+
+  return summary;
+}
+
 const incomingEventDedupe = new TtlDedupeSet(10 * 60 * 1000);
 
 function getEventDedupeKey(event: FacebookWebhookEvent): string | undefined {
@@ -303,6 +357,14 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
   app.get("/webhook/facebook", handleVerification);
 
   app.post("/webhook/facebook", (req, res) => {
+    console.log(
+      JSON.stringify({
+        level: "info",
+        msg: "webhook_in",
+        summary: summarizeWebhook(req.body),
+      }),
+    );
+
     const payload = req.body;
     res.sendStatus(200);
 
