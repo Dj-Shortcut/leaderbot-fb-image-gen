@@ -145,6 +145,9 @@ const SMALLTALK = new Set([
   "thanks",
   "thank you",
 ]);
+const ACK_WORDS = new Set(["ok", "okay", "k", "kk", "thx", "thanks", "merci", "top", "nice", "(y)"]);
+
+type AckMessageKind = "emoji" | "word";
 
 
 type GreetingResponse =
@@ -192,6 +195,24 @@ function stylePayloadToStyle(payload: string): Style | undefined {
 
 function parseStyle(text: string): Style | undefined {
   return normalizeStyle(text);
+}
+
+export function isAckMessage(text: string): { kind: AckMessageKind } | null {
+  const normalized = text.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (ACK_WORDS.has(normalized.toLowerCase())) {
+    return { kind: "word" };
+  }
+
+  const emojiOnlyPattern = /^[\p{Extended_Pictographic}\p{Emoji_Component}\uFE0F\u200D\s]+$/u;
+  if (emojiOnlyPattern.test(normalized) && /\p{Extended_Pictographic}/u.test(normalized)) {
+    return { kind: "emoji" };
+  }
+
+  return null;
 }
 
 function toMessengerReplies(state: ConversationState) {
@@ -350,7 +371,20 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
     return;
   }
 
+  const state = getOrCreateState(userId);
   const normalizedText = text.toLowerCase();
+  const ack = isAckMessage(text);
+  if (ack) {
+    safeLog("edgecase_ack", { state: state.stage, kind: ack.kind });
+
+    if (state.stage === "AWAITING_STYLE") {
+      await sendStateQuickReplies(psid, "AWAITING_STYLE", "Pick a style using the buttons below 🙂");
+    } else if (state.stage === "AWAITING_PHOTO") {
+      await sendText(psid, "Send a photo to start 📷");
+    }
+
+    return;
+  }
 
   const styleFromText = parseStyle(text);
   if (styleFromText) {
