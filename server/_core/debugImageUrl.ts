@@ -13,7 +13,8 @@ export async function probeImageUrlForMessenger(
   url: string
 ): Promise<ImageUrlProbeResult> {
   const { stdout } = await execFileAsync("curl", [
-    "-I",
+    "-X",
+    "GET",
     "-L",
     "-A",
     "facebookexternalhit/1.1",
