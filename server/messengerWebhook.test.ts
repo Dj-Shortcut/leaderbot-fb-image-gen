@@ -34,7 +34,11 @@ describe("webhook summary logging", () => {
             },
             {
               postback: { payload: "STYLE_DISCO" },
+            },
+            {
               read: { watermark: 1 },
+            },
+            {
               delivery: { mids: ["mid-1"] },
             },
           ],
@@ -60,9 +64,27 @@ describe("webhook summary logging", () => {
           hasText: false,
           attachmentTypes: [],
           isEcho: false,
-          hasRead: true,
-          hasDelivery: true,
+          hasRead: false,
+          hasDelivery: false,
           hasPostback: true,
+        },
+        {
+          type: "read",
+          hasText: false,
+          attachmentTypes: [],
+          isEcho: false,
+          hasRead: true,
+          hasDelivery: false,
+          hasPostback: false,
+        },
+        {
+          type: "delivery",
+          hasText: false,
+          attachmentTypes: [],
+          isEcho: false,
+          hasRead: false,
+          hasDelivery: true,
+          hasPostback: false,
         },
       ],
     });
