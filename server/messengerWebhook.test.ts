@@ -593,7 +593,7 @@ describe("acknowledgement edgecases", () => {
 
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).not.toHaveBeenCalled();
-    expect(safeLogMock).toHaveBeenCalledWith("ack_ignored", { ack: "like", text: "(y)" });
+    expect(safeLogMock).toHaveBeenCalledWith("ack_ignored", { ack: "like" });
   });
 
   it("ignores 👍 without sending text or quick replies", async () => {
@@ -612,6 +612,6 @@ describe("acknowledgement edgecases", () => {
 
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).not.toHaveBeenCalled();
-    expect(safeLogMock).toHaveBeenCalledWith("ack_ignored", { ack: "emoji", text: "👍" });
+    expect(safeLogMock).toHaveBeenCalledWith("ack_ignored", { ack: "emoji" });
   });
 });
