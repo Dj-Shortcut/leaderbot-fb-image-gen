@@ -43,12 +43,12 @@ const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
   ],
   AWAITING_PHOTO: [{ title: "Send photo", payload: "SEND_PHOTO" }],
   AWAITING_STYLE: [
-    { title: "Caricature", payload: "STYLE_CARICATURE" },
-    { title: "Petals", payload: "STYLE_PETALS" },
-    { title: "Gold", payload: "STYLE_GOLD" },
-    { title: "Cinematic", payload: "STYLE_CINEMATIC" },
-    { title: "Disco", payload: "STYLE_DISCO" },
-    { title: "Clouds", payload: "STYLE_CLOUDS" },
+    { title: "Caricature", payload: "caricature" },
+    { title: "Petals", payload: "petals" },
+    { title: "Gold", payload: "gold" },
+    { title: "Cinematic", payload: "cinematic" },
+    { title: "Disco", payload: "disco" },
+    { title: "Clouds", payload: "clouds" },
   ],
   PROCESSING: [],
   RESULT_READY: [
