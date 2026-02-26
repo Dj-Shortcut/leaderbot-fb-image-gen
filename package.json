@@ -10,7 +10,8 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate"
+    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "debug:image-url": "tsx server/_core/debugImageUrl.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.12",
