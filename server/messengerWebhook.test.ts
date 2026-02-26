@@ -518,7 +518,7 @@ describe("messenger greeting behavior", () => {
     expect(sendTextMock).toHaveBeenCalledWith("style-user", "Photo received ✅");
     expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
       "style-user",
-      "What style should I use?",
+      "Pick a style using the buttons below 🙂",
       [
         { content_type: "text", title: "Caricature", payload: "caricature" },
         { content_type: "text", title: "Petals", payload: "petals" },
