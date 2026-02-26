@@ -577,7 +577,7 @@ describe("acknowledgement edgecases", () => {
     expect(detectAck("disco")).toBeNull();
   });
 
-  it("ignores legacy like (y)", async () => {
+  it("ignores (y) without sending text or quick replies", async () => {
     await processFacebookWebhookPayload({
       entry: [
         {
@@ -593,20 +593,17 @@ describe("acknowledgement edgecases", () => {
 
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).not.toHaveBeenCalled();
-    expect(safeLogMock).toHaveBeenCalledWith("ack_ignored", expect.objectContaining({ ack: "like" }));
+    expect(safeLogMock).toHaveBeenCalledWith("ack_ignored", { ack: "like" });
   });
 
-  it("ignores ack text in RESULT_READY without extra replies", async () => {
-    const psid = "ack-noop-user";
-    setFlowState(anonymizePsid(psid), "RESULT_READY");
-
+  it("ignores 👍 without sending text or quick replies", async () => {
     await processFacebookWebhookPayload({
       entry: [
         {
           messaging: [
             {
-              sender: { id: psid },
-              message: { mid: "mid-ack-noop", text: "thanks" },
+              sender: { id: "ack-emoji-user" },
+              message: { mid: "mid-ack-emoji", text: "👍" },
             },
           ],
         },
@@ -615,6 +612,6 @@ describe("acknowledgement edgecases", () => {
 
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).not.toHaveBeenCalled();
-    expect(safeLogMock).toHaveBeenCalledWith("ack_ignored", expect.objectContaining({ ack: "thanks" }));
+    expect(safeLogMock).toHaveBeenCalledWith("ack_ignored", { ack: "emoji" });
   });
 });
