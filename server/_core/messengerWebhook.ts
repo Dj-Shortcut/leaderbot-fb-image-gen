@@ -145,9 +145,7 @@ const SMALLTALK = new Set([
   "thanks",
   "thank you",
 ]);
-const ACK_WORDS = new Set(["ok", "okay", "k", "kk", "thx", "thanks", "merci", "top", "nice"]);
-
-type AckMessageKind = "emoji" | "word";
+export type AckKind = "like" | "ok" | "thanks" | "emoji";
 
 
 type GreetingResponse =
@@ -197,19 +195,32 @@ function parseStyle(text: string): Style | undefined {
   return normalizeStyle(text);
 }
 
-export function isAckMessage(text: string): { kind: AckMessageKind } | null {
-  const normalized = text.trim();
-  if (!normalized) {
+export function detectAck(raw: string | undefined | null): AckKind | null {
+  if (!raw) {
     return null;
   }
 
-  if (ACK_WORDS.has(normalized.toLowerCase())) {
-    return { kind: "word" };
+  const text = raw.trim();
+  if (!text) {
+    return null;
   }
 
-  const emojiOnlyPattern = /^[\p{Extended_Pictographic}\p{Emoji_Component}\uFE0F\u200D\s]+$/u;
-  if (emojiOnlyPattern.test(normalized) && /\p{Extended_Pictographic}/u.test(normalized)) {
-    return { kind: "emoji" };
+  const lower = text.toLowerCase();
+
+  if (/^\(\s*y\s*\)$/.test(lower)) {
+    return "like";
+  }
+
+  if (/^(ok|oke|k|kk|yes|yep|ja|jep)$/.test(lower)) {
+    return "ok";
+  }
+
+  if (/^(thanks|thx|merci|tks)$/.test(lower)) {
+    return "thanks";
+  }
+
+  if (/^[\p{Extended_Pictographic}]+$/u.test(text)) {
+    return "emoji";
   }
 
   return null;
@@ -366,27 +377,20 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
     return;
   }
 
-  const text = message.text?.trim();
-  if (!text) {
-    return;
-  }
-
-  const state = getOrCreateState(userId);
-  const normalizedText = text.toLowerCase();
-  const ack = isAckMessage(text);
+  const text = message.text;
+  const ack = detectAck(text);
   if (ack) {
-    safeLog("edgecase_ack", { state: state.stage, kind: ack.kind });
-
-    if (state.stage === "AWAITING_STYLE") {
-      await sendStateQuickReplies(psid, "AWAITING_STYLE", "Pick a style using the buttons below 🙂");
-    } else if (state.stage === "AWAITING_PHOTO") {
-      await sendText(psid, "Send a photo to start 📷");
-    }
-
+    safeLog("ack_ignored", { ack, text: "redacted" });
     return;
   }
 
-  const styleFromText = parseStyle(text);
+  const trimmedText = text?.trim();
+  const normalizedText = trimmedText?.toLowerCase();
+  if (!normalizedText || !trimmedText) {
+    return;
+  }
+
+  const styleFromText = parseStyle(trimmedText);
   if (styleFromText) {
     await handleStyleSelection(psid, userId, styleFromText);
     return;
@@ -407,6 +411,7 @@ async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
   }
 
   if (event.message?.is_echo) {
+    safeLog("echo_ignored", {});
     return;
   }
 

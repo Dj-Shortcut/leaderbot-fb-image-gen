@@ -15,7 +15,7 @@ vi.mock("./_core/messengerApi", () => ({
 }));
 
 import {
-  isAckMessage,
+  detectAck,
   processFacebookWebhookPayload,
   resetMessengerEventDedupe,
   summarizeWebhook,
@@ -494,7 +494,7 @@ describe("messenger greeting behavior", () => {
     );
   });
 
-  it("keeps users in AWAITING_STYLE when they send acknowledgement text", async () => {
+  it("ignores acknowledgement text after entering AWAITING_STYLE", async () => {
     await processFacebookWebhookPayload({
       entry: [
         {
@@ -568,75 +568,35 @@ describe("acknowledgement edgecases", () => {
     resetMessengerEventDedupe();
   });
 
-  it("detects emoji-only and word acknowledgements", () => {
-    expect(isAckMessage(" 👍 ")).toEqual({ kind: "emoji" });
-    expect(isAckMessage("  Merci ")).toEqual({ kind: "word" });
-    expect(isAckMessage("disco")).toBeNull();
+  it("detects legacy like, short acknowledgements, and emoji", () => {
+    expect(detectAck("(y)")).toBe("like");
+    expect(detectAck("  jep ")).toBe("ok");
+    expect(detectAck("Merci")).toBe("thanks");
+    expect(detectAck("👍")).toBe("emoji");
+    expect(detectAck("   ")).toBeNull();
+    expect(detectAck("disco")).toBeNull();
   });
 
-  it("keeps style buttons visible when ack arrives in AWAITING_STYLE", async () => {
+  it("ignores legacy like (y)", async () => {
     await processFacebookWebhookPayload({
       entry: [
         {
           messaging: [
             {
-              sender: { id: "ack-style-user" },
-              message: {
-                mid: "mid-ack-style-photo",
-                attachments: [{ type: "image", payload: { url: "https://img.example/style.jpg" } }],
-              },
-            },
-            {
-              sender: { id: "ack-style-user" },
-              message: { mid: "mid-ack-style-emoji", text: "👍" },
-            },
-            {
-              sender: { id: "ack-style-user" },
-              message: { mid: "mid-ack-style-word", text: "ok" },
+              sender: { id: "ack-like-user" },
+              message: { mid: "mid-ack-like", text: "(y)" },
             },
           ],
         },
       ],
     });
 
-    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
-      "ack-style-user",
-      "Pick a style using the buttons below 🙂",
-      [
-        { content_type: "text", title: "Caricature", payload: "caricature" },
-        { content_type: "text", title: "Petals", payload: "petals" },
-        { content_type: "text", title: "Gold", payload: "gold" },
-        { content_type: "text", title: "Cinematic", payload: "cinematic" },
-        { content_type: "text", title: "Disco", payload: "disco" },
-        { content_type: "text", title: "Clouds", payload: "clouds" },
-      ],
-    );
-    expect(safeLogMock).toHaveBeenCalledWith("edgecase_ack", { state: "AWAITING_STYLE", kind: "emoji" });
-    expect(safeLogMock).toHaveBeenCalledWith("edgecase_ack", { state: "AWAITING_STYLE", kind: "word" });
+    expect(sendTextMock).not.toHaveBeenCalled();
+    expect(sendQuickRepliesMock).not.toHaveBeenCalled();
+    expect(safeLogMock).toHaveBeenCalledWith("ack_ignored", expect.objectContaining({ ack: "like" }));
   });
 
-  it("prompts for photo when ack arrives in AWAITING_PHOTO", async () => {
-    const psid = "ack-photo-user";
-    setFlowState(anonymizePsid(psid), "AWAITING_PHOTO");
-
-    await processFacebookWebhookPayload({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: psid },
-              message: { mid: "mid-ack-photo-emoji", text: "👍" },
-            },
-          ],
-        },
-      ],
-    });
-
-    expect(sendTextMock).toHaveBeenCalledWith(psid, "Send a photo to start 📷");
-    expect(safeLogMock).toHaveBeenCalledWith("edgecase_ack", { state: "AWAITING_PHOTO", kind: "emoji" });
-  });
-
-  it("does not reply when ack arrives outside required-input states", async () => {
+  it("ignores ack text in RESULT_READY without extra replies", async () => {
     const psid = "ack-noop-user";
     setFlowState(anonymizePsid(psid), "RESULT_READY");
 
@@ -646,7 +606,7 @@ describe("acknowledgement edgecases", () => {
           messaging: [
             {
               sender: { id: psid },
-              message: { mid: "mid-ack-noop", text: "👍" },
+              message: { mid: "mid-ack-noop", text: "thanks" },
             },
           ],
         },
@@ -655,6 +615,6 @@ describe("acknowledgement edgecases", () => {
 
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).not.toHaveBeenCalled();
-    expect(safeLogMock).toHaveBeenCalledWith("edgecase_ack", { state: "RESULT_READY", kind: "emoji" });
+    expect(safeLogMock).toHaveBeenCalledWith("ack_ignored", expect.objectContaining({ ack: "thanks" }));
   });
 });
