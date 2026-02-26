@@ -1,7 +1,8 @@
 import express from "express";
 import { TtlDedupeSet } from "./dedupe";
 import { sendImage, sendQuickReplies, sendText, safeLog } from "./messengerApi";
-import { STYLE_TO_DEMO_FILE, type Style } from "./messengerStyles";
+import { type Style } from "./messengerStyles";
+import { createImageGenerator } from "./imageService";
 import {
   anonymizePsid,
   getOrCreateState,
@@ -139,6 +140,12 @@ const SMALLTALK = new Set([
   "thank you",
 ]);
 
+const imageGenerator = createImageGenerator();
+
+function isMockModeEnabled(): boolean {
+  return process.env.MOCK_MODE !== "false";
+}
+
 type GreetingResponse =
   | { mode: "text"; text: string }
   | { mode: "quick_replies"; state: ConversationState; text: string };
@@ -229,42 +236,15 @@ async function handleGreeting(psid: string, userId: string): Promise<void> {
   await sendStateQuickReplies(psid, response.state, response.text);
 }
 
-function isMockModeEnabled(): boolean {
-  return process.env.MOCK_MODE !== "false";
-}
-
-function getBaseUrl(): string {
-  const configuredBaseUrl = process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
-
-  if (configuredBaseUrl && /^https?:\/\//.test(configuredBaseUrl)) {
-    return configuredBaseUrl;
-  }
-
-  return "http://localhost:3000";
-}
-
-function getMockImageForStyle(style: string): string | undefined {
-  const normalizedStyle = normalizeStyle(style);
-
-  if (!normalizedStyle) {
-    return undefined;
-  }
-
-  const filename = STYLE_TO_DEMO_FILE[normalizedStyle];
-  return `${getBaseUrl()}/demo/${filename}`;
-}
 
 async function runMockGeneration(psid: string, userId: string, style: Style): Promise<void> {
   setFlowState(userId, "PROCESSING");
   await sendText(psid, `Processing ${STYLE_LABELS[style]} style ✨`);
-  const imageUrl = getMockImageForStyle(style);
-
-  if (!imageUrl) {
-    await sendText(psid, "Unknown style. Pick one from the quick replies.");
-    setFlowState(userId, "AWAITING_STYLE");
-    await sendStylePicker(psid);
-    return;
-  }
+  const { imageUrl } = await imageGenerator.generate({
+    style,
+    sourceImageUrl: getOrCreateState(userId).lastPhoto ?? undefined,
+    psid,
+  });
 
   await sendImage(psid, imageUrl);
 
