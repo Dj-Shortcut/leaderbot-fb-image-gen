@@ -231,7 +231,7 @@ function isMockModeEnabled(): boolean {
 }
 
 function getBaseUrl(): string {
-  const configuredBaseUrl = process.env.BASE_URL?.trim();
+  const configuredBaseUrl = process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
 
   if (configuredBaseUrl && /^https?:\/\//.test(configuredBaseUrl)) {
     return configuredBaseUrl;

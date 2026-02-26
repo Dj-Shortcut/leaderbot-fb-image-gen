@@ -241,7 +241,6 @@ describe("messenger webhook dedupe", () => {
 
         const [[, imageUrl]] = sendImageMock.mock.calls as [[string, string]];
         expect(imageUrl).toBe(`http://localhost:3000/demo/${filename}`);
-        expect(imageUrl).not.toContain("https://picsum.photos");
       }
     } finally {
       randomSpy.mockRestore();

@@ -176,7 +176,7 @@ Total: 13 tests passed, 0 failures
 
 ### Image Generation Integration
 
-**Current:** Mock images from `picsum.photos`  
+**Current:** Mock images now use local `/demo/*` assets  
 **Future:** Replace `getMockGeneratedImage()` in `imageService.ts`
 
 ```typescript
