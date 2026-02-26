@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import express from "express";
 import { TtlDedupeSet } from "./dedupe";
 import { sendImage, sendQuickReplies, sendText, safeLog } from "./messengerApi";
+import { STYLE_TO_DEMO_FILE, type Style } from "./messengerStyles";
 import { recordImageJob } from "./messengerJobStore";
 import {
   anonymizePsid,
@@ -119,12 +120,15 @@ function getEventDedupeKey(event: FacebookWebhookEvent): string | undefined {
   return undefined;
 }
 
-const STYLE_OPTIONS = ["Disco", "Gold", "Anime", "Clouds"] as const;
-const MOCK_STYLE_IMAGES: Record<string, string> = {
-  disco: "https://picsum.photos/seed/disco-placeholder/1024/1024",
-  gold: "https://picsum.photos/seed/gold-placeholder/1024/1024",
-  anime: "https://picsum.photos/seed/anime-placeholder/1024/1024",
-  clouds: "https://picsum.photos/seed/clouds-placeholder/1024/1024",
+const STYLE_OPTIONS: Style[] = ["caricature", "petals", "gold", "cinematic", "disco", "clouds"];
+
+const STYLE_LABELS: Record<Style, string> = {
+  caricature: "Caricature",
+  petals: "Petals",
+  gold: "Gold",
+  cinematic: "Cinematic",
+  disco: "Disco",
+  clouds: "Clouds",
 };
 const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
 const SMALLTALK = new Set([
@@ -161,18 +165,22 @@ export function getGreetingResponse(state: ConversationState): GreetingResponse 
   }
 }
 
-function stylePayloadToLabel(payload: string): string | undefined {
+function normalizeStyle(input: string): Style | undefined {
+  const normalized = input.trim().toLowerCase();
+  return STYLE_OPTIONS.find(style => style === normalized);
+}
+
+function stylePayloadToStyle(payload: string): Style | undefined {
   if (!payload.startsWith("STYLE_")) {
     return undefined;
   }
 
-  const name = payload.slice("STYLE_".length).toLowerCase();
-  return STYLE_OPTIONS.find(style => style.toLowerCase() === name);
+  const styleKey = payload.slice("STYLE_".length).toLowerCase();
+  return normalizeStyle(styleKey);
 }
 
-function parseStyle(text: string): string | undefined {
-  const normalized = text.trim().toLowerCase();
-  return STYLE_OPTIONS.find(style => style.toLowerCase() === normalized);
+function parseStyle(text: string): Style | undefined {
+  return normalizeStyle(text);
 }
 
 function toMessengerReplies(state: ConversationState) {
@@ -222,9 +230,25 @@ function isMockModeEnabled(): boolean {
   return process.env.MOCK_MODE !== "false";
 }
 
-function getMockImageForStyle(style: string): string {
-  const normalizedStyle = style.trim().toLowerCase();
-  return MOCK_STYLE_IMAGES[normalizedStyle] ?? MOCK_STYLE_IMAGES.disco;
+function getBaseUrl(): string {
+  const configuredBaseUrl = process.env.BASE_URL?.trim();
+
+  if (configuredBaseUrl && /^https?:\/\//.test(configuredBaseUrl)) {
+    return configuredBaseUrl;
+  }
+
+  return "http://localhost:3000";
+}
+
+function getMockImageForStyle(style: string): string | undefined {
+  const normalizedStyle = normalizeStyle(style);
+
+  if (!normalizedStyle) {
+    return undefined;
+  }
+
+  const filename = STYLE_TO_DEMO_FILE[normalizedStyle];
+  return `${getBaseUrl()}/demo/${filename}`;
 }
 
 async function waitForMockProcessing(): Promise<void> {
@@ -232,7 +256,7 @@ async function waitForMockProcessing(): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, delayMs));
 }
 
-async function runMockGeneration(psid: string, userId: string, style: string): Promise<void> {
+async function runMockGeneration(psid: string, userId: string, style: Style): Promise<void> {
   setFlowState(userId, "PROCESSING");
   const imageJobId = randomUUID();
 
@@ -243,35 +267,44 @@ async function runMockGeneration(psid: string, userId: string, style: string): P
     timestamp: Date.now(),
   });
 
-  await sendText(psid, `Perfect — applying ${style} style now (mock) ✨`);
+  await sendText(psid, `Perfect — applying ${STYLE_LABELS[style]} style now (mock) ✨`);
   await sendText(psid, `Job queued: ${imageJobId}`);
   await waitForMockProcessing();
-  await sendImage(psid, getMockImageForStyle(style));
+  const imageUrl = getMockImageForStyle(style);
+
+  if (!imageUrl) {
+    await sendText(psid, "Unknown style. Pick one from the quick replies.");
+    setFlowState(userId, "AWAITING_STYLE");
+    await sendStylePicker(psid);
+    return;
+  }
+
+  await sendImage(psid, imageUrl);
 
   setFlowState(userId, "RESULT_READY");
   await sendStateQuickReplies(psid, "RESULT_READY", "Done. What do you want next?");
 }
 
-async function runStyleGeneration(psid: string, userId: string, style: string): Promise<void> {
+async function runStyleGeneration(psid: string, userId: string, style: Style): Promise<void> {
   if (isMockModeEnabled()) {
     await runMockGeneration(psid, userId, style);
     return;
   }
 
   setFlowState(userId, "PROCESSING");
-  await sendText(psid, `Perfect — applying ${style} style now ✨`);
+  await sendText(psid, `Perfect — applying ${STYLE_LABELS[style]} style now ✨`);
   await sendText(psid, "Real generation is not connected yet.");
   setFlowState(userId, "AWAITING_STYLE");
   await sendStylePicker(psid);
 }
 
-async function handleStyleSelection(psid: string, userId: string, style: string): Promise<void> {
+async function handleStyleSelection(psid: string, userId: string, style: Style): Promise<void> {
   const state = getOrCreateState(userId);
   setChosenStyle(userId, style);
 
   if (!state.lastPhoto) {
     setFlowState(userId, "AWAITING_PHOTO");
-    await sendStateQuickReplies(psid, "AWAITING_PHOTO", `Nice choice: ${style}. Send me a photo first 📸`);
+    await sendStateQuickReplies(psid, "AWAITING_PHOTO", `Nice choice: ${STYLE_LABELS[style]}. Send me a photo first 📸`);
     return;
   }
 
@@ -279,7 +312,7 @@ async function handleStyleSelection(psid: string, userId: string, style: string)
 }
 
 async function handlePayload(psid: string, userId: string, payload: string): Promise<void> {
-  const selectedStyle = stylePayloadToLabel(payload);
+  const selectedStyle = stylePayloadToStyle(payload);
   if (selectedStyle) {
     await handleStyleSelection(psid, userId, selectedStyle);
     return;

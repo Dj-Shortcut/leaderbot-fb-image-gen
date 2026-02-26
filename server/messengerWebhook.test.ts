@@ -193,6 +193,62 @@ describe("messenger webhook dedupe", () => {
     expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
   });
 
+
+
+  it("returns local demo images for all canonical styles in MOCK_MODE", async () => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+
+    try {
+      const styles: Array<[string, string]> = [
+        ["caricature", "01-caricature.png"],
+        ["petals", "02-petals.png"],
+        ["gold", "03-gold.png"],
+        ["cinematic", "04-crayon.png"],
+        ["disco", "05-paparazzi.png"],
+        ["clouds", "06-clouds.png"],
+      ];
+
+      for (const [style, filename] of styles) {
+        sendImageMock.mockClear();
+        sendQuickRepliesMock.mockClear();
+        sendTextMock.mockClear();
+        resetStateStore();
+        resetMessengerEventDedupe();
+
+        const processing = processFacebookWebhookPayload({
+          entry: [
+            {
+              messaging: [
+                {
+                  sender: { id: `style-user-${style}` },
+                  message: {
+                    mid: `mid-photo-${style}`,
+                    attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                  },
+                },
+                {
+                  sender: { id: `style-user-${style}` },
+                  message: { mid: `mid-style-${style}`, text: style },
+                },
+              ],
+            },
+          ],
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await processing;
+
+        const [[, imageUrl]] = sendImageMock.mock.calls as [[string, string]];
+        expect(imageUrl).toBe(`http://localhost:3000/demo/${filename}`);
+        expect(imageUrl).not.toContain("https://picsum.photos");
+      }
+    } finally {
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it("returns a mock image attachment and follow-up after style selection", async () => {
     vi.useFakeTimers();
     const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
@@ -211,7 +267,7 @@ describe("messenger webhook dedupe", () => {
               },
               {
                 sender: { id: "mock-image-user" },
-                message: { mid: "mid-style-1", text: "Disco" },
+                message: { mid: "mid-style-1", text: "disco" },
               },
             ],
           },
@@ -223,7 +279,7 @@ describe("messenger webhook dedupe", () => {
 
       expect(sendImageMock).toHaveBeenCalledWith(
         "mock-image-user",
-        "https://picsum.photos/seed/disco-placeholder/1024/1024",
+        "http://localhost:3000/demo/05-paparazzi.png",
       );
       expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
         "mock-image-user",
@@ -299,9 +355,11 @@ describe("messenger greeting behavior", () => {
       "style-user",
       "What style should I use?",
       [
-        { content_type: "text", title: "Disco", payload: "STYLE_DISCO" },
+        { content_type: "text", title: "Caricature", payload: "STYLE_CARICATURE" },
+        { content_type: "text", title: "Petals", payload: "STYLE_PETALS" },
         { content_type: "text", title: "Gold", payload: "STYLE_GOLD" },
-        { content_type: "text", title: "Anime", payload: "STYLE_ANIME" },
+        { content_type: "text", title: "Cinematic", payload: "STYLE_CINEMATIC" },
+        { content_type: "text", title: "Disco", payload: "STYLE_DISCO" },
         { content_type: "text", title: "Clouds", payload: "STYLE_CLOUDS" },
       ],
     );
