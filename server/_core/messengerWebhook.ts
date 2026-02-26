@@ -380,7 +380,7 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
   const text = message.text;
   const ack = detectAck(text);
   if (ack) {
-    safeLog("ack_ignored", { ack, text: "redacted" });
+    safeLog("ack_ignored", { ack, text });
     return;
   }
 
