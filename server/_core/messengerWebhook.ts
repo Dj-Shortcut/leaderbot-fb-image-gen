@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import express from "express";
 import { TtlDedupeSet } from "./dedupe";
-import { sendQuickReplies, sendText, safeLog } from "./messengerApi";
+import { sendImage, sendQuickReplies, sendText, safeLog } from "./messengerApi";
 import { recordImageJob } from "./messengerJobStore";
 import {
   anonymizePsid,
@@ -120,6 +120,12 @@ function getEventDedupeKey(event: FacebookWebhookEvent): string | undefined {
 }
 
 const STYLE_OPTIONS = ["Disco", "Gold", "Anime", "Clouds"] as const;
+const MOCK_STYLE_IMAGES: Record<string, string> = {
+  disco: "https://picsum.photos/seed/disco-placeholder/1024/1024",
+  gold: "https://picsum.photos/seed/gold-placeholder/1024/1024",
+  anime: "https://picsum.photos/seed/anime-placeholder/1024/1024",
+  clouds: "https://picsum.photos/seed/clouds-placeholder/1024/1024",
+};
 const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
 const SMALLTALK = new Set([
   "how are you",
@@ -212,6 +218,20 @@ async function handleGreeting(psid: string, userId: string): Promise<void> {
   await sendStateQuickReplies(psid, response.state, response.text);
 }
 
+function isMockModeEnabled(): boolean {
+  return process.env.MOCK_MODE !== "false";
+}
+
+function getMockImageForStyle(style: string): string {
+  const normalizedStyle = style.trim().toLowerCase();
+  return MOCK_STYLE_IMAGES[normalizedStyle] ?? MOCK_STYLE_IMAGES.disco;
+}
+
+async function waitForMockProcessing(): Promise<void> {
+  const delayMs = 2000 + Math.floor(Math.random() * 2001);
+  await new Promise(resolve => setTimeout(resolve, delayMs));
+}
+
 async function runMockGeneration(psid: string, userId: string, style: string): Promise<void> {
   setFlowState(userId, "PROCESSING");
   const imageJobId = randomUUID();
@@ -225,9 +245,24 @@ async function runMockGeneration(psid: string, userId: string, style: string): P
 
   await sendText(psid, `Perfect — applying ${style} style now (mock) ✨`);
   await sendText(psid, `Job queued: ${imageJobId}`);
+  await waitForMockProcessing();
+  await sendImage(psid, getMockImageForStyle(style));
 
   setFlowState(userId, "RESULT_READY");
   await sendStateQuickReplies(psid, "RESULT_READY", "Done. What do you want next?");
+}
+
+async function runStyleGeneration(psid: string, userId: string, style: string): Promise<void> {
+  if (isMockModeEnabled()) {
+    await runMockGeneration(psid, userId, style);
+    return;
+  }
+
+  setFlowState(userId, "PROCESSING");
+  await sendText(psid, `Perfect — applying ${style} style now ✨`);
+  await sendText(psid, "Real generation is not connected yet.");
+  setFlowState(userId, "AWAITING_STYLE");
+  await sendStylePicker(psid);
 }
 
 async function handleStyleSelection(psid: string, userId: string, style: string): Promise<void> {
@@ -240,7 +275,7 @@ async function handleStyleSelection(psid: string, userId: string, style: string)
     return;
   }
 
-  await runMockGeneration(psid, userId, style);
+  await runStyleGeneration(psid, userId, style);
 }
 
 async function handlePayload(psid: string, userId: string, payload: string): Promise<void> {
