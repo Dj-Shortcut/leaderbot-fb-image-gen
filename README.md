@@ -39,6 +39,8 @@ Copy `.env.example` to `.env` for local development and set:
 - `FB_PAGE_ACCESS_TOKEN`
 - `FB_APP_SECRET` (optional)
 - `ADMIN_TOKEN` (optional, required for `GET /debug/build`)
+- `APP_BASE_URL` (optional, defaults to `http://localhost:3000`; used for mock Messenger image attachments)
+- `MOCK_MODE` (optional, defaults to `true`)
 
 Do not commit secrets.
 

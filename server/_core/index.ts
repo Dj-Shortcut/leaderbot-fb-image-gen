@@ -73,6 +73,7 @@ async function startServer() {
         hasFbPageAccessToken: Boolean(process.env.FB_PAGE_ACCESS_TOKEN),
         hasFbAppSecret: Boolean(process.env.FB_APP_SECRET),
         hasAdminToken: Boolean(process.env.ADMIN_TOKEN),
+        hasAppBaseUrl: Boolean(process.env.APP_BASE_URL),
       },
     });
   });

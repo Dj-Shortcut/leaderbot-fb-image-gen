@@ -171,6 +171,11 @@ function normalizeStyle(input: string): Style | undefined {
 }
 
 function stylePayloadToStyle(payload: string): Style | undefined {
+  const canonicalPayloadStyle = normalizeStyle(payload);
+  if (canonicalPayloadStyle) {
+    return canonicalPayloadStyle;
+  }
+
   if (!payload.startsWith("STYLE_")) {
     return undefined;
   }
@@ -231,7 +236,7 @@ function isMockModeEnabled(): boolean {
 }
 
 function getBaseUrl(): string {
-  const configuredBaseUrl = process.env.BASE_URL?.trim();
+  const configuredBaseUrl = process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
 
   if (configuredBaseUrl && /^https?:\/\//.test(configuredBaseUrl)) {
     return configuredBaseUrl;
@@ -301,6 +306,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
 async function handleStyleSelection(psid: string, userId: string, style: Style): Promise<void> {
   const state = getOrCreateState(userId);
   setChosenStyle(userId, style);
+  safeLog("style_selected", { userId, selectedStyle: style });
 
   if (!state.lastPhoto) {
     setFlowState(userId, "AWAITING_PHOTO");

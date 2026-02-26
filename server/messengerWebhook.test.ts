@@ -35,7 +35,7 @@ describe("webhook summary logging", () => {
               },
             },
             {
-              postback: { payload: "STYLE_DISCO" },
+              postback: { payload: "disco" },
             },
             {
               read: { watermark: 1 },
@@ -241,9 +241,52 @@ describe("messenger webhook dedupe", () => {
 
         const [[, imageUrl]] = sendImageMock.mock.calls as [[string, string]];
         expect(imageUrl).toBe(`http://localhost:3000/demo/${filename}`);
-        expect(imageUrl).not.toContain("https://picsum.photos");
       }
     } finally {
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+
+  it("uses canonical quick-reply payload and APP_BASE_URL for image attachments", async () => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+
+    try {
+      const processing = processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "canonical-payload-user" },
+                message: {
+                  mid: "mid-photo-canonical",
+                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                },
+              },
+              {
+                sender: { id: "canonical-payload-user" },
+                message: {
+                  mid: "mid-style-canonical",
+                  quick_reply: { payload: "disco" },
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      await vi.advanceTimersByTimeAsync(2000);
+      await processing;
+
+      expect(sendImageMock).toHaveBeenCalledWith(
+        "canonical-payload-user",
+        "https://leaderbot-fb-image-gen.fly.dev/demo/05-paparazzi.png",
+      );
+    } finally {
+      delete process.env.APP_BASE_URL;
       randomSpy.mockRestore();
       vi.useRealTimers();
     }
@@ -355,12 +398,12 @@ describe("messenger greeting behavior", () => {
       "style-user",
       "What style should I use?",
       [
-        { content_type: "text", title: "Caricature", payload: "STYLE_CARICATURE" },
-        { content_type: "text", title: "Petals", payload: "STYLE_PETALS" },
-        { content_type: "text", title: "Gold", payload: "STYLE_GOLD" },
-        { content_type: "text", title: "Cinematic", payload: "STYLE_CINEMATIC" },
-        { content_type: "text", title: "Disco", payload: "STYLE_DISCO" },
-        { content_type: "text", title: "Clouds", payload: "STYLE_CLOUDS" },
+        { content_type: "text", title: "Caricature", payload: "caricature" },
+        { content_type: "text", title: "Petals", payload: "petals" },
+        { content_type: "text", title: "Gold", payload: "gold" },
+        { content_type: "text", title: "Cinematic", payload: "cinematic" },
+        { content_type: "text", title: "Disco", payload: "disco" },
+        { content_type: "text", title: "Clouds", payload: "clouds" },
       ],
     );
   });
