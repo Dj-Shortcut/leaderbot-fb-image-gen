@@ -1,9 +1,7 @@
-import { randomUUID } from "crypto";
 import express from "express";
 import { TtlDedupeSet } from "./dedupe";
 import { sendImage, sendQuickReplies, sendText, safeLog } from "./messengerApi";
 import { STYLE_TO_DEMO_FILE, type Style } from "./messengerStyles";
-import { recordImageJob } from "./messengerJobStore";
 import {
   anonymizePsid,
   getOrCreateState,
@@ -256,25 +254,9 @@ function getMockImageForStyle(style: string): string | undefined {
   return `${getBaseUrl()}/demo/${filename}`;
 }
 
-async function waitForMockProcessing(): Promise<void> {
-  const delayMs = 2000 + Math.floor(Math.random() * 2001);
-  await new Promise(resolve => setTimeout(resolve, delayMs));
-}
-
 async function runMockGeneration(psid: string, userId: string, style: Style): Promise<void> {
   setFlowState(userId, "PROCESSING");
-  const imageJobId = randomUUID();
-
-  recordImageJob({
-    userId,
-    style,
-    imageJobId,
-    timestamp: Date.now(),
-  });
-
-  await sendText(psid, `Perfect — applying ${STYLE_LABELS[style]} style now (mock) ✨`);
-  await sendText(psid, `Job queued: ${imageJobId}`);
-  await waitForMockProcessing();
+  await sendText(psid, `Processing ${STYLE_LABELS[style]} style ✨`);
   const imageUrl = getMockImageForStyle(style);
 
   if (!imageUrl) {
