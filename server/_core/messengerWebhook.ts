@@ -219,7 +219,10 @@ export function detectAck(raw: string | undefined | null): AckKind | null {
     return "thanks";
   }
 
-  if (/^[\p{Extended_Pictographic}]+$/u.test(text)) {
+  // Check if text is primarily emoji/pictographic characters
+  // Using a simpler approach that doesn't require ES2018+ Unicode flag
+  const emojiPattern = /[\u{1F300}-\u{1F9FF}]/u;
+  if (text.length > 0 && text.split("").every(char => /[\u{1F300}-\u{1F9FF}\s]/u.test(char))) {
     return "emoji";
   }
 
@@ -455,9 +458,26 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
     const mode = req.query["hub.mode"];
     const verifyToken = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
+    const configuredToken = process.env.FB_VERIFY_TOKEN;
 
-    if (mode === "subscribe" && verifyToken === process.env.FB_VERIFY_TOKEN) {
+    // Fail closed: require both mode and token to be properly configured and match
+    if (
+      mode === "subscribe" &&
+      typeof configuredToken === "string" &&
+      configuredToken.length > 0 &&
+      typeof verifyToken === "string" &&
+      verifyToken === configuredToken
+    ) {
       return res.status(200).type("text/plain").send(challenge);
+    }
+
+    // Log verification failures for security monitoring
+    if (mode === "subscribe") {
+      console.warn("[Webhook] Verification failed", {
+        hasToken: typeof verifyToken === "string",
+        isConfigured: typeof configuredToken === "string" && configuredToken.length > 0,
+        matches: verifyToken === configuredToken,
+      });
     }
 
     return res.sendStatus(403);

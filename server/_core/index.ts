@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./vite";
 import { registerMetaWebhookRoutes } from "./messengerWebhook";
+import { captureRawBody, verifyMetaWebhookSignature } from "./webhookSignatureVerification";
 
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
@@ -26,8 +27,20 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
+  // Capture raw body BEFORE JSON parsing for webhook signature verification
+  app.use((req, res, next) => {
+    if (req.path === "/webhook/facebook") {
+      captureRawBody(req, res, next);
+    } else {
+      next();
+    }
+  });
+
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // Verify webhook signature for Facebook webhook endpoint
+  app.use("/webhook/facebook", verifyMetaWebhookSignature);
 
   app.use((req, res, next) => {
     const startTime = process.hrtime.bigint();
@@ -41,15 +54,21 @@ async function startServer() {
         ms: Number(durationMs.toFixed(1)),
       };
 
-      console.log(JSON.stringify(log));
+      // Don't log webhook paths in detail to avoid PII leakage
+      if (!req.path.startsWith("/webhook")) {
+        console.log(JSON.stringify(log));
+      }
     });
 
     next();
   });
 
-  app.get("/healthz", (_req, res) => {
+  // Support both /health and /healthz for compatibility with Fly.io and other platforms
+  const healthHandler = (_req: express.Request, res: express.Response) => {
     res.status(200).send("ok");
-  });
+  };
+  app.get("/health", healthHandler);
+  app.get("/healthz", healthHandler);
 
   app.get("/__version", (_req, res) => {
     res.status(200).json(buildVersionPayload());
@@ -74,6 +93,10 @@ async function startServer() {
         hasFbAppSecret: Boolean(process.env.FB_APP_SECRET),
         hasAdminToken: Boolean(process.env.ADMIN_TOKEN),
         hasAppBaseUrl: Boolean(process.env.APP_BASE_URL),
+      },
+      securityStatus: {
+        webhookSignatureVerificationEnabled: Boolean(process.env.FB_APP_SECRET),
+        verifyTokenConfigured: Boolean(process.env.FB_VERIFY_TOKEN),
       },
     });
   });
@@ -181,6 +204,7 @@ async function startServer() {
   `);
   });
 
+  // Register webhook routes AFTER signature verification middleware
   registerMetaWebhookRoutes(app);
 
   registerOAuthRoutes(app);
