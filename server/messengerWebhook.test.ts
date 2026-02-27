@@ -459,6 +459,160 @@ describe("messenger webhook dedupe", () => {
     expect(safeLogMock).toHaveBeenCalledWith("generation_fail", expect.objectContaining({ mode: "openai", errorClass: "GenerationTimeoutError" }));
   });
 
+  it("style click during generation does not start a second run", async () => {
+    process.env.GENERATOR_MODE = "openai";
+    process.env.OPENAI_API_KEY = "dummy-key";
+
+    let resolveFetch: ((value: { ok: boolean; json: () => Promise<{ data: Array<{ url: string }> }> }) => void) | undefined;
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<{ ok: boolean; json: () => Promise<{ data: Array<{ url: string }> }> }>(resolve => {
+          resolveFetch = resolve;
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "busy-user" },
+                message: {
+                  mid: "mid-photo-busy",
+                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      const firstRun = processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "busy-user" },
+                message: { mid: "mid-style-busy-1", quick_reply: { payload: "disco" } },
+              },
+            ],
+          },
+        ],
+      });
+
+      await Promise.resolve();
+
+      sendImageMock.mockClear();
+      sendQuickRepliesMock.mockClear();
+      sendTextMock.mockClear();
+      safeLogMock.mockClear();
+
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "busy-user" },
+                message: { mid: "mid-style-busy-2", quick_reply: { payload: "gold" } },
+              },
+            ],
+          },
+        ],
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(safeLogMock).not.toHaveBeenCalledWith("generation_start", expect.anything());
+
+      resolveFetch?.({
+        ok: true,
+        json: async () => ({ data: [{ url: "https://cdn.example/generated.png" }] }),
+      });
+      await firstRun;
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("returns only in-progress status message for style changes while generating", async () => {
+    process.env.GENERATOR_MODE = "openai";
+    process.env.OPENAI_API_KEY = "dummy-key";
+
+    let resolveFetch: ((value: { ok: boolean; json: () => Promise<{ data: Array<{ url: string }> }> }) => void) | undefined;
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<{ ok: boolean; json: () => Promise<{ data: Array<{ url: string }> }> }>(resolve => {
+          resolveFetch = resolve;
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "busy-user-text" },
+                message: {
+                  mid: "mid-photo-busy-text",
+                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      const firstRun = processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "busy-user-text" },
+                message: { mid: "mid-style-busy-text-1", text: "disco" },
+              },
+            ],
+          },
+        ],
+      });
+
+      await Promise.resolve();
+
+      sendImageMock.mockClear();
+      sendQuickRepliesMock.mockClear();
+      sendTextMock.mockClear();
+
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "busy-user-text" },
+                message: { mid: "mid-style-busy-text-2", text: "gold" },
+              },
+            ],
+          },
+        ],
+      });
+
+      expect(sendTextMock.mock.calls).toEqual([
+        ["busy-user-text", "✨ Creating your Gold version… This takes a few seconds."],
+      ]);
+      expect(sendImageMock).not.toHaveBeenCalled();
+      expect(sendQuickRepliesMock).not.toHaveBeenCalled();
+
+      resolveFetch?.({
+        ok: true,
+        json: async () => ({ data: [{ url: "https://cdn.example/generated.png" }] }),
+      });
+      await firstRun;
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
 });
 
 describe("messenger greeting behavior", () => {

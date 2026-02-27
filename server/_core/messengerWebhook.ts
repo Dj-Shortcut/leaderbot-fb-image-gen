@@ -319,6 +319,13 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
 
 async function handleStyleSelection(psid: string, userId: string, style: Style): Promise<void> {
   const state = getOrCreateState(userId);
+
+  if (state.stage === "PROCESSING") {
+    const statusStyle = STYLE_LABELS[style];
+    await sendText(psid, `✨ Creating your ${statusStyle} version… This takes a few seconds.`);
+    return;
+  }
+
   setChosenStyle(userId, style);
   safeLog("style_selected", { user: toLogUser(userId), selectedStyle: style });
 
@@ -334,6 +341,7 @@ async function handleStyleSelection(psid: string, userId: string, style: Style):
 async function handlePayload(psid: string, userId: string, payload: string): Promise<void> {
   const selectedStyle = stylePayloadToStyle(payload);
   if (selectedStyle) {
+    getOrCreateState(userId);
     await handleStyleSelection(psid, userId, selectedStyle);
     return;
   }
@@ -394,6 +402,7 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
 
   const styleFromText = parseStyle(trimmedText);
   if (styleFromText) {
+    getOrCreateState(userId);
     await handleStyleSelection(psid, userId, styleFromText);
     return;
   }
