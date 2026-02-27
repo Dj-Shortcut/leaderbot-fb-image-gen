@@ -163,7 +163,7 @@ type GreetingResponse =
 
 export function getGreetingResponse(state: ConversationState): GreetingResponse {
   switch (state) {
-    case "PROCESSING":
+    case "GENERATING":
       return { mode: "text", text: "I’m still working on it—few seconds." };
     case "AWAITING_STYLE":
       return { mode: "quick_replies", state: "AWAITING_STYLE", text: USER_MESSAGES.stylePicker };
@@ -173,8 +173,16 @@ export function getGreetingResponse(state: ConversationState): GreetingResponse 
         state: "RESULT_READY",
         text: USER_MESSAGES.success,
       };
+    case "FAILURE":
+      return {
+        mode: "quick_replies",
+        state: "FAILURE",
+        text: "That one failed. Want to retry or pick another style?",
+      };
     case "AWAITING_PHOTO":
       return { mode: "quick_replies", state: "AWAITING_PHOTO", text: "Send a photo when you’re ready 📸" };
+    case "FAILURE":
+      return { mode: "quick_replies", state: "AWAITING_STYLE", text: "You can try again or pick a different style." };
     case "IDLE":
     default:
       return { mode: "quick_replies", state: "IDLE", text: USER_MESSAGES.idleIntro };
@@ -285,7 +293,7 @@ async function handleGreeting(psid: string, userId: string): Promise<void> {
 async function runStyleGeneration(psid: string, userId: string, style: Style): Promise<void> {
   const { mode, generator } = createImageGenerator();
 
-  setFlowState(userId, "PROCESSING");
+  setFlowState(userId, "GENERATING");
   await sendText(
     psid,
     USER_MESSAGES.generating(STYLE_LABELS[style]),
@@ -339,6 +347,27 @@ async function handleStyleSelection(psid: string, userId: string, style: Style):
 }
 
 async function handlePayload(psid: string, userId: string, payload: string): Promise<void> {
+  if (payload.startsWith("RETRY_STYLE_")) {
+    const retryStyleFromPayload = normalizeStyle(payload.slice("RETRY_STYLE_".length));
+    const state = getOrCreateState(userId);
+    const selectedStyle = normalizeStyle(state.selectedStyle ?? "") ?? retryStyleFromPayload;
+
+    if (!selectedStyle) {
+      setFlowState(userId, "AWAITING_STYLE");
+      await sendStylePicker(psid);
+      return;
+    }
+
+    if (!state.lastPhoto) {
+      setFlowState(userId, "AWAITING_PHOTO");
+      await sendStateQuickReplies(psid, "AWAITING_PHOTO", `Nice choice: ${STYLE_LABELS[selectedStyle]}. Send me a photo first 📸`);
+      return;
+    }
+
+    await runStyleGeneration(psid, userId, selectedStyle);
+    return;
+  }
+
   const selectedStyle = stylePayloadToStyle(payload);
   if (selectedStyle) {
     await handleStyleSelection(psid, userId, selectedStyle);
@@ -346,6 +375,20 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
   }
 
   if (payload === "CHOOSE_STYLE") {
+    setFlowState(userId, "AWAITING_STYLE");
+    await sendStylePicker(psid);
+    return;
+  }
+
+  if (payload === "RETRY_STYLE") {
+    const chosenStyle = getOrCreateState(userId).selectedStyle;
+    const retryStyle = chosenStyle ? parseStyle(chosenStyle) : undefined;
+
+    if (retryStyle) {
+      await handleStyleSelection(psid, userId, retryStyle);
+      return;
+    }
+
     setFlowState(userId, "AWAITING_STYLE");
     await sendStylePicker(psid);
     return;
