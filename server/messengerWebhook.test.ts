@@ -20,7 +20,7 @@ import {
   resetMessengerEventDedupe,
   summarizeWebhook,
 } from "./_core/messengerWebhook";
-import { anonymizePsid, resetStateStore, setFlowState } from "./_core/messengerState";
+import { anonymizePsid, getState, resetStateStore, setFlowState } from "./_core/messengerState";
 
 
 describe("webhook summary logging", () => {
@@ -340,8 +340,8 @@ describe("messenger webhook dedupe", () => {
         "mock-image-user",
         "Done ✅ What next?",
         [
+          { content_type: "text", title: "Download HD", payload: "DOWNLOAD_HD" },
           { content_type: "text", title: "Try another style", payload: "CHOOSE_STYLE" },
-          { content_type: "text", title: "New photo", payload: "SEND_PHOTO" },
         ],
       );
     } finally {
@@ -427,6 +427,80 @@ describe("messenger webhook dedupe", () => {
   });
 
 
+
+
+  it("keeps failure context and retries selected style with prior photo", async () => {
+    process.env.GENERATOR_MODE = "openai";
+    delete process.env.OPENAI_API_KEY;
+
+    const psid = "retry-failure-user";
+    const userId = anonymizePsid(psid);
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-photo-retry-failure",
+                attachments: [{ type: "image", payload: { url: "https://img.example/retry.jpg" } }],
+              },
+            },
+            {
+              sender: { id: psid },
+              message: { mid: "mid-style-retry-failure", text: "gold" },
+            },
+          ],
+        },
+      ],
+    });
+
+    const failedState = getState(userId);
+    expect(failedState?.stage).toBe("FAILURE");
+    expect(failedState?.lastPhoto).toBe("https://img.example/retry.jpg");
+    expect(failedState?.selectedStyle).toBe("gold");
+
+    sendTextMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              postback: { payload: "RETRY_STYLE_gold" },
+            },
+          ],
+        },
+      ],
+    });
+
+    const retriedState = getState(userId);
+    expect(retriedState?.stage).toBe("FAILURE");
+    expect(retriedState?.lastPhoto).toBe("https://img.example/retry.jpg");
+    expect(retriedState?.selectedStyle).toBe("gold");
+    expect(sendQuickRepliesMock).not.toHaveBeenCalledWith(
+      psid,
+      "What style should I use?",
+      expect.anything(),
+    );
+    expect(sendQuickRepliesMock).not.toHaveBeenCalledWith(
+      psid,
+      "Pick a style using the buttons below 🙂",
+      expect.anything(),
+    );
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      psid,
+      "Choose an option:",
+      [
+        { content_type: "text", title: "Retry Gold", payload: "RETRY_STYLE_gold" },
+        { content_type: "text", title: "Choose another style", payload: "CHOOSE_STYLE" },
+      ],
+    );
+    expect(safeLogMock).toHaveBeenCalledWith("generation_start", expect.objectContaining({ style: "gold", mode: "openai" }));
+  });
   it("shows timeout message when OpenAI generation exceeds timeout", async () => {
     process.env.GENERATOR_MODE = "openai";
     process.env.OPENAI_API_KEY = "dummy-key";
@@ -499,7 +573,7 @@ describe("messenger greeting behavior", () => {
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       "idle-user",
-      "Welcome 👋 Pick a quick start.",
+      "✨ I turn your photos into stylized images.\nSend me a picture to get started.",
       expect.arrayContaining([
         { content_type: "text", title: "Send photo", payload: "START_PHOTO" },
         { content_type: "text", title: "What is this?", payload: "WHAT_IS_THIS" },
@@ -604,7 +678,7 @@ describe("messenger greeting behavior", () => {
   it("offers follow-up quick actions when state is RESULT_READY", async () => {
     const psid = "result-user";
     const userId = anonymizePsid(psid);
-    setFlowState(userId, "RESULT_READY");
+    setFlowState(userId, "SUCCESS");
 
     await processFacebookWebhookPayload({
       entry: [
@@ -621,10 +695,38 @@ describe("messenger greeting behavior", () => {
 
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
-      "Yo 👋 Wil je nog een style proberen op dezelfde foto, of een nieuwe sturen?",
+      "✨ Your image is ready.",
       [
+        { content_type: "text", title: "Download HD", payload: "DOWNLOAD_HD" },
         { content_type: "text", title: "Try another style", payload: "CHOOSE_STYLE" },
-        { content_type: "text", title: "New photo", payload: "SEND_PHOTO" },
+      ],
+    );
+  });
+
+  it("offers retry actions when state is FAILURE", async () => {
+    const psid = "failure-user";
+    const userId = anonymizePsid(psid);
+    setFlowState(userId, "FAILURE");
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: { mid: "mid-failure-1", text: "Hey" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      psid,
+      "That one failed. Want to retry or pick another style?",
+      [
+        { content_type: "text", title: "Retry {style}", payload: "RETRY_STYLE" },
+        { content_type: "text", title: "Choose another style", payload: "CHOOSE_STYLE" },
       ],
     );
   });

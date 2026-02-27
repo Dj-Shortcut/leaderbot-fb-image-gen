@@ -134,6 +134,16 @@ const STYLE_LABELS: Record<Style, string> = {
   disco: "Disco",
   clouds: "Clouds",
 };
+
+const USER_MESSAGES = {
+  idleIntro: "✨ I turn your photos into stylized images.\nSend me a picture to get started.",
+  photoReceived: "✅ Photo received",
+  stylePicker: "🎨 Pick a style to transform your image:",
+  generating: (styleLabel: string) => `✨ Creating your ${styleLabel} version…\nThis takes a few seconds.`,
+  success: "✨ Your image is ready.",
+  failure: "⚠️ I couldn’t generate this style right now.\nYou can try again or pick a different style.",
+} as const;
+
 const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
 const SMALLTALK = new Set([
   "how are you",
@@ -153,21 +163,29 @@ type GreetingResponse =
 
 export function getGreetingResponse(state: ConversationState): GreetingResponse {
   switch (state) {
-    case "PROCESSING":
+    case "GENERATING":
       return { mode: "text", text: "I’m still working on it—few seconds." };
     case "AWAITING_STYLE":
-      return { mode: "quick_replies", state: "AWAITING_STYLE", text: "What style should I use?" };
+      return { mode: "quick_replies", state: "AWAITING_STYLE", text: USER_MESSAGES.stylePicker };
     case "RESULT_READY":
       return {
         mode: "quick_replies",
         state: "RESULT_READY",
-        text: "Yo 👋 Wil je nog een style proberen op dezelfde foto, of een nieuwe sturen?",
+        text: USER_MESSAGES.success,
+      };
+    case "FAILURE":
+      return {
+        mode: "quick_replies",
+        state: "FAILURE",
+        text: "That one failed. Want to retry or pick another style?",
       };
     case "AWAITING_PHOTO":
       return { mode: "quick_replies", state: "AWAITING_PHOTO", text: "Send a photo when you’re ready 📸" };
+    case "FAILURE":
+      return { mode: "quick_replies", state: "AWAITING_STYLE", text: "You can try again or pick a different style." };
     case "IDLE":
     default:
-      return { mode: "quick_replies", state: "IDLE", text: "Welcome 👋 Pick a quick start." };
+      return { mode: "quick_replies", state: "IDLE", text: USER_MESSAGES.idleIntro };
   }
 }
 
@@ -245,11 +263,11 @@ async function sendStateQuickReplies(psid: string, state: ConversationState, tex
 }
 
 async function sendGreeting(psid: string): Promise<void> {
-  await sendStateQuickReplies(psid, "IDLE", "Welcome 👋 Pick a quick start.");
+  await sendStateQuickReplies(psid, "IDLE", USER_MESSAGES.idleIntro);
 }
 
 async function sendStylePicker(psid: string): Promise<void> {
-  await sendStateQuickReplies(psid, "AWAITING_STYLE", "What style should I use?");
+  await sendStateQuickReplies(psid, "AWAITING_STYLE", USER_MESSAGES.stylePicker);
 }
 
 async function sendPhotoReceivedPrompt(psid: string): Promise<void> {
@@ -277,7 +295,7 @@ async function sendFailurePrompt(psid: string, style: Style, message: string): P
 }
 
 async function explainFlow(psid: string): Promise<void> {
-  await sendStateQuickReplies(psid, "IDLE", "I turn photos into stylized images. Send me a picture to start.");
+  await sendStateQuickReplies(psid, "IDLE", USER_MESSAGES.idleIntro);
 }
 
 async function handleGreeting(psid: string, userId: string): Promise<void> {
@@ -327,6 +345,8 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
       failureText = "I couldn’t generate that image right now.";
     }
 
+    await sendText(psid, USER_MESSAGES.failure);
+
     setFlowState(userId, "AWAITING_STYLE");
     await sendFailurePrompt(psid, style, failureText);
   }
@@ -347,6 +367,27 @@ async function handleStyleSelection(psid: string, userId: string, style: Style):
 }
 
 async function handlePayload(psid: string, userId: string, payload: string): Promise<void> {
+  if (payload.startsWith("RETRY_STYLE_")) {
+    const retryStyleFromPayload = normalizeStyle(payload.slice("RETRY_STYLE_".length));
+    const state = getOrCreateState(userId);
+    const selectedStyle = normalizeStyle(state.selectedStyle ?? "") ?? retryStyleFromPayload;
+
+    if (!selectedStyle) {
+      setFlowState(userId, "AWAITING_STYLE");
+      await sendStylePicker(psid);
+      return;
+    }
+
+    if (!state.lastPhoto) {
+      setFlowState(userId, "AWAITING_PHOTO");
+      await sendStateQuickReplies(psid, "AWAITING_PHOTO", `Nice choice: ${STYLE_LABELS[selectedStyle]}. Send me a photo first 📸`);
+      return;
+    }
+
+    await runStyleGeneration(psid, userId, selectedStyle);
+    return;
+  }
+
   const selectedStyle = stylePayloadToStyle(payload);
   if (selectedStyle) {
     await handleStyleSelection(psid, userId, selectedStyle);
@@ -354,6 +395,20 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
   }
 
   if (payload === "CHOOSE_STYLE") {
+    setFlowState(userId, "AWAITING_STYLE");
+    await sendStylePicker(psid);
+    return;
+  }
+
+  if (payload === "RETRY_STYLE") {
+    const chosenStyle = getOrCreateState(userId).selectedStyle;
+    const retryStyle = chosenStyle ? parseStyle(chosenStyle) : undefined;
+
+    if (retryStyle) {
+      await handleStyleSelection(psid, userId, retryStyle);
+      return;
+    }
+
     setFlowState(userId, "AWAITING_STYLE");
     await sendStylePicker(psid);
     return;
