@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./vite";
 import { registerMetaWebhookRoutes } from "./messengerWebhook";
+import { assertPrivacyConfig } from "./privacy";
 import {
   captureMetaWebhookRawBody,
   verifyMetaWebhookSignature,
@@ -26,6 +27,7 @@ function buildVersionPayload() {
 async function startServer() {
   console.log("BOOT", { pid: process.pid });
   console.log("VERSION", buildVersionPayload());
+  assertPrivacyConfig();
 
   const app = express();
   const server = createServer(app);

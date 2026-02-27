@@ -110,6 +110,7 @@ FB_VERIFY_TOKEN
 FB_PAGE_ACCESS_TOKEN
 FB_APP_SECRET
 APP_BASE_URL
+PRIVACY_PEPPER
 
 Optional:
 
@@ -147,6 +148,16 @@ Endpoint	Purpose
 📊 Logging Philosophy
 
 Structured, minimal, privacy-safe.
+
+
+## 🔒 Privacy-by-Design (Meta App Review)
+
+- We derive a pseudonymous `userKey` from Messenger PSID using `HMAC-SHA256(psid, PRIVACY_PEPPER)`.
+- `PRIVACY_PEPPER` is server-held only (Fly secret) and is required at startup.
+- Raw PSIDs are never written to logs or storage keys.
+- Logs intentionally exclude attachment URLs, message text, access tokens, and raw webhook payload bodies.
+- Input photos are processed only to fulfill the generation request and are not retained beyond operational processing needs.
+
 
 We log:
 

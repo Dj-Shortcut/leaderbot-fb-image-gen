@@ -105,6 +105,7 @@ describe("webhook summary logging", () => {
 describe("messenger webhook dedupe", () => {
   beforeEach(() => {
     process.env.MOCK_MODE = "true";
+    process.env.PRIVACY_PEPPER = "test-pepper";
     process.env.GENERATOR_MODE = "mock";
     delete process.env.OPENAI_API_KEY;
     sendImageMock.mockClear();
@@ -462,6 +463,7 @@ describe("messenger webhook dedupe", () => {
 
 describe("messenger greeting behavior", () => {
   beforeEach(() => {
+    process.env.PRIVACY_PEPPER = "test-pepper";
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
     safeLogMock.mockClear();
@@ -561,6 +563,7 @@ describe("messenger greeting behavior", () => {
 
 describe("acknowledgement edgecases", () => {
   beforeEach(() => {
+    process.env.PRIVACY_PEPPER = "test-pepper";
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
     safeLogMock.mockClear();

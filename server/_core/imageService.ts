@@ -6,7 +6,7 @@ export interface ImageGenerator {
   generate(input: {
     style: Style;
     sourceImageUrl?: string;
-    psid: string;
+    userKey: string;
   }): Promise<{ imageUrl: string }>;
 }
 
@@ -44,7 +44,7 @@ function getOpenAiTimeoutMs(): number {
 }
 
 class MockImageGenerator implements ImageGenerator {
-  async generate(input: { style: Style; sourceImageUrl?: string; psid: string }): Promise<{ imageUrl: string }> {
+  async generate(input: { style: Style; sourceImageUrl?: string; userKey: string }): Promise<{ imageUrl: string }> {
     return {
       imageUrl: getMockImageForStyle(input.style),
     };
@@ -52,7 +52,7 @@ class MockImageGenerator implements ImageGenerator {
 }
 
 export class OpenAiImageGenerator implements ImageGenerator {
-  async generate(input: { style: Style; sourceImageUrl?: string; psid: string }): Promise<{ imageUrl: string }> {
+  async generate(input: { style: Style; sourceImageUrl?: string; userKey: string }): Promise<{ imageUrl: string }> {
     if (!input.style) {
       throw new InvalidGenerationInputError("Style is required");
     }

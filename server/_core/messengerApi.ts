@@ -1,26 +1,5 @@
 const GRAPH_API_VERSION = "v21.0";
 
-function redactImageUrlForLog(imageUrl: string): string {
-  try {
-    const parsed = new URL(imageUrl);
-    return `${parsed.origin}${parsed.pathname}`;
-  } catch {
-    return "invalid_url";
-  }
-}
-
-function isLikelyHtmlPageUrl(imageUrl: string): boolean {
-  try {
-    const parsed = new URL(imageUrl);
-    return (
-      parsed.hostname === "commons.wikimedia.org" &&
-      parsed.pathname.startsWith("/wiki/")
-    );
-  } catch {
-    return false;
-  }
-}
-
 type QuickReply = {
   content_type: "text";
   title: string;
@@ -73,17 +52,32 @@ async function sendMessage(
   }
 }
 
+function shouldDropLogKey(key: string): boolean {
+  const lowered = key.toLowerCase();
+  return ["token", "psid", "text", "url", "payload", "attachment", "message", "sender", "body"].some(fragment =>
+    lowered.includes(fragment)
+  );
+}
+
+function redactLogDetails(details: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(details)
+      .filter(([key]) => !shouldDropLogKey(key))
+      .map(([key, value]) => {
+        if (typeof value === "string" && key === "user") {
+          return [key, value.slice(0, 8)];
+        }
+
+        return [key, value];
+      })
+  );
+}
+
 export function safeLog(
   event: string,
   details: Record<string, unknown> = {}
 ): void {
-  const redacted = Object.fromEntries(
-    Object.entries(details).filter(
-      ([key]) => !key.toLowerCase().includes("token")
-    )
-  );
-
-  console.log(`[messenger] ${event}`, redacted);
+  console.log(`[messenger] ${event}`, redactLogDetails(details));
 }
 
 export async function sendText(psid: string, text: string): Promise<void> {
@@ -117,20 +111,7 @@ export async function sendGenericTemplate(
 }
 
 export async function sendImage(psid: string, imageUrl: string): Promise<void> {
-  const loggedImageUrl = redactImageUrlForLog(imageUrl);
-  const likelyHtmlPageUrl = isLikelyHtmlPageUrl(imageUrl);
-
-  safeLog("messenger_image_send", {
-    imageUrl: loggedImageUrl,
-    likelyHtmlPageUrl,
-  });
-
-  if (likelyHtmlPageUrl) {
-    safeLog("messenger_image_send_warning", {
-      reason: "likely_html_page_url",
-      imageUrl: loggedImageUrl,
-    });
-  }
+  safeLog("messenger_image_send", {});
 
   await sendMessage(psid, {
     attachment: {
