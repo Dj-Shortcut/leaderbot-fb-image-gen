@@ -1,6 +1,8 @@
 import { createHmac } from "node:crypto";
 import type { Request, Response, NextFunction } from "express";
 
+type MetaWebhookRequest = Request & { rawBody?: Buffer };
+
 /**
  * Verifies Meta webhook signature using HMAC-SHA256
  * Protects against forged webhook events
@@ -28,7 +30,7 @@ export function verifyMetaWebhookSignature(
   }
 
   // Get raw body (must be captured before JSON parsing)
-  const rawBody = (req as any).rawBody as Buffer | string;
+  const rawBody = (req as MetaWebhookRequest).rawBody;
   if (!rawBody) {
     console.error("[Webhook] Raw body not available for signature verification");
     res.status(500).json({ error: "Server misconfiguration" });
@@ -36,9 +38,8 @@ export function verifyMetaWebhookSignature(
   }
 
   // Recreate signature
-  const bodyString = typeof rawBody === "string" ? rawBody : rawBody.toString("utf-8");
   const expectedSignature = createHmac("sha256", appSecret)
-    .update(bodyString)
+    .update(rawBody)
     .digest("hex");
 
   const expectedHeader = `sha256=${expectedSignature}`;
@@ -75,23 +76,18 @@ function constantTimeCompare(a: string, b: string): boolean {
   return result === 0;
 }
 
-/**
- * Middleware to capture raw body for signature verification
- * Must be applied BEFORE express.json()
- */
-export function captureRawBody(
+export function captureMetaWebhookRawBody(
   req: Request,
-  res: Response,
-  next: NextFunction
+  _res: Response,
+  buf: Buffer
 ): void {
-  let rawBody = "";
+  if (!req.originalUrl.startsWith("/webhook")) {
+    return;
+  }
 
-  req.on("data", (chunk: Buffer) => {
-    rawBody += chunk.toString("utf-8");
-  });
+  if (!buf.length) {
+    return;
+  }
 
-  req.on("end", () => {
-    (req as any).rawBody = rawBody;
-    next();
-  });
+  (req as MetaWebhookRequest).rawBody = Buffer.from(buf);
 }

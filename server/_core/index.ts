@@ -8,7 +8,10 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./vite";
 import { registerMetaWebhookRoutes } from "./messengerWebhook";
-import { captureRawBody, verifyMetaWebhookSignature } from "./webhookSignatureVerification";
+import {
+  captureMetaWebhookRawBody,
+  verifyMetaWebhookSignature,
+} from "./webhookSignatureVerification";
 
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
@@ -27,16 +30,12 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
-  // Capture raw body BEFORE JSON parsing for webhook signature verification
-  app.use((req, res, next) => {
-    if (req.path === "/webhook/facebook") {
-      captureRawBody(req, res, next);
-    } else {
-      next();
-    }
-  });
-
-  app.use(express.json({ limit: "50mb" }));
+  app.use(
+    express.json({
+      limit: "50mb",
+      verify: captureMetaWebhookRawBody,
+    })
+  );
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // Verify webhook signature for Facebook webhook endpoint
