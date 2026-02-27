@@ -47,12 +47,20 @@ export async function setupVite(app: Express, server: Server, createViteServer: 
   });
 }
 
-export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "..", "public");
-  if (!fs.existsSync(distPath)) {
+export function serveStatic(app: Express, staticRoot?: string) {
+  const distPathCandidates = staticRoot
+    ? [path.resolve(staticRoot)]
+    : [
+        path.resolve(import.meta.dirname, "public"),
+        path.resolve(import.meta.dirname, "..", "public"),
+      ];
+  const distPath = distPathCandidates.find((candidate) => fs.existsSync(candidate));
+
+  if (!distPath) {
     console.error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`
+      `Could not find a build directory. Tried: ${distPathCandidates.join(", ")}. Make sure to build the client first.`
     );
+    return;
   }
 
   app.use(express.static(distPath));
