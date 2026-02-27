@@ -20,7 +20,7 @@ import {
   resetMessengerEventDedupe,
   summarizeWebhook,
 } from "./_core/messengerWebhook";
-import { anonymizePsid, resetStateStore, setFlowState } from "./_core/messengerState";
+import { anonymizePsid, resetStateStore, setFlowState, setLastGenerated } from "./_core/messengerState";
 
 
 describe("webhook summary logging", () => {
@@ -568,6 +568,68 @@ describe("messenger greeting behavior", () => {
     );
   });
 
+
+
+  it("handles DOWNLOAD_HD quick reply by re-sending the latest generated image", async () => {
+    const psid = "download-hd-user";
+    const userId = anonymizePsid(psid);
+    setLastGenerated(userId, "disco", "https://cdn.example/hd-image.png");
+    setFlowState(userId, "SUCCESS");
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-download-hd",
+                quick_reply: { payload: "DOWNLOAD_HD" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendImageMock).toHaveBeenCalledWith(psid, "https://cdn.example/hd-image.png");
+    expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
+      psid,
+      "Here’s your latest image again.",
+      [
+        { content_type: "text", title: "Download HD", payload: "DOWNLOAD_HD" },
+        { content_type: "text", title: "Try another style", payload: "CHOOSE_STYLE" },
+      ],
+    );
+  });
+
+  it("guides users to generate first when DOWNLOAD_HD is tapped without a result", async () => {
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "download-hd-empty-user" },
+              message: {
+                mid: "mid-download-hd-empty",
+                quick_reply: { payload: "DOWNLOAD_HD" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      "download-hd-empty-user",
+      "I can share HD downloads after I generate an image.",
+    );
+    expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
+      "download-hd-empty-user",
+      "Send a photo when you’re ready 📸",
+      [{ content_type: "text", title: "Send photo", payload: "SEND_PHOTO" }],
+    );
+  });
   it("offers retry actions when state is FAILURE", async () => {
     const psid = "failure-user";
     const userId = anonymizePsid(psid);

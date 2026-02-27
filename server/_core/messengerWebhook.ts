@@ -1,7 +1,7 @@
 import express from "express";
 import { TtlDedupeSet } from "./dedupe";
 import { sendImage, sendQuickReplies, sendText, safeLog } from "./messengerApi";
-import { type Style } from "./messengerStyles";
+import { type Style, type StyleId } from "./messengerStyles";
 import {
   createImageGenerator,
   GenerationTimeoutError,
@@ -15,6 +15,7 @@ import {
   pruneOldState,
   setChosenStyle,
   setFlowState,
+  setLastGenerated,
   setPendingImage,
   type ConversationState,
 } from "./messengerState";
@@ -133,6 +134,15 @@ const STYLE_LABELS: Record<Style, string> = {
   cinematic: "Cinematic",
   disco: "Disco",
   clouds: "Clouds",
+};
+
+const STYLE_IDS_BY_STYLE: Record<Style, StyleId> = {
+  caricature: "STYLE_CARICATURE",
+  petals: "STYLE_PETALS",
+  gold: "STYLE_GOLD",
+  cinematic: "STYLE_CINEMATIC",
+  disco: "STYLE_DISCO",
+  clouds: "STYLE_CLOUDS",
 };
 const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
 const SMALLTALK = new Set([
@@ -298,6 +308,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
 
     safeLog("generation_success", { mode, ms: Date.now() - startedAt });
     await sendImage(psid, imageUrl);
+    setLastGenerated(userId, STYLE_IDS_BY_STYLE[style], imageUrl);
     setFlowState(userId, "SUCCESS");
     await sendStateQuickReplies(psid, "SUCCESS", "Done. What do you want next?");
   } catch (error) {
@@ -344,6 +355,28 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
   if (payload === "CHOOSE_STYLE") {
     setFlowState(userId, "AWAITING_STYLE");
     await sendStylePicker(psid);
+    return;
+  }
+
+  if (payload === "DOWNLOAD_HD") {
+    const state = getOrCreateState(userId);
+
+    if (state.lastImageUrl) {
+      await sendImage(psid, state.lastImageUrl);
+      await sendStateQuickReplies(psid, "SUCCESS", "Here’s your latest image again.");
+      return;
+    }
+
+    await sendText(psid, "I can share HD downloads after I generate an image.");
+
+    if (state.lastPhoto) {
+      setFlowState(userId, "AWAITING_STYLE");
+      await sendStylePicker(psid);
+      return;
+    }
+
+    setFlowState(userId, "AWAITING_PHOTO");
+    await sendStateQuickReplies(psid, "AWAITING_PHOTO", "Send a photo when you’re ready 📸");
     return;
   }
 
