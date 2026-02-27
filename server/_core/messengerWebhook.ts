@@ -165,6 +165,8 @@ export function getGreetingResponse(state: ConversationState): GreetingResponse 
       };
     case "AWAITING_PHOTO":
       return { mode: "quick_replies", state: "AWAITING_PHOTO", text: "Send a photo when you’re ready 📸" };
+    case "FAILURE":
+      return { mode: "quick_replies", state: "AWAITING_STYLE", text: "You can try again or pick a different style." };
     case "IDLE":
     default:
       return { mode: "quick_replies", state: "IDLE", text: "Welcome 👋 Pick a quick start." };
@@ -221,7 +223,7 @@ export function detectAck(raw: string | undefined | null): AckKind | null {
   // Check if text is primarily emoji/pictographic characters
   // Using a simpler approach that doesn't require ES2018+ Unicode flag
   const emojiPattern = /[\u{1F300}-\u{1F9FF}]/u;
-  if (text.length > 0 && text.split("").every(char => /[\u{1F300}-\u{1F9FF}\s]/u.test(char))) {
+  if (text.length > 0 && Array.from(text).every(char => /[\u{1F300}-\u{1F9FF}\s]/u.test(char))) {
     return "emoji";
   }
 
@@ -303,17 +305,27 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
 
     if (error instanceof MissingOpenAiApiKeyError) {
       safeLog("openai_not_configured", { mode });
-      await sendText(psid, "AI generation isn’t enabled yet.");
     } else if (error instanceof GenerationTimeoutError) {
-      await sendText(psid, "This took too long — please try again.");
+      safeLog("generation_timeout", { mode });
     } else if (error instanceof InvalidGenerationInputError || error instanceof OpenAiGenerationError) {
-      await sendText(psid, "I couldn’t generate that image right now. Please try again.");
-    } else {
-      await sendText(psid, "I couldn’t generate that image right now. Please try again.");
+      safeLog("generation_invalid_input_or_openai_error", { mode });
     }
 
-    setFlowState(userId, "AWAITING_STYLE");
-    await sendStylePicker(psid);
+    setFlowState(userId, "FAILURE");
+    await sendText(psid, "⚠️ I couldn’t generate this style right now.");
+    await sendText(psid, "You can try again or pick a different style.");
+    await sendQuickReplies(psid, "Choose an option:", [
+      {
+        content_type: "text",
+        title: `Retry ${STYLE_LABELS[style]}`,
+        payload: `RETRY_STYLE_${style}`,
+      },
+      {
+        content_type: "text",
+        title: "Choose another style",
+        payload: "CHOOSE_STYLE",
+      },
+    ]);
   }
 }
 
@@ -332,6 +344,27 @@ async function handleStyleSelection(psid: string, userId: string, style: Style):
 }
 
 async function handlePayload(psid: string, userId: string, payload: string): Promise<void> {
+  if (payload.startsWith("RETRY_STYLE_")) {
+    const retryStyleFromPayload = normalizeStyle(payload.slice("RETRY_STYLE_".length));
+    const state = getOrCreateState(userId);
+    const selectedStyle = normalizeStyle(state.selectedStyle ?? "") ?? retryStyleFromPayload;
+
+    if (!selectedStyle) {
+      setFlowState(userId, "AWAITING_STYLE");
+      await sendStylePicker(psid);
+      return;
+    }
+
+    if (!state.lastPhoto) {
+      setFlowState(userId, "AWAITING_PHOTO");
+      await sendStateQuickReplies(psid, "AWAITING_PHOTO", `Nice choice: ${STYLE_LABELS[selectedStyle]}. Send me a photo first 📸`);
+      return;
+    }
+
+    await runStyleGeneration(psid, userId, selectedStyle);
+    return;
+  }
+
   const selectedStyle = stylePayloadToStyle(payload);
   if (selectedStyle) {
     await handleStyleSelection(psid, userId, selectedStyle);
