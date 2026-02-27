@@ -236,10 +236,7 @@ export function detectAck(raw: string | undefined | null): AckKind | null {
     return "thanks";
   }
 
-  // Check if text is primarily emoji/pictographic characters.
-  const emojiOrSpacePattern = /[\p{Extended_Pictographic}\s\uFE0F]/u;
-  const graphemes = Array.from(text);
-  if (graphemes.length > 0 && graphemes.every(char => emojiOrSpacePattern.test(char))) {
+  if (text.length > 0 && Array.from(text).every(char => /[\p{Extended_Pictographic}\s]/u.test(char))) {
     return "emoji";
   }
 
@@ -273,6 +270,30 @@ async function sendStylePicker(psid: string): Promise<void> {
   await sendStateQuickReplies(psid, "AWAITING_STYLE", USER_MESSAGES.stylePicker);
 }
 
+async function sendPhotoReceivedPrompt(psid: string): Promise<void> {
+  await sendStateQuickReplies(psid, "AWAITING_STYLE", "Photo received ✅ Pick a style below 🙂");
+}
+
+async function sendGeneratingPrompt(psid: string, style: Style, mode: string): Promise<void> {
+  await sendText(
+    psid,
+    mode === "mock"
+      ? `Processing ${STYLE_LABELS[style]} style ✨`
+      : `Perfect — applying ${STYLE_LABELS[style]} style now ✨`,
+  );
+}
+
+async function sendSuccessPrompt(psid: string): Promise<void> {
+  await sendStateQuickReplies(psid, "RESULT_READY", "Done ✅ What next?");
+}
+
+async function sendFailurePrompt(psid: string, style: Style, message: string): Promise<void> {
+  await sendQuickReplies(psid, message, [
+    { content_type: "text", title: "Retry this style", payload: style },
+    { content_type: "text", title: "Choose another style", payload: "CHOOSE_STYLE" },
+  ]);
+}
+
 async function explainFlow(psid: string): Promise<void> {
   await sendStateQuickReplies(psid, "IDLE", USER_MESSAGES.idleIntro);
 }
@@ -293,11 +314,8 @@ async function handleGreeting(psid: string, userId: string): Promise<void> {
 async function runStyleGeneration(psid: string, userId: string, style: Style): Promise<void> {
   const { mode, generator } = createImageGenerator();
 
-  setFlowState(userId, "GENERATING");
-  await sendText(
-    psid,
-    USER_MESSAGES.generating(STYLE_LABELS[style]),
-  );
+  setFlowState(userId, "PROCESSING");
+  await sendGeneratingPrompt(psid, style, mode);
 
   const startedAt = Date.now();
   safeLog("generation_start", { style, mode });
@@ -312,23 +330,25 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
     safeLog("generation_success", { mode, ms: Date.now() - startedAt });
     await sendImage(psid, imageUrl);
     setFlowState(userId, "RESULT_READY");
-    await sendStateQuickReplies(psid, "RESULT_READY", USER_MESSAGES.success);
+    await sendSuccessPrompt(psid);
   } catch (error) {
     const errorClass = error instanceof Error ? error.constructor.name : "UnknownError";
     safeLog("generation_fail", { mode, errorClass, ms: Date.now() - startedAt });
 
+    let failureText = "I couldn’t generate that image right now.";
     if (error instanceof MissingOpenAiApiKeyError) {
       safeLog("openai_not_configured", { mode });
+      failureText = "AI generation isn’t enabled yet.";
     } else if (error instanceof GenerationTimeoutError) {
-      // Timeout falls through to the same user-facing retry guidance.
+      failureText = "This took too long.";
     } else if (error instanceof InvalidGenerationInputError || error instanceof OpenAiGenerationError) {
-      // Known generation errors share the same user-facing retry guidance.
+      failureText = "I couldn’t generate that image right now.";
     }
 
     await sendText(psid, USER_MESSAGES.failure);
 
     setFlowState(userId, "AWAITING_STYLE");
-    await sendStylePicker(psid);
+    await sendFailurePrompt(psid, style, failureText);
   }
 }
 
@@ -423,9 +443,8 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
 
   const imageAttachment = message.attachments?.find(att => att.type === "image" && att.payload?.url);
   if (imageAttachment?.payload?.url) {
-    await sendText(psid, USER_MESSAGES.photoReceived);
     setPendingImage(userId, imageAttachment.payload.url);
-    await sendStylePicker(psid);
+    await sendPhotoReceivedPrompt(psid);
     return;
   }
 
