@@ -206,7 +206,12 @@ async function startServer() {
   // Register webhook routes AFTER signature verification middleware
   registerMetaWebhookRoutes(app);
 
-  registerOAuthRoutes(app);
+  const oauthServerUrl = process.env.OAUTH_SERVER_URL;
+  if (oauthServerUrl) {
+    registerOAuthRoutes(app);
+  } else {
+    console.info("[OAuth] OAUTH_SERVER_URL not set, skipping OAuth route initialization");
+  }
   registerChatRoutes(app);
   app.use(
     "/api/trpc",
