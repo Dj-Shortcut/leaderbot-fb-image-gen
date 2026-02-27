@@ -175,7 +175,7 @@ describe("messenger webhook dedupe", () => {
     });
 
     expect(sendTextMock).toHaveBeenCalledTimes(1);
-    expect(sendTextMock).toHaveBeenCalledWith("echo-user", "Photo received ✅");
+    expect(sendTextMock).toHaveBeenCalledWith("echo-user", "✅ Photo received");
     expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
   });
 
@@ -335,7 +335,7 @@ describe("messenger webhook dedupe", () => {
       );
       expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
         "mock-image-user",
-        "Done. What do you want next?",
+        "✨ Your image is ready.",
         [
           { content_type: "text", title: "Download HD", payload: "DOWNLOAD_HD" },
           { content_type: "text", title: "Try another style", payload: "CHOOSE_STYLE" },
@@ -371,16 +371,7 @@ describe("messenger webhook dedupe", () => {
       ],
     });
 
-    expect(sendTextMock).toHaveBeenNthCalledWith(3, "openai-missing-key-user", "⚠️ I couldn’t generate this style right now.");
-    expect(sendTextMock).toHaveBeenNthCalledWith(4, "openai-missing-key-user", "You can try again or pick a different style.");
-    expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
-      "openai-missing-key-user",
-      "Choose an option:",
-      [
-        { content_type: "text", title: "Retry Disco", payload: "RETRY_STYLE_disco" },
-        { content_type: "text", title: "Choose another style", payload: "CHOOSE_STYLE" },
-      ],
-    );
+    expect(sendTextMock).toHaveBeenCalledWith("openai-missing-key-user", "⚠️ I couldn’t generate this style right now.\nYou can try again or pick a different style.");
     expect(sendImageMock).not.toHaveBeenCalled();
     expect(safeLogMock).toHaveBeenCalledWith("generation_start", expect.objectContaining({ style: "disco", mode: "openai" }));
     expect(safeLogMock).toHaveBeenCalledWith("generation_fail", expect.objectContaining({ mode: "openai", errorClass: "MissingOpenAiApiKeyError" }));
@@ -538,8 +529,7 @@ describe("messenger webhook dedupe", () => {
       vi.unstubAllGlobals();
     }
 
-    expect(sendTextMock).toHaveBeenNthCalledWith(3, "openai-timeout-user", "⚠️ I couldn’t generate this style right now.");
-    expect(sendTextMock).toHaveBeenNthCalledWith(4, "openai-timeout-user", "You can try again or pick a different style.");
+    expect(sendTextMock).toHaveBeenCalledWith("openai-timeout-user", "⚠️ I couldn’t generate this style right now.\nYou can try again or pick a different style.");
     expect(safeLogMock).toHaveBeenCalledWith("generation_fail", expect.objectContaining({ mode: "openai", errorClass: "GenerationTimeoutError" }));
   });
 
@@ -572,7 +562,7 @@ describe("messenger greeting behavior", () => {
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       "idle-user",
-      "Welcome 👋 Pick a quick start.",
+      "✨ I turn your photos into stylized images.\nSend me a picture to get started.",
       expect.arrayContaining([
         { content_type: "text", title: "Send photo", payload: "START_PHOTO" },
         { content_type: "text", title: "What is this?", payload: "WHAT_IS_THIS" },
@@ -601,10 +591,10 @@ describe("messenger greeting behavior", () => {
       ],
     });
 
-    expect(sendTextMock).toHaveBeenCalledWith("style-user", "Photo received ✅");
+    expect(sendTextMock).toHaveBeenCalledWith("style-user", "✅ Photo received");
     expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
       "style-user",
-      "What style should I use?",
+      "🎨 Pick a style to transform your image:",
       [
         { content_type: "text", title: "Caricature", payload: "caricature" },
         { content_type: "text", title: "Petals", payload: "petals" },
@@ -636,7 +626,7 @@ describe("messenger greeting behavior", () => {
 
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
-      "Yo 👋 Wil je nog een style proberen op dezelfde foto, of een nieuwe sturen?",
+      "✨ Your image is ready.",
       [
         { content_type: "text", title: "Download HD", payload: "DOWNLOAD_HD" },
         { content_type: "text", title: "Try another style", payload: "CHOOSE_STYLE" },
