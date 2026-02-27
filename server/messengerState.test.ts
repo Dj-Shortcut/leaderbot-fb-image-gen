@@ -50,10 +50,14 @@ describe("messenger state flow", () => {
       { title: "Disco", payload: "disco" },
       { title: "Clouds", payload: "clouds" },
     ]);
-    expect(getQuickRepliesForState("PROCESSING")).toEqual([]);
-    expect(getQuickRepliesForState("RESULT_READY")).toEqual([
+    expect(getQuickRepliesForState("GENERATING")).toEqual([]);
+    expect(getQuickRepliesForState("SUCCESS")).toEqual([
+      { title: "Download HD", payload: "DOWNLOAD_HD" },
       { title: "Try another style", payload: "CHOOSE_STYLE" },
-      { title: "New photo", payload: "SEND_PHOTO" },
+    ]);
+    expect(getQuickRepliesForState("FAILURE")).toEqual([
+      { title: "Retry {style}", payload: "RETRY_STYLE" },
+      { title: "Choose another style", payload: "CHOOSE_STYLE" },
     ]);
   });
 

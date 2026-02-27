@@ -337,8 +337,8 @@ describe("messenger webhook dedupe", () => {
         "mock-image-user",
         "Done. What do you want next?",
         [
+          { content_type: "text", title: "Download HD", payload: "DOWNLOAD_HD" },
           { content_type: "text", title: "Try another style", payload: "CHOOSE_STYLE" },
-          { content_type: "text", title: "New photo", payload: "SEND_PHOTO" },
         ],
       );
     } finally {
@@ -372,6 +372,14 @@ describe("messenger webhook dedupe", () => {
     });
 
     expect(sendTextMock).toHaveBeenCalledWith("openai-missing-key-user", "AI generation isn’t enabled yet.");
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      "openai-missing-key-user",
+      "I couldn’t finish that style. What do you want to do?",
+      [
+        { content_type: "text", title: "Retry {style}", payload: "RETRY_STYLE" },
+        { content_type: "text", title: "Choose another style", payload: "CHOOSE_STYLE" },
+      ],
+    );
     expect(sendImageMock).not.toHaveBeenCalled();
     expect(safeLogMock).toHaveBeenCalledWith("generation_start", expect.objectContaining({ style: "disco", mode: "openai" }));
     expect(safeLogMock).toHaveBeenCalledWith("generation_fail", expect.objectContaining({ mode: "openai", errorClass: "MissingOpenAiApiKeyError" }));
@@ -520,7 +528,7 @@ describe("messenger greeting behavior", () => {
     expect(sendTextMock).toHaveBeenCalledWith("style-user", "Photo received ✅");
     expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
       "style-user",
-      "Pick a style using the buttons below 🙂",
+      "What style should I use?",
       [
         { content_type: "text", title: "Caricature", payload: "caricature" },
         { content_type: "text", title: "Petals", payload: "petals" },
@@ -532,10 +540,10 @@ describe("messenger greeting behavior", () => {
     );
   });
 
-  it("offers follow-up quick actions when state is RESULT_READY", async () => {
+  it("offers follow-up quick actions when state is SUCCESS", async () => {
     const psid = "result-user";
     const userId = anonymizePsid(psid);
-    setFlowState(userId, "RESULT_READY");
+    setFlowState(userId, "SUCCESS");
 
     await processFacebookWebhookPayload({
       entry: [
@@ -554,8 +562,36 @@ describe("messenger greeting behavior", () => {
       psid,
       "Yo 👋 Wil je nog een style proberen op dezelfde foto, of een nieuwe sturen?",
       [
+        { content_type: "text", title: "Download HD", payload: "DOWNLOAD_HD" },
         { content_type: "text", title: "Try another style", payload: "CHOOSE_STYLE" },
-        { content_type: "text", title: "New photo", payload: "SEND_PHOTO" },
+      ],
+    );
+  });
+
+  it("offers retry actions when state is FAILURE", async () => {
+    const psid = "failure-user";
+    const userId = anonymizePsid(psid);
+    setFlowState(userId, "FAILURE");
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: { mid: "mid-failure-1", text: "Hey" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      psid,
+      "That one failed. Want to retry or pick another style?",
+      [
+        { content_type: "text", title: "Retry {style}", payload: "RETRY_STYLE" },
+        { content_type: "text", title: "Choose another style", payload: "CHOOSE_STYLE" },
       ],
     );
   });
