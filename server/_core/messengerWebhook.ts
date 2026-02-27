@@ -15,6 +15,7 @@ import {
   pruneOldState,
   setChosenStyle,
   setFlowState,
+  setLastGenerated,
   setPendingImage,
   type ConversationState,
 } from "./messengerState";
@@ -144,6 +145,9 @@ const USER_MESSAGES = {
   failure: "⚠️ I couldn’t generate this style right now.\nYou can try again or pick a different style.",
 } as const;
 
+const PHOTO_PROMPT = "Send a photo when you're ready 📷";
+const PHOTO_REQUIRED_PROMPT = "Send a photo first 📷";
+
 const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
 const SMALLTALK = new Set([
   "how are you",
@@ -163,7 +167,7 @@ type GreetingResponse =
 
 export function getGreetingResponse(state: ConversationState): GreetingResponse {
   switch (state) {
-    case "GENERATING":
+    case "PROCESSING":
       return { mode: "text", text: "I’m still working on it—few seconds." };
     case "AWAITING_STYLE":
       return { mode: "quick_replies", state: "AWAITING_STYLE", text: USER_MESSAGES.stylePicker };
@@ -180,9 +184,7 @@ export function getGreetingResponse(state: ConversationState): GreetingResponse 
         text: "That one failed. Want to retry or pick another style?",
       };
     case "AWAITING_PHOTO":
-      return { mode: "quick_replies", state: "AWAITING_PHOTO", text: "Send a photo when you’re ready 📸" };
-    case "FAILURE":
-      return { mode: "quick_replies", state: "AWAITING_STYLE", text: "You can try again or pick a different style." };
+      return { mode: "text", text: PHOTO_PROMPT };
     case "IDLE":
     default:
       return { mode: "quick_replies", state: "IDLE", text: USER_MESSAGES.idleIntro };
@@ -271,7 +273,7 @@ async function sendStylePicker(psid: string): Promise<void> {
 }
 
 async function sendPhotoReceivedPrompt(psid: string): Promise<void> {
-  await sendStateQuickReplies(psid, "AWAITING_STYLE", "Photo received ✅ Pick a style below 🙂");
+  await sendStylePicker(psid);
 }
 
 async function sendGeneratingPrompt(psid: string, style: Style, mode: string): Promise<void> {
@@ -329,6 +331,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
 
     safeLog("generation_success", { mode, ms: Date.now() - startedAt });
     await sendImage(psid, imageUrl);
+    setLastGenerated(userId, style, imageUrl);
     setFlowState(userId, "RESULT_READY");
     await sendSuccessPrompt(psid);
   } catch (error) {
@@ -366,7 +369,7 @@ async function handleStyleSelection(psid: string, userId: string, style: Style):
 
   if (!state.lastPhoto) {
     setFlowState(userId, "AWAITING_PHOTO");
-    await sendStateQuickReplies(psid, "AWAITING_PHOTO", `Nice choice: ${STYLE_LABELS[style]}. Send me a photo first 📸`);
+    await sendText(psid, PHOTO_REQUIRED_PROMPT);
     return;
   }
 
@@ -387,7 +390,7 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
 
     if (!state.lastPhoto) {
       setFlowState(userId, "AWAITING_PHOTO");
-      await sendStateQuickReplies(psid, "AWAITING_PHOTO", `Nice choice: ${STYLE_LABELS[selectedStyle]}. Send me a photo first 📸`);
+      await sendText(psid, PHOTO_REQUIRED_PROMPT);
       return;
     }
 
@@ -429,7 +432,21 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
 
   if (payload === "START_PHOTO" || payload === "SEND_PHOTO") {
     setFlowState(userId, "AWAITING_PHOTO");
-    await sendStateQuickReplies(psid, "AWAITING_PHOTO", "Send a photo when you’re ready 📸");
+    await sendText(psid, PHOTO_PROMPT);
+    return;
+  }
+
+  if (payload === "DOWNLOAD_HD") {
+    const state = getOrCreateState(userId);
+
+    if (state.lastImageUrl) {
+      await sendImage(psid, state.lastImageUrl);
+      return;
+    }
+
+    await sendText(psid, "I can share HD downloads after I generate an image.");
+    setFlowState(userId, "AWAITING_PHOTO");
+    await sendText(psid, PHOTO_PROMPT);
     return;
   }
 
@@ -452,6 +469,7 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
   const imageAttachment = message.attachments?.find(att => att.type === "image" && att.payload?.url);
   if (imageAttachment?.payload?.url) {
     setPendingImage(userId, imageAttachment.payload.url);
+    setFlowState(userId, "AWAITING_STYLE");
     await sendPhotoReceivedPrompt(psid);
     return;
   }
@@ -473,6 +491,13 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
   if (styleFromText) {
     getOrCreateState(userId);
     await handleStyleSelection(psid, userId, styleFromText);
+    return;
+  }
+
+  const state = getOrCreateState(userId);
+  if (!state.lastPhoto) {
+    setFlowState(userId, "AWAITING_PHOTO");
+    await sendText(psid, PHOTO_PROMPT);
     return;
   }
 

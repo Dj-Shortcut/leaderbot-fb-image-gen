@@ -2,10 +2,17 @@ import { describe, expect, it } from "vitest";
 import { getGreetingResponse } from "./_core/messengerWebhook";
 
 describe("greeting handling by conversation state", () => {
-  it("returns processing text while GENERATING", () => {
-    expect(getGreetingResponse("GENERATING")).toEqual({
+  it("returns processing text while PROCESSING", () => {
+    expect(getGreetingResponse("PROCESSING")).toEqual({
       mode: "text",
       text: "I’m still working on it—few seconds.",
+    });
+  });
+
+  it("returns plain photo prompt while AWAITING_PHOTO", () => {
+    expect(getGreetingResponse("AWAITING_PHOTO")).toEqual({
+      mode: "text",
+      text: "Send a photo when you're ready 📷",
     });
   });
 
@@ -17,8 +24,8 @@ describe("greeting handling by conversation state", () => {
     });
   });
 
-  it("returns follow-up options while SUCCESS", () => {
-    expect(getGreetingResponse("SUCCESS")).toEqual({
+  it("returns follow-up options while RESULT_READY", () => {
+    expect(getGreetingResponse("RESULT_READY")).toEqual({
       mode: "quick_replies",
       state: "RESULT_READY",
       text: "✨ Your image is ready.",

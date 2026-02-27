@@ -40,7 +40,7 @@ const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
     { title: "Send photo", payload: "START_PHOTO" },
     { title: "What is this?", payload: "WHAT_IS_THIS" },
   ],
-  AWAITING_PHOTO: [{ title: "Send photo", payload: "SEND_PHOTO" }],
+  AWAITING_PHOTO: [],
   AWAITING_STYLE: [
     { title: "Caricature", payload: "caricature" },
     { title: "Petals", payload: "petals" },
@@ -49,8 +49,8 @@ const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
     { title: "Disco", payload: "disco" },
     { title: "Clouds", payload: "clouds" },
   ],
-  GENERATING: [],
-  SUCCESS: [
+  PROCESSING: [],
+  RESULT_READY: [
     { title: "Download HD", payload: "DOWNLOAD_HD" },
     { title: "Try another style", payload: "CHOOSE_STYLE" },
   ],
@@ -58,7 +58,6 @@ const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
     { title: "Retry {style}", payload: "RETRY_STYLE" },
     { title: "Choose another style", payload: "CHOOSE_STYLE" },
   ],
-  FAILURE: [],
 };
 
 export function getQuickRepliesForState(state: ConversationState): StateQuickReply[] {
