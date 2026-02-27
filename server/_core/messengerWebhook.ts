@@ -134,6 +134,16 @@ const STYLE_LABELS: Record<Style, string> = {
   disco: "Disco",
   clouds: "Clouds",
 };
+
+const USER_MESSAGES = {
+  idleIntro: "✨ I turn your photos into stylized images.\nSend me a picture to get started.",
+  photoReceived: "✅ Photo received",
+  stylePicker: "🎨 Pick a style to transform your image:",
+  generating: (styleLabel: string) => `✨ Creating your ${styleLabel} version…\nThis takes a few seconds.`,
+  success: "✨ Your image is ready.",
+  failure: "⚠️ I couldn’t generate this style right now.\nYou can try again or pick a different style.",
+} as const;
+
 const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
 const SMALLTALK = new Set([
   "how are you",
@@ -156,18 +166,18 @@ export function getGreetingResponse(state: ConversationState): GreetingResponse 
     case "PROCESSING":
       return { mode: "text", text: "I’m still working on it—few seconds." };
     case "AWAITING_STYLE":
-      return { mode: "quick_replies", state: "AWAITING_STYLE", text: "What style should I use?" };
+      return { mode: "quick_replies", state: "AWAITING_STYLE", text: USER_MESSAGES.stylePicker };
     case "RESULT_READY":
       return {
         mode: "quick_replies",
         state: "RESULT_READY",
-        text: "Yo 👋 Wil je nog een style proberen op dezelfde foto, of een nieuwe sturen?",
+        text: USER_MESSAGES.success,
       };
     case "AWAITING_PHOTO":
       return { mode: "quick_replies", state: "AWAITING_PHOTO", text: "Send a photo when you’re ready 📸" };
     case "IDLE":
     default:
-      return { mode: "quick_replies", state: "IDLE", text: "Welcome 👋 Pick a quick start." };
+      return { mode: "quick_replies", state: "IDLE", text: USER_MESSAGES.idleIntro };
   }
 }
 
@@ -218,10 +228,10 @@ export function detectAck(raw: string | undefined | null): AckKind | null {
     return "thanks";
   }
 
-  // Check if text is primarily emoji/pictographic characters
-  // Using a simpler approach that doesn't require ES2018+ Unicode flag
-  const emojiPattern = /[\u{1F300}-\u{1F9FF}]/u;
-  if (text.length > 0 && text.split("").every(char => /[\u{1F300}-\u{1F9FF}\s]/u.test(char))) {
+  // Check if text is primarily emoji/pictographic characters.
+  const emojiOrSpacePattern = /[\p{Extended_Pictographic}\s\uFE0F]/u;
+  const graphemes = Array.from(text);
+  if (graphemes.length > 0 && graphemes.every(char => emojiOrSpacePattern.test(char))) {
     return "emoji";
   }
 
@@ -248,15 +258,15 @@ async function sendStateQuickReplies(psid: string, state: ConversationState, tex
 }
 
 async function sendGreeting(psid: string): Promise<void> {
-  await sendStateQuickReplies(psid, "IDLE", "Welcome 👋 Pick a quick start.");
+  await sendStateQuickReplies(psid, "IDLE", USER_MESSAGES.idleIntro);
 }
 
 async function sendStylePicker(psid: string): Promise<void> {
-  await sendStateQuickReplies(psid, "AWAITING_STYLE", "What style should I use?");
+  await sendStateQuickReplies(psid, "AWAITING_STYLE", USER_MESSAGES.stylePicker);
 }
 
 async function explainFlow(psid: string): Promise<void> {
-  await sendStateQuickReplies(psid, "IDLE", "I turn photos into stylized images. Send me a picture to start.");
+  await sendStateQuickReplies(psid, "IDLE", USER_MESSAGES.idleIntro);
 }
 
 async function handleGreeting(psid: string, userId: string): Promise<void> {
@@ -278,9 +288,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
   setFlowState(userId, "PROCESSING");
   await sendText(
     psid,
-    mode === "mock"
-      ? `Processing ${STYLE_LABELS[style]} style ✨`
-      : `Perfect — applying ${STYLE_LABELS[style]} style now ✨`,
+    USER_MESSAGES.generating(STYLE_LABELS[style]),
   );
 
   const startedAt = Date.now();
@@ -296,21 +304,20 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
     safeLog("generation_success", { mode, ms: Date.now() - startedAt });
     await sendImage(psid, imageUrl);
     setFlowState(userId, "RESULT_READY");
-    await sendStateQuickReplies(psid, "RESULT_READY", "Done. What do you want next?");
+    await sendStateQuickReplies(psid, "RESULT_READY", USER_MESSAGES.success);
   } catch (error) {
     const errorClass = error instanceof Error ? error.constructor.name : "UnknownError";
     safeLog("generation_fail", { mode, errorClass, ms: Date.now() - startedAt });
 
     if (error instanceof MissingOpenAiApiKeyError) {
       safeLog("openai_not_configured", { mode });
-      await sendText(psid, "AI generation isn’t enabled yet.");
     } else if (error instanceof GenerationTimeoutError) {
-      await sendText(psid, "This took too long — please try again.");
+      // Timeout falls through to the same user-facing retry guidance.
     } else if (error instanceof InvalidGenerationInputError || error instanceof OpenAiGenerationError) {
-      await sendText(psid, "I couldn’t generate that image right now. Please try again.");
-    } else {
-      await sendText(psid, "I couldn’t generate that image right now. Please try again.");
+      // Known generation errors share the same user-facing retry guidance.
     }
+
+    await sendText(psid, USER_MESSAGES.failure);
 
     setFlowState(userId, "AWAITING_STYLE");
     await sendStylePicker(psid);
@@ -373,7 +380,7 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
 
   const imageAttachment = message.attachments?.find(att => att.type === "image" && att.payload?.url);
   if (imageAttachment?.payload?.url) {
-    await sendText(psid, "Photo received ✅");
+    await sendText(psid, USER_MESSAGES.photoReceived);
     setPendingImage(userId, imageAttachment.payload.url);
     await sendStylePicker(psid);
     return;

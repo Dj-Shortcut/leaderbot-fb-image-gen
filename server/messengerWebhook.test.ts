@@ -175,7 +175,7 @@ describe("messenger webhook dedupe", () => {
     });
 
     expect(sendTextMock).toHaveBeenCalledTimes(1);
-    expect(sendTextMock).toHaveBeenCalledWith("echo-user", "Photo received ✅");
+    expect(sendTextMock).toHaveBeenCalledWith("echo-user", "✅ Photo received");
     expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
   });
 
@@ -335,7 +335,7 @@ describe("messenger webhook dedupe", () => {
       );
       expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
         "mock-image-user",
-        "Done. What do you want next?",
+        "✨ Your image is ready.",
         [
           { content_type: "text", title: "Try another style", payload: "CHOOSE_STYLE" },
           { content_type: "text", title: "New photo", payload: "SEND_PHOTO" },
@@ -371,7 +371,7 @@ describe("messenger webhook dedupe", () => {
       ],
     });
 
-    expect(sendTextMock).toHaveBeenCalledWith("openai-missing-key-user", "AI generation isn’t enabled yet.");
+    expect(sendTextMock).toHaveBeenCalledWith("openai-missing-key-user", "⚠️ I couldn’t generate this style right now.\nYou can try again or pick a different style.");
     expect(sendImageMock).not.toHaveBeenCalled();
     expect(safeLogMock).toHaveBeenCalledWith("generation_start", expect.objectContaining({ style: "disco", mode: "openai" }));
     expect(safeLogMock).toHaveBeenCalledWith("generation_fail", expect.objectContaining({ mode: "openai", errorClass: "MissingOpenAiApiKeyError" }));
@@ -455,7 +455,7 @@ describe("messenger webhook dedupe", () => {
       vi.unstubAllGlobals();
     }
 
-    expect(sendTextMock).toHaveBeenCalledWith("openai-timeout-user", "This took too long — please try again.");
+    expect(sendTextMock).toHaveBeenCalledWith("openai-timeout-user", "⚠️ I couldn’t generate this style right now.\nYou can try again or pick a different style.");
     expect(safeLogMock).toHaveBeenCalledWith("generation_fail", expect.objectContaining({ mode: "openai", errorClass: "GenerationTimeoutError" }));
   });
 
@@ -488,7 +488,7 @@ describe("messenger greeting behavior", () => {
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       "idle-user",
-      "Welcome 👋 Pick a quick start.",
+      "✨ I turn your photos into stylized images.\nSend me a picture to get started.",
       expect.arrayContaining([
         { content_type: "text", title: "Send photo", payload: "START_PHOTO" },
         { content_type: "text", title: "What is this?", payload: "WHAT_IS_THIS" },
@@ -517,10 +517,10 @@ describe("messenger greeting behavior", () => {
       ],
     });
 
-    expect(sendTextMock).toHaveBeenCalledWith("style-user", "Photo received ✅");
+    expect(sendTextMock).toHaveBeenCalledWith("style-user", "✅ Photo received");
     expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
       "style-user",
-      "Pick a style using the buttons below 🙂",
+      "🎨 Pick a style to transform your image:",
       [
         { content_type: "text", title: "Caricature", payload: "caricature" },
         { content_type: "text", title: "Petals", payload: "petals" },
@@ -552,7 +552,7 @@ describe("messenger greeting behavior", () => {
 
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
-      "Yo 👋 Wil je nog een style proberen op dezelfde foto, of een nieuwe sturen?",
+      "✨ Your image is ready.",
       [
         { content_type: "text", title: "Try another style", payload: "CHOOSE_STYLE" },
         { content_type: "text", title: "New photo", payload: "SEND_PHOTO" },

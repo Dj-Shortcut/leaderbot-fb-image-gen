@@ -13,7 +13,7 @@ describe("greeting handling by conversation state", () => {
     expect(getGreetingResponse("AWAITING_STYLE")).toEqual({
       mode: "quick_replies",
       state: "AWAITING_STYLE",
-      text: "What style should I use?",
+      text: "🎨 Pick a style to transform your image:",
     });
   });
 
@@ -21,7 +21,7 @@ describe("greeting handling by conversation state", () => {
     expect(getGreetingResponse("RESULT_READY")).toEqual({
       mode: "quick_replies",
       state: "RESULT_READY",
-      text: "Yo 👋 Wil je nog een style proberen op dezelfde foto, of een nieuwe sturen?",
+      text: "✨ Your image is ready.",
     });
   });
 
@@ -29,7 +29,7 @@ describe("greeting handling by conversation state", () => {
     expect(getGreetingResponse("IDLE")).toEqual({
       mode: "quick_replies",
       state: "IDLE",
-      text: "Welcome 👋 Pick a quick start.",
+      text: "✨ I turn your photos into stylized images.\nSend me a picture to get started.",
     });
   });
 });
