@@ -58,7 +58,7 @@ describe("messenger state flow", () => {
   });
 
   it("hashes PSID deterministically", () => {
-    process.env.MESSENGER_PSID_SALT = "test-salt";
+    process.env.PRIVACY_PEPPER = "test-pepper";
 
     const first = anonymizePsid("12345");
     const second = anonymizePsid("12345");

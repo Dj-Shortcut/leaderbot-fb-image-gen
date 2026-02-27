@@ -10,7 +10,6 @@ import {
   OpenAiGenerationError,
 } from "./imageService";
 import {
-  anonymizePsid,
   getOrCreateState,
   getQuickRepliesForState,
   pruneOldState,
@@ -19,6 +18,7 @@ import {
   setPendingImage,
   type ConversationState,
 } from "./messengerState";
+import { toLogUser, toUserKey } from "./privacy";
 
 type FacebookWebhookEvent = {
   sender?: { id?: string };
@@ -109,17 +109,16 @@ export function summarizeWebhook(body: unknown): WebhookSummary {
 
 const incomingEventDedupe = new TtlDedupeSet(10 * 60 * 1000);
 
-function getEventDedupeKey(event: FacebookWebhookEvent): string | undefined {
+function getEventDedupeKey(event: FacebookWebhookEvent, userKey: string): string | undefined {
   const messageId = event.message?.mid?.trim();
   if (messageId) {
     return `mid:${messageId}`;
   }
 
-  const senderId = event.sender?.id?.trim();
   const timestamp = event.timestamp;
 
-  if (senderId && Number.isFinite(timestamp)) {
-    return `fallback:${senderId}:${timestamp}`;
+  if (Number.isFinite(timestamp)) {
+    return `fallback:${userKey}:${timestamp}`;
   }
 
   return undefined;
@@ -291,7 +290,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
     const { imageUrl } = await generator.generate({
       style,
       sourceImageUrl: getOrCreateState(userId).lastPhoto ?? undefined,
-      psid,
+      userKey: userId,
     });
 
     safeLog("generation_success", { mode, ms: Date.now() - startedAt });
@@ -321,7 +320,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
 async function handleStyleSelection(psid: string, userId: string, style: Style): Promise<void> {
   const state = getOrCreateState(userId);
   setChosenStyle(userId, style);
-  safeLog("style_selected", { userId, selectedStyle: style });
+  safeLog("style_selected", { user: toLogUser(userId), selectedStyle: style });
 
   if (!state.lastPhoto) {
     setFlowState(userId, "AWAITING_PHOTO");
@@ -356,7 +355,7 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
     return;
   }
 
-  safeLog("unknown_payload", { userId, payload });
+  safeLog("unknown_payload", { user: toLogUser(userId) });
 }
 
 async function handleMessage(psid: string, userId: string, event: FacebookWebhookEvent): Promise<void> {
@@ -413,18 +412,18 @@ async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
     return;
   }
 
+  const userId = toUserKey(psid);
+
   if (event.message?.is_echo) {
-    safeLog("echo_ignored", {});
+    safeLog("echo_ignored", { user: toLogUser(userId) });
     return;
   }
 
-  const dedupeKey = getEventDedupeKey(event);
+  const dedupeKey = getEventDedupeKey(event, userId);
   if (dedupeKey && incomingEventDedupe.seen(dedupeKey)) {
-    safeLog("duplicate_event_skipped", { dedupeKey });
+    safeLog("duplicate_event_skipped", { user: toLogUser(userId) });
     return;
   }
-
-  const userId = anonymizePsid(psid);
 
   if (event.postback?.payload) {
     await handlePayload(psid, userId, event.postback.payload);

@@ -1,5 +1,5 @@
-import { createHash } from "crypto";
 import type { StyleId } from "./messengerStyles";
+import { toUserKey } from "./privacy";
 
 export type ConversationState = "IDLE" | "AWAITING_PHOTO" | "AWAITING_STYLE" | "PROCESSING" | "RESULT_READY";
 export type MessengerFlowState = ConversationState;
@@ -33,7 +33,6 @@ export type MessengerUserState = {
 };
 
 const DEFAULT_DAY_KEY = "1970-01-01";
-const DEFAULT_HASH_SALT = "local-dev-salt";
 const stateByUserId = new Map<string, MessengerUserState>();
 
 const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
@@ -62,8 +61,7 @@ export function getQuickRepliesForState(state: ConversationState): StateQuickRep
 }
 
 export function anonymizePsid(psid: string): string {
-  const salt = process.env.MESSENGER_PSID_SALT ?? DEFAULT_HASH_SALT;
-  return createHash("sha256").update(`${psid}${salt}`).digest("hex");
+  return toUserKey(psid);
 }
 
 export function getDayKey(now = Date.now()): string {
