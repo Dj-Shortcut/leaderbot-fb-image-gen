@@ -218,10 +218,7 @@ export function detectAck(raw: string | undefined | null): AckKind | null {
     return "thanks";
   }
 
-  // Check if text is primarily emoji/pictographic characters
-  // Using a simpler approach that doesn't require ES2018+ Unicode flag
-  const emojiPattern = /[\u{1F300}-\u{1F9FF}]/u;
-  if (text.length > 0 && text.split("").every(char => /[\u{1F300}-\u{1F9FF}\s]/u.test(char))) {
+  if (text.length > 0 && Array.from(text).every(char => /[\p{Extended_Pictographic}\s]/u.test(char))) {
     return "emoji";
   }
 
@@ -255,6 +252,30 @@ async function sendStylePicker(psid: string): Promise<void> {
   await sendStateQuickReplies(psid, "AWAITING_STYLE", "What style should I use?");
 }
 
+async function sendPhotoReceivedPrompt(psid: string): Promise<void> {
+  await sendStateQuickReplies(psid, "AWAITING_STYLE", "Photo received ✅ Pick a style below 🙂");
+}
+
+async function sendGeneratingPrompt(psid: string, style: Style, mode: string): Promise<void> {
+  await sendText(
+    psid,
+    mode === "mock"
+      ? `Processing ${STYLE_LABELS[style]} style ✨`
+      : `Perfect — applying ${STYLE_LABELS[style]} style now ✨`,
+  );
+}
+
+async function sendSuccessPrompt(psid: string): Promise<void> {
+  await sendStateQuickReplies(psid, "RESULT_READY", "Done ✅ What next?");
+}
+
+async function sendFailurePrompt(psid: string, style: Style, message: string): Promise<void> {
+  await sendQuickReplies(psid, message, [
+    { content_type: "text", title: "Retry this style", payload: style },
+    { content_type: "text", title: "Choose another style", payload: "CHOOSE_STYLE" },
+  ]);
+}
+
 async function explainFlow(psid: string): Promise<void> {
   await sendStateQuickReplies(psid, "IDLE", "I turn photos into stylized images. Send me a picture to start.");
 }
@@ -276,12 +297,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
   const { mode, generator } = createImageGenerator();
 
   setFlowState(userId, "PROCESSING");
-  await sendText(
-    psid,
-    mode === "mock"
-      ? `Processing ${STYLE_LABELS[style]} style ✨`
-      : `Perfect — applying ${STYLE_LABELS[style]} style now ✨`,
-  );
+  await sendGeneratingPrompt(psid, style, mode);
 
   const startedAt = Date.now();
   safeLog("generation_start", { style, mode });
@@ -296,24 +312,23 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
     safeLog("generation_success", { mode, ms: Date.now() - startedAt });
     await sendImage(psid, imageUrl);
     setFlowState(userId, "RESULT_READY");
-    await sendStateQuickReplies(psid, "RESULT_READY", "Done. What do you want next?");
+    await sendSuccessPrompt(psid);
   } catch (error) {
     const errorClass = error instanceof Error ? error.constructor.name : "UnknownError";
     safeLog("generation_fail", { mode, errorClass, ms: Date.now() - startedAt });
 
+    let failureText = "I couldn’t generate that image right now.";
     if (error instanceof MissingOpenAiApiKeyError) {
       safeLog("openai_not_configured", { mode });
-      await sendText(psid, "AI generation isn’t enabled yet.");
+      failureText = "AI generation isn’t enabled yet.";
     } else if (error instanceof GenerationTimeoutError) {
-      await sendText(psid, "This took too long — please try again.");
+      failureText = "This took too long.";
     } else if (error instanceof InvalidGenerationInputError || error instanceof OpenAiGenerationError) {
-      await sendText(psid, "I couldn’t generate that image right now. Please try again.");
-    } else {
-      await sendText(psid, "I couldn’t generate that image right now. Please try again.");
+      failureText = "I couldn’t generate that image right now.";
     }
 
     setFlowState(userId, "AWAITING_STYLE");
-    await sendStylePicker(psid);
+    await sendFailurePrompt(psid, style, failureText);
   }
 }
 
@@ -373,9 +388,8 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
 
   const imageAttachment = message.attachments?.find(att => att.type === "image" && att.payload?.url);
   if (imageAttachment?.payload?.url) {
-    await sendText(psid, "Photo received ✅");
     setPendingImage(userId, imageAttachment.payload.url);
-    await sendStylePicker(psid);
+    await sendPhotoReceivedPrompt(psid);
     return;
   }
 
