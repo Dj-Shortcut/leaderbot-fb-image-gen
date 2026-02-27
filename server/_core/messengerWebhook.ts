@@ -153,15 +153,21 @@ type GreetingResponse =
 
 export function getGreetingResponse(state: ConversationState): GreetingResponse {
   switch (state) {
-    case "PROCESSING":
+    case "GENERATING":
       return { mode: "text", text: "I’m still working on it—few seconds." };
     case "AWAITING_STYLE":
       return { mode: "quick_replies", state: "AWAITING_STYLE", text: "What style should I use?" };
-    case "RESULT_READY":
+    case "SUCCESS":
       return {
         mode: "quick_replies",
-        state: "RESULT_READY",
+        state: "SUCCESS",
         text: "Yo 👋 Wil je nog een style proberen op dezelfde foto, of een nieuwe sturen?",
+      };
+    case "FAILURE":
+      return {
+        mode: "quick_replies",
+        state: "FAILURE",
+        text: "That one failed. Want to retry or pick another style?",
       };
     case "AWAITING_PHOTO":
       return { mode: "quick_replies", state: "AWAITING_PHOTO", text: "Send a photo when you’re ready 📸" };
@@ -277,7 +283,7 @@ async function handleGreeting(psid: string, userId: string): Promise<void> {
 async function runStyleGeneration(psid: string, userId: string, style: Style): Promise<void> {
   const { mode, generator } = createImageGenerator();
 
-  setFlowState(userId, "PROCESSING");
+  setFlowState(userId, "GENERATING");
   await sendText(
     psid,
     mode === "mock"
@@ -297,8 +303,8 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
 
     safeLog("generation_success", { mode, ms: Date.now() - startedAt });
     await sendImage(psid, imageUrl);
-    setFlowState(userId, "RESULT_READY");
-    await sendStateQuickReplies(psid, "RESULT_READY", "Done. What do you want next?");
+    setFlowState(userId, "SUCCESS");
+    await sendStateQuickReplies(psid, "SUCCESS", "Done. What do you want next?");
   } catch (error) {
     const errorClass = error instanceof Error ? error.constructor.name : "UnknownError";
     safeLog("generation_fail", { mode, errorClass, ms: Date.now() - startedAt });
@@ -372,6 +378,20 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
   }
 
   if (payload === "CHOOSE_STYLE") {
+    setFlowState(userId, "AWAITING_STYLE");
+    await sendStylePicker(psid);
+    return;
+  }
+
+  if (payload === "RETRY_STYLE") {
+    const chosenStyle = getOrCreateState(userId).selectedStyle;
+    const retryStyle = chosenStyle ? parseStyle(chosenStyle) : undefined;
+
+    if (retryStyle) {
+      await handleStyleSelection(psid, userId, retryStyle);
+      return;
+    }
+
     setFlowState(userId, "AWAITING_STYLE");
     await sendStylePicker(psid);
     return;

@@ -49,10 +49,14 @@ const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
     { title: "Disco", payload: "disco" },
     { title: "Clouds", payload: "clouds" },
   ],
-  PROCESSING: [],
-  RESULT_READY: [
+  GENERATING: [],
+  SUCCESS: [
+    { title: "Download HD", payload: "DOWNLOAD_HD" },
     { title: "Try another style", payload: "CHOOSE_STYLE" },
-    { title: "New photo", payload: "SEND_PHOTO" },
+  ],
+  FAILURE: [
+    { title: "Retry {style}", payload: "RETRY_STYLE" },
+    { title: "Choose another style", payload: "CHOOSE_STYLE" },
   ],
   FAILURE: [],
 };
