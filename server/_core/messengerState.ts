@@ -1,13 +1,7 @@
 import type { StyleId } from "./messengerStyles";
 import { toUserKey } from "./privacy";
 
-export type ConversationState =
-  | "IDLE"
-  | "AWAITING_PHOTO"
-  | "AWAITING_STYLE"
-  | "GENERATING"
-  | "SUCCESS"
-  | "FAILURE";
+export type ConversationState = "IDLE" | "AWAITING_PHOTO" | "AWAITING_STYLE" | "PROCESSING" | "RESULT_READY" | "FAILURE";
 export type MessengerFlowState = ConversationState;
 
 export type StateQuickReply = {
@@ -64,6 +58,7 @@ const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
     { title: "Retry {style}", payload: "RETRY_STYLE" },
     { title: "Choose another style", payload: "CHOOSE_STYLE" },
   ],
+  FAILURE: [],
 };
 
 export function getQuickRepliesForState(state: ConversationState): StateQuickReply[] {
