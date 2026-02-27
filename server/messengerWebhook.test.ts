@@ -624,12 +624,30 @@ describe("messenger greeting behavior", () => {
       "download-hd-empty-user",
       "I can share HD downloads after I generate an image.",
     );
-    expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
-      "download-hd-empty-user",
-      "Send a photo when you’re ready 📸",
-      [{ content_type: "text", title: "Send photo", payload: "SEND_PHOTO" }],
-    );
+    expect(sendTextMock).toHaveBeenCalledWith("download-hd-empty-user", "Send a photo when you’re ready 📸");
+    expect(sendQuickRepliesMock).not.toHaveBeenCalled();
   });
+  it("sends text only when SEND_PHOTO payload is tapped", async () => {
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "send-photo-user" },
+              message: {
+                mid: "mid-send-photo",
+                quick_reply: { payload: "SEND_PHOTO" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith("send-photo-user", "Send a photo when you're ready 📷");
+    expect(sendQuickRepliesMock).not.toHaveBeenCalled();
+  });
+
   it("offers retry actions when state is FAILURE", async () => {
     const psid = "failure-user";
     const userId = anonymizePsid(psid);

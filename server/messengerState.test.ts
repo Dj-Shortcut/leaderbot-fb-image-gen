@@ -41,7 +41,7 @@ describe("messenger state flow", () => {
       { title: "Send photo", payload: "START_PHOTO" },
       { title: "What is this?", payload: "WHAT_IS_THIS" },
     ]);
-    expect(getQuickRepliesForState("AWAITING_PHOTO")).toEqual([{ title: "Send photo", payload: "SEND_PHOTO" }]);
+    expect(getQuickRepliesForState("AWAITING_PHOTO")).toEqual([]);
     expect(getQuickRepliesForState("AWAITING_STYLE")).toEqual([
       { title: "Caricature", payload: "caricature" },
       { title: "Petals", payload: "petals" },

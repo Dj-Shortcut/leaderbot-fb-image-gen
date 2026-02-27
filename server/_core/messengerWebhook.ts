@@ -401,7 +401,7 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
 
   if (payload === "START_PHOTO" || payload === "SEND_PHOTO") {
     setFlowState(userId, "AWAITING_PHOTO");
-    await sendStateQuickReplies(psid, "AWAITING_PHOTO", "Send a photo when you’re ready 📸");
+    await sendText(psid, "Send a photo when you're ready 📷");
     return;
   }
 
