@@ -33,7 +33,10 @@ export function useComposition<
   const timer = useRef<TimerResponse | null>(null);
   const timer2 = useRef<TimerResponse | null>(null);
 
-  const onCompositionStart = usePersistFn((e: React.CompositionEvent<T>) => {
+  const onCompositionStart = usePersistFn<
+    [React.CompositionEvent<T>],
+    void
+  >((e) => {
     if (timer.current) {
       clearTimeout(timer.current);
       timer.current = null;
@@ -46,7 +49,10 @@ export function useComposition<
     originalOnCompositionStart?.(e);
   });
 
-  const onCompositionEnd = usePersistFn((e: React.CompositionEvent<T>) => {
+  const onCompositionEnd = usePersistFn<
+    [React.CompositionEvent<T>],
+    void
+  >((e) => {
     // 使用两层 setTimeout 来处理 Safari 浏览器中 compositionEnd 先于 onKeyDown 触发的问题
     timer.current = setTimeout(() => {
       timer2.current = setTimeout(() => {
@@ -56,7 +62,7 @@ export function useComposition<
     originalOnCompositionEnd?.(e);
   });
 
-  const onKeyDown = usePersistFn((e: React.KeyboardEvent<T>) => {
+  const onKeyDown = usePersistFn<[React.KeyboardEvent<T>], void>((e) => {
     // 在 composition 状态下，阻止 ESC 和 Enter（非 shift+Enter）事件的冒泡
     if (
       c.current &&

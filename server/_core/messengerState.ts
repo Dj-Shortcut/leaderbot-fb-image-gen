@@ -1,4 +1,4 @@
-import type { StyleId } from "./messengerStyles";
+import type { Style, StyleId } from "./messengerStyles";
 import { STYLE_CONFIGS } from "./messengerStyles";
 import { toUserKey } from "./privacy";
 
@@ -26,7 +26,7 @@ export type MessengerUserState = {
   pendingImageUrl?: string;
   pendingImageAt?: number;
   lastImageUrl?: string;
-  lastStyle?: StyleId;
+  lastStyle?: Style;
   lastGeneratedAt?: number;
   lastVariantCursor?: number;
   quota: QuotaState;
@@ -119,7 +119,7 @@ export function setChosenStyle(userId: string, style: string, now = Date.now()):
   state.updatedAt = now;
 }
 
-export function setLastGenerated(userId: string, style: StyleId, resultImageUrl: string, now = Date.now()): void {
+export function setLastGenerated(userId: string, style: Style, resultImageUrl: string, now = Date.now()): void {
   const state = getOrCreateState(userId);
   state.lastStyle = style;
   state.lastImageUrl = resultImageUrl;
