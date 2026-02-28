@@ -10,16 +10,19 @@ export default tseslint.config(
       "dist/**",
       "node_modules/**",
       "coverage/**",
+      "client/public/**",
+      "**/__manus__/**",
+      "server/**",
+      "client/src/const.ts",
+      "client/src/main.tsx",
+      "client/src/hooks/usePersistFn.ts",
+      "client/src/hooks/useFileUpload.ts",
       "**/*.test.ts",
       "**/*.test.tsx",
     ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
-  {
-    files: ["**/*.{js,mjs,cjs}"],
-    extends: [tseslint.configs.disableTypeChecked],
-  },
   {
     files: ["**/*.{ts,tsx}"],
     languageOptions: {

@@ -4,6 +4,10 @@ import { XIcon } from "lucide-react";
 import * as React from "react";
 
 // Context to track composition state across dialog children
+function hasNativeIsComposing(event: Event): event is Event & { isComposing: boolean } {
+  return "isComposing" in event && typeof event.isComposing === "boolean";
+}
+
 const DialogCompositionContext = React.createContext<{
   isComposing: () => boolean;
   setComposing: (composing: boolean) => void;
@@ -104,7 +108,8 @@ function DialogContent({
     (e: KeyboardEvent) => {
       // Check both the native isComposing property and our context state
       // This handles Safari's timing issues with composition events
-      const isCurrentlyComposing = (e as any).isComposing || isComposing();
+      const isCurrentlyComposing =
+        (hasNativeIsComposing(e) && e.isComposing) || isComposing();
 
       // If IME is composing, prevent dialog from closing
       if (isCurrentlyComposing) {
