@@ -52,13 +52,15 @@ describe("photo-first onboarding", () => {
     expect(userState?.stage).toBe("AWAITING_STYLE");
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
-      "🎨 Pick a style to transform your image:",
-      expect.any(Array),
+      "Dank je. Kies hieronder een stijl.",
+      expect.arrayContaining([
+        expect.objectContaining({ payload: "STYLE_CARICATURE" }),
+      ]),
     );
     expect(sendTextMock).not.toHaveBeenCalled();
   });
 
-  it("routes text-only greeting into AWAITING_PHOTO with text-only prompt", async () => {
+  it("routes text-only greeting into IDLE with quick replies", async () => {
     const psid = "text-user";
 
     await processFacebookWebhookPayload({
@@ -75,9 +77,13 @@ describe("photo-first onboarding", () => {
     });
 
     const userState = getState(anonymizePsid(psid));
-    expect(userState?.stage).toBe("AWAITING_PHOTO");
-    expect(sendTextMock).toHaveBeenCalledWith(psid, "Send a photo when you're ready 📷");
-    expect(sendQuickRepliesMock).not.toHaveBeenCalled();
+    expect(userState?.stage).toBe("IDLE");
+    expect(sendTextMock).not.toHaveBeenCalled();
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      psid,
+      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis.",
+      expect.any(Array),
+    );
   });
 
   it("guards style payload without pending image", async () => {
@@ -98,7 +104,7 @@ describe("photo-first onboarding", () => {
 
     const userState = getState(anonymizePsid(psid));
     expect(userState?.stage).toBe("AWAITING_PHOTO");
-    expect(sendTextMock).toHaveBeenCalledWith(psid, "Send a photo first 📷");
+    expect(sendTextMock).toHaveBeenCalledWith(psid, "Stuur eerst een foto, dan maak ik die stijl voor je.");
     expect(sendQuickRepliesMock).not.toHaveBeenCalled();
   });
 
@@ -122,8 +128,57 @@ describe("photo-first onboarding", () => {
     expect(userState?.stage).toBe("AWAITING_PHOTO");
     expect(sendTextMock.mock.calls).toEqual([
       [psid, "I can share HD downloads after I generate an image."],
-      [psid, "Send a photo when you're ready 📷"],
+      [psid, "Stuur gerust een foto, dan kan ik een stijl voor je maken."],
     ]);
     expect(sendQuickRepliesMock).not.toHaveBeenCalled();
   });
+
+  it("returns privacy explanation on PRIVACY_INFO postback", async () => {
+    const psid = "privacy-user";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              postback: { payload: "PRIVACY_INFO" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      psid,
+      [
+        "Je foto wordt enkel gebruikt om de afbeelding te maken.",
+        "Ze wordt daarna niet bewaard.",
+        "Hier kan je het volledige privacybeleid lezen: <link>",
+      ].join("\n"),
+    );
+  });
+
+  it("answers who is behind on user text", async () => {
+    const psid = "about-user";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: { mid: "mid-about", text: "Wie zit hierachter?" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      psid,
+      "Leaderbot is gemaakt door Andy. Je mag hem gerust contacteren via Facebook.\nVolledige naam op vraag: Andy Arijs.",
+    );
+  });
+
 });

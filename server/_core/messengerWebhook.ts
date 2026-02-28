@@ -137,16 +137,22 @@ const STYLE_LABELS: Record<Style, string> = {
 };
 
 const USER_MESSAGES = {
-  idleIntro: "✨ I turn your photos into stylized images.\nSend me a picture to get started.",
-  photoReceived: "✅ Photo received",
-  stylePicker: "🎨 Pick a style to transform your image:",
-  generating: (styleLabel: string) => `✨ Creating your ${styleLabel} version…\nThis takes a few seconds.`,
-  success: "✨ Your image is ready.",
-  failure: "⚠️ I couldn’t generate this style right now.\nYou can try again or pick a different style.",
+  flowExplanation: "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis.",
+  stylePicker: "Dank je. Kies hieronder een stijl.",
+  success: "Klaar. Je kan de afbeelding opslaan door erop te tikken.",
+  processingBlocked: "Ik ben nog bezig met je vorige afbeelding.",
+  styleWithoutPhoto: "Stuur eerst een foto, dan maak ik die stijl voor je.",
+  textWithoutPhoto: "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
+  privacy: (link: string) => [
+    "Je foto wordt enkel gebruikt om de afbeelding te maken.",
+    "Ze wordt daarna niet bewaard.",
+    `Hier kan je het volledige privacybeleid lezen: ${link}`,
+  ].join("\n"),
+  aboutLeaderbot: "Leaderbot is gemaakt door Andy. Je mag hem gerust contacteren via Facebook.\nVolledige naam op vraag: Andy Arijs.",
+  failure: "Er ging iets mis bij het maken van je afbeelding. Kies gerust opnieuw een stijl.",
 } as const;
 
-const PHOTO_PROMPT = "Send a photo when you're ready 📷";
-const PHOTO_REQUIRED_PROMPT = "Send a photo first 📷";
+const PRIVACY_POLICY_URL = process.env.PRIVACY_POLICY_URL?.trim() || "<link>";
 
 const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
 const SMALLTALK = new Set([
@@ -168,7 +174,7 @@ type GreetingResponse =
 export function getGreetingResponse(state: ConversationState): GreetingResponse {
   switch (state) {
     case "PROCESSING":
-      return { mode: "text", text: "I’m still working on it—few seconds." };
+      return { mode: "text", text: USER_MESSAGES.processingBlocked };
     case "AWAITING_STYLE":
       return { mode: "quick_replies", state: "AWAITING_STYLE", text: USER_MESSAGES.stylePicker };
     case "RESULT_READY":
@@ -181,13 +187,13 @@ export function getGreetingResponse(state: ConversationState): GreetingResponse 
       return {
         mode: "quick_replies",
         state: "FAILURE",
-        text: "That one failed. Want to retry or pick another style?",
+        text: USER_MESSAGES.failure,
       };
     case "AWAITING_PHOTO":
-      return { mode: "text", text: PHOTO_PROMPT };
+      return { mode: "text", text: USER_MESSAGES.textWithoutPhoto };
     case "IDLE":
     default:
-      return { mode: "quick_replies", state: "IDLE", text: USER_MESSAGES.idleIntro };
+      return { mode: "quick_replies", state: "IDLE", text: USER_MESSAGES.flowExplanation };
   }
 }
 
@@ -265,7 +271,7 @@ async function sendStateQuickReplies(psid: string, state: ConversationState, tex
 }
 
 async function sendGreeting(psid: string): Promise<void> {
-  await sendStateQuickReplies(psid, "IDLE", USER_MESSAGES.idleIntro);
+  await sendStateQuickReplies(psid, "IDLE", USER_MESSAGES.flowExplanation);
 }
 
 async function sendStylePicker(psid: string): Promise<void> {
@@ -276,28 +282,34 @@ async function sendPhotoReceivedPrompt(psid: string): Promise<void> {
   await sendStylePicker(psid);
 }
 
-async function sendGeneratingPrompt(psid: string, style: Style, mode: string): Promise<void> {
+async function sendGeneratingPrompt(psid: string, style: Style): Promise<void> {
   await sendText(
     psid,
-    mode === "mock"
-      ? `Processing ${STYLE_LABELS[style]} style ✨`
-      : `Perfect — applying ${STYLE_LABELS[style]} style now ✨`,
+    `Ik maak nu je ${STYLE_LABELS[style]}-stijl.`,
   );
 }
 
 async function sendSuccessPrompt(psid: string): Promise<void> {
-  await sendStateQuickReplies(psid, "RESULT_READY", "Done ✅ What next?");
+  await sendStateQuickReplies(psid, "RESULT_READY", USER_MESSAGES.success);
 }
 
 async function sendFailurePrompt(psid: string, style: Style, message: string): Promise<void> {
   await sendQuickReplies(psid, message, [
     { content_type: "text", title: "Retry this style", payload: style },
-    { content_type: "text", title: "Choose another style", payload: "CHOOSE_STYLE" },
+    { content_type: "text", title: "Andere stijl", payload: "CHOOSE_STYLE" },
   ]);
 }
 
 async function explainFlow(psid: string): Promise<void> {
-  await sendStateQuickReplies(psid, "IDLE", USER_MESSAGES.idleIntro);
+  await sendText(psid, USER_MESSAGES.flowExplanation);
+}
+
+async function explainPrivacy(psid: string): Promise<void> {
+  await sendText(psid, USER_MESSAGES.privacy(PRIVACY_POLICY_URL));
+}
+
+async function explainWhoIsBehind(psid: string): Promise<void> {
+  await sendText(psid, USER_MESSAGES.aboutLeaderbot);
 }
 
 async function handleGreeting(psid: string, userId: string): Promise<void> {
@@ -317,7 +329,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
   const { mode, generator } = createImageGenerator();
 
   setFlowState(userId, "PROCESSING");
-  await sendGeneratingPrompt(psid, style, mode);
+  await sendGeneratingPrompt(psid, style);
 
   const startedAt = Date.now();
   safeLog("generation_start", { style, mode });
@@ -350,7 +362,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
 
     await sendText(psid, USER_MESSAGES.failure);
 
-    setFlowState(userId, "AWAITING_STYLE");
+    setFlowState(userId, "FAILURE");
     await sendFailurePrompt(psid, style, failureText);
   }
 }
@@ -359,8 +371,7 @@ async function handleStyleSelection(psid: string, userId: string, style: Style):
   const state = getOrCreateState(userId);
 
   if (state.stage === "PROCESSING") {
-    const statusStyle = STYLE_LABELS[style];
-    await sendText(psid, `✨ Creating your ${statusStyle} version… This takes a few seconds.`);
+    await sendText(psid, USER_MESSAGES.processingBlocked);
     return;
   }
 
@@ -369,7 +380,7 @@ async function handleStyleSelection(psid: string, userId: string, style: Style):
 
   if (!state.lastPhoto) {
     setFlowState(userId, "AWAITING_PHOTO");
-    await sendText(psid, PHOTO_REQUIRED_PROMPT);
+    await sendText(psid, USER_MESSAGES.styleWithoutPhoto);
     return;
   }
 
@@ -390,7 +401,7 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
 
     if (!state.lastPhoto) {
       setFlowState(userId, "AWAITING_PHOTO");
-      await sendText(psid, PHOTO_REQUIRED_PROMPT);
+      await sendText(psid, USER_MESSAGES.styleWithoutPhoto);
       return;
     }
 
@@ -430,9 +441,19 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
     return;
   }
 
+  if (payload === "PRIVACY_INFO") {
+    await explainPrivacy(psid);
+    return;
+  }
+
+  if (payload === "WHO_IS_BEHIND") {
+    await explainWhoIsBehind(psid);
+    return;
+  }
+
   if (payload === "START_PHOTO" || payload === "SEND_PHOTO") {
     setFlowState(userId, "AWAITING_PHOTO");
-    await sendText(psid, PHOTO_PROMPT);
+    await sendText(psid, USER_MESSAGES.textWithoutPhoto);
     return;
   }
 
@@ -446,7 +467,7 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
 
     await sendText(psid, "I can share HD downloads after I generate an image.");
     setFlowState(userId, "AWAITING_PHOTO");
-    await sendText(psid, PHOTO_PROMPT);
+    await sendText(psid, USER_MESSAGES.textWithoutPhoto);
     return;
   }
 
@@ -487,6 +508,11 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
     return;
   }
 
+  if (normalizedText === "wie zit hierachter?" || normalizedText === "wie zit hierachter") {
+    await explainWhoIsBehind(psid);
+    return;
+  }
+
   const styleFromText = parseStyle(trimmedText);
   if (styleFromText) {
     getOrCreateState(userId);
@@ -494,15 +520,15 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
     return;
   }
 
-  const state = getOrCreateState(userId);
-  if (!state.lastPhoto) {
-    setFlowState(userId, "AWAITING_PHOTO");
-    await sendText(psid, PHOTO_PROMPT);
+  if (GREETINGS.has(normalizedText) || SMALLTALK.has(normalizedText)) {
+    await handleGreeting(psid, userId);
     return;
   }
 
-  if (GREETINGS.has(normalizedText) || SMALLTALK.has(normalizedText)) {
-    await handleGreeting(psid, userId);
+  const state = getOrCreateState(userId);
+  if (!state.lastPhoto) {
+    setFlowState(userId, "AWAITING_PHOTO");
+    await sendText(psid, USER_MESSAGES.textWithoutPhoto);
     return;
   }
 

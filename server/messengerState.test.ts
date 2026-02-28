@@ -38,26 +38,26 @@ describe("messenger state flow", () => {
 
   it("maps quick replies by state", () => {
     expect(getQuickRepliesForState("IDLE")).toEqual([
-      { title: "Send photo", payload: "START_PHOTO" },
-      { title: "What is this?", payload: "WHAT_IS_THIS" },
+      { title: "Wat doe ik?", payload: "WHAT_IS_THIS" },
+      { title: "Privacy", payload: "PRIVACY_INFO" },
     ]);
     expect(getQuickRepliesForState("AWAITING_PHOTO")).toEqual([]);
     expect(getQuickRepliesForState("AWAITING_STYLE")).toEqual([
-      { title: "Caricature", payload: "caricature" },
-      { title: "Petals", payload: "petals" },
-      { title: "Gold", payload: "gold" },
-      { title: "Cinematic", payload: "cinematic" },
-      { title: "Disco", payload: "disco" },
-      { title: "Clouds", payload: "clouds" },
+      { title: "🎨 Caricature", payload: "STYLE_CARICATURE" },
+      { title: "🌸 Petals", payload: "STYLE_PETALS" },
+      { title: "✨ Gold", payload: "STYLE_GOLD" },
+      { title: "🎬 Cinematic", payload: "STYLE_CINEMATIC" },
+      { title: "🪩 Disco Glow", payload: "STYLE_DISCO" },
+      { title: "☁️ Clouds", payload: "STYLE_CLOUDS" },
     ]);
     expect(getQuickRepliesForState("PROCESSING")).toEqual([]);
     expect(getQuickRepliesForState("RESULT_READY")).toEqual([
-      { title: "Download HD", payload: "DOWNLOAD_HD" },
-      { title: "Try another style", payload: "CHOOSE_STYLE" },
+      { title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
+      { title: "Privacy", payload: "PRIVACY_INFO" },
     ]);
     expect(getQuickRepliesForState("FAILURE")).toEqual([
-      { title: "Retry {style}", payload: "RETRY_STYLE" },
-      { title: "Choose another style", payload: "CHOOSE_STYLE" },
+      { title: "Probeer opnieuw", payload: "RETRY_STYLE" },
+      { title: "Andere stijl", payload: "CHOOSE_STYLE" },
     ]);
   });
 
