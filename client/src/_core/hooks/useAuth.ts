@@ -8,6 +8,30 @@ type UseAuthOptions = {
   redirectPath?: string;
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const getErrorCode = (error: unknown): string | null => {
+  if (error instanceof TRPCClientError && typeof error.data?.code === "string") {
+    return error.data.code;
+  }
+
+  if (isRecord(error) && typeof error.code === "string") {
+    return error.code;
+  }
+
+  if (
+    isRecord(error) &&
+    isRecord(error.response) &&
+    isRecord(error.response.data) &&
+    typeof error.response.data.code === "string"
+  ) {
+    return error.response.data.code;
+  }
+
+  return null;
+};
+
 export function useAuth(options?: UseAuthOptions) {
   const { redirectOnUnauthenticated = false, redirectPath = getLoginUrl() } =
     options ?? {};
@@ -27,14 +51,11 @@ export function useAuth(options?: UseAuthOptions) {
   const logout = useCallback(async () => {
     try {
       await logoutMutation.mutateAsync();
-    } catch (error: unknown) {
-      if (
-        error instanceof TRPCClientError &&
-        error.data?.code === "UNAUTHORIZED"
-      ) {
+    } catch (err: unknown) {
+      if (getErrorCode(err) === "UNAUTHORIZED") {
         return;
       }
-      throw error;
+      throw err;
     } finally {
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
@@ -67,7 +88,7 @@ export function useAuth(options?: UseAuthOptions) {
     if (typeof window === "undefined") return;
     if (window.location.pathname === redirectPath) return;
 
-    window.location.href = redirectPath
+    window.location.href = redirectPath;
   }, [
     redirectOnUnauthenticated,
     redirectPath,
