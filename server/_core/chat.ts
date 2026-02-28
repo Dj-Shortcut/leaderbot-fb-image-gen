@@ -45,7 +45,7 @@ const tools = {
       const temp = Math.floor(Math.random() * 30) + 5;
       const conditions = ["sunny", "cloudy", "rainy", "partly cloudy"][
         Math.floor(Math.random() * 4)
-      ] as string;
+      ];
       return {
         location,
         temperature: unit === "fahrenheit" ? Math.round(temp * 1.8 + 32) : temp,
