@@ -1,23 +1,19 @@
 import js from "@eslint/js";
-import eslintConfigPrettier from "eslint-config-prettier";
-import importPlugin from "eslint-plugin-import";
 import tseslint from "typescript-eslint";
+import importPlugin from "eslint-plugin-import";
+import prettier from "eslint-config-prettier";
 
-export default tseslint.config(
+export default [
   {
-    ignores: [
-      "build/**",
-      "dist/**",
-      "node_modules/**",
-      "coverage/**",
-      "**/*.test.ts",
-      "**/*.test.tsx",
-    ],
+    ignores: ["dist/**", "build/**", "coverage/**", "node_modules/**"],
   },
-  js.configs.recommended,
+  {
+    files: ["**/*.js"],
+    ...js.configs.recommended,
+  },
   ...tseslint.configs.recommendedTypeChecked,
   {
-    files: ["**/*.{ts,tsx}"],
+    files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
       parserOptions: {
         project: true,
@@ -28,8 +24,10 @@ export default tseslint.config(
       import: importPlugin,
     },
     rules: {
-      "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+      "no-unused-vars": "off",
+      "import/no-duplicates": "warn",
     },
   },
-  eslintConfigPrettier,
-);
+  prettier,
+];
