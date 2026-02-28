@@ -230,3 +230,24 @@ High quality
 Frictionless
 
 Everything else is optional.
+
+
+## 🧹 Linting
+
+ESLint is configured with type-aware TypeScript rules using the root `tsconfig.json` so issues are caught early in `client`, `shared`, and `server` code.
+
+- Run lint checks:
+  ```bash
+  pnpm run lint
+  ```
+- Auto-fix safe issues:
+  ```bash
+  pnpm run lint:fix
+  ```
+
+Why ESLint was added:
+
+- catches real TypeScript/runtime pitfalls (for example unhandled promises)
+- keeps code quality consistent across server/client/shared modules
+- stays conflict-free with Prettier by disabling stylistic overlap
+
