@@ -86,27 +86,39 @@ declare global {
   }
 }
 
-const API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY;
+const API_KEY = getEnvString(import.meta.env.VITE_FRONTEND_FORGE_API_KEY) ?? "";
 const FORGE_BASE_URL =
-  import.meta.env.VITE_FRONTEND_FORGE_API_URL ||
+  getEnvString(import.meta.env.VITE_FRONTEND_FORGE_API_URL) ??
   "https://forge.butterfly-effect.dev";
 const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
 
+function getEnvString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
 function loadMapScript() {
-  return new Promise(resolve => {
+  return new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
     script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry`;
     script.async = true;
     script.crossOrigin = "anonymous";
     script.onload = () => {
-      resolve(null);
+      resolve();
       script.remove(); // Clean up immediately
     };
     script.onerror = () => {
-      console.error("Failed to load Google Maps script");
+      reject(new Error("Failed to load Google Maps script"));
     };
     document.head.appendChild(script);
   });
+}
+
+function getGoogleMaps(): typeof google.maps | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  return window.google?.maps;
 }
 
 interface MapViewProps {
@@ -127,11 +139,18 @@ export function MapView({
 
   const init = usePersistFn(async () => {
     await loadMapScript();
+    const maps = getGoogleMaps();
     if (!mapContainer.current) {
       console.error("Map container not found");
       return;
     }
-    map.current = new window.google.maps.Map(mapContainer.current, {
+
+    if (!maps) {
+      console.error("Google Maps API unavailable");
+      return;
+    }
+
+    map.current = new maps.Map(mapContainer.current, {
       zoom: initialZoom,
       center: initialCenter,
       mapTypeControl: true,
@@ -146,7 +165,9 @@ export function MapView({
   });
 
   useEffect(() => {
-    init();
+    void init().catch(err => {
+      console.error("Failed to initialize map", err);
+    });
   }, [init]);
 
   return (
