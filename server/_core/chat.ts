@@ -7,6 +7,7 @@
 
 import { streamText, stepCountIs } from "ai";
 import { tool } from "ai";
+import type { ModelMessage } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import type { Express } from "express";
 import { z } from "zod/v4";
@@ -40,7 +41,7 @@ const tools = {
         .describe("The city and country, e.g. 'Tokyo, Japan'"),
       unit: z.enum(["celsius", "fahrenheit"]).optional().default("celsius"),
     }),
-    execute: async ({ location, unit }) => {
+    execute: ({ location, unit }) => {
       // Simulate weather API call
       const temp = Math.floor(Math.random() * 30) + 5;
       const conditions = ["sunny", "cloudy", "rainy", "partly cloudy"][
@@ -63,13 +64,9 @@ const tools = {
         .string()
         .describe("The math expression to evaluate, e.g. '2 + 2'"),
     }),
-    execute: async ({ expression }) => {
+    execute: ({ expression }) => {
       try {
-        // Simple safe eval for basic math
-        const sanitized = expression.replace(/[^0-9+\-*/().%\s]/g, "");
-        const result = Function(
-          `"use strict"; return (${sanitized})`
-        )() as number;
+        const result = evaluateMathExpression(expression);
         return { expression, result };
       } catch {
         return { expression, error: "Invalid expression" };
@@ -77,6 +74,131 @@ const tools = {
     },
   }),
 };
+
+function isModelMessage(value: unknown): value is ModelMessage {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const candidate = value as { role?: unknown; content?: unknown };
+  return typeof candidate.role === "string" && "content" in candidate;
+}
+
+function evaluateMathExpression(expression: string): number {
+  const sanitized = expression.replace(/\s+/g, "");
+  if (!/^[0-9+\-*/().%]+$/.test(sanitized)) {
+    throw new Error("Invalid characters in expression");
+  }
+
+  const tokens = sanitized.match(/\d+(?:\.\d+)?|[()+\-*/%]/g);
+  if (!tokens) {
+    throw new Error("Empty expression");
+  }
+
+  const values: number[] = [];
+  const operators: string[] = [];
+
+  const precedence = (operator: string): number => {
+    if (operator === "+" || operator === "-") {
+      return 1;
+    }
+
+    if (operator === "*" || operator === "/" || operator === "%") {
+      return 2;
+    }
+
+    return 0;
+  };
+
+  const applyOperator = () => {
+    const operator = operators.pop();
+    const right = values.pop();
+    const left = values.pop();
+
+    if (!operator || right === undefined || left === undefined) {
+      throw new Error("Malformed expression");
+    }
+
+    switch (operator) {
+      case "+":
+        values.push(left + right);
+        break;
+      case "-":
+        values.push(left - right);
+        break;
+      case "*":
+        values.push(left * right);
+        break;
+      case "/":
+        if (right === 0) {
+          throw new Error("Division by zero");
+        }
+        values.push(left / right);
+        break;
+      case "%":
+        if (right === 0) {
+          throw new Error("Division by zero");
+        }
+        values.push(left % right);
+        break;
+      default:
+        throw new Error("Unsupported operator");
+    }
+  };
+
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    const previous = i > 0 ? tokens[i - 1] : undefined;
+
+    if (/^\d/.test(token)) {
+      values.push(Number(token));
+      continue;
+    }
+
+    if (token === "(") {
+      operators.push(token);
+      continue;
+    }
+
+    if (token === ")") {
+      while (operators.at(-1) !== "(") {
+        applyOperator();
+      }
+      operators.pop();
+      continue;
+    }
+
+    if (
+      token === "-" &&
+      (i === 0 || previous === "(" || (previous !== undefined && /[+\-*/%]/.test(previous)))
+    ) {
+      values.push(0);
+    }
+
+    while (
+      operators.length > 0 &&
+      precedence(operators[operators.length - 1]) >= precedence(token)
+    ) {
+      applyOperator();
+    }
+
+    operators.push(token);
+  }
+
+  while (operators.length > 0) {
+    if (operators[operators.length - 1] === "(") {
+      throw new Error("Mismatched parentheses");
+    }
+    applyOperator();
+  }
+
+  const result = values[0];
+  if (!Number.isFinite(result) || values.length !== 1) {
+    throw new Error("Invalid expression result");
+  }
+
+  return result;
+}
 
 /**
  * Registers the /api/chat endpoint for streaming AI responses.
@@ -92,14 +214,28 @@ const tools = {
 export function registerChatRoutes(app: Express) {
   const openai = createLLMProvider();
 
-  app.post("/api/chat", async (req, res) => {
+  app.post("/api/chat", (req, res) => {
     try {
-      const { messages } = req.body;
+      const requestBody: unknown = req.body;
 
-      if (!messages || !Array.isArray(messages)) {
+      if (typeof requestBody !== "object" || requestBody === null) {
         res.status(400).json({ error: "messages array is required" });
         return;
       }
+
+      const messagesValue = (requestBody as { messages?: unknown }).messages;
+
+      if (!Array.isArray(messagesValue)) {
+        res.status(400).json({ error: "messages array is required" });
+        return;
+      }
+
+      if (!messagesValue.every(isModelMessage)) {
+        res.status(400).json({ error: "messages must be valid model messages" });
+        return;
+      }
+
+      const messages: ModelMessage[] = messagesValue;
 
       const result = streamText({
         model: openai.chat("gpt-4o"),
