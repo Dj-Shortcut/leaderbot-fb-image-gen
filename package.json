@@ -10,10 +10,12 @@
     "debug:image-url": "tsx server/_core/debugImageUrl.ts",
     "dev": "cross-env NODE_ENV=development tsx watch server/_core/index.ts",
     "format": "prettier --write .",
-    "lint": "eslint client/src shared server",
-    "lint:fix": "eslint client/src shared server --fix",
+    "lint": "eslint client/src shared",
+    "lint:fix": "eslint client/src shared --fix",
     "start": "cross-env NODE_ENV=production node dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint:server": "eslint server",
+    "lint:server:fix": "eslint server --fix"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.12",
