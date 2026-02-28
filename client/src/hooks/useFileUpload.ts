@@ -190,7 +190,9 @@ export function useFileUpload({
 
       if (newFiles.length > 0) {
         setFiles((prev) => [...prev, ...newFiles]);
-        newFiles.forEach(uploadFile);
+        newFiles.forEach((file) => {
+          void uploadFile(file);
+        });
       }
     },
     [accept, maxSize, uploadFile]
@@ -216,7 +218,7 @@ export function useFileUpload({
           f.id === id ? { ...f, status: "uploading" as const, error: undefined } : f
         )
       );
-      uploadFile({ ...file, status: "uploading" });
+      void uploadFile({ ...file, status: "uploading" });
     },
     [files, uploadFile]
   );

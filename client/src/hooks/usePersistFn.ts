@@ -1,20 +1,23 @@
 import { useRef } from "react";
 
-type noop = (...args: any[]) => any;
+type GenericFunction = (...args: unknown[]) => unknown;
 
 /**
  * usePersistFn instead of useCallback to reduce cognitive load
  */
-export function usePersistFn<T extends noop>(fn: T) {
+export function usePersistFn<T extends GenericFunction>(
+  fn: T,
+): (...args: Parameters<T>) => ReturnType<T> {
   const fnRef = useRef<T>(fn);
   fnRef.current = fn;
 
-  const persistFn = useRef<T>(null);
-  if (!persistFn.current) {
-    persistFn.current = function (this: unknown, ...args) {
-      return fnRef.current!.apply(this, args);
-    } as T;
+  const persistFnRef = useRef<((...args: Parameters<T>) => ReturnType<T>) | null>(null);
+
+  if (persistFnRef.current === null) {
+    persistFnRef.current = (...args: Parameters<T>) => {
+      return fnRef.current(...args) as ReturnType<T>;
+    };
   }
 
-  return persistFn.current!;
+  return persistFnRef.current;
 }
