@@ -1,6 +1,6 @@
 import { eq, and, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, imageRequests, dailyQuota, usageStats, notificationLog, InsertImageRequest, InsertDailyQuota, InsertUsageStats, InsertNotificationLog } from "../drizzle/schema";
+import { InsertUser, users, imageRequests, dailyQuota, usageStats, notificationLog, InsertImageRequest, InsertUsageStats, InsertNotificationLog } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -15,6 +15,7 @@ export async function getDb() {
       _db = null;
     }
   }
+  await Promise.resolve();
   return _db;
 }
 
@@ -208,7 +209,20 @@ export async function reserveUserDailyQuota(userId: number): Promise<boolean> {
       AND imagesGenerated < 1
   `);
 
-  const affectedRows = Number((result as any)?.[0]?.affectedRows ?? (result as any)?.affectedRows ?? 0);
+  const getAffectedRows = (value: unknown): number => {
+    if (typeof value === "object" && value !== null && "affectedRows" in value) {
+      const maybeAffectedRows = (value as { affectedRows?: unknown }).affectedRows;
+      return typeof maybeAffectedRows === "number" ? maybeAffectedRows : 0;
+    }
+
+    if (Array.isArray(value) && value.length > 0) {
+      return getAffectedRows(value[0]);
+    }
+
+    return 0;
+  };
+
+  const affectedRows = getAffectedRows(result);
   return affectedRows > 0;
 }
 

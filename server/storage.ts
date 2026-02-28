@@ -5,6 +5,17 @@ import { ENV } from './_core/env';
 
 type StorageConfig = { baseUrl: string; apiKey: string };
 
+function extractUrl(value: unknown): string {
+  if (typeof value === "object" && value !== null && "url" in value) {
+    const url = (value as { url?: unknown }).url;
+    if (typeof url === "string") {
+      return url;
+    }
+  }
+
+  throw new Error("Storage response missing url");
+}
+
 function getStorageConfig(): StorageConfig {
   const baseUrl = ENV.forgeApiUrl;
   const apiKey = ENV.forgeApiKey;
@@ -38,7 +49,8 @@ async function buildDownloadUrl(
     method: "GET",
     headers: buildAuthHeaders(apiKey),
   });
-  return (await response.json()).url;
+  const payload: unknown = await response.json();
+  return extractUrl(payload);
 }
 
 function ensureTrailingSlash(value: string): string {
@@ -57,7 +69,7 @@ function toFormData(
   const blob =
     typeof data === "string"
       ? new Blob([data], { type: contentType })
-      : new Blob([data as any], { type: contentType });
+      : new Blob([new Uint8Array(data)], { type: contentType });
   const form = new FormData();
   form.append("file", blob, fileName || "file");
   return form;
@@ -88,7 +100,8 @@ export async function storagePut(
       `Storage upload failed (${response.status} ${response.statusText}): ${message}`
     );
   }
-  const url = (await response.json()).url;
+  const payload: unknown = await response.json();
+  const url = extractUrl(payload);
   return { key, url };
 }
 

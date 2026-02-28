@@ -1,4 +1,4 @@
-import type { Style, StyleId } from "./messengerStyles";
+import type { Style } from "./messengerStyles";
 import { STYLE_CONFIGS } from "./messengerStyles";
 import { toUserKey } from "./privacy";
 
