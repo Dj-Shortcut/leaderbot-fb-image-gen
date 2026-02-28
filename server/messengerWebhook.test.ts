@@ -177,7 +177,7 @@ describe("messenger webhook dedupe", () => {
     expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       "echo-user",
-      "Photo received ✅ Pick a style below 🙂",
+      "Dank je. Kies hieronder een stijl.",
       expect.any(Array),
     );
   });
@@ -338,10 +338,10 @@ describe("messenger webhook dedupe", () => {
       );
       expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
         "mock-image-user",
-        "Done ✅ What next?",
+        "Klaar. Je kan de afbeelding opslaan door erop te tikken.",
         [
-          { content_type: "text", title: "Download HD", payload: "DOWNLOAD_HD" },
-          { content_type: "text", title: "Try another style", payload: "CHOOSE_STYLE" },
+          { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
+          { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
         ],
       );
     } finally {
@@ -376,7 +376,7 @@ describe("messenger webhook dedupe", () => {
 
     expect(sendQuickRepliesMock).toHaveBeenLastCalledWith("openai-missing-key-user", "AI generation isn’t enabled yet.", [
       { content_type: "text", title: "Retry this style", payload: "disco" },
-      { content_type: "text", title: "Choose another style", payload: "CHOOSE_STYLE" },
+      { content_type: "text", title: "Andere stijl", payload: "CHOOSE_STYLE" },
     ]);
     expect(sendImageMock).not.toHaveBeenCalled();
     expect(sendTextMock).toHaveBeenCalledTimes(1);
@@ -496,7 +496,7 @@ describe("messenger webhook dedupe", () => {
       "Choose an option:",
       [
         { content_type: "text", title: "Retry Gold", payload: "RETRY_STYLE_gold" },
-        { content_type: "text", title: "Choose another style", payload: "CHOOSE_STYLE" },
+        { content_type: "text", title: "Andere stijl", payload: "CHOOSE_STYLE" },
       ],
     );
     expect(safeLogMock).toHaveBeenCalledWith("generation_start", expect.objectContaining({ style: "gold", mode: "openai" }));
@@ -539,7 +539,7 @@ describe("messenger webhook dedupe", () => {
 
     expect(sendQuickRepliesMock).toHaveBeenLastCalledWith("openai-timeout-user", "This took too long.", [
       { content_type: "text", title: "Retry this style", payload: "clouds" },
-      { content_type: "text", title: "Choose another style", payload: "CHOOSE_STYLE" },
+      { content_type: "text", title: "Andere stijl", payload: "CHOOSE_STYLE" },
     ]);
     expect(safeLogMock).toHaveBeenCalledWith("generation_fail", expect.objectContaining({ mode: "openai", errorClass: "GenerationTimeoutError" }));
   });
@@ -608,7 +608,7 @@ describe("messenger webhook dedupe", () => {
       });
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(safeLogMock).not.toHaveBeenCalledWith("generation_start", expect.anything());
+      expect(sendTextMock).toHaveBeenCalledWith("busy-user", "Ik ben nog bezig met je vorige afbeelding.");
 
       resolveFetch?.({
         ok: true,
@@ -683,7 +683,7 @@ describe("messenger webhook dedupe", () => {
       });
 
       expect(sendTextMock.mock.calls).toEqual([
-        ["busy-user-text", "✨ Creating your Gold version… This takes a few seconds."],
+        ["busy-user-text", "Ik ben nog bezig met je vorige afbeelding."],
       ]);
       expect(sendImageMock).not.toHaveBeenCalled();
       expect(sendQuickRepliesMock).not.toHaveBeenCalled();
@@ -727,10 +727,10 @@ describe("messenger greeting behavior", () => {
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       "idle-user",
-      "✨ I turn your photos into stylized images.\nSend me a picture to get started.",
+      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis.",
       expect.arrayContaining([
-        { content_type: "text", title: "Send photo", payload: "START_PHOTO" },
-        { content_type: "text", title: "What is this?", payload: "WHAT_IS_THIS" },
+        { content_type: "text", title: "Wat doe ik?", payload: "WHAT_IS_THIS" },
+        { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
       ]),
     );
   });
@@ -759,14 +759,14 @@ describe("messenger greeting behavior", () => {
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
       "style-user",
-      "Photo received ✅ Pick a style below 🙂",
+      "Dank je. Kies hieronder een stijl.",
       [
-        { content_type: "text", title: "Caricature", payload: "caricature" },
-        { content_type: "text", title: "Petals", payload: "petals" },
-        { content_type: "text", title: "Gold", payload: "gold" },
-        { content_type: "text", title: "Cinematic", payload: "cinematic" },
-        { content_type: "text", title: "Disco", payload: "disco" },
-        { content_type: "text", title: "Clouds", payload: "clouds" },
+        { content_type: "text", title: "🎨 Caricature", payload: "STYLE_CARICATURE" },
+        { content_type: "text", title: "🌸 Petals", payload: "STYLE_PETALS" },
+        { content_type: "text", title: "✨ Gold", payload: "STYLE_GOLD" },
+        { content_type: "text", title: "🎬 Cinematic", payload: "STYLE_CINEMATIC" },
+        { content_type: "text", title: "🪩 Disco Glow", payload: "STYLE_DISCO" },
+        { content_type: "text", title: "☁️ Clouds", payload: "STYLE_CLOUDS" },
       ],
     );
   });
@@ -804,18 +804,18 @@ describe("messenger greeting behavior", () => {
       expect(sendQuickRepliesMock).toHaveBeenNthCalledWith(
         1,
         "transition-order-user",
-        "Photo received ✅ Pick a style below 🙂",
+        "Dank je. Kies hieronder een stijl.",
         expect.any(Array),
       );
       expect(sendTextMock).toHaveBeenCalledTimes(1);
-      expect(sendTextMock).toHaveBeenCalledWith("transition-order-user", expect.stringContaining("Gold style"));
+      expect(sendTextMock).toHaveBeenCalledWith("transition-order-user", "Ik maak nu je Gold-stijl.");
       expect(sendImageMock).toHaveBeenCalledTimes(1);
       expect(sendQuickRepliesMock).toHaveBeenNthCalledWith(
         2,
         "transition-order-user",
-        "Done ✅ What next?",
+        "Klaar. Je kan de afbeelding opslaan door erop te tikken.",
         [
-          { content_type: "text", title: "Try another style", payload: "CHOOSE_STYLE" },
+          { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
           { content_type: "text", title: "New photo", payload: "SEND_PHOTO" },
         ],
       );
@@ -832,7 +832,7 @@ describe("messenger greeting behavior", () => {
   it("offers follow-up quick actions when state is RESULT_READY", async () => {
     const psid = "result-user";
     const userId = anonymizePsid(psid);
-    setFlowState(userId, "SUCCESS");
+    setFlowState(userId, "RESULT_READY");
 
     await processFacebookWebhookPayload({
       entry: [
@@ -849,10 +849,10 @@ describe("messenger greeting behavior", () => {
 
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
-      "✨ Your image is ready.",
+      "Klaar. Je kan de afbeelding opslaan door erop te tikken.",
       [
-        { content_type: "text", title: "Download HD", payload: "DOWNLOAD_HD" },
-        { content_type: "text", title: "Try another style", payload: "CHOOSE_STYLE" },
+        { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
+        { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
       ],
     );
   });
@@ -877,10 +877,10 @@ describe("messenger greeting behavior", () => {
 
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
-      "That one failed. Want to retry or pick another style?",
+      "Er ging iets mis bij het maken van je afbeelding. Kies gerust opnieuw een stijl.",
       [
-        { content_type: "text", title: "Retry {style}", payload: "RETRY_STYLE" },
-        { content_type: "text", title: "Choose another style", payload: "CHOOSE_STYLE" },
+        { content_type: "text", title: "Probeer opnieuw", payload: "RETRY_STYLE" },
+        { content_type: "text", title: "Andere stijl", payload: "CHOOSE_STYLE" },
       ],
     );
   });

@@ -5,14 +5,14 @@ describe("greeting handling by conversation state", () => {
   it("returns processing text while PROCESSING", () => {
     expect(getGreetingResponse("PROCESSING")).toEqual({
       mode: "text",
-      text: "I’m still working on it—few seconds.",
+      text: "Ik ben nog bezig met je vorige afbeelding.",
     });
   });
 
   it("returns plain photo prompt while AWAITING_PHOTO", () => {
     expect(getGreetingResponse("AWAITING_PHOTO")).toEqual({
       mode: "text",
-      text: "Send a photo when you're ready 📷",
+      text: "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
     });
   });
 
@@ -20,7 +20,7 @@ describe("greeting handling by conversation state", () => {
     expect(getGreetingResponse("AWAITING_STYLE")).toEqual({
       mode: "quick_replies",
       state: "AWAITING_STYLE",
-      text: "🎨 Pick a style to transform your image:",
+      text: "Dank je. Kies hieronder een stijl.",
     });
   });
 
@@ -28,7 +28,7 @@ describe("greeting handling by conversation state", () => {
     expect(getGreetingResponse("RESULT_READY")).toEqual({
       mode: "quick_replies",
       state: "RESULT_READY",
-      text: "✨ Your image is ready.",
+      text: "Klaar. Je kan de afbeelding opslaan door erop te tikken.",
     });
   });
 
@@ -36,7 +36,7 @@ describe("greeting handling by conversation state", () => {
     expect(getGreetingResponse("FAILURE")).toEqual({
       mode: "quick_replies",
       state: "FAILURE",
-      text: "That one failed. Want to retry or pick another style?",
+      text: "Er ging iets mis bij het maken van je afbeelding. Kies gerust opnieuw een stijl.",
     });
   });
 
@@ -44,7 +44,7 @@ describe("greeting handling by conversation state", () => {
     expect(getGreetingResponse("IDLE")).toEqual({
       mode: "quick_replies",
       state: "IDLE",
-      text: "✨ I turn your photos into stylized images.\nSend me a picture to get started.",
+      text: "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis.",
     });
   });
 });

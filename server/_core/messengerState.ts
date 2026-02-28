@@ -1,4 +1,5 @@
 import type { StyleId } from "./messengerStyles";
+import { STYLE_CONFIGS } from "./messengerStyles";
 import { toUserKey } from "./privacy";
 
 export type ConversationState = "IDLE" | "AWAITING_PHOTO" | "AWAITING_STYLE" | "PROCESSING" | "RESULT_READY" | "FAILURE";
@@ -37,26 +38,22 @@ const stateByUserId = new Map<string, MessengerUserState>();
 
 const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
   IDLE: [
-    { title: "Send photo", payload: "START_PHOTO" },
-    { title: "What is this?", payload: "WHAT_IS_THIS" },
+    { title: "Wat doe ik?", payload: "WHAT_IS_THIS" },
+    { title: "Privacy", payload: "PRIVACY_INFO" },
   ],
   AWAITING_PHOTO: [],
-  AWAITING_STYLE: [
-    { title: "Caricature", payload: "caricature" },
-    { title: "Petals", payload: "petals" },
-    { title: "Gold", payload: "gold" },
-    { title: "Cinematic", payload: "cinematic" },
-    { title: "Disco", payload: "disco" },
-    { title: "Clouds", payload: "clouds" },
-  ],
+  AWAITING_STYLE: STYLE_CONFIGS.map(style => ({
+    title: style.label,
+    payload: style.payload,
+  })),
   PROCESSING: [],
   RESULT_READY: [
-    { title: "Download HD", payload: "DOWNLOAD_HD" },
-    { title: "Try another style", payload: "CHOOSE_STYLE" },
+    { title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
+    { title: "Privacy", payload: "PRIVACY_INFO" },
   ],
   FAILURE: [
-    { title: "Retry {style}", payload: "RETRY_STYLE" },
-    { title: "Choose another style", payload: "CHOOSE_STYLE" },
+    { title: "Probeer opnieuw", payload: "RETRY_STYLE" },
+    { title: "Andere stijl", payload: "CHOOSE_STYLE" },
   ],
 };
 

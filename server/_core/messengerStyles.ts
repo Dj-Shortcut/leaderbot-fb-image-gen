@@ -62,20 +62,20 @@ export const STYLE_CONFIGS: StyleConfig[] = [
     mockResultUrls: [getLocalDemoUrl("gold")],
   },
   {
-    id: "STYLE_DISCO",
-    payload: "STYLE_DISCO",
-    style: "disco",
-    label: "🪩 Disco Glow",
-    demoThumbnailUrl: getLocalDemoUrl("disco"),
-    mockResultUrls: [getLocalDemoUrl("disco")],
-  },
-  {
     id: "STYLE_CINEMATIC",
     payload: "STYLE_CINEMATIC",
     style: "cinematic",
     label: "🎬 Cinematic",
     demoThumbnailUrl: getLocalDemoUrl("cinematic"),
     mockResultUrls: [getLocalDemoUrl("cinematic")],
+  },
+  {
+    id: "STYLE_DISCO",
+    payload: "STYLE_DISCO",
+    style: "disco",
+    label: "🪩 Disco Glow",
+    demoThumbnailUrl: getLocalDemoUrl("disco"),
+    mockResultUrls: [getLocalDemoUrl("disco")],
   },
   {
     id: "STYLE_CLOUDS",
