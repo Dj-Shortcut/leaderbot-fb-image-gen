@@ -1,21 +1,23 @@
 import { useRef } from "react";
 
-type GenericFunction = (...args: unknown[]) => unknown;
+type GenericFunction<TArgs extends unknown[] = unknown[], TResult = unknown> = (
+  ...args: TArgs
+) => TResult;
 
 /**
  * usePersistFn instead of useCallback to reduce cognitive load
  */
-export function usePersistFn<T extends GenericFunction>(
-  fn: T,
-): (...args: Parameters<T>) => ReturnType<T> {
-  const fnRef = useRef<T>(fn);
+export function usePersistFn<TArgs extends unknown[], TResult>(
+  fn: GenericFunction<TArgs, TResult>,
+): GenericFunction<TArgs, TResult> {
+  const fnRef = useRef<GenericFunction<TArgs, TResult>>(fn);
   fnRef.current = fn;
 
-  const persistFnRef = useRef<((...args: Parameters<T>) => ReturnType<T>) | null>(null);
+  const persistFnRef = useRef<GenericFunction<TArgs, TResult> | null>(null);
 
   if (persistFnRef.current === null) {
-    persistFnRef.current = (...args: Parameters<T>) => {
-      return fnRef.current(...args) as ReturnType<T>;
+    persistFnRef.current = (...args: TArgs) => {
+      return fnRef.current(...args);
     };
   }
 

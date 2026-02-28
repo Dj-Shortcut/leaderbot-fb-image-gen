@@ -293,9 +293,9 @@ function ChartTooltipContent({
                             }
                           )}
                           style={{
-                            "--color-bg": indicatorColor,
-                            "--color-border": indicatorColor,
-                          }}
+                            ["--color-bg" as string]: indicatorColor,
+                            ["--color-border" as string]: indicatorColor,
+                          } as React.CSSProperties & Record<string, string | undefined>}
                         />
                       )
                     )}
