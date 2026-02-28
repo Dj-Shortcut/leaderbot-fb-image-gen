@@ -270,10 +270,6 @@ async function sendStateQuickReplies(psid: string, state: ConversationState, tex
   await sendQuickReplies(psid, text, replies);
 }
 
-async function sendGreeting(psid: string): Promise<void> {
-  await sendStateQuickReplies(psid, "IDLE", USER_MESSAGES.flowExplanation);
-}
-
 async function sendStylePicker(psid: string): Promise<void> {
   await sendStateQuickReplies(psid, "AWAITING_STYLE", USER_MESSAGES.stylePicker);
 }
@@ -630,15 +626,13 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
       console.log("[webhook_in]", webhookInLog);
     }
 
-    const payload = req.body;
+    const payload: unknown = req.body;
     res.sendStatus(200);
 
-    setImmediate(async () => {
-      try {
-        await processFacebookWebhookPayload(payload);
-      } catch (error) {
+    setImmediate(() => {
+      void processFacebookWebhookPayload(payload).catch(error => {
         console.error("[facebook-webhook] failed to process event", error);
-      }
+      });
     });
   });
 }

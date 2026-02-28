@@ -43,6 +43,18 @@ interface RequestOptions {
   body?: Record<string, unknown>;
 }
 
+function toQueryParamValue(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(item => toQueryParamValue(item)).join("|");
+  }
+
+  return JSON.stringify(value);
+}
+
 /**
  * Make authenticated requests to Google Maps APIs
  * 
@@ -67,7 +79,7 @@ export async function makeRequest<T = unknown>(
   // Add other query parameters
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null) {
-      url.searchParams.append(key, String(value));
+      url.searchParams.append(key, toQueryParamValue(value));
     }
   });
 

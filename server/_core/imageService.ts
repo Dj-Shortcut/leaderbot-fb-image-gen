@@ -44,10 +44,10 @@ function getOpenAiTimeoutMs(): number {
 }
 
 class MockImageGenerator implements ImageGenerator {
-  async generate(input: { style: Style; sourceImageUrl?: string; userKey: string }): Promise<{ imageUrl: string }> {
-    return {
+  generate(input: { style: Style; sourceImageUrl?: string; userKey: string }): Promise<{ imageUrl: string }> {
+    return Promise.resolve({
       imageUrl: getMockImageForStyle(input.style),
-    };
+    });
   }
 }
 

@@ -28,6 +28,12 @@ const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
 const GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
 const GET_USER_INFO_WITH_JWT_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfoWithJwt`;
 
+type UserInfoWithPlatforms = {
+  platform?: string | null;
+  loginMethod?: string | null;
+  platforms?: unknown;
+};
+
 class OAuthService {
   constructor(private client: ReturnType<typeof axios.create>) {
     if (ENV.oAuthServerUrl) {
@@ -113,6 +119,19 @@ class SDKServer {
     return first ? first.toLowerCase() : null;
   }
 
+  private withLoginMethod<T extends UserInfoWithPlatforms>(data: T): T {
+    const loginMethod = this.deriveLoginMethod(
+      data.platforms,
+      data.platform ?? null
+    );
+
+    return {
+      ...data,
+      platform: loginMethod,
+      loginMethod,
+    };
+  }
+
   /**
    * Exchange OAuth authorization code for access token
    * @example
@@ -134,15 +153,8 @@ class SDKServer {
     const data = await this.oauthService.getUserInfoByToken({
       accessToken,
     } as ExchangeTokenResponse);
-    const loginMethod = this.deriveLoginMethod(
-      (data as any)?.platforms,
-      (data as any)?.platform ?? data.platform ?? null
-    );
-    return {
-      ...(data as any),
-      platform: loginMethod,
-      loginMethod,
-    } as GetUserInfoResponse;
+
+    return this.withLoginMethod(data);
   }
 
   private parseCookies(cookieHeader: string | undefined) {
@@ -245,15 +257,7 @@ class SDKServer {
       payload
     );
 
-    const loginMethod = this.deriveLoginMethod(
-      (data as any)?.platforms,
-      (data as any)?.platform ?? data.platform ?? null
-    );
-    return {
-      ...(data as any),
-      platform: loginMethod,
-      loginMethod,
-    } as GetUserInfoWithJwtResponse;
+    return this.withLoginMethod(data);
   }
 
   async authenticateRequest(req: Request): Promise<User> {
