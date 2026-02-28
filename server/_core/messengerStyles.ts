@@ -21,7 +21,8 @@ export type StyleId =
   | "STYLE_GOLD"
   | "STYLE_CINEMATIC"
   | "STYLE_DISCO"
-  | "STYLE_CLOUDS";
+  | "STYLE_CLOUDS"
+  | "gold";
 
 export type StyleConfig = {
   id: StyleId;
