@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import path from "path";
 import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
@@ -225,6 +226,17 @@ async function startServer() {
       createContext,
     })
   );
+
+  const publicDir = path.join(process.cwd(), "public");
+  app.use(
+    "/demo",
+    express.static(path.join(publicDir, "demo"), { fallthrough: false })
+  );
+  app.use(
+    "/generated",
+    express.static(path.join(publicDir, "generated"), { fallthrough: false })
+  );
+  app.use(express.static(publicDir));
 
   if (process.env.NODE_ENV !== "production") {
     const [{ setupVite }, { createServer }] = await Promise.all([
