@@ -20,8 +20,10 @@ import {
   setLastGenerated,
   setPendingImage,
   type ConversationState,
+  anonymizePsid,
 } from "./messengerState";
 import { toLogUser, toUserKey } from "./privacy";
+import { isDebugLogEnabled, isStateDumpEnabled, shouldSampleWebhookSummary } from "./logLevel";
 
 type FacebookWebhookEvent = {
   sender?: { id?: string };
@@ -336,12 +338,14 @@ async function runStyleGeneration(psid: string, userId: string, style: Style, re
   const lastImageUrl = state.lastPhoto;
   const chosenStyle = style;
 
-  console.log("STATE_BEFORE_GENERATE", {
-    psid,
-    state,
-    lastImageUrl,
-    hasImage: !!lastImageUrl,
-  });
+  if (isStateDumpEnabled()) {
+    console.log("STATE_BEFORE_GENERATE", {
+      psid,
+      state,
+      lastImageUrl,
+      hasImage: !!lastImageUrl,
+    });
+  }
 
   console.log("OPENAI_CALL_START", {
     psid,
@@ -349,7 +353,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style, re
   });
 
   try {
-    const { imageUrl } = await generator.generate({
+    const { imageUrl, proof } = await generator.generate({
       style,
       sourceImageUrl: lastImageUrl ?? undefined,
       userKey: userId,
@@ -358,7 +362,20 @@ async function runStyleGeneration(psid: string, userId: string, style: Style, re
 
     console.log("OPENAI_CALL_SUCCESS", { psid });
 
-    safeLog("generation_success", { mode, ms: Date.now() - startedAt });
+    const totalMs = Date.now() - startedAt;
+    safeLog("generation_success", { mode, ms: totalMs });
+    console.log("PROOF_SUMMARY", JSON.stringify({
+      reqId,
+      psidHash: anonymizePsid(psid).slice(0, 12),
+      style: chosenStyle,
+      incomingLen: proof.incomingLen,
+      incomingSha256: proof.incomingSha256,
+      openaiInputLen: proof.openaiInputLen,
+      openaiInputSha256: proof.openaiInputSha256,
+      outputUrl: imageUrl,
+      totalMs,
+      ok: true,
+    }));
     console.log("MESSENGER_SEND_IMAGE", { psid, imageUrl });
     await sendImage(psid, imageUrl);
     setLastGenerated(userId, style, imageUrl);
@@ -371,7 +388,21 @@ async function runStyleGeneration(psid: string, userId: string, style: Style, re
     });
 
     const errorClass = error instanceof Error ? error.constructor.name : "UnknownError";
-    safeLog("generation_fail", { mode, errorClass, ms: Date.now() - startedAt });
+    const totalMs = Date.now() - startedAt;
+    safeLog("generation_fail", { mode, errorClass, ms: totalMs });
+    console.log("PROOF_SUMMARY", JSON.stringify({
+      reqId,
+      psidHash: anonymizePsid(psid).slice(0, 12),
+      style: chosenStyle,
+      incomingLen: 0,
+      incomingSha256: "",
+      openaiInputLen: 0,
+      openaiInputSha256: "",
+      outputUrl: null,
+      totalMs,
+      ok: false,
+      errorCode: errorClass,
+    }));
 
     let failureText = "I couldn’t generate that image right now.";
     if (error instanceof MissingInputImageError) {
@@ -660,19 +691,19 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
   app.get("/webhook/facebook", handleVerification);
 
   app.post("/webhook/facebook", (req, res) => {
-    console.log("===WEBHOOK_FACEBOOK_POST_HIT===");
+    if (shouldSampleWebhookSummary()) {
+      const webhookInLog = {
+        level: isDebugLogEnabled() ? "debug" : "info",
+        msg: "webhook_in",
+        reqId: (req as { reqId?: unknown }).reqId,
+        summary: summarizeWebhook(req.body),
+      };
 
-    const webhookInLog = {
-      level: "info",
-      msg: "webhook_in",
-      reqId: (req as { reqId?: unknown }).reqId,
-      summary: summarizeWebhook(req.body),
-    };
-
-    try {
-      console.log(JSON.stringify(webhookInLog));
-    } catch {
-      console.log("[webhook_in]", webhookInLog);
+      try {
+        console.log(JSON.stringify(webhookInLog));
+      } catch {
+        console.log("[webhook_in]", webhookInLog);
+      }
     }
 
     const payload: unknown = req.body;

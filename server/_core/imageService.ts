@@ -12,7 +12,7 @@ export interface ImageGenerator {
     sourceImageUrl?: string;
     userKey: string;
     reqId: string;
-  }): Promise<{ imageUrl: string }>;
+  }): Promise<{ imageUrl: string; proof: { incomingLen: number; incomingSha256: string; openaiInputLen: number; openaiInputSha256: string } }>;
 }
 
 export class InvalidGenerationInputError extends Error {}
@@ -97,14 +97,20 @@ function getOpenAiTimeoutMs(): number {
 }
 
 class MockImageGenerator implements ImageGenerator {
-  generate(input: { style: Style; sourceImageUrl?: string; userKey: string; reqId: string }): Promise<{ imageUrl: string }> {
+  generate(input: { style: Style; sourceImageUrl?: string; userKey: string; reqId: string }): Promise<{ imageUrl: string; proof: { incomingLen: number; incomingSha256: string; openaiInputLen: number; openaiInputSha256: string } }> {
     return Promise.resolve({
       imageUrl: getMockImageForStyle(input.style),
+      proof: {
+        incomingLen: 0,
+        incomingSha256: "",
+        openaiInputLen: 0,
+        openaiInputSha256: "",
+      },
     });
   }
 }
 
-async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string): Promise<{ imageBuffer: Buffer; contentType: string }> {
+async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string): Promise<{ imageBuffer: Buffer; contentType: string; incomingLen: number; incomingSha256: string }> {
   const response = await fetch(sourceImageUrl);
   const contentType = response.headers.get("content-type") ?? "application/octet-stream";
 
@@ -117,19 +123,11 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
   const incomingByteLen = safeLen(imageBuffer);
   const incomingHash = sha256(imageBuffer);
 
-  console.log("IMAGE_PROOF", {
-    reqId,
-    proof_stage: "incoming",
-    content_type: contentType,
-    byte_len: incomingByteLen,
-    sha256: incomingHash,
-  });
-
   if (process.env.DEBUG_IMAGE_PROOF === "1") {
     const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
     const savedPath = `/tmp/leaderbot_incoming.${ext}`;
     await fs.writeFile(savedPath, imageBuffer);
-    console.log("IMAGE_PROOF", { reqId, proof_stage: "incoming", saved_path: savedPath });
+    console.log("DEBUG_IMAGE_PROOF", { reqId, saved_path: savedPath });
   }
 
   if (incomingByteLen < MIN_INPUT_IMAGE_BYTES) {
@@ -137,11 +135,11 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
     throw new MissingInputImageError(`Source image too small (${incomingByteLen} bytes)`);
   }
 
-  return { imageBuffer, contentType };
+  return { imageBuffer, contentType, incomingLen: incomingByteLen, incomingSha256: incomingHash };
 }
 
 export class OpenAiImageGenerator implements ImageGenerator {
-  async generate(input: { style: Style; sourceImageUrl?: string; userKey: string; reqId: string }): Promise<{ imageUrl: string }> {
+  async generate(input: { style: Style; sourceImageUrl?: string; userKey: string; reqId: string }): Promise<{ imageUrl: string; proof: { incomingLen: number; incomingSha256: string; openaiInputLen: number; openaiInputSha256: string } }> {
     if (!input.style) {
       throw new InvalidGenerationInputError("Style is required");
     }
@@ -161,23 +159,16 @@ export class OpenAiImageGenerator implements ImageGenerator {
     }, getOpenAiTimeoutMs());
 
     try {
-      const { imageBuffer, contentType } = await downloadSourceImageOrThrow(input.sourceImageUrl, input.reqId);
+      const { imageBuffer, contentType, incomingLen, incomingSha256 } = await downloadSourceImageOrThrow(input.sourceImageUrl, input.reqId);
       const openAiInputHash = sha256(imageBuffer);
       const openAiInputByteLen = safeLen(imageBuffer);
-
-      console.log("IMAGE_PROOF", {
-        reqId: input.reqId,
-        proof_stage: "openai_input",
-        byte_len: openAiInputByteLen,
-        sha256: openAiInputHash,
-      });
 
       const formData = new FormData();
       formData.set("model", "gpt-image-1");
       formData.set("prompt", `Apply ${input.style} style to this photo.`);
       formData.set("size", "1024x1024");
       formData.set("output_format", "png");
-      formData.set("image", new Blob([imageBuffer], { type: contentType }), "source-image");
+      formData.set("image", new Blob([new Uint8Array(imageBuffer)], { type: contentType }), "source-image");
 
       const response = await fetch("https://api.openai.com/v1/images/edits", {
         method: "POST",
@@ -203,7 +194,15 @@ export class OpenAiImageGenerator implements ImageGenerator {
       const relativeFilePath = await persistGeneratedPng(imageBufferResult);
       const publicBaseUrl = getRequiredPublicBaseUrl();
 
-      return { imageUrl: `${publicBaseUrl}/${relativeFilePath}` };
+      return {
+        imageUrl: `${publicBaseUrl}/${relativeFilePath}`,
+        proof: {
+          incomingLen,
+          incomingSha256,
+          openaiInputLen: openAiInputByteLen,
+          openaiInputSha256: openAiInputHash,
+        },
+      };
     } catch (error) {
       if ((error as { name?: string })?.name === "AbortError") {
         throw new GenerationTimeoutError("OpenAI generation timed out");
