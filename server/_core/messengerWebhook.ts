@@ -4,6 +4,7 @@ import { sendImage, sendQuickReplies, sendText, safeLog } from "./messengerApi";
 import { type Style } from "./messengerStyles";
 import {
   createImageGenerator,
+  getGenerationMetrics,
   GenerationTimeoutError,
   InvalidGenerationInputError,
   MissingInputImageError,
@@ -311,6 +312,33 @@ async function handleGreeting(psid: string, userId: string, lang: Lang): Promise
   await sendStateQuickReplies(psid, response.state, response.text);
 }
 
+function logGenerationSummary(summary: {
+  reqId: string;
+  psid: string;
+  mode: string;
+  style: Style;
+  ok: boolean;
+  errorClass?: string;
+  fbImageFetchMs?: number;
+  openAiMs?: number;
+  uploadOrServeMs?: number;
+  totalMs: number;
+}): void {
+  console.info(JSON.stringify({
+    level: "info",
+    msg: "generation_summary",
+    reqId: summary.reqId,
+    psid: summary.psid,
+    mode: summary.mode,
+    style: summary.style,
+    ok: summary.ok,
+    errorClass: summary.errorClass,
+    fb_image_fetch_ms: summary.fbImageFetchMs,
+    openai_ms: summary.openAiMs,
+    upload_or_serve_ms: summary.uploadOrServeMs,
+    total_ms: summary.totalMs,
+  }));
+}
 
 async function runStyleGeneration(psid: string, userId: string, style: Style, reqId: string, lang: Lang): Promise<void> {
   const { mode, generator } = createImageGenerator();
@@ -318,8 +346,6 @@ async function runStyleGeneration(psid: string, userId: string, style: Style, re
   setFlowState(userId, "PROCESSING");
   await sendGeneratingPrompt(psid, style, lang);
 
-  const startedAt = Date.now();
-  safeLog("generation_start", { style, mode });
   const state = getOrCreateState(userId);
   const lastImageUrl = state.lastPhoto;
   const chosenStyle = style;
@@ -333,23 +359,25 @@ async function runStyleGeneration(psid: string, userId: string, style: Style, re
     });
   }
 
-  console.log("OPENAI_CALL_START", {
-    psid,
-    style: chosenStyle,
-  });
-
   try {
-    const { imageUrl, proof } = await generator.generate({
+    const { imageUrl, proof, metrics } = await generator.generate({
       style,
       sourceImageUrl: lastImageUrl ?? undefined,
       userKey: userId,
       reqId,
     });
 
-    console.log("OPENAI_CALL_SUCCESS", { psid });
-
-    const totalMs = Date.now() - startedAt;
-    safeLog("generation_success", { mode, ms: totalMs });
+    logGenerationSummary({
+      reqId,
+      psid,
+      mode,
+      style: chosenStyle,
+      ok: true,
+      fbImageFetchMs: metrics.fbImageFetchMs,
+      openAiMs: metrics.openAiMs,
+      uploadOrServeMs: metrics.uploadOrServeMs,
+      totalMs: metrics.totalMs,
+    });
     console.log("PROOF_SUMMARY", JSON.stringify({
       reqId,
       psidHash: anonymizePsid(psid).slice(0, 12),
@@ -359,7 +387,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style, re
       openaiInputLen: proof.openaiInputLen,
       openaiInputSha256: proof.openaiInputSha256,
       outputUrl: imageUrl,
-      totalMs,
+      totalMs: metrics.totalMs,
       ok: true,
     }));
     console.log("MESSENGER_SEND_IMAGE", { psid, imageUrl });
@@ -374,8 +402,19 @@ async function runStyleGeneration(psid: string, userId: string, style: Style, re
     });
 
     const errorClass = error instanceof Error ? error.constructor.name : "UnknownError";
-    const totalMs = Date.now() - startedAt;
-    safeLog("generation_fail", { mode, errorClass, ms: totalMs });
+    const metrics = getGenerationMetrics(error) ?? { totalMs: 0 };
+    logGenerationSummary({
+      reqId,
+      psid,
+      mode,
+      style: chosenStyle,
+      ok: false,
+      errorClass,
+      fbImageFetchMs: metrics.fbImageFetchMs,
+      openAiMs: metrics.openAiMs,
+      uploadOrServeMs: metrics.uploadOrServeMs,
+      totalMs: metrics.totalMs,
+    });
     console.log("PROOF_SUMMARY", JSON.stringify({
       reqId,
       psidHash: anonymizePsid(psid).slice(0, 12),
@@ -385,7 +424,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style, re
       openaiInputLen: 0,
       openaiInputSha256: "",
       outputUrl: null,
-      totalMs,
+      totalMs: metrics.totalMs,
       ok: false,
       errorCode: errorClass,
     }));
@@ -397,7 +436,6 @@ async function runStyleGeneration(psid: string, userId: string, style: Style, re
       setFlowState(userId, "AWAITING_PHOTO");
       return;
     } else if (error instanceof MissingOpenAiApiKeyError || error instanceof MissingAppBaseUrlError) {
-      safeLog("openai_not_configured", { mode });
       failureText = t(lang, "generationUnavailable");
     } else if (error instanceof GenerationTimeoutError) {
       failureText = t(lang, "generationTimeout");
