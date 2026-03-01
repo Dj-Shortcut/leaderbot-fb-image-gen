@@ -1,5 +1,6 @@
 import type { Style } from "./messengerStyles";
 import { STYLE_CONFIGS } from "./messengerStyles";
+import type { Lang } from "./i18n";
 import { toUserKey } from "./privacy";
 
 export type ConversationState = "IDLE" | "AWAITING_PHOTO" | "AWAITING_STYLE" | "PROCESSING" | "RESULT_READY" | "FAILURE";
@@ -19,6 +20,7 @@ export type MessengerUserState = {
   stage: MessengerFlowState;
   lastPhoto: string | null;
   selectedStyle: string | null;
+  preferredLang?: Lang;
   // legacy fields kept to avoid breaking current modules
   state: MessengerFlowState;
   lastPhotoUrl?: string;
@@ -116,6 +118,12 @@ export function setChosenStyle(userId: string, style: string, now = Date.now()):
   const state = getOrCreateState(userId);
   state.selectedStyle = style;
   state.chosenStyle = style;
+  state.updatedAt = now;
+}
+
+export function setPreferredLang(userId: string, lang: Lang, now = Date.now()): void {
+  const state = getOrCreateState(userId);
+  state.preferredLang = lang;
   state.updatedAt = now;
 }
 
