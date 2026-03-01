@@ -139,6 +139,8 @@ HD version preserves full quality.
 Preview = instant dopamine.
 HD download = full ownership.
 
+For production Messenger delivery (`attachment.payload.url`), generated OpenAI PNG output is persisted to `public/generated/<id>.png` and sent as `${APP_BASE_URL}/generated/<id>.png`. `APP_BASE_URL` must be a public URL in OpenAI mode so Meta can fetch the image from the internet.
+
 📦 Core Endpoints
 Endpoint	Purpose
 /healthz	Health check
