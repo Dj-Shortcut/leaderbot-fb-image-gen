@@ -35,7 +35,6 @@ export type MessengerUserState = {
   updatedAt: number;
 };
 
-const DEFAULT_DAY_KEY = "1970-01-01";
 const stateByUserId = new Map<string, MessengerUserState>();
 
 const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
@@ -85,7 +84,7 @@ export function getOrCreateState(userId: string): MessengerUserState {
     lastPhoto: null,
     selectedStyle: null,
     quota: {
-      dayKey: DEFAULT_DAY_KEY,
+      dayKey: getDayKey(),
       count: 0,
     },
     updatedAt: Date.now(),
