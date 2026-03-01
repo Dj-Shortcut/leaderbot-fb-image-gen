@@ -391,11 +391,22 @@ describe("messenger webhook dedupe", () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
 
+    const sourceImage = Buffer.alloc(6000, 7);
     const generatedImageBytes = Buffer.from("fake-png").toString("base64");
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ data: [{ b64_json: generatedImageBytes }] }),
-    }));
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "https://img.example/source.jpg") {
+        return {
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => sourceImage,
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: generatedImageBytes }] }),
+      } as Response;
+    });
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -423,7 +434,7 @@ describe("messenger webhook dedupe", () => {
       vi.unstubAllGlobals();
     }
 
-    expect(fetchMock).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(sendImageMock).toHaveBeenCalledWith(
       "openai-success-user",
       expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/.+\.png$/),
@@ -514,7 +525,16 @@ describe("messenger webhook dedupe", () => {
 
     const timeoutError = new Error("aborted");
     timeoutError.name = "AbortError";
-    const fetchMock = vi.fn(async () => {
+    const sourceImage = Buffer.alloc(6000, 7);
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "https://img.example/source.jpg") {
+        return {
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => sourceImage,
+        } as Response;
+      }
+
       throw timeoutError;
     });
 
@@ -557,12 +577,20 @@ describe("messenger webhook dedupe", () => {
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
 
     let resolveFetch: ((value: { ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }) => void) | undefined;
-    const fetchMock = vi.fn(
-      () =>
-        new Promise<{ ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }>(resolve => {
-          resolveFetch = resolve;
-        }),
-    );
+    const sourceImage = Buffer.alloc(6000, 7);
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "https://img.example/source.jpg") {
+        return Promise.resolve({
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => sourceImage,
+        } as Response);
+      }
+
+      return new Promise<{ ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }>(resolve => {
+        resolveFetch = resolve;
+      });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     try {
@@ -615,7 +643,7 @@ describe("messenger webhook dedupe", () => {
         ],
       });
 
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(sendTextMock).toHaveBeenCalledWith("busy-user", "Ik ben nog bezig met je vorige afbeelding.");
 
       const generatedImageBytes = Buffer.from("fake-png").toString("base64");
@@ -635,12 +663,20 @@ describe("messenger webhook dedupe", () => {
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
 
     let resolveFetch: ((value: { ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }) => void) | undefined;
-    const fetchMock = vi.fn(
-      () =>
-        new Promise<{ ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }>(resolve => {
-          resolveFetch = resolve;
-        }),
-    );
+    const sourceImage = Buffer.alloc(6000, 7);
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "https://img.example/source.jpg") {
+        return Promise.resolve({
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => sourceImage,
+        } as Response);
+      }
+
+      return new Promise<{ ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }>(resolve => {
+        resolveFetch = resolve;
+      });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     try {

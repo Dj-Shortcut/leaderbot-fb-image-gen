@@ -6,6 +6,7 @@ import {
   createImageGenerator,
   GenerationTimeoutError,
   InvalidGenerationInputError,
+  MissingInputImageError,
   MissingAppBaseUrlError,
   MissingOpenAiApiKeyError,
   OpenAiGenerationError,
@@ -151,6 +152,7 @@ const USER_MESSAGES = {
   ].join("\n"),
   aboutLeaderbot: "Leaderbot is gemaakt door Andy. Je mag hem gerust contacteren via Facebook.\nVolledige naam op vraag: Andy Arijs.",
   failure: "Er ging iets mis bij het maken van je afbeelding. Kies gerust opnieuw een stijl.",
+  missingInputImage: "Ik kon je foto niet goed lezen. Stuur ze nog eens door aub.",
 } as const;
 
 const PRIVACY_POLICY_URL = process.env.PRIVACY_POLICY_URL?.trim() || "<link>";
@@ -322,7 +324,7 @@ async function handleGreeting(psid: string, userId: string): Promise<void> {
 }
 
 
-async function runStyleGeneration(psid: string, userId: string, style: Style): Promise<void> {
+async function runStyleGeneration(psid: string, userId: string, style: Style, reqId: string): Promise<void> {
   const { mode, generator } = createImageGenerator();
 
   setFlowState(userId, "PROCESSING");
@@ -351,6 +353,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
       style,
       sourceImageUrl: lastImageUrl ?? undefined,
       userKey: userId,
+      reqId,
     });
 
     console.log("OPENAI_CALL_SUCCESS", { psid });
@@ -371,7 +374,12 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
     safeLog("generation_fail", { mode, errorClass, ms: Date.now() - startedAt });
 
     let failureText = "I couldn’t generate that image right now.";
-    if (error instanceof MissingOpenAiApiKeyError || error instanceof MissingAppBaseUrlError) {
+    if (error instanceof MissingInputImageError) {
+      console.error("MISSING_INPUT_IMAGE", { reqId, userId });
+      await sendText(psid, USER_MESSAGES.missingInputImage);
+      setFlowState(userId, "AWAITING_PHOTO");
+      return;
+    } else if (error instanceof MissingOpenAiApiKeyError || error instanceof MissingAppBaseUrlError) {
       safeLog("openai_not_configured", { mode });
       failureText = "AI generation isn’t enabled yet.";
     } else if (error instanceof GenerationTimeoutError) {
@@ -387,7 +395,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
   }
 }
 
-async function handleStyleSelection(psid: string, userId: string, style: Style): Promise<void> {
+async function handleStyleSelection(psid: string, userId: string, style: Style, reqId: string): Promise<void> {
   const state = getOrCreateState(userId);
   const chosenStyle = style;
 
@@ -410,10 +418,10 @@ async function handleStyleSelection(psid: string, userId: string, style: Style):
     return;
   }
 
-  await runStyleGeneration(psid, userId, style);
+  await runStyleGeneration(psid, userId, style, reqId);
 }
 
-async function handlePayload(psid: string, userId: string, payload: string): Promise<void> {
+async function handlePayload(psid: string, userId: string, payload: string, reqId: string): Promise<void> {
   if (payload.startsWith("RETRY_STYLE_")) {
     const retryStyleFromPayload = normalizeStyle(payload.slice("RETRY_STYLE_".length));
     const state = getOrCreateState(userId);
@@ -436,14 +444,14 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
       style: selectedStyle,
     });
 
-    await runStyleGeneration(psid, userId, selectedStyle);
+    await runStyleGeneration(psid, userId, selectedStyle, reqId);
     return;
   }
 
   const selectedStyle = stylePayloadToStyle(payload);
   if (selectedStyle) {
     getOrCreateState(userId);
-    await handleStyleSelection(psid, userId, selectedStyle);
+    await handleStyleSelection(psid, userId, selectedStyle, reqId);
     return;
   }
 
@@ -458,7 +466,7 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
     const retryStyle = chosenStyle ? parseStyle(chosenStyle) : undefined;
 
     if (retryStyle) {
-      await handleStyleSelection(psid, userId, retryStyle);
+      await handleStyleSelection(psid, userId, retryStyle, reqId);
       return;
     }
 
@@ -505,7 +513,7 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
   safeLog("unknown_payload", { user: toLogUser(userId) });
 }
 
-async function handleMessage(psid: string, userId: string, event: FacebookWebhookEvent): Promise<void> {
+async function handleMessage(psid: string, userId: string, event: FacebookWebhookEvent, reqId: string): Promise<void> {
   const message = event.message;
 
   if (!message || message.is_echo) {
@@ -514,7 +522,7 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
 
   const quickPayload = message.quick_reply?.payload;
   if (quickPayload) {
-    await handlePayload(psid, userId, quickPayload);
+    await handlePayload(psid, userId, quickPayload, reqId);
     return;
   }
 
@@ -552,7 +560,7 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
   const styleFromText = parseStyle(trimmedText);
   if (styleFromText) {
     getOrCreateState(userId);
-    await handleStyleSelection(psid, userId, styleFromText);
+    await handleStyleSelection(psid, userId, styleFromText, reqId);
     return;
   }
 
@@ -578,6 +586,7 @@ async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
   }
 
   const userId = toUserKey(psid);
+  const reqId = `${psid}-${Date.now()}`;
 
   if (event.message?.is_echo) {
     safeLog("echo_ignored", { user: toLogUser(userId) });
@@ -591,11 +600,11 @@ async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
   }
 
   if (event.postback?.payload) {
-    await handlePayload(psid, userId, event.postback.payload);
+    await handlePayload(psid, userId, event.postback.payload, reqId);
     return;
   }
 
-  await handleMessage(psid, userId, event);
+  await handleMessage(psid, userId, event, reqId);
 }
 
 export async function processFacebookWebhookPayload(payload: unknown): Promise<void> {
