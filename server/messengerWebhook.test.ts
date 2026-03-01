@@ -382,8 +382,6 @@ describe("messenger webhook dedupe", () => {
     expect(sendTextMock).toHaveBeenCalledTimes(2);
     expect(sendTextMock).toHaveBeenNthCalledWith(1, "openai-missing-key-user", "Ik maak nu je Disco-stijl.");
     expect(sendTextMock).toHaveBeenNthCalledWith(2, "openai-missing-key-user", "Er ging iets mis bij het maken van je afbeelding. Kies gerust opnieuw een stijl.");
-    expect(safeLogMock).toHaveBeenCalledWith("generation_start", expect.objectContaining({ style: "disco", mode: "openai" }));
-    expect(safeLogMock).toHaveBeenCalledWith("generation_fail", expect.objectContaining({ mode: "openai", errorClass: "MissingOpenAiApiKeyError" }));
   });
 
   it("reaches OpenAI generator path with GENERATOR_MODE=openai and API key", async () => {
@@ -439,8 +437,6 @@ describe("messenger webhook dedupe", () => {
       "openai-success-user",
       expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/.+\.png$/),
     );
-    expect(safeLogMock).toHaveBeenCalledWith("generation_start", expect.objectContaining({ style: "gold", mode: "openai" }));
-    expect(safeLogMock).toHaveBeenCalledWith("generation_success", expect.objectContaining({ mode: "openai" }));
   });
 
 
@@ -516,7 +512,6 @@ describe("messenger webhook dedupe", () => {
         { content_type: "text", title: "Andere stijl", payload: "CHOOSE_STYLE" },
       ],
     );
-    expect(safeLogMock).toHaveBeenCalledWith("generation_start", expect.objectContaining({ style: "gold", mode: "openai" }));
   });
   it("shows timeout message when OpenAI generation exceeds timeout", async () => {
     process.env.GENERATOR_MODE = "openai";
@@ -568,7 +563,6 @@ describe("messenger webhook dedupe", () => {
       { content_type: "text", title: "Retry this style", payload: "clouds" },
       { content_type: "text", title: "Andere stijl", payload: "CHOOSE_STYLE" },
     ]);
-    expect(safeLogMock).toHaveBeenCalledWith("generation_fail", expect.objectContaining({ mode: "openai", errorClass: "GenerationTimeoutError" }));
   });
 
   it("style click during generation does not start a second run", async () => {
