@@ -296,7 +296,7 @@ The following TypeScript errors exist in template components and are **NOT** fro
 1. Integrate real image generation (OpenAI)
 2. Add database persistence for quota
 3. Implement Manus OAuth authentication
-4. Add cost tracking and €100/month cap
+4. Add cost tracking and €10/month cap
 5. Create admin dashboard for monitoring
 
 ### Medium-term (Growth Phase)
