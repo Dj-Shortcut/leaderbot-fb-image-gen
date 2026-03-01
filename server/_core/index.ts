@@ -15,6 +15,7 @@ import {
   captureMetaWebhookRawBody,
   verifyMetaWebhookSignature,
 } from "./webhookSignatureVerification";
+import { isDebugLogEnabled } from "./logLevel";
 
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
@@ -59,8 +60,9 @@ async function startServer() {
         ms: Number(durationMs.toFixed(1)),
       };
 
-      // Don't log webhook paths in detail to avoid PII leakage
-      if (!req.path.startsWith("/webhook")) {
+      // Keep info logs compact: skip webhook and health checks unless debug logging is enabled.
+      const shouldLogAtInfo = !req.path.startsWith("/webhook") && req.path !== "/healthz" && req.path !== "/health";
+      if (isDebugLogEnabled() || shouldLogAtInfo) {
         console.log(JSON.stringify(log));
       }
     });
