@@ -1,4 +1,7 @@
 import { STYLE_TO_DEMO_FILE, type Style } from "./messengerStyles";
+import fs from "fs/promises";
+import path from "path";
+import { randomUUID } from "crypto";
 
 export type GeneratorMode = "mock" | "openai";
 
@@ -14,11 +17,22 @@ export class InvalidGenerationInputError extends Error {}
 export class MissingOpenAiApiKeyError extends Error {}
 export class GenerationTimeoutError extends Error {}
 export class OpenAiGenerationError extends Error {}
+export class MissingAppBaseUrlError extends Error {}
 
-function getBaseUrl(): string {
+function getConfiguredBaseUrl(): string | undefined {
   const configuredBaseUrl = process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
 
   if (configuredBaseUrl && /^https?:\/\//.test(configuredBaseUrl)) {
+    return configuredBaseUrl.replace(/\/$/, "");
+  }
+
+  return undefined;
+}
+
+function getBaseUrl(): string {
+  const configuredBaseUrl = getConfiguredBaseUrl();
+
+  if (configuredBaseUrl) {
     return configuredBaseUrl;
   }
 
@@ -31,7 +45,41 @@ function getMockImageForStyle(style: Style): string {
 }
 
 function getGeneratorMode(): GeneratorMode {
-  return process.env.GENERATOR_MODE === "openai" ? "openai" : "mock";
+  return process.env.GENERATOR_MODE === "mock" ? "mock" : "openai";
+}
+
+function getRequiredPublicBaseUrl(): string {
+  const baseUrl = getConfiguredBaseUrl();
+  if (!baseUrl) {
+    console.error("APP_BASE_URL is required when GENERATOR_MODE=openai");
+    throw new MissingAppBaseUrlError("APP_BASE_URL is missing or invalid");
+  }
+
+  return baseUrl;
+}
+
+async function persistGeneratedPng(buffer: Buffer): Promise<string> {
+  const publicId = `${Date.now()}-${randomUUID()}`;
+  const relativeFilePath = path.join("generated", `${publicId}.png`);
+  const absoluteDirPath = path.resolve(process.cwd(), "public", "generated");
+  const absoluteFilePath = path.resolve(process.cwd(), "public", relativeFilePath);
+
+  await fs.mkdir(absoluteDirPath, { recursive: true });
+  await fs.writeFile(absoluteFilePath, buffer);
+
+  const stats = await fs.stat(absoluteFilePath);
+  if (stats.size <= 0) {
+    throw new OpenAiGenerationError("Generated image file is empty");
+  }
+
+  return relativeFilePath;
+}
+
+export function getGeneratorStartupConfig(): { mode: GeneratorMode; resolvedBaseUrl: string | undefined } {
+  return {
+    mode: getGeneratorMode(),
+    resolvedBaseUrl: getConfiguredBaseUrl(),
+  };
 }
 
 function getOpenAiTimeoutMs(): number {
@@ -81,6 +129,7 @@ export class OpenAiImageGenerator implements ImageGenerator {
           model: "gpt-image-1",
           prompt: `Apply ${input.style} style to this photo URL: ${input.sourceImageUrl}`,
           size: "1024x1024",
+          output_format: "png",
         }),
         signal: controller.signal,
       });
@@ -89,14 +138,18 @@ export class OpenAiImageGenerator implements ImageGenerator {
         throw new OpenAiGenerationError(`OpenAI request failed (${response.status} ${response.statusText})`);
       }
 
-      const result = (await response.json()) as { data?: Array<{ url?: string }> };
-      const imageUrl = result.data?.[0]?.url;
+      const result = (await response.json()) as { data?: Array<{ b64_json?: string }> };
+      const base64Png = result.data?.[0]?.b64_json;
 
-      if (!imageUrl) {
-        throw new OpenAiGenerationError("OpenAI response did not include an image URL");
+      if (!base64Png) {
+        throw new OpenAiGenerationError("OpenAI response did not include base64 image data");
       }
 
-      return { imageUrl };
+      const imageBuffer = Buffer.from(base64Png, "base64");
+      const relativeFilePath = await persistGeneratedPng(imageBuffer);
+      const publicBaseUrl = getRequiredPublicBaseUrl();
+
+      return { imageUrl: `${publicBaseUrl}/${relativeFilePath}` };
     } catch (error) {
       if ((error as { name?: string })?.name === "AbortError") {
         throw new GenerationTimeoutError("OpenAI generation timed out");

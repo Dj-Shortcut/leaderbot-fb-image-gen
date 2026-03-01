@@ -49,7 +49,7 @@ export async function setupVite(app: Express, server: Server, createViteServer: 
   });
 }
 
-export function serveStatic(app: Express, staticRoot?: string) {
+export function serveStatic(app: Express, staticRoot?: string, generatedRoot?: string) {
   const distPathCandidates = staticRoot
     ? [path.resolve(staticRoot)]
     : [
@@ -63,6 +63,15 @@ export function serveStatic(app: Express, staticRoot?: string) {
       `Could not find a build directory. Tried: ${distPathCandidates.join(", ")}. Make sure to build the client first.`
     );
     return;
+  }
+
+  const generatedPathCandidates = generatedRoot
+    ? [path.resolve(generatedRoot)]
+    : [path.resolve(process.cwd(), "public", "generated")];
+  const generatedPath = generatedPathCandidates.find((candidate) => fs.existsSync(candidate));
+
+  if (generatedPath) {
+    app.use("/generated", express.static(generatedPath));
   }
 
   app.use(express.static(distPath));

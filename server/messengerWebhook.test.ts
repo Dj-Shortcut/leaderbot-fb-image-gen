@@ -379,8 +379,9 @@ describe("messenger webhook dedupe", () => {
       { content_type: "text", title: "Andere stijl", payload: "CHOOSE_STYLE" },
     ]);
     expect(sendImageMock).not.toHaveBeenCalled();
-    expect(sendTextMock).toHaveBeenCalledTimes(1);
-    expect(sendTextMock).toHaveBeenCalledWith("openai-missing-key-user", "Perfect — applying Disco style now ✨");
+    expect(sendTextMock).toHaveBeenCalledTimes(2);
+    expect(sendTextMock).toHaveBeenNthCalledWith(1, "openai-missing-key-user", "Ik maak nu je Disco-stijl.");
+    expect(sendTextMock).toHaveBeenNthCalledWith(2, "openai-missing-key-user", "Er ging iets mis bij het maken van je afbeelding. Kies gerust opnieuw een stijl.");
     expect(safeLogMock).toHaveBeenCalledWith("generation_start", expect.objectContaining({ style: "disco", mode: "openai" }));
     expect(safeLogMock).toHaveBeenCalledWith("generation_fail", expect.objectContaining({ mode: "openai", errorClass: "MissingOpenAiApiKeyError" }));
   });
@@ -388,10 +389,12 @@ describe("messenger webhook dedupe", () => {
   it("reaches OpenAI generator path with GENERATOR_MODE=openai and API key", async () => {
     process.env.GENERATOR_MODE = "openai";
     process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
 
+    const generatedImageBytes = Buffer.from("fake-png").toString("base64");
     const fetchMock = vi.fn(async () => ({
       ok: true,
-      json: async () => ({ data: [{ url: "https://cdn.example/generated.png" }] }),
+      json: async () => ({ data: [{ b64_json: generatedImageBytes }] }),
     }));
 
     vi.stubGlobal("fetch", fetchMock);
@@ -421,7 +424,10 @@ describe("messenger webhook dedupe", () => {
     }
 
     expect(fetchMock).toHaveBeenCalled();
-    expect(sendImageMock).toHaveBeenCalledWith("openai-success-user", "https://cdn.example/generated.png");
+    expect(sendImageMock).toHaveBeenCalledWith(
+      "openai-success-user",
+      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/.+\.png$/),
+    );
     expect(safeLogMock).toHaveBeenCalledWith("generation_start", expect.objectContaining({ style: "gold", mode: "openai" }));
     expect(safeLogMock).toHaveBeenCalledWith("generation_success", expect.objectContaining({ mode: "openai" }));
   });
@@ -493,9 +499,9 @@ describe("messenger webhook dedupe", () => {
     );
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
-      "Choose an option:",
+      "AI generation isn’t enabled yet.",
       [
-        { content_type: "text", title: "Retry Gold", payload: "RETRY_STYLE_gold" },
+        { content_type: "text", title: "Retry this style", payload: "gold" },
         { content_type: "text", title: "Andere stijl", payload: "CHOOSE_STYLE" },
       ],
     );
@@ -504,6 +510,7 @@ describe("messenger webhook dedupe", () => {
   it("shows timeout message when OpenAI generation exceeds timeout", async () => {
     process.env.GENERATOR_MODE = "openai";
     process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
 
     const timeoutError = new Error("aborted");
     timeoutError.name = "AbortError";
@@ -547,11 +554,12 @@ describe("messenger webhook dedupe", () => {
   it("style click during generation does not start a second run", async () => {
     process.env.GENERATOR_MODE = "openai";
     process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
 
-    let resolveFetch: ((value: { ok: boolean; json: () => Promise<{ data: Array<{ url: string }> }> }) => void) | undefined;
+    let resolveFetch: ((value: { ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }) => void) | undefined;
     const fetchMock = vi.fn(
       () =>
-        new Promise<{ ok: boolean; json: () => Promise<{ data: Array<{ url: string }> }> }>(resolve => {
+        new Promise<{ ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }>(resolve => {
           resolveFetch = resolve;
         }),
     );
@@ -610,9 +618,10 @@ describe("messenger webhook dedupe", () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(sendTextMock).toHaveBeenCalledWith("busy-user", "Ik ben nog bezig met je vorige afbeelding.");
 
+      const generatedImageBytes = Buffer.from("fake-png").toString("base64");
       resolveFetch?.({
         ok: true,
-        json: async () => ({ data: [{ url: "https://cdn.example/generated.png" }] }),
+        json: async () => ({ data: [{ b64_json: generatedImageBytes }] }),
       });
       await firstRun;
     } finally {
@@ -623,11 +632,12 @@ describe("messenger webhook dedupe", () => {
   it("returns only in-progress status message for style changes while generating", async () => {
     process.env.GENERATOR_MODE = "openai";
     process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
 
-    let resolveFetch: ((value: { ok: boolean; json: () => Promise<{ data: Array<{ url: string }> }> }) => void) | undefined;
+    let resolveFetch: ((value: { ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }) => void) | undefined;
     const fetchMock = vi.fn(
       () =>
-        new Promise<{ ok: boolean; json: () => Promise<{ data: Array<{ url: string }> }> }>(resolve => {
+        new Promise<{ ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }>(resolve => {
           resolveFetch = resolve;
         }),
     );
@@ -688,9 +698,10 @@ describe("messenger webhook dedupe", () => {
       expect(sendImageMock).not.toHaveBeenCalled();
       expect(sendQuickRepliesMock).not.toHaveBeenCalled();
 
+      const generatedImageBytes = Buffer.from("fake-png").toString("base64");
       resolveFetch?.({
         ok: true,
-        json: async () => ({ data: [{ url: "https://cdn.example/generated.png" }] }),
+        json: async () => ({ data: [{ b64_json: generatedImageBytes }] }),
       });
       await firstRun;
     } finally {
@@ -703,6 +714,7 @@ describe("messenger webhook dedupe", () => {
 describe("messenger greeting behavior", () => {
   beforeEach(() => {
     process.env.PRIVACY_PEPPER = "test-pepper";
+    sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
     safeLogMock.mockClear();
@@ -815,8 +827,8 @@ describe("messenger greeting behavior", () => {
         "transition-order-user",
         "Klaar. Je kan de afbeelding opslaan door erop te tikken.",
         [
+          { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
           { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
-          { content_type: "text", title: "New photo", payload: "SEND_PHOTO" },
         ],
       );
 
@@ -889,6 +901,7 @@ describe("messenger greeting behavior", () => {
 describe("acknowledgement edgecases", () => {
   beforeEach(() => {
     process.env.PRIVACY_PEPPER = "test-pepper";
+    sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
     safeLogMock.mockClear();

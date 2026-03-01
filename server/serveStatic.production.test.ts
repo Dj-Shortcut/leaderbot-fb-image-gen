@@ -17,6 +17,13 @@ function createTempBuild() {
   return dir;
 }
 
+
+function createGeneratedAssets() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leaderbot-generated-"));
+  tempDirs.push(dir);
+  fs.writeFileSync(path.join(dir, "sample.png"), Buffer.from([137,80,78,71,13,10,26,10]));
+  return dir;
+}
 async function listen(app: express.Express) {
   return await new Promise<{
     baseUrl: string;
@@ -89,4 +96,27 @@ describe("serveStatic production mode", () => {
       await server.close();
     }
   });
+
+  it("serves generated PNGs from /generated with image content type", async () => {
+    const app = express();
+    const staticDir = createTempBuild();
+    const generatedDir = createGeneratedAssets();
+
+    serveStatic(app, staticDir, generatedDir);
+
+    const server = await listen(app);
+
+    try {
+      const generatedResponse = await fetch(`${server.baseUrl}/generated/sample.png`);
+      expect(generatedResponse.status).toBe(200);
+      expect(generatedResponse.headers.get("content-type")).toContain("image/png");
+
+      const missingGeneratedResponse = await fetch(`${server.baseUrl}/generated/missing.png`);
+      expect(missingGeneratedResponse.status).toBe(200);
+      expect(missingGeneratedResponse.headers.get("content-type")).toContain("text/html");
+    } finally {
+      await server.close();
+    }
+  });
+
 });
