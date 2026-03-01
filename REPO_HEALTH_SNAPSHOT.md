@@ -1,61 +1,59 @@
 # Repository Health Snapshot
 
-## 1) Repo Health Snapshot (very light)
+## 1) Repo Health Snapshot (Very Light)
 
-### CI status overview
-- One CI workflow (`.github/workflows/ci.yml`) runs on PRs and pushes to `main`.
-- Current gate set: install deps, lint (`pnpm run lint`), and build (`pnpm run build`).
-- Missing in CI today: explicit server lint, typecheck, and tests.
+### CI Status Overview
+- **Status:** ⚠️ Matig / Verbeterbaar.
+- **Workflow:** Eén workflow (`.github/workflows/ci.yml`) die draait op PR's en pushes naar `main`.
+- **Huidige Gates:** Installatie van dependencies, lint (`pnpm run lint`) en build (`pnpm run build`).
+- **Ontbrekend:** Geen expliciete server-linting (`lint:server`), geen typecheck (`check`) en geen geautomatiseerde tests (`test`) in de CI-pijplijn.
 
-### Lint/Typecheck setup summary
-- TypeScript is in `strict` mode (`"strict": true`) with `tsc --noEmit` available via `pnpm run check`.
-- ESLint uses `typescript-eslint` type-aware config (`recommendedTypeChecked`) and enforces `no-floating-promises`.
-- Script split is slightly fragmented: `lint` covers `client/src shared`, while server lint is separate (`lint:server`).
+### Lint/Typecheck Setup Summary
+- **TypeScript:** Staat in `strict` mode (`"strict": true`). Handmatige check mogelijk via `pnpm run check`.
+- **ESLint:** Gebruikt `typescript-eslint` type-aware configuratie (`recommendedTypeChecked`).
+- **Structuur:** Linting is gefragmenteerd; de standaard `lint` taak slaat de `server/` map over, die apart moet worden gedraaid via `lint:server`.
 
-### Branch structure overview
-- Local branch structure appears minimal (`work` checked out).
-- CI policy suggests `main` is intended as integration branch (push-triggered workflow).
-- No evidence in-repo of release/hotfix branch conventions.
+### Branch Structure Overview
+- **Hoofdtak:** `main` fungeert als de primaire integratiebranch.
+- **Workflow:** Gebruik van kortstondige feature-branches (zoals Codex-branches) die via PR's worden samengevoegd.
 
-### 5 low-effort, non-breaking improvements
-1. Add `pnpm run check` to CI for explicit strict type gating.
-2. Add `pnpm run test` to CI to lock in behavior regressions.
-3. Replace `lint` with a combined script that also includes server lint.
-4. Add CI `concurrency` cancellation for superseded runs.
-5. Add a short `CONTRIBUTING.md` with branch + PR conventions.
+### 5 Low-effort, Non-breaking Improvements
+1. **Integreer Server Lint:** Voeg `pnpm run lint:server` toe aan de CI om server-fouten te blokkeren.
+2. **Typecheck in CI:** Voeg `pnpm run check` toe aan de CI-stap om strikte type-gating af te dwingen.
+3. **Husky Pre-commit:** Gebruik `husky` om linting lokaal af te dwingen vóór een push.
+4. **Environment Validatie:** Gebruik een library zoals `t3-env` om bij startup te crashen als essentiële tokens (zoals `FB_PAGE_ACCESS_TOKEN`) ontbreken.
+5. **Shared Types:** Verplaats meer interfaces van `server/_core/types` naar `shared/` voor betere front-end synchronisatie.
 
 ---
 
 ## 2) CI Harden Mini-Audit (`.github/workflows/ci.yml`)
-1. **Pin install behavior tighter:** use `pnpm install --frozen-lockfile --prefer-offline` to reduce transient registry hiccups.
-2. **Add workflow/job timeout:** e.g. `timeout-minutes: 15` to avoid hung runners.
-3. **Add concurrency cancellation:**
-   ```yml
-   concurrency:
-     group: ci-${{ github.ref }}
-     cancel-in-progress: true
-   ```
-   Improves reliability under rapid push bursts without meaningful runtime cost.
+
+1. **Concurrency Control:** Voeg `concurrency` toe om oude runs automatisch te annuleren bij nieuwe pushes. Dit bespaart resources en voorkomt race-conditions in de build-status.
+2. **Frozen Lockfile:** Gebruik `pnpm install --frozen-lockfile` (reeds aanwezig, maar essentieel om te behouden) om inconsistente dependency-versies te voorkomen.
+3. **Job Timeouts:** Voeg `timeout-minutes: 15` toe aan jobs om te voorkomen dat vastgelopen runners onnodig lang blijven draaien.
 
 ---
 
-## 3) Strict Mode Risk Scan (runtime risks still possible)
-1. **Unchecked external JSON casts:** image API response is cast directly and nested fields are assumed present (`result.image.b64Json`).
-2. **Environment fallback-to-empty strings:** required secrets are typed as strings but default to `""`, so runtime failures shift later.
-3. **In-memory state/job stores:** process memory maps/arrays have no backpressure, persistence, or multi-instance consistency.
+## 3) Strict Mode Risk Scan (Runtime Risico's)
+
+1. **Webhook Payloads:** In `messengerWebhook.ts` wordt veel met `any` of `unknown` gewerkt. Zelfs met linting kunnen onverwachte JSON-structuren van Meta runtime crashes veroorzaken.
+2. **Database Nullables:** Velden in `schema.ts` (zoals `text` of `varchar`) hebben vaak geen expliciete defaults. TypeScript gaat ervan uit dat ze er zijn, maar een lege database-rij kan `undefined` teruggeven.
+3. **External API Fetch:** De `sendMessage` functie controleert op `!response.ok`, maar valideert niet of de teruggekomen `body` voldoet aan de verwachte structuur voordat deze wordt verwerkt.
 
 ---
 
-## 4) DX Micro-Improvements (no runtime behavior change)
-1. Add `lint:all` script (`lint` + `lint:server`) and use that in CI.
-2. Add `test:watch` script for local feedback loops.
-3. Add `check:all` script chaining lint, typecheck, test.
-4. Add `docs/architecture.md` with module map of `server/_core`.
-5. Standardize log prefixes (`[webhook]`, `[image]`, `[oauth]`) for grep-friendly debugging.
+## 4) DX Micro-Improvements (Developer Experience)
+
+1. **Gecombineerde Scripts:** Voeg een `lint:all` script toe (`lint` + `lint:server`) voor een compleet overzicht in één commando.
+2. **Gestructureerde Logging:** Vervang `console.log` door een logger zoals `pino` voor betere traceerbaarheid en filtering in productie.
+3. **VSCode Settings:** Voeg `.vscode/settings.json` toe met "format on save" om consistentie in het team te waarborgen.
+4. **Log Prefixes:** Gebruik standaard prefixes (`[webhook]`, `[image]`, `[oauth]`) om debugging via `grep` in logs te vergemakkelijken.
+5. **Architecture Doc:** Voeg `docs/architecture.md` toe met een module-map van `server/_core` voor snellere onboarding.
 
 ---
 
-## 5) “What would break first?” (under production load)
-1. **In-memory conversation state** (`Map`) can grow and diverge across instances; horizontal scaling breaks user continuity first.
-2. **In-memory job list** (`jobs[]`) is unbounded; sustained throughput risks memory pressure.
-3. **Synchronous dependency chain on external fetches** (image generation + storage) has no retry/circuit-breaker strategy, so transient provider issues cascade quickly.
+## 6) “What would break first?” (Productie Belasting)
+
+1. **In-memory State:** Het gebruik van `Map` voor conversatiestatus in `messengerState.ts` schaalt niet horizontaal. Bij meerdere server-instances raakt de status van de gebruiker verspreid.
+2. **Rate Limiting:** Zonder een queue-systeem (zoals BullMQ) zal de bot bij een piek in Meta-webhooks direct tegen de limieten van de Graph API aanlopen (429 errors).
+3. **Fragiele Dependency Chain:** Externe calls naar image generation en storage hebben geen retry- of circuit-breaker strategie. Eén trage provider-respons vertraagt de hele webhook-afhandeling.
