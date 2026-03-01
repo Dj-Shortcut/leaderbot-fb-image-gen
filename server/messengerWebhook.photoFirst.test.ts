@@ -181,4 +181,51 @@ describe("photo-first onboarding", () => {
     );
   });
 
+  it("uses sender locale when provided and reuses it for later events", async () => {
+    const psid = "locale-user";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid, locale: "en_US" },
+              message: { mid: "mid-locale-1", text: "Hi" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      psid,
+      "Send a photo and I will make a special version of it in another style for free.",
+      expect.any(Array),
+    );
+
+    sendQuickRepliesMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              postback: { payload: "PRIVACY_INFO" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenLastCalledWith(
+      psid,
+      [
+        "Your photo is only used to make the image.",
+        "It is not stored afterwards.",
+        "You can read the full privacy policy here: <link>",
+      ].join("\n"),
+    );
+  });
+
 });

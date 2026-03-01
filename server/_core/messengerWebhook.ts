@@ -19,14 +19,16 @@ import {
   setFlowState,
   setLastGenerated,
   setPendingImage,
+  setPreferredLang,
   type ConversationState,
   anonymizePsid,
 } from "./messengerState";
+import { normalizeLang, t, type Lang } from "./i18n";
 import { toLogUser, toUserKey } from "./privacy";
 import { isDebugLogEnabled, isStateDumpEnabled, shouldSampleWebhookSummary } from "./logLevel";
 
 type FacebookWebhookEvent = {
-  sender?: { id?: string };
+  sender?: { id?: string; locale?: string };
   message?: {
     mid?: string;
     is_echo?: boolean;
@@ -140,24 +142,8 @@ const STYLE_LABELS: Record<Style, string> = {
   clouds: "Clouds",
 };
 
-const USER_MESSAGES = {
-  flowExplanation: "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis.",
-  stylePicker: "Dank je. Kies hieronder een stijl.",
-  success: "Klaar. Je kan de afbeelding opslaan door erop te tikken.",
-  processingBlocked: "Ik ben nog bezig met je vorige afbeelding.",
-  styleWithoutPhoto: "Stuur eerst een foto, dan maak ik die stijl voor je.",
-  textWithoutPhoto: "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
-  privacy: (link: string) => [
-    "Je foto wordt enkel gebruikt om de afbeelding te maken.",
-    "Ze wordt daarna niet bewaard.",
-    `Hier kan je het volledige privacybeleid lezen: ${link}`,
-  ].join("\n"),
-  aboutLeaderbot: "Leaderbot is gemaakt door Andy. Je mag hem gerust contacteren via Facebook.\nVolledige naam op vraag: Andy Arijs.",
-  failure: "Er ging iets mis bij het maken van je afbeelding. Kies gerust opnieuw een stijl.",
-  missingInputImage: "Ik kon je foto niet goed lezen. Stuur ze nog eens door aub.",
-} as const;
-
 const PRIVACY_POLICY_URL = process.env.PRIVACY_POLICY_URL?.trim() || "<link>";
+const DEFAULT_LANG: Lang = normalizeLang(process.env.DEFAULT_MESSENGER_LANG);
 
 const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
 const SMALLTALK = new Set([
@@ -176,29 +162,29 @@ type GreetingResponse =
   | { mode: "text"; text: string }
   | { mode: "quick_replies"; state: ConversationState; text: string };
 
-export function getGreetingResponse(state: ConversationState): GreetingResponse {
+export function getGreetingResponse(state: ConversationState, lang: Lang = DEFAULT_LANG): GreetingResponse {
   switch (state) {
     case "PROCESSING":
-      return { mode: "text", text: USER_MESSAGES.processingBlocked };
+      return { mode: "text", text: t(lang, "processingBlocked") };
     case "AWAITING_STYLE":
-      return { mode: "quick_replies", state: "AWAITING_STYLE", text: USER_MESSAGES.stylePicker };
+      return { mode: "quick_replies", state: "AWAITING_STYLE", text: t(lang, "stylePicker") };
     case "RESULT_READY":
       return {
         mode: "quick_replies",
         state: "RESULT_READY",
-        text: USER_MESSAGES.success,
+        text: t(lang, "success"),
       };
     case "FAILURE":
       return {
         mode: "quick_replies",
         state: "FAILURE",
-        text: USER_MESSAGES.failure,
+        text: t(lang, "failure"),
       };
     case "AWAITING_PHOTO":
-      return { mode: "text", text: USER_MESSAGES.textWithoutPhoto };
+      return { mode: "text", text: t(lang, "textWithoutPhoto") };
     case "IDLE":
     default:
-      return { mode: "quick_replies", state: "IDLE", text: USER_MESSAGES.flowExplanation };
+      return { mode: "quick_replies", state: "IDLE", text: t(lang, "flowExplanation") };
   }
 }
 
@@ -275,48 +261,48 @@ async function sendStateQuickReplies(psid: string, state: ConversationState, tex
   await sendQuickReplies(psid, text, replies);
 }
 
-async function sendStylePicker(psid: string): Promise<void> {
-  await sendStateQuickReplies(psid, "AWAITING_STYLE", USER_MESSAGES.stylePicker);
+async function sendStylePicker(psid: string, lang: Lang): Promise<void> {
+  await sendStateQuickReplies(psid, "AWAITING_STYLE", t(lang, "stylePicker"));
 }
 
-async function sendPhotoReceivedPrompt(psid: string): Promise<void> {
-  await sendStylePicker(psid);
+async function sendPhotoReceivedPrompt(psid: string, lang: Lang): Promise<void> {
+  await sendStylePicker(psid, lang);
 }
 
-async function sendGeneratingPrompt(psid: string, style: Style): Promise<void> {
+async function sendGeneratingPrompt(psid: string, style: Style, lang: Lang): Promise<void> {
   await sendText(
     psid,
-    `Ik maak nu je ${STYLE_LABELS[style]}-stijl.`,
+    t(lang, "generatingPrompt", { styleLabel: STYLE_LABELS[style] }),
   );
 }
 
-async function sendSuccessPrompt(psid: string): Promise<void> {
-  await sendStateQuickReplies(psid, "RESULT_READY", USER_MESSAGES.success);
+async function sendSuccessPrompt(psid: string, lang: Lang): Promise<void> {
+  await sendStateQuickReplies(psid, "RESULT_READY", t(lang, "success"));
 }
 
-async function sendFailurePrompt(psid: string, style: Style, message: string): Promise<void> {
+async function sendFailurePrompt(psid: string, style: Style, message: string, lang: Lang): Promise<void> {
   await sendQuickReplies(psid, message, [
-    { content_type: "text", title: "Retry this style", payload: style },
-    { content_type: "text", title: "Andere stijl", payload: "CHOOSE_STYLE" },
+    { content_type: "text", title: t(lang, "retryThisStyle"), payload: style },
+    { content_type: "text", title: t(lang, "otherStyle"), payload: "CHOOSE_STYLE" },
   ]);
 }
 
-async function explainFlow(psid: string): Promise<void> {
-  await sendText(psid, USER_MESSAGES.flowExplanation);
+async function explainFlow(psid: string, lang: Lang): Promise<void> {
+  await sendText(psid, t(lang, "flowExplanation"));
 }
 
-async function explainPrivacy(psid: string): Promise<void> {
-  await sendText(psid, USER_MESSAGES.privacy(PRIVACY_POLICY_URL));
+async function explainPrivacy(psid: string, lang: Lang): Promise<void> {
+  await sendText(psid, t(lang, "privacy", { link: PRIVACY_POLICY_URL }));
 }
 
-async function explainWhoIsBehind(psid: string): Promise<void> {
-  await sendText(psid, USER_MESSAGES.aboutLeaderbot);
+async function explainWhoIsBehind(psid: string, lang: Lang): Promise<void> {
+  await sendText(psid, t(lang, "aboutLeaderbot"));
 }
 
-async function handleGreeting(psid: string, userId: string): Promise<void> {
+async function handleGreeting(psid: string, userId: string, lang: Lang): Promise<void> {
   const state = getOrCreateState(userId);
 
-  const response = getGreetingResponse(state.stage);
+  const response = getGreetingResponse(state.stage, lang);
   if (response.mode === "text") {
     await sendText(psid, response.text);
     return;
@@ -326,11 +312,11 @@ async function handleGreeting(psid: string, userId: string): Promise<void> {
 }
 
 
-async function runStyleGeneration(psid: string, userId: string, style: Style, reqId: string): Promise<void> {
+async function runStyleGeneration(psid: string, userId: string, style: Style, reqId: string, lang: Lang): Promise<void> {
   const { mode, generator } = createImageGenerator();
 
   setFlowState(userId, "PROCESSING");
-  await sendGeneratingPrompt(psid, style);
+  await sendGeneratingPrompt(psid, style, lang);
 
   const startedAt = Date.now();
   safeLog("generation_start", { style, mode });
@@ -380,7 +366,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style, re
     await sendImage(psid, imageUrl);
     setLastGenerated(userId, style, imageUrl);
     setFlowState(userId, "RESULT_READY");
-    await sendSuccessPrompt(psid);
+    await sendSuccessPrompt(psid, lang);
   } catch (error) {
     console.error("OPENAI_CALL_ERROR", {
       psid,
@@ -404,29 +390,29 @@ async function runStyleGeneration(psid: string, userId: string, style: Style, re
       errorCode: errorClass,
     }));
 
-    let failureText = "I couldn’t generate that image right now.";
+    let failureText = t(lang, "generationGenericFailure");
     if (error instanceof MissingInputImageError) {
       console.error("MISSING_INPUT_IMAGE", { reqId, userId });
-      await sendText(psid, USER_MESSAGES.missingInputImage);
+      await sendText(psid, t(lang, "missingInputImage"));
       setFlowState(userId, "AWAITING_PHOTO");
       return;
     } else if (error instanceof MissingOpenAiApiKeyError || error instanceof MissingAppBaseUrlError) {
       safeLog("openai_not_configured", { mode });
-      failureText = "AI generation isn’t enabled yet.";
+      failureText = t(lang, "generationUnavailable");
     } else if (error instanceof GenerationTimeoutError) {
-      failureText = "This took too long.";
+      failureText = t(lang, "generationTimeout");
     } else if (error instanceof InvalidGenerationInputError || error instanceof OpenAiGenerationError) {
-      failureText = "I couldn’t generate that image right now.";
+      failureText = t(lang, "generationGenericFailure");
     }
 
-    await sendText(psid, USER_MESSAGES.failure);
+    await sendText(psid, t(lang, "failure"));
 
     setFlowState(userId, "FAILURE");
-    await sendFailurePrompt(psid, style, failureText);
+    await sendFailurePrompt(psid, style, failureText, lang);
   }
 }
 
-async function handleStyleSelection(psid: string, userId: string, style: Style, reqId: string): Promise<void> {
+async function handleStyleSelection(psid: string, userId: string, style: Style, reqId: string, lang: Lang): Promise<void> {
   const state = getOrCreateState(userId);
   const chosenStyle = style;
 
@@ -436,7 +422,7 @@ async function handleStyleSelection(psid: string, userId: string, style: Style, 
   });
 
   if (state.stage === "PROCESSING") {
-    await sendText(psid, USER_MESSAGES.processingBlocked);
+    await sendText(psid, t(lang, "processingBlocked"));
     return;
   }
 
@@ -445,14 +431,14 @@ async function handleStyleSelection(psid: string, userId: string, style: Style, 
 
   if (!state.lastPhoto) {
     setFlowState(userId, "AWAITING_PHOTO");
-    await sendText(psid, USER_MESSAGES.styleWithoutPhoto);
+    await sendText(psid, t(lang, "styleWithoutPhoto"));
     return;
   }
 
-  await runStyleGeneration(psid, userId, style, reqId);
+  await runStyleGeneration(psid, userId, style, reqId, lang);
 }
 
-async function handlePayload(psid: string, userId: string, payload: string, reqId: string): Promise<void> {
+async function handlePayload(psid: string, userId: string, payload: string, reqId: string, lang: Lang): Promise<void> {
   if (payload.startsWith("RETRY_STYLE_")) {
     const retryStyleFromPayload = normalizeStyle(payload.slice("RETRY_STYLE_".length));
     const state = getOrCreateState(userId);
@@ -460,13 +446,13 @@ async function handlePayload(psid: string, userId: string, payload: string, reqI
 
     if (!selectedStyle) {
       setFlowState(userId, "AWAITING_STYLE");
-      await sendStylePicker(psid);
+      await sendStylePicker(psid, lang);
       return;
     }
 
     if (!state.lastPhoto) {
       setFlowState(userId, "AWAITING_PHOTO");
-      await sendText(psid, USER_MESSAGES.styleWithoutPhoto);
+      await sendText(psid, t(lang, "styleWithoutPhoto"));
       return;
     }
 
@@ -475,20 +461,20 @@ async function handlePayload(psid: string, userId: string, payload: string, reqI
       style: selectedStyle,
     });
 
-    await runStyleGeneration(psid, userId, selectedStyle, reqId);
+    await runStyleGeneration(psid, userId, selectedStyle, reqId, lang);
     return;
   }
 
   const selectedStyle = stylePayloadToStyle(payload);
   if (selectedStyle) {
     getOrCreateState(userId);
-    await handleStyleSelection(psid, userId, selectedStyle, reqId);
+    await handleStyleSelection(psid, userId, selectedStyle, reqId, lang);
     return;
   }
 
   if (payload === "CHOOSE_STYLE") {
     setFlowState(userId, "AWAITING_STYLE");
-    await sendStylePicker(psid);
+    await sendStylePicker(psid, lang);
     return;
   }
 
@@ -497,33 +483,33 @@ async function handlePayload(psid: string, userId: string, payload: string, reqI
     const retryStyle = chosenStyle ? parseStyle(chosenStyle) : undefined;
 
     if (retryStyle) {
-      await handleStyleSelection(psid, userId, retryStyle, reqId);
+      await handleStyleSelection(psid, userId, retryStyle, reqId, lang);
       return;
     }
 
     setFlowState(userId, "AWAITING_STYLE");
-    await sendStylePicker(psid);
+    await sendStylePicker(psid, lang);
     return;
   }
 
   if (payload === "WHAT_IS_THIS") {
-    await explainFlow(psid);
+    await explainFlow(psid, lang);
     return;
   }
 
   if (payload === "PRIVACY_INFO") {
-    await explainPrivacy(psid);
+    await explainPrivacy(psid, lang);
     return;
   }
 
   if (payload === "WHO_IS_BEHIND") {
-    await explainWhoIsBehind(psid);
+    await explainWhoIsBehind(psid, lang);
     return;
   }
 
   if (payload === "START_PHOTO" || payload === "SEND_PHOTO") {
     setFlowState(userId, "AWAITING_PHOTO");
-    await sendText(psid, USER_MESSAGES.textWithoutPhoto);
+    await sendText(psid, t(lang, "textWithoutPhoto"));
     return;
   }
 
@@ -535,16 +521,16 @@ async function handlePayload(psid: string, userId: string, payload: string, reqI
       return;
     }
 
-    await sendText(psid, "I can share HD downloads after I generate an image.");
+    await sendText(psid, t(lang, "hdUnavailable"));
     setFlowState(userId, "AWAITING_PHOTO");
-    await sendText(psid, USER_MESSAGES.textWithoutPhoto);
+    await sendText(psid, t(lang, "textWithoutPhoto"));
     return;
   }
 
   safeLog("unknown_payload", { user: toLogUser(userId) });
 }
 
-async function handleMessage(psid: string, userId: string, event: FacebookWebhookEvent, reqId: string): Promise<void> {
+async function handleMessage(psid: string, userId: string, event: FacebookWebhookEvent, reqId: string, lang: Lang): Promise<void> {
   const message = event.message;
 
   if (!message || message.is_echo) {
@@ -553,7 +539,7 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
 
   const quickPayload = message.quick_reply?.payload;
   if (quickPayload) {
-    await handlePayload(psid, userId, quickPayload, reqId);
+    await handlePayload(psid, userId, quickPayload, reqId, lang);
     return;
   }
 
@@ -566,7 +552,7 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
 
     setPendingImage(userId, imageAttachment.payload.url);
     setFlowState(userId, "AWAITING_STYLE");
-    await sendPhotoReceivedPrompt(psid);
+    await sendPhotoReceivedPrompt(psid, lang);
     return;
   }
 
@@ -584,30 +570,42 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
   }
 
   if (normalizedText === "wie zit hierachter?" || normalizedText === "wie zit hierachter") {
-    await explainWhoIsBehind(psid);
+    await explainWhoIsBehind(psid, lang);
     return;
   }
 
   const styleFromText = parseStyle(trimmedText);
   if (styleFromText) {
     getOrCreateState(userId);
-    await handleStyleSelection(psid, userId, styleFromText, reqId);
+    await handleStyleSelection(psid, userId, styleFromText, reqId, lang);
     return;
   }
 
   if (GREETINGS.has(normalizedText) || SMALLTALK.has(normalizedText)) {
-    await handleGreeting(psid, userId);
+    await handleGreeting(psid, userId, lang);
     return;
   }
 
   const state = getOrCreateState(userId);
   if (!state.lastPhoto) {
     setFlowState(userId, "AWAITING_PHOTO");
-    await sendText(psid, USER_MESSAGES.textWithoutPhoto);
+    await sendText(psid, t(lang, "textWithoutPhoto"));
     return;
   }
 
-  await explainFlow(psid);
+  await explainFlow(psid, lang);
+}
+
+function getEventLang(event: FacebookWebhookEvent, userId: string): Lang {
+  const localeLang = normalizeLang(event.sender?.locale);
+  const stateLang = getOrCreateState(userId).preferredLang;
+
+  if (typeof event.sender?.locale === "string" && event.sender.locale.trim().length > 0) {
+    setPreferredLang(userId, localeLang);
+    return localeLang;
+  }
+
+  return stateLang ?? DEFAULT_LANG;
 }
 
 async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
@@ -618,6 +616,7 @@ async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
 
   const userId = toUserKey(psid);
   const reqId = `${psid}-${Date.now()}`;
+  const lang = getEventLang(event, userId);
 
   if (event.message?.is_echo) {
     safeLog("echo_ignored", { user: toLogUser(userId) });
@@ -631,11 +630,11 @@ async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
   }
 
   if (event.postback?.payload) {
-    await handlePayload(psid, userId, event.postback.payload, reqId);
+    await handlePayload(psid, userId, event.postback.payload, reqId, lang);
     return;
   }
 
-  await handleMessage(psid, userId, event, reqId);
+  await handleMessage(psid, userId, event, reqId, lang);
 }
 
 export async function processFacebookWebhookPayload(payload: unknown): Promise<void> {
