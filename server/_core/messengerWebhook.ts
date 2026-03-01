@@ -329,13 +329,30 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
 
   const startedAt = Date.now();
   safeLog("generation_start", { style, mode });
+  const state = getOrCreateState(userId);
+  const lastImageUrl = state.lastPhoto;
+  const chosenStyle = style;
+
+  console.log("STATE_BEFORE_GENERATE", {
+    psid,
+    state,
+    lastImageUrl,
+    hasImage: !!lastImageUrl,
+  });
+
+  console.log("OPENAI_CALL_START", {
+    psid,
+    style: chosenStyle,
+  });
 
   try {
     const { imageUrl } = await generator.generate({
       style,
-      sourceImageUrl: getOrCreateState(userId).lastPhoto ?? undefined,
+      sourceImageUrl: lastImageUrl ?? undefined,
       userKey: userId,
     });
+
+    console.log("OPENAI_CALL_SUCCESS", { psid });
 
     safeLog("generation_success", { mode, ms: Date.now() - startedAt });
     await sendImage(psid, imageUrl);
@@ -343,6 +360,11 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
     setFlowState(userId, "RESULT_READY");
     await sendSuccessPrompt(psid);
   } catch (error) {
+    console.error("OPENAI_CALL_ERROR", {
+      psid,
+      error: error instanceof Error ? error.message : undefined,
+    });
+
     const errorClass = error instanceof Error ? error.constructor.name : "UnknownError";
     safeLog("generation_fail", { mode, errorClass, ms: Date.now() - startedAt });
 
@@ -365,6 +387,12 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
 
 async function handleStyleSelection(psid: string, userId: string, style: Style): Promise<void> {
   const state = getOrCreateState(userId);
+  const chosenStyle = style;
+
+  console.log("STYLE_SELECTED", {
+    psid,
+    style: chosenStyle,
+  });
 
   if (state.stage === "PROCESSING") {
     await sendText(psid, USER_MESSAGES.processingBlocked);
@@ -400,6 +428,11 @@ async function handlePayload(psid: string, userId: string, payload: string): Pro
       await sendText(psid, USER_MESSAGES.styleWithoutPhoto);
       return;
     }
+
+    console.log("STYLE_SELECTED", {
+      psid,
+      style: selectedStyle,
+    });
 
     await runStyleGeneration(psid, userId, selectedStyle);
     return;
@@ -485,6 +518,11 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
 
   const imageAttachment = message.attachments?.find(att => att.type === "image" && att.payload?.url);
   if (imageAttachment?.payload?.url) {
+    console.log("PHOTO_RECEIVED", {
+      psid,
+      hasAttachments: !!message.attachments,
+    });
+
     setPendingImage(userId, imageAttachment.payload.url);
     setFlowState(userId, "AWAITING_STYLE");
     await sendPhotoReceivedPrompt(psid);
