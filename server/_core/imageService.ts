@@ -2,6 +2,7 @@ import { STYLE_TO_DEMO_FILE, type Style } from "./messengerStyles";
 import fs from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
+import { safeLen, sha256 } from "./imageProof";
 
 export type GeneratorMode = "mock" | "openai";
 
@@ -10,6 +11,7 @@ export interface ImageGenerator {
     style: Style;
     sourceImageUrl?: string;
     userKey: string;
+    reqId: string;
   }): Promise<{ imageUrl: string }>;
 }
 
@@ -18,6 +20,9 @@ export class MissingOpenAiApiKeyError extends Error {}
 export class GenerationTimeoutError extends Error {}
 export class OpenAiGenerationError extends Error {}
 export class MissingAppBaseUrlError extends Error {}
+export class MissingInputImageError extends Error {}
+
+const MIN_INPUT_IMAGE_BYTES = 5 * 1024;
 
 function getConfiguredBaseUrl(): string | undefined {
   const configuredBaseUrl = process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
@@ -92,21 +97,58 @@ function getOpenAiTimeoutMs(): number {
 }
 
 class MockImageGenerator implements ImageGenerator {
-  generate(input: { style: Style; sourceImageUrl?: string; userKey: string }): Promise<{ imageUrl: string }> {
+  generate(input: { style: Style; sourceImageUrl?: string; userKey: string; reqId: string }): Promise<{ imageUrl: string }> {
     return Promise.resolve({
       imageUrl: getMockImageForStyle(input.style),
     });
   }
 }
 
+async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string): Promise<{ imageBuffer: Buffer; contentType: string }> {
+  const response = await fetch(sourceImageUrl);
+  const contentType = response.headers.get("content-type") ?? "application/octet-stream";
+
+  if (!response.ok) {
+    console.error("MISSING_INPUT_IMAGE", { reqId, reason: "download_failed", status: response.status });
+    throw new MissingInputImageError(`Failed to download source image (${response.status})`);
+  }
+
+  const imageBuffer = Buffer.from(await response.arrayBuffer());
+  const incomingByteLen = safeLen(imageBuffer);
+  const incomingHash = sha256(imageBuffer);
+
+  console.log("IMAGE_PROOF", {
+    reqId,
+    proof_stage: "incoming",
+    content_type: contentType,
+    byte_len: incomingByteLen,
+    sha256: incomingHash,
+  });
+
+  if (process.env.DEBUG_IMAGE_PROOF === "1") {
+    const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
+    const savedPath = `/tmp/leaderbot_incoming.${ext}`;
+    await fs.writeFile(savedPath, imageBuffer);
+    console.log("IMAGE_PROOF", { reqId, proof_stage: "incoming", saved_path: savedPath });
+  }
+
+  if (incomingByteLen < MIN_INPUT_IMAGE_BYTES) {
+    console.error("MISSING_INPUT_IMAGE", { reqId, reason: "too_small", byte_len: incomingByteLen });
+    throw new MissingInputImageError(`Source image too small (${incomingByteLen} bytes)`);
+  }
+
+  return { imageBuffer, contentType };
+}
+
 export class OpenAiImageGenerator implements ImageGenerator {
-  async generate(input: { style: Style; sourceImageUrl?: string; userKey: string }): Promise<{ imageUrl: string }> {
+  async generate(input: { style: Style; sourceImageUrl?: string; userKey: string; reqId: string }): Promise<{ imageUrl: string }> {
     if (!input.style) {
       throw new InvalidGenerationInputError("Style is required");
     }
 
     if (!input.sourceImageUrl) {
-      throw new InvalidGenerationInputError("sourceImageUrl is required");
+      console.error("MISSING_INPUT_IMAGE", { reqId: input.reqId, reason: "missing_source_url" });
+      throw new MissingInputImageError("sourceImageUrl is required");
     }
 
     if (!process.env.OPENAI_API_KEY) {
@@ -119,18 +161,30 @@ export class OpenAiImageGenerator implements ImageGenerator {
     }, getOpenAiTimeoutMs());
 
     try {
-      const response = await fetch("https://api.openai.com/v1/images/generations", {
+      const { imageBuffer, contentType } = await downloadSourceImageOrThrow(input.sourceImageUrl, input.reqId);
+      const openAiInputHash = sha256(imageBuffer);
+      const openAiInputByteLen = safeLen(imageBuffer);
+
+      console.log("IMAGE_PROOF", {
+        reqId: input.reqId,
+        proof_stage: "openai_input",
+        byte_len: openAiInputByteLen,
+        sha256: openAiInputHash,
+      });
+
+      const formData = new FormData();
+      formData.set("model", "gpt-image-1");
+      formData.set("prompt", `Apply ${input.style} style to this photo.`);
+      formData.set("size", "1024x1024");
+      formData.set("output_format", "png");
+      formData.set("image", new Blob([imageBuffer], { type: contentType }), "source-image");
+
+      const response = await fetch("https://api.openai.com/v1/images/edits", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         },
-        body: JSON.stringify({
-          model: "gpt-image-1",
-          prompt: `Apply ${input.style} style to this photo URL: ${input.sourceImageUrl}`,
-          size: "1024x1024",
-          output_format: "png",
-        }),
+        body: formData,
         signal: controller.signal,
       });
 
@@ -145,8 +199,8 @@ export class OpenAiImageGenerator implements ImageGenerator {
         throw new OpenAiGenerationError("OpenAI response did not include base64 image data");
       }
 
-      const imageBuffer = Buffer.from(base64Png, "base64");
-      const relativeFilePath = await persistGeneratedPng(imageBuffer);
+      const imageBufferResult = Buffer.from(base64Png, "base64");
+      const relativeFilePath = await persistGeneratedPng(imageBufferResult);
       const publicBaseUrl = getRequiredPublicBaseUrl();
 
       return { imageUrl: `${publicBaseUrl}/${relativeFilePath}` };
