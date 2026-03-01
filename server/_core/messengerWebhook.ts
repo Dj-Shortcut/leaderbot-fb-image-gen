@@ -6,6 +6,7 @@ import {
   createImageGenerator,
   GenerationTimeoutError,
   InvalidGenerationInputError,
+  MissingAppBaseUrlError,
   MissingOpenAiApiKeyError,
   OpenAiGenerationError,
 } from "./imageService";
@@ -355,6 +356,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
     console.log("OPENAI_CALL_SUCCESS", { psid });
 
     safeLog("generation_success", { mode, ms: Date.now() - startedAt });
+    console.log("MESSENGER_SEND_IMAGE", { psid, imageUrl });
     await sendImage(psid, imageUrl);
     setLastGenerated(userId, style, imageUrl);
     setFlowState(userId, "RESULT_READY");
@@ -369,7 +371,7 @@ async function runStyleGeneration(psid: string, userId: string, style: Style): P
     safeLog("generation_fail", { mode, errorClass, ms: Date.now() - startedAt });
 
     let failureText = "I couldn’t generate that image right now.";
-    if (error instanceof MissingOpenAiApiKeyError) {
+    if (error instanceof MissingOpenAiApiKeyError || error instanceof MissingAppBaseUrlError) {
       safeLog("openai_not_configured", { mode });
       failureText = "AI generation isn’t enabled yet.";
     } else if (error instanceof GenerationTimeoutError) {

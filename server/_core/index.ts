@@ -9,6 +9,7 @@ import { createContext } from "./context";
 import { serveStatic } from "./vite";
 import { registerMetaWebhookRoutes } from "./messengerWebhook";
 import { assertPrivacyConfig } from "./privacy";
+import { getGeneratorStartupConfig } from "./imageService";
 import {
   captureMetaWebhookRawBody,
   verifyMetaWebhookSignature,
@@ -27,6 +28,8 @@ function buildVersionPayload() {
 async function startServer() {
   console.log("BOOT", { pid: process.pid });
   console.log("VERSION", buildVersionPayload());
+  const generatorStartupConfig = getGeneratorStartupConfig();
+  console.log("GENERATOR_STARTUP_CONFIG", generatorStartupConfig);
   assertPrivacyConfig();
 
   const app = express();
