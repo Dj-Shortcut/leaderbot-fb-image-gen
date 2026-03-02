@@ -18,9 +18,20 @@ export type MessengerUserState = {
   stage: MessengerFlowState;
   lastPhotoUrl: string | null;
   selectedStyle: string | null;
-  preferredLang: Lang;
-  lastGeneratedUrl: string | null;
-  updatedAt: Date;
+  preselectedStyle?: string | null;
+  preferredLang?: Lang;
+  // legacy fields kept to avoid breaking current modules
+  state: MessengerFlowState;
+  lastPhotoUrl?: string;
+  chosenStyle?: string;
+  pendingImageUrl?: string;
+  pendingImageAt?: number;
+  lastImageUrl?: string;
+  lastStyle?: Style;
+  lastGeneratedAt?: number;
+  lastVariantCursor?: number;
+  quota: QuotaState;
+  updatedAt: number;
 };
 
 const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
@@ -97,8 +108,30 @@ export async function setPendingImage(psid: string, imageUrl: string): Promise<v
   });
 }
 
-export async function setChosenStyle(psid: string, style: string): Promise<void> {
-  await db.updateMessengerState(psid, { selectedStyle: style });
+export function clearPendingImageState(userId: string, now = Date.now()): MessengerUserState {
+  const state = getOrCreateState(userId);
+  state.lastPhoto = null;
+  state.lastPhotoUrl = undefined;
+  state.pendingImageUrl = undefined;
+  state.pendingImageAt = undefined;
+  state.selectedStyle = null;
+  state.chosenStyle = undefined;
+  state.updatedAt = now;
+  return state;
+}
+
+export function setPreselectedStyle(userId: string, style: string | null, now = Date.now()): MessengerUserState {
+  const state = getOrCreateState(userId);
+  state.preselectedStyle = style;
+  state.updatedAt = now;
+  return state;
+}
+
+export function setChosenStyle(userId: string, style: string, now = Date.now()): void {
+  const state = getOrCreateState(userId);
+  state.selectedStyle = style;
+  state.chosenStyle = style;
+  state.updatedAt = now;
 }
 
 export async function setPreferredLang(psid: string, lang: Lang): Promise<void> {

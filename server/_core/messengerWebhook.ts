@@ -13,12 +13,14 @@ import {
   OpenAiGenerationError,
 } from "./imageService";
 import {
+  clearPendingImageState,
   getOrCreateState,
   getQuickRepliesForState,
   setChosenStyle,
   setFlowState,
   setLastGenerated,
   setPendingImage,
+  setPreselectedStyle,
   setPreferredLang,
   type ConversationState,
   anonymizePsid,
@@ -30,6 +32,7 @@ import { storagePut } from "../storage";
 
 type FacebookWebhookEvent = {
   sender?: { id?: string; locale?: string };
+  referral?: { ref?: string };
   message?: {
     mid?: string;
     is_echo?: boolean;
@@ -40,6 +43,7 @@ type FacebookWebhookEvent = {
   postback?: {
     title?: string;
     payload?: string;
+    referral?: { ref?: string };
   };
   timestamp?: number;
 };
@@ -85,6 +89,8 @@ const SMALLTALK = new Set([
   "thanks",
   "thank you",
 ]);
+
+export type AckKind = "like" | "ok" | "thanks" | "emoji";
 
 type GreetingResponse =
   | { mode: "text"; text: string }
@@ -135,19 +141,152 @@ function stylePayloadToStyle(payload: string): Style | undefined {
   return normalizeStyle(styleKey);
 }
 
-async function sendStateQuickReplies(psid: string, state: ConversationState, text: string): Promise<void> {
-  const replies = getQuickRepliesForState(state).map(reply => ({
+function parseStyle(text: string): Style | undefined {
+  return normalizeStyle(text);
+}
+
+function parseReferralStyle(ref: string | undefined): Style | undefined {
+  if (!ref?.startsWith("style_")) {
+    return undefined;
+  }
+
+  return normalizeStyle(ref.slice("style_".length));
+}
+
+export function detectAck(raw: string | undefined | null): AckKind | null {
+  if (!raw) {
+    return null;
+  }
+
+  const text = raw.trim();
+  if (!text) {
+    return null;
+  }
+
+  const lower = text.toLowerCase();
+
+  if (/^\(\s*y\s*\)$/.test(lower)) {
+    return "like";
+  }
+
+  if (/^(ok|oke|k|kk|yes|yep|ja|jep)$/.test(lower)) {
+    return "ok";
+  }
+
+  if (/^(thanks|thx|merci|tks)$/.test(lower)) {
+    return "thanks";
+  }
+
+  if (text.length > 0 && Array.from(text).every(char => /[\p{Extended_Pictographic}\s]/u.test(char))) {
+    return "emoji";
+  }
+
+  return null;
+}
+
+function toMessengerReplies(state: ConversationState) {
+  return getQuickRepliesForState(state).map(reply => ({
     content_type: "text" as const,
     title: reply.title,
     payload: reply.payload,
   }));
+}
 
+async function sendStateQuickReplies(psid: string, state: ConversationState, text: string): Promise<void> {
+  const replies = toMessengerReplies(state);
   if (replies.length === 0) {
     await sendText(psid, text);
     return;
   }
 
   await sendQuickReplies(psid, text, replies);
+}
+
+async function sendStylePicker(psid: string, lang: Lang): Promise<void> {
+  await sendStateQuickReplies(psid, "AWAITING_STYLE", t(lang, "stylePicker"));
+}
+
+async function sendPhotoReceivedPrompt(psid: string, lang: Lang): Promise<void> {
+  await sendStylePicker(psid, lang);
+}
+
+async function sendReferralPhotoPrompt(psid: string, style: Style, lang: Lang): Promise<void> {
+  const styleLabel = STYLE_LABELS[style];
+  const text =
+    lang === "en"
+      ? `You came in via ${styleLabel}. Send a photo to start `
+      : `Je bent binnengekomen via ${styleLabel}. Stuur een foto om te starten `;
+  await sendText(psid, text);
+}
+
+async function sendGeneratingPrompt(psid: string, style: Style, lang: Lang): Promise<void> {
+  await sendText(
+    psid,
+    t(lang, "generatingPrompt", { styleLabel: STYLE_LABELS[style] }),
+  );
+}
+
+async function sendSuccessPrompt(psid: string, lang: Lang): Promise<void> {
+  await sendStateQuickReplies(psid, "RESULT_READY", t(lang, "success"));
+}
+
+async function sendFailurePrompt(psid: string, style: Style, message: string, lang: Lang): Promise<void> {
+  await sendQuickReplies(psid, message, [
+    { content_type: "text", title: t(lang, "retryThisStyle"), payload: style },
+    { content_type: "text", title: t(lang, "otherStyle"), payload: "CHOOSE_STYLE" },
+  ]);
+}
+
+async function explainFlow(psid: string, lang: Lang): Promise<void> {
+  await sendText(psid, t(lang, "flowExplanation"));
+}
+
+async function explainPrivacy(psid: string, lang: Lang): Promise<void> {
+  await sendText(psid, t(lang, "privacy", { link: PRIVACY_POLICY_URL }));
+}
+
+async function explainWhoIsBehind(psid: string, lang: Lang): Promise<void> {
+  await sendText(psid, t(lang, "aboutLeaderbot"));
+}
+
+async function handleGreeting(psid: string, userId: string, lang: Lang): Promise<void> {
+  const state = getOrCreateState(userId);
+
+  const response = getGreetingResponse(state.stage, lang);
+  if (response.mode === "text") {
+    await sendText(psid, response.text);
+    return;
+  }
+
+  await sendStateQuickReplies(psid, response.state, response.text);
+}
+
+function logGenerationSummary(summary: {
+  reqId: string;
+  psid: string;
+  mode: string;
+  style: Style;
+  ok: boolean;
+  errorClass?: string;
+  fbImageFetchMs?: number;
+  openAiMs?: number;
+  uploadOrServeMs?: number;
+  totalMs: number;
+}): void {
+  console.info(JSON.stringify({
+    level: "info",
+    msg: "generation_summary",
+    reqId: summary.reqId,
+    psid: summary.psid,
+    mode: summary.mode,
+    style: summary.style,
+    ok: summary.ok,
+    errorClass: summary.errorClass,
+    fb_image_fetch_ms: summary.fbImageFetchMs,
+    openai_ms: summary.openAiMs,
+    upload_or_serve_ms: summary.uploadOrServeMs,
+    total_ms: summary.totalMs,
+  }));
 }
 
 async function runStyleGeneration(psid: string, userId: string, style: Style, reqId: string, lang: Lang): Promise<void> {
@@ -259,8 +398,23 @@ async function handlePayload(psid: string, userId: string, payload: string, reqI
   }
 
   if (payload === "CHOOSE_STYLE") {
-    await setFlowState(psid, "AWAITING_STYLE");
-    await sendStateQuickReplies(psid, "AWAITING_STYLE", t(lang, "stylePicker"));
+    setPreselectedStyle(userId, null);
+    setFlowState(userId, "AWAITING_STYLE");
+    await sendStylePicker(psid, lang);
+    return;
+  }
+
+  if (payload === "RETRY_STYLE") {
+    const chosenStyle = getOrCreateState(userId).selectedStyle;
+    const retryStyle = chosenStyle ? parseStyle(chosenStyle) : undefined;
+
+    if (retryStyle) {
+      await handleStyleSelection(psid, userId, retryStyle, reqId, lang);
+      return;
+    }
+
+    setFlowState(userId, "AWAITING_STYLE");
+    await sendStylePicker(psid, lang);
     return;
   }
 
@@ -289,25 +443,41 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
 
   const imageAttachment = message.attachments?.find(att => att.type === "image" && att.payload?.url);
   if (imageAttachment?.payload?.url) {
-    // Download and store to S3 immediately to avoid expiration
-    try {
-        const response = await fetch(imageAttachment.payload.url);
-        const buffer = Buffer.from(await response.arrayBuffer());
-        const { url: s3Url } = await storagePut(`incoming/${userId}/${Date.now()}.jpg`, buffer, "image/jpeg");
-        
-        await setPendingImage(psid, s3Url);
-        await sendStateQuickReplies(psid, "AWAITING_STYLE", t(lang, "stylePicker"));
-    } catch (error) {
-        console.error("FAILED_TO_UPLOAD_INCOMING_PHOTO", error);
-        await sendText(psid, t(lang, "missingInputImage"));
+    console.log("PHOTO_RECEIVED", {
+      psid,
+      hasAttachments: !!message.attachments,
+    });
+
+    const state = getOrCreateState(userId);
+    const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");
+    setPendingImage(userId, imageAttachment.payload.url);
+
+    if (preselectedStyle) {
+      setPreselectedStyle(userId, null);
+      setChosenStyle(userId, preselectedStyle);
+      await runStyleGeneration(psid, userId, preselectedStyle, reqId, lang);
+      return;
     }
+
+    setFlowState(userId, "AWAITING_STYLE");
+    await sendPhotoReceivedPrompt(psid, lang);
     return;
   }
 
-  const text = message.text?.trim().toLowerCase();
-  if (!text) return;
+  const text = message.text;
+  const ack = detectAck(text);
+  if (ack) {
+    safeLog("ack_ignored", { ack });
+    return;
+  }
 
-  if (GREETINGS.has(text) || SMALLTALK.has(text)) {
+  const trimmedText = text?.trim();
+  const normalizedText = trimmedText?.toLowerCase();
+  if (!normalizedText || !trimmedText) {
+    return;
+  }
+
+  if (GREETINGS.has(normalizedText) || SMALLTALK.has(normalizedText)) {
     const state = await getOrCreateState(psid);
     const response = getGreetingResponse(state.stage, lang);
     if (response.mode === "text") {
@@ -344,6 +514,14 @@ async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
 
   const dedupeKey = getEventDedupeKey(event, userId);
   if (dedupeKey && incomingEventDedupe.seen(dedupeKey)) return;
+
+  const referralStyle = parseReferralStyle(event.postback?.referral?.ref ?? event.referral?.ref);
+  if (referralStyle) {
+    clearPendingImageState(userId);
+    setPreselectedStyle(userId, referralStyle);
+    setFlowState(userId, "AWAITING_PHOTO");
+    return sendReferralPhotoPrompt(psid, referralStyle, lang);
+  }
 
   if (event.postback?.payload) {
     await handlePayload(psid, userId, event.postback.payload, reqId, lang);
