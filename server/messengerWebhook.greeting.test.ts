@@ -5,7 +5,7 @@ describe("greeting handling by conversation state", () => {
   it("returns processing text while PROCESSING", () => {
     expect(getGreetingResponse("PROCESSING")).toEqual({
       mode: "text",
-      text: "Ik ben nog bezig met je vorige afbeelding.",
+      text: "Even geduld — je vorige afbeelding is bijna klaar.",
     });
   });
 
@@ -20,7 +20,7 @@ describe("greeting handling by conversation state", () => {
     expect(getGreetingResponse("AWAITING_STYLE")).toEqual({
       mode: "quick_replies",
       state: "AWAITING_STYLE",
-      text: "Dank je. Kies hieronder een stijl.",
+      text: "Kies je stijl 👇",
     });
   });
 
@@ -28,7 +28,7 @@ describe("greeting handling by conversation state", () => {
     expect(getGreetingResponse("RESULT_READY")).toEqual({
       mode: "quick_replies",
       state: "RESULT_READY",
-      text: "Klaar. Je kan de afbeelding opslaan door erop te tikken.",
+      text: "Klaar ✅",
     });
   });
 
@@ -36,7 +36,7 @@ describe("greeting handling by conversation state", () => {
     expect(getGreetingResponse("FAILURE")).toEqual({
       mode: "quick_replies",
       state: "FAILURE",
-      text: "Er ging iets mis bij het maken van je afbeelding. Kies gerust opnieuw een stijl.",
+      text: "Oeps. Probeer nog een stijl.",
     });
   });
 
