@@ -518,8 +518,7 @@ async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
     clearPendingImageState(userId);
     setPreselectedStyle(userId, referralStyle);
     setFlowState(userId, "AWAITING_PHOTO");
-    await sendReferralPhotoPrompt(psid, referralStyle, lang);
-    return;
+    return sendReferralPhotoPrompt(psid, referralStyle, lang);
   }
 
   if (event.postback?.payload) {
