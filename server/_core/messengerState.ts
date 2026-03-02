@@ -2,9 +2,23 @@ import type { Style } from "./messengerStyles";
 import { STYLE_CONFIGS } from "./messengerStyles";
 import type { Lang } from "./i18n";
 import { toUserKey } from "./privacy";
-import * as db from "../db";
+import {
+  clearStateStore,
+  findInMemoryState,
+  isPromiseLike,
+  isRedisStateStoreEnabled,
+  readState,
+  type MaybePromise,
+  writeState,
+} from "./stateStore";
 
-export type ConversationState = "IDLE" | "AWAITING_PHOTO" | "AWAITING_STYLE" | "PROCESSING" | "RESULT_READY" | "FAILURE";
+export type ConversationState =
+  | "IDLE"
+  | "AWAITING_PHOTO"
+  | "AWAITING_STYLE"
+  | "PROCESSING"
+  | "RESULT_READY"
+  | "FAILURE";
 export type MessengerFlowState = ConversationState;
 
 export type StateQuickReply = {
@@ -12,21 +26,26 @@ export type StateQuickReply = {
   payload: string;
 };
 
+export type QuotaState = {
+  dayKey: string;
+  count: number;
+};
+
 export type MessengerUserState = {
   psid: string;
   userKey: string;
   stage: MessengerFlowState;
+  state: MessengerFlowState;
   lastPhotoUrl: string | null;
+  lastPhoto: string | null;
   selectedStyle: string | null;
+  chosenStyle: string | null;
   preselectedStyle?: string | null;
   preferredLang?: Lang;
-  // legacy fields kept to avoid breaking current modules
-  state: MessengerFlowState;
-  lastPhotoUrl?: string;
-  chosenStyle?: string;
   pendingImageUrl?: string;
   pendingImageAt?: number;
   lastImageUrl?: string;
+  lastGeneratedUrl?: string | null;
   lastStyle?: Style;
   lastGeneratedAt?: number;
   lastVariantCursor?: number;
@@ -55,6 +74,138 @@ const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
   ],
 };
 
+type PartialState = Partial<MessengerUserState>;
+
+function looksLikeUserKey(value: string): boolean {
+  return /^[a-f0-9]{64}$/i.test(value);
+}
+
+function getUserKey(psid: string): string {
+  return looksLikeUserKey(psid) ? psid : toUserKey(psid);
+}
+
+function createDefaultState(psid: string, now = Date.now()): MessengerUserState {
+  return {
+    psid,
+    userKey: getUserKey(psid),
+    stage: "IDLE",
+    state: "IDLE",
+    lastPhotoUrl: null,
+    lastPhoto: null,
+    selectedStyle: null,
+    chosenStyle: null,
+    preselectedStyle: null,
+    preferredLang: "nl",
+    pendingImageUrl: undefined,
+    pendingImageAt: undefined,
+    lastImageUrl: undefined,
+    lastGeneratedUrl: null,
+    lastStyle: undefined,
+    lastGeneratedAt: undefined,
+    lastVariantCursor: undefined,
+    quota: {
+      dayKey: getDayKey(now),
+      count: 0,
+    },
+    updatedAt: now,
+  };
+}
+
+function normalizeState(psid: string, value: PartialState | null | undefined): MessengerUserState {
+  const resolvedPsid = value?.psid ?? psid;
+  const fallback = createDefaultState(resolvedPsid);
+  const stage = value?.stage ?? value?.state ?? fallback.stage;
+  const lastPhoto = value?.lastPhoto ?? value?.lastPhotoUrl ?? fallback.lastPhoto;
+  const selectedStyle = value?.selectedStyle ?? value?.chosenStyle ?? fallback.selectedStyle;
+
+  return {
+    ...fallback,
+    ...value,
+    psid: resolvedPsid,
+    userKey: value?.userKey ?? fallback.userKey,
+    stage,
+    state: stage,
+    lastPhotoUrl: lastPhoto,
+    lastPhoto,
+    selectedStyle,
+    chosenStyle: selectedStyle,
+    quota: {
+      dayKey: value?.quota?.dayKey ?? fallback.quota.dayKey,
+      count: value?.quota?.count ?? fallback.quota.count,
+    },
+    updatedAt: value?.updatedAt ?? fallback.updatedAt,
+  };
+}
+
+function saveState(psid: string, nextState: MessengerUserState): MaybePromise<MessengerUserState> {
+  const result = writeState(psid, nextState);
+  if (isPromiseLike(result)) {
+    return result.then(() => nextState);
+  }
+
+  return nextState;
+}
+
+function getStateFromMemory(psid: string): MessengerUserState | null {
+  const direct = readState<PartialState>(psid);
+  if (isPromiseLike(direct)) {
+    throw new Error("Unexpected async state read in memory mode");
+  }
+
+  if (direct) {
+    return normalizeState(psid, direct);
+  }
+
+  const userKey = getUserKey(psid);
+  const legacyState = findInMemoryState<PartialState>(state => state.userKey === userKey);
+  return legacyState ? normalizeState(legacyState.psid ?? psid, legacyState) : null;
+}
+
+function getStateFromRedis(psid: string): Promise<MessengerUserState | null> {
+  return Promise.resolve(readState<PartialState>(psid)).then(state => {
+    return state ? normalizeState(psid, state) : null;
+  });
+}
+
+function patchStateInMemory(psid: string, patch: PartialState, now = Date.now()): MessengerUserState {
+  const current = getOrCreateState(psid);
+  if (isPromiseLike(current)) {
+    throw new Error("Unexpected async state patch in memory mode");
+  }
+
+  const nextState = normalizeState(psid, {
+    ...current,
+    ...patch,
+    updatedAt: now,
+  });
+
+  const saved = saveState(psid, nextState);
+  if (isPromiseLike(saved)) {
+    throw new Error("Unexpected async state save in memory mode");
+  }
+
+  return saved;
+}
+
+function patchStateInRedis(psid: string, patch: PartialState, now = Date.now()): Promise<MessengerUserState> {
+  return Promise.resolve(getOrCreateState(psid)).then(current => {
+    const nextState = normalizeState(psid, {
+      ...current,
+      ...patch,
+      updatedAt: now,
+    });
+    return Promise.resolve(saveState(psid, nextState));
+  });
+}
+
+function patchState(psid: string, patch: PartialState, now = Date.now()): MaybePromise<MessengerUserState> {
+  if (!isRedisStateStoreEnabled()) {
+    return patchStateInMemory(psid, patch, now);
+  }
+
+  return patchStateInRedis(psid, patch, now);
+}
+
 export function getQuickRepliesForState(state: ConversationState): StateQuickReply[] {
   return QUICK_REPLIES_BY_STATE[state];
 }
@@ -67,84 +218,138 @@ export function getDayKey(now = Date.now()): string {
   return new Date(now).toISOString().slice(0, 10);
 }
 
-export async function getOrCreateState(psid: string): Promise<MessengerUserState> {
-  const userKey = toUserKey(psid);
-  const state = await db.getOrCreateMessengerState(psid, userKey);
-  
-  if (!state) {
-      // Fallback if DB is down (not ideal but keeps it running)
-      return {
-          psid,
-          userKey,
-          stage: "IDLE",
-          lastPhotoUrl: null,
-          selectedStyle: null,
-          preferredLang: "nl",
-          lastGeneratedUrl: null,
-          updatedAt: new Date(),
-      };
+export function getState(psid: string): MaybePromise<MessengerUserState | null> {
+  if (!isRedisStateStoreEnabled()) {
+    return getStateFromMemory(psid);
   }
 
-  return {
-      psid: state.psid,
-      userKey: state.userKey,
-      stage: state.stage as MessengerFlowState,
-      lastPhotoUrl: state.lastPhotoUrl,
-      selectedStyle: state.selectedStyle,
-      preferredLang: (state.preferredLang as Lang) || "nl",
-      lastGeneratedUrl: state.lastGeneratedUrl,
-      updatedAt: state.updatedAt,
-  };
+  return getStateFromRedis(psid);
 }
 
-export async function setFlowState(psid: string, nextState: MessengerFlowState): Promise<void> {
-  await db.updateMessengerState(psid, { stage: nextState });
+export function getOrCreateState(psid: string): MaybePromise<MessengerUserState> {
+  if (!isRedisStateStoreEnabled()) {
+    const state = getStateFromMemory(psid);
+    if (state) {
+      return state;
+    }
+
+    const createdState = createDefaultState(psid);
+    return saveState(psid, createdState);
+  }
+
+  return getStateFromRedis(psid).then(state => {
+    if (state) {
+      return state;
+    }
+
+    return Promise.resolve(saveState(psid, createDefaultState(psid)));
+  });
 }
 
-export async function setPendingImage(psid: string, imageUrl: string): Promise<void> {
-  await db.updateMessengerState(psid, { 
+export function setFlowState(psid: string, nextState: MessengerFlowState): MaybePromise<void> {
+  const result = patchState(psid, {
+    stage: nextState,
+    state: nextState,
+  });
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
+}
+
+export function setPendingImage(psid: string, imageUrl: string, now = Date.now()): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
       lastPhotoUrl: imageUrl,
-      stage: "AWAITING_STYLE" 
-  });
+      lastPhoto: imageUrl,
+      pendingImageUrl: imageUrl,
+      pendingImageAt: now,
+      stage: "AWAITING_STYLE",
+      state: "AWAITING_STYLE",
+    },
+    now,
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
 }
 
-export function clearPendingImageState(userId: string, now = Date.now()): MessengerUserState {
-  const state = getOrCreateState(userId);
-  state.lastPhoto = null;
-  state.lastPhotoUrl = undefined;
-  state.pendingImageUrl = undefined;
-  state.pendingImageAt = undefined;
-  state.selectedStyle = null;
-  state.chosenStyle = undefined;
-  state.updatedAt = now;
-  return state;
+export function clearPendingImageState(psid: string, now = Date.now()): MaybePromise<MessengerUserState> {
+  return patchState(
+    psid,
+    {
+      lastPhotoUrl: null,
+      lastPhoto: null,
+      pendingImageUrl: undefined,
+      pendingImageAt: undefined,
+      selectedStyle: null,
+      chosenStyle: null,
+    },
+    now,
+  );
 }
 
-export function setPreselectedStyle(userId: string, style: string | null, now = Date.now()): MessengerUserState {
-  const state = getOrCreateState(userId);
-  state.preselectedStyle = style;
-  state.updatedAt = now;
-  return state;
+export function setPreselectedStyle(psid: string, style: string | null, now = Date.now()): MaybePromise<MessengerUserState> {
+  return patchState(
+    psid,
+    {
+      preselectedStyle: style,
+    },
+    now,
+  );
 }
 
-export function setChosenStyle(userId: string, style: string, now = Date.now()): void {
-  const state = getOrCreateState(userId);
-  state.selectedStyle = style;
-  state.chosenStyle = style;
-  state.updatedAt = now;
+export function setChosenStyle(psid: string, style: string, now = Date.now()): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      selectedStyle: style,
+      chosenStyle: style,
+    },
+    now,
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
 }
 
-export async function setPreferredLang(psid: string, lang: Lang): Promise<void> {
-  await db.updateMessengerState(psid, { preferredLang: lang });
+export function setPreferredLang(psid: string, lang: Lang, now = Date.now()): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      preferredLang: lang,
+    },
+    now,
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
 }
 
-export async function setLastGenerated(psid: string, resultImageUrl: string): Promise<void> {
-  await db.updateMessengerState(psid, { 
+export function setLastGenerated(psid: string, resultImageUrl: string, now = Date.now()): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      lastImageUrl: resultImageUrl,
       lastGeneratedUrl: resultImageUrl,
-      stage: "RESULT_READY"
-  });
+      lastGeneratedAt: now,
+      stage: "RESULT_READY",
+      state: "RESULT_READY",
+    },
+    now,
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
 }
 
-// Pruning is now handled by the database (standard TTL or cleanup jobs)
 export function pruneOldState(): void {}
-export function resetStateStore(): void {}
+
+export function resetStateStore(): void {
+  clearStateStore();
+}
