@@ -250,7 +250,7 @@ async function explainWhoIsBehind(psid: string, lang: Lang): Promise<void> {
 }
 
 async function handleGreeting(psid: string, userId: string, lang: Lang): Promise<void> {
-  const state = getOrCreateState(userId);
+  const state = await getOrCreateState(psid);
 
   const response = getGreetingResponse(state.stage, lang);
   if (response.mode === "text") {
@@ -259,6 +259,23 @@ async function handleGreeting(psid: string, userId: string, lang: Lang): Promise
   }
 
   await sendStateQuickReplies(psid, response.state, response.text);
+}
+
+async function handleStyleSelection(psid: string, userId: string, selectedStyle: Style, reqId: string, lang: Lang): Promise<void> {
+  const state = await getOrCreateState(psid);
+  if (state.stage === "PROCESSING") {
+    await sendText(psid, t(lang, "processingBlocked"));
+    return;
+  }
+
+  await setChosenStyle(psid, selectedStyle);
+  if (!state.lastPhotoUrl) {
+    await setFlowState(psid, "AWAITING_PHOTO");
+    await sendText(psid, t(lang, "styleWithoutPhoto"));
+    return;
+  }
+
+  await runStyleGeneration(psid, userId, selectedStyle, reqId, lang);
 }
 
 function logGenerationSummary(summary: {
@@ -382,30 +399,19 @@ async function handlePayload(psid: string, userId: string, payload: string, reqI
 
   const selectedStyle = stylePayloadToStyle(payload);
   if (selectedStyle) {
-    const state = await getOrCreateState(psid);
-    if (state.stage === "PROCESSING") {
-        await sendText(psid, t(lang, "processingBlocked"));
-        return;
-    }
-    await setChosenStyle(psid, selectedStyle);
-    if (!state.lastPhotoUrl) {
-        await setFlowState(psid, "AWAITING_PHOTO");
-        await sendText(psid, t(lang, "styleWithoutPhoto"));
-        return;
-    }
-    await runStyleGeneration(psid, userId, selectedStyle, reqId, lang);
+    await handleStyleSelection(psid, userId, selectedStyle, reqId, lang);
     return;
   }
 
   if (payload === "CHOOSE_STYLE") {
-    setPreselectedStyle(userId, null);
-    setFlowState(userId, "AWAITING_STYLE");
+    await setPreselectedStyle(psid, null);
+    await setFlowState(psid, "AWAITING_STYLE");
     await sendStylePicker(psid, lang);
     return;
   }
 
   if (payload === "RETRY_STYLE") {
-    const chosenStyle = getOrCreateState(userId).selectedStyle;
+    const chosenStyle = (await getOrCreateState(psid)).selectedStyle;
     const retryStyle = chosenStyle ? parseStyle(chosenStyle) : undefined;
 
     if (retryStyle) {
@@ -413,7 +419,7 @@ async function handlePayload(psid: string, userId: string, payload: string, reqI
       return;
     }
 
-    setFlowState(userId, "AWAITING_STYLE");
+    await setFlowState(psid, "AWAITING_STYLE");
     await sendStylePicker(psid, lang);
     return;
   }
@@ -448,18 +454,18 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
       hasAttachments: !!message.attachments,
     });
 
-    const state = getOrCreateState(userId);
+    const state = await getOrCreateState(psid);
     const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");
-    setPendingImage(userId, imageAttachment.payload.url);
+    await setPendingImage(psid, imageAttachment.payload.url);
 
     if (preselectedStyle) {
-      setPreselectedStyle(userId, null);
-      setChosenStyle(userId, preselectedStyle);
+      await setPreselectedStyle(psid, null);
+      await setChosenStyle(psid, preselectedStyle);
       await runStyleGeneration(psid, userId, preselectedStyle, reqId, lang);
       return;
     }
 
-    setFlowState(userId, "AWAITING_STYLE");
+    await setFlowState(psid, "AWAITING_STYLE");
     await sendPhotoReceivedPrompt(psid, lang);
     return;
   }
@@ -517,9 +523,9 @@ async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
 
   const referralStyle = parseReferralStyle(event.postback?.referral?.ref ?? event.referral?.ref);
   if (referralStyle) {
-    clearPendingImageState(userId);
-    setPreselectedStyle(userId, referralStyle);
-    setFlowState(userId, "AWAITING_PHOTO");
+    await clearPendingImageState(psid);
+    await setPreselectedStyle(psid, referralStyle);
+    await setFlowState(psid, "AWAITING_PHOTO");
     return sendReferralPhotoPrompt(psid, referralStyle, lang);
   }
 
