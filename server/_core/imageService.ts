@@ -1,7 +1,6 @@
 import { STYLE_TO_DEMO_FILE, type Style } from "./messengerStyles";
 import fs from "fs/promises";
 import path from "path";
-import { randomUUID } from "crypto";
 import { safeLen, sha256 } from "./imageProof";
 
 export type GeneratorMode = "mock" | "openai";
@@ -77,13 +76,48 @@ function getRequiredPublicBaseUrl(): string {
   return baseUrl;
 }
 
-async function persistGeneratedPng(buffer: Buffer): Promise<string> {
-  const publicId = `${Date.now()}-${randomUUID()}`;
-  const relativeFilePath = path.posix.join("generated", `${publicId}.png`);
+
+function isJpegBuffer(buffer: Buffer): boolean {
+  return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+}
+
+async function ensureJpegBuffer(buffer: Buffer): Promise<Buffer> {
+  if (isJpegBuffer(buffer)) {
+    return buffer;
+  }
+
+  try {
+    // @ts-expect-error sharp is optional at runtime in environments where OpenAI already returns JPEG.
+    const sharpModule = await import("sharp");
+    const sharpFn = (sharpModule.default ?? sharpModule) as (input: Buffer) => { jpeg: (opts: { quality: number }) => { toBuffer: () => Promise<Buffer> } };
+
+    return await sharpFn(buffer).jpeg({ quality: 90 }).toBuffer();
+  } catch {
+    return buffer;
+  }
+}
+
+async function removeGeneratedWebpArtifacts(absoluteDirPath: string): Promise<void> {
+  const existingFiles = await fs.readdir(absoluteDirPath, { withFileTypes: true });
+  const webpFiles = existingFiles
+    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".webp"))
+    .map((entry) => path.join(absoluteDirPath, entry.name));
+
+  if (webpFiles.length > 0) {
+    await Promise.all(webpFiles.map((filePath) => fs.unlink(filePath)));
+  }
+}
+
+async function persistGeneratedJpg(buffer: Buffer, style: Style): Promise<string> {
+  const timestamp = Date.now();
+  const normalizedStyle = style.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+  const filename = `leaderbot-${normalizedStyle}-${timestamp}.jpg`;
+  const relativeFilePath = path.posix.join("generated", filename);
   const absoluteDirPath = path.resolve(process.cwd(), "public", "generated");
-  const absoluteFilePath = path.resolve(process.cwd(), "public", "generated", `${publicId}.png`);
+  const absoluteFilePath = path.resolve(process.cwd(), "public", "generated", filename);
 
   await fs.mkdir(absoluteDirPath, { recursive: true });
+  await removeGeneratedWebpArtifacts(absoluteDirPath);
   await fs.writeFile(absoluteFilePath, buffer);
 
   const stats = await fs.stat(absoluteFilePath);
@@ -227,7 +261,7 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
       const incomingHash = sha256(imageBuffer);
 
       if (process.env.DEBUG_IMAGE_PROOF === "1") {
-        const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
+        const ext = contentType.includes("png") ? "png" : "jpg";
         const savedPath = `/tmp/leaderbot_incoming.${ext}`;
         await fs.writeFile(savedPath, imageBuffer);
         console.log("DEBUG_IMAGE_PROOF", { reqId, saved_path: savedPath });
@@ -312,7 +346,7 @@ export class OpenAiImageGenerator implements ImageGenerator {
       formData.set("model", "gpt-image-1");
       formData.set("prompt", `Apply ${input.style} style to this photo.`);
       formData.set("size", "1024x1024");
-      formData.set("output_format", "png");
+      formData.set("output_format", "jpeg");
       formData.set("image", new Blob([new Uint8Array(imageBuffer)], { type: contentType }), "source-image");
 
       const openAiStartedAt = Date.now();
@@ -335,15 +369,16 @@ export class OpenAiImageGenerator implements ImageGenerator {
       }
 
       const result = (await response.json()) as { data?: Array<{ b64_json?: string }> };
-      const base64Png = result.data?.[0]?.b64_json;
+      const base64Image = result.data?.[0]?.b64_json;
 
-      if (!base64Png) {
+      if (!base64Image) {
         throw new OpenAiGenerationError("OpenAI response did not include base64 image data");
       }
 
-      const imageBufferResult = Buffer.from(base64Png, "base64");
+      const imageBufferResult = Buffer.from(base64Image, "base64");
+      const jpegBuffer = await ensureJpegBuffer(imageBufferResult);
       const uploadStartedAt = Date.now();
-      const relativeFilePath = await persistGeneratedPng(imageBufferResult);
+      const relativeFilePath = await persistGeneratedJpg(jpegBuffer, input.style);
       const uploadOrServeMs = Date.now() - uploadStartedAt;
       partialMetrics.uploadOrServeMs = uploadOrServeMs;
       const publicBaseUrl = getRequiredPublicBaseUrl();
