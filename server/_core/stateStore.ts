@@ -10,15 +10,18 @@ type RedisModule = {
   default: new (url: string) => RedisLike;
 };
 
+export type MaybePromise<T> = T | Promise<T>;
+
+const memoryState = new Map<string, string>();
+
 let redisClientPromise: Promise<RedisLike> | null = null;
 
-function getRedisUrl(): string {
-  const redisUrl = process.env.REDIS_URL?.trim();
-  if (!redisUrl) {
-    throw new Error("REDIS_URL is required");
-  }
+function getRedisUrl(): string | null {
+  return process.env.REDIS_URL?.trim() || null;
+}
 
-  return redisUrl;
+function isPromiseLike<T>(value: MaybePromise<T>): value is Promise<T> {
+  return typeof (value as Promise<T> | undefined)?.then === "function";
 }
 
 async function importRedisModule(): Promise<RedisModule> {
@@ -27,8 +30,13 @@ async function importRedisModule(): Promise<RedisModule> {
 }
 
 async function createRedisClient(): Promise<RedisLike> {
+  const redisUrl = getRedisUrl();
+  if (!redisUrl) {
+    throw new Error("REDIS_URL is not configured");
+  }
+
   const { default: Redis } = await importRedisModule();
-  return new Redis(getRedisUrl());
+  return new Redis(redisUrl);
 }
 
 async function getRedisClient(): Promise<RedisLike> {
@@ -43,24 +51,61 @@ function getStateKey(psid: string): string {
   return `psid:${psid}`;
 }
 
+export function isRedisStateStoreEnabled(): boolean {
+  return Boolean(getRedisUrl());
+}
+
 export async function ensureStateStoreReady(): Promise<void> {
+  if (!isRedisStateStoreEnabled()) {
+    return;
+  }
+
   const redis = await getRedisClient();
   await redis.ping();
 }
 
-export async function readState<T>(psid: string): Promise<T | null> {
-  const redis = await getRedisClient();
-  const payload = await redis.get(getStateKey(psid));
-  if (!payload) {
+export function readState<T>(psid: string): MaybePromise<T | null> {
+  if (!isRedisStateStoreEnabled()) {
+    const payload = memoryState.get(getStateKey(psid));
+    return payload ? (JSON.parse(payload) as T) : null;
+  }
+
+  return getRedisClient().then(async redis => {
+    const payload = await redis.get(getStateKey(psid));
+    return payload ? (JSON.parse(payload) as T) : null;
+  });
+}
+
+export function writeState<T>(psid: string, value: T): MaybePromise<void> {
+  const payload = JSON.stringify(value);
+
+  if (!isRedisStateStoreEnabled()) {
+    memoryState.set(getStateKey(psid), payload);
+    return;
+  }
+
+  return getRedisClient().then(redis => {
+    return redis.set(getStateKey(psid), payload, "EX", STATE_TTL_SECONDS).then(() => undefined);
+  });
+}
+
+export function findInMemoryState<T>(predicate: (value: T) => boolean): T | null {
+  if (isRedisStateStoreEnabled()) {
     return null;
   }
 
-  return JSON.parse(payload) as T;
+  for (const payload of memoryState.values()) {
+    const value = JSON.parse(payload) as T;
+    if (predicate(value)) {
+      return value;
+    }
+  }
+
+  return null;
 }
 
-export async function writeState<T>(psid: string, value: T): Promise<void> {
-  const redis = await getRedisClient();
-  await redis.set(getStateKey(psid), JSON.stringify(value), "EX", STATE_TTL_SECONDS);
+export function clearStateStore(): void {
+  memoryState.clear();
 }
 
-export { STATE_TTL_SECONDS };
+export { STATE_TTL_SECONDS, isPromiseLike };
