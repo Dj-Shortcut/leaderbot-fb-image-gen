@@ -13,6 +13,7 @@ import {
   OpenAiGenerationError,
 } from "./imageService";
 import {
+  clearPendingImageState,
   getOrCreateState,
   getQuickRepliesForState,
   pruneOldState,
@@ -20,6 +21,7 @@ import {
   setFlowState,
   setLastGenerated,
   setPendingImage,
+  setPreselectedStyle,
   setPreferredLang,
   type ConversationState,
   anonymizePsid,
@@ -30,6 +32,7 @@ import { isDebugLogEnabled, isStateDumpEnabled, shouldSampleWebhookSummary } fro
 
 type FacebookWebhookEvent = {
   sender?: { id?: string; locale?: string };
+  referral?: { ref?: string };
   message?: {
     mid?: string;
     is_echo?: boolean;
@@ -40,6 +43,7 @@ type FacebookWebhookEvent = {
   postback?: {
     title?: string;
     payload?: string;
+    referral?: { ref?: string };
   };
   timestamp?: number;
 };
@@ -212,6 +216,14 @@ function parseStyle(text: string): Style | undefined {
   return normalizeStyle(text);
 }
 
+function parseReferralStyle(ref: string | undefined): Style | undefined {
+  if (!ref?.startsWith("style_")) {
+    return undefined;
+  }
+
+  return normalizeStyle(ref.slice("style_".length));
+}
+
 export function detectAck(raw: string | undefined | null): AckKind | null {
   if (!raw) {
     return null;
@@ -268,6 +280,15 @@ async function sendStylePicker(psid: string, lang: Lang): Promise<void> {
 
 async function sendPhotoReceivedPrompt(psid: string, lang: Lang): Promise<void> {
   await sendStylePicker(psid, lang);
+}
+
+async function sendReferralPhotoPrompt(psid: string, style: Style, lang: Lang): Promise<void> {
+  const styleLabel = STYLE_LABELS[style];
+  const text =
+    lang === "en"
+      ? `You came in via ${styleLabel}. Send a photo to start `
+      : `Je bent binnengekomen via ${styleLabel}. Stuur een foto om te starten `;
+  await sendText(psid, text);
 }
 
 async function sendGeneratingPrompt(psid: string, style: Style, lang: Lang): Promise<void> {
@@ -511,6 +532,7 @@ async function handlePayload(psid: string, userId: string, payload: string, reqI
   }
 
   if (payload === "CHOOSE_STYLE") {
+    setPreselectedStyle(userId, null);
     setFlowState(userId, "AWAITING_STYLE");
     await sendStylePicker(psid, lang);
     return;
@@ -588,7 +610,17 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
       hasAttachments: !!message.attachments,
     });
 
+    const state = getOrCreateState(userId);
+    const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");
     setPendingImage(userId, imageAttachment.payload.url);
+
+    if (preselectedStyle) {
+      setPreselectedStyle(userId, null);
+      setChosenStyle(userId, preselectedStyle);
+      await runStyleGeneration(psid, userId, preselectedStyle, reqId, lang);
+      return;
+    }
+
     setFlowState(userId, "AWAITING_STYLE");
     await sendPhotoReceivedPrompt(psid, lang);
     return;
@@ -664,6 +696,15 @@ async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
   const dedupeKey = getEventDedupeKey(event, userId);
   if (dedupeKey && incomingEventDedupe.seen(dedupeKey)) {
     safeLog("duplicate_event_skipped", { user: toLogUser(userId) });
+    return;
+  }
+
+  const referralStyle = parseReferralStyle(event.postback?.referral?.ref ?? event.referral?.ref);
+  if (referralStyle) {
+    clearPendingImageState(userId);
+    setPreselectedStyle(userId, referralStyle);
+    setFlowState(userId, "AWAITING_PHOTO");
+    await sendReferralPhotoPrompt(psid, referralStyle, lang);
     return;
   }
 

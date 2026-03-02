@@ -20,6 +20,7 @@ export type MessengerUserState = {
   stage: MessengerFlowState;
   lastPhoto: string | null;
   selectedStyle: string | null;
+  preselectedStyle?: string | null;
   preferredLang?: Lang;
   // legacy fields kept to avoid breaking current modules
   state: MessengerFlowState;
@@ -111,6 +112,25 @@ export function setPendingImage(userId: string, imageUrl: string, now = Date.now
   state.stage = "AWAITING_STYLE";
   state.state = "AWAITING_STYLE";
   state.updatedAt = now;
+}
+
+export function clearPendingImageState(userId: string, now = Date.now()): MessengerUserState {
+  const state = getOrCreateState(userId);
+  state.lastPhoto = null;
+  state.lastPhotoUrl = undefined;
+  state.pendingImageUrl = undefined;
+  state.pendingImageAt = undefined;
+  state.selectedStyle = null;
+  state.chosenStyle = undefined;
+  state.updatedAt = now;
+  return state;
+}
+
+export function setPreselectedStyle(userId: string, style: string | null, now = Date.now()): MessengerUserState {
+  const state = getOrCreateState(userId);
+  state.preselectedStyle = style;
+  state.updatedAt = now;
+  return state;
 }
 
 export function setChosenStyle(userId: string, style: string, now = Date.now()): void {
