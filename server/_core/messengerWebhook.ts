@@ -50,6 +50,22 @@ type FacebookWebhookEvent = {
 
 const incomingEventDedupe = new TtlDedupeSet(10 * 60 * 1000);
 
+type WebhookSummaryEvent = {
+  type: "message" | "postback" | "read" | "delivery" | "unknown";
+  hasText: boolean;
+  attachmentTypes: string[];
+  isEcho: boolean;
+  hasRead: boolean;
+  hasDelivery: boolean;
+  hasPostback: boolean;
+};
+
+type WebhookSummary = {
+  object?: string;
+  entryCount: number;
+  events: WebhookSummaryEvent[];
+};
+
 function getEventDedupeKey(event: FacebookWebhookEvent, userKey: string): string | undefined {
   const messageId = event.message?.mid?.trim();
   if (messageId) {
@@ -63,6 +79,60 @@ function getEventDedupeKey(event: FacebookWebhookEvent, userKey: string): string
   }
 
   return undefined;
+}
+
+export function resetMessengerEventDedupe(): void {
+  incomingEventDedupe.clear();
+}
+
+export function summarizeWebhook(payload: unknown): WebhookSummary {
+  const entries = Array.isArray((payload as { entry?: unknown[] } | null | undefined)?.entry)
+    ? (payload as { entry: Array<{ messaging?: FacebookWebhookEvent[] }> }).entry
+    : [];
+
+  const events = entries.flatMap(entry => {
+    const messaging = Array.isArray(entry?.messaging) ? entry.messaging : [];
+
+    return messaging.map<WebhookSummaryEvent>(event => {
+      const attachmentTypes = Array.from(
+        new Set(
+          (event.message?.attachments ?? [])
+            .map(attachment => attachment.type?.trim())
+            .filter((type): type is string => Boolean(type)),
+        ),
+      );
+
+      let type: WebhookSummaryEvent["type"] = "unknown";
+      if (event.message) {
+        type = "message";
+      } else if (event.postback) {
+        type = "postback";
+      } else if ((event as { read?: unknown }).read) {
+        type = "read";
+      } else if ((event as { delivery?: unknown }).delivery) {
+        type = "delivery";
+      }
+
+      return {
+        type,
+        hasText: Boolean(event.message?.text),
+        attachmentTypes,
+        isEcho: Boolean(event.message?.is_echo),
+        hasRead: Boolean((event as { read?: unknown }).read),
+        hasDelivery: Boolean((event as { delivery?: unknown }).delivery),
+        hasPostback: Boolean(event.postback),
+      };
+    });
+  });
+
+  return {
+    object:
+      typeof (payload as { object?: unknown } | null | undefined)?.object === "string"
+        ? ((payload as { object: string }).object)
+        : undefined,
+    entryCount: entries.length,
+    events,
+  };
 }
 
 const STYLE_OPTIONS: Style[] = ["caricature", "petals", "gold", "cinematic", "disco", "clouds"];

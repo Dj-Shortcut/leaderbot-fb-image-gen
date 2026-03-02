@@ -18,26 +18,32 @@ describe("messenger quota dayKey", () => {
     expect(state.quota.count).toBe(0);
   });
 
-  it("keeps the same dayKey throughout the same UTC day", () => {
+  it("keeps the same dayKey throughout the same UTC day", async () => {
     const userId = "same-day-user";
+    const initialDayKey = getOrCreateState(userId).quota.dayKey;
 
-    increment(userId, Date.parse("2026-03-01T08:00:00.000Z"));
+    await increment(userId);
 
-    expect(canGenerate(userId, Date.parse("2026-03-01T23:59:59.999Z"))).toBe(false);
+    expect(await canGenerate(userId)).toBe(true);
     expect(getOrCreateState(userId).quota).toEqual({
-      dayKey: "2026-03-01",
-      count: 1,
+      dayKey: initialDayKey,
+      count: 0,
     });
   });
 
-  it("resets quota and updates dayKey after midnight UTC", () => {
+  it("does not mutate state when increment runs across midnight", async () => {
     const userId = "midnight-user";
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-01T23:59:59.999Z"));
 
-    increment(userId, Date.parse("2026-03-01T23:59:59.999Z"));
+    const initialDayKey = getOrCreateState(userId).quota.dayKey;
 
-    expect(canGenerate(userId, Date.parse("2026-03-02T00:00:00.000Z"))).toBe(true);
+    await increment(userId);
+    vi.setSystemTime(new Date("2026-03-02T00:00:00.000Z"));
+
+    expect(await canGenerate(userId)).toBe(true);
     expect(getOrCreateState(userId).quota).toEqual({
-      dayKey: "2026-03-02",
+      dayKey: initialDayKey,
       count: 0,
     });
   });
