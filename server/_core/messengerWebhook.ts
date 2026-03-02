@@ -90,6 +90,8 @@ const SMALLTALK = new Set([
   "thank you",
 ]);
 
+export type AckKind = "like" | "ok" | "thanks" | "emoji";
+
 type GreetingResponse =
   | { mode: "text"; text: string }
   | { mode: "quick_replies"; state: ConversationState; text: string };
@@ -188,7 +190,10 @@ function toMessengerReplies(state: ConversationState) {
     title: reply.title,
     payload: reply.payload,
   }));
+}
 
+async function sendStateQuickReplies(psid: string, state: ConversationState, text: string): Promise<void> {
+  const replies = toMessengerReplies(state);
   if (replies.length === 0) {
     await sendText(psid, text);
     return;
@@ -472,10 +477,7 @@ async function handleMessage(psid: string, userId: string, event: FacebookWebhoo
     return;
   }
 
-  const text = message.text?.trim().toLowerCase();
-  if (!text) return;
-
-  if (GREETINGS.has(text) || SMALLTALK.has(text)) {
+  if (GREETINGS.has(normalizedText) || SMALLTALK.has(normalizedText)) {
     const state = await getOrCreateState(psid);
     const response = getGreetingResponse(state.stage, lang);
     if (response.mode === "text") {
