@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import os from "node:os";
 import { STYLE_TO_DEMO_FILE, type Style } from "./messengerStyles";
 import fs from "fs/promises";
 import path from "path";
@@ -81,7 +83,7 @@ async function persistGeneratedPng(buffer: Buffer): Promise<string> {
   const relativeFilePath = path.join("generated", `${publicId}.png`);
   const publicRelativeFilePath = relativeFilePath.replaceAll(path.sep, "/");
   const absoluteDirPath = path.resolve(process.cwd(), "public", "generated");
-  const absoluteFilePath = path.resolve(process.cwd(), "public", "generated", filename);
+  const absoluteFilePath = path.resolve(process.cwd(), "public", relativeFilePath);
 
   await fs.mkdir(absoluteDirPath, { recursive: true });
   await removeGeneratedWebpArtifacts(absoluteDirPath);
@@ -93,6 +95,39 @@ async function persistGeneratedPng(buffer: Buffer): Promise<string> {
   }
 
   return publicRelativeFilePath;
+}
+
+async function persistGeneratedJpg(buffer: Buffer, style: Style): Promise<string> {
+  const filename = `leaderbot-${style}-${Date.now()}.jpg`;
+  const relativeFilePath = path.join("generated", filename);
+  const publicRelativeFilePath = relativeFilePath.replaceAll(path.sep, "/");
+  const absoluteDirPath = path.resolve(process.cwd(), "public", "generated");
+  const absoluteFilePath = path.resolve(process.cwd(), "public", relativeFilePath);
+
+  await fs.mkdir(absoluteDirPath, { recursive: true });
+  await removeGeneratedWebpArtifacts(absoluteDirPath);
+  await fs.writeFile(absoluteFilePath, buffer);
+
+  const stats = await fs.stat(absoluteFilePath);
+  if (stats.size <= 0) {
+    throw new OpenAiGenerationError("Generated image file is empty");
+  }
+
+  return publicRelativeFilePath;
+}
+
+async function removeGeneratedWebpArtifacts(dirPath: string): Promise<void> {
+  const entries = await fs.readdir(dirPath, { withFileTypes: true }).catch(() => []);
+
+  await Promise.all(
+    entries
+      .filter(entry => entry.isFile() && entry.name.endsWith(".webp"))
+      .map(entry => fs.unlink(path.join(dirPath, entry.name)).catch(() => undefined))
+  );
+}
+
+async function ensureJpegBuffer(buffer: Buffer): Promise<Buffer> {
+  return buffer;
 }
 
 export function getGeneratorStartupConfig(): { mode: GeneratorMode; resolvedBaseUrl: string | undefined } {
@@ -228,10 +263,19 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
       const incomingHash = sha256(imageBuffer);
 
       if (process.env.DEBUG_IMAGE_PROOF === "1") {
-        const ext = contentType.includes("png") ? "png" : "jpg";
-        const savedPath = `/tmp/leaderbot_incoming.${ext}`;
-        await fs.writeFile(savedPath, imageBuffer);
-        console.log("DEBUG_IMAGE_PROOF", { reqId, saved_path: savedPath });
+        if (process.env.NODE_ENV === "production") {
+          console.warn("DEBUG_IMAGE_PROOF is ignored in production", { reqId });
+        } else {
+          const ext = contentType.includes("png") ? "png" : "jpg";
+          const debugDir = path.join(os.tmpdir(), "leaderbot-debug");
+          const savedPath = path.join(
+            debugDir,
+            `leaderbot_incoming_${reqId}_${Date.now()}_${randomUUID()}.${ext}`
+          );
+          await fs.mkdir(debugDir, { recursive: true });
+          await fs.writeFile(savedPath, imageBuffer);
+          console.log("DEBUG_IMAGE_PROOF", { reqId, saved_path: savedPath });
+        }
       }
 
       if (incomingByteLen < MIN_INPUT_IMAGE_BYTES) {

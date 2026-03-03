@@ -11,6 +11,7 @@ import { serveStatic } from "./vite";
 import { registerMetaWebhookRoutes } from "./messengerWebhook";
 import { assertPrivacyConfig } from "./privacy";
 import { getGeneratorStartupConfig } from "./imageService";
+import { assertAuthConfig } from "./env";
 import {
   captureMetaWebhookRawBody,
   verifyMetaWebhookSignature,
@@ -20,6 +21,7 @@ import { ensureStateStoreReady } from "./stateStore";
 
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
+const REQUEST_BODY_LIMIT = "1mb";
 
 function buildVersionPayload() {
   return {
@@ -33,6 +35,7 @@ async function startServer() {
   console.log("VERSION", buildVersionPayload());
   const generatorStartupConfig = getGeneratorStartupConfig();
   console.log("GENERATOR_STARTUP_CONFIG", generatorStartupConfig);
+  assertAuthConfig();
   assertPrivacyConfig();
   await ensureStateStoreReady();
 
@@ -41,11 +44,11 @@ async function startServer() {
 
   app.use(
     express.json({
-      limit: "50mb",
+      limit: REQUEST_BODY_LIMIT,
       verify: captureMetaWebhookRawBody,
     })
   );
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.use(express.urlencoded({ limit: REQUEST_BODY_LIMIT, extended: true }));
 
   // Verify webhook signature for Facebook webhook endpoint
   app.use("/webhook/facebook", verifyMetaWebhookSignature);
