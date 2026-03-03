@@ -5,10 +5,12 @@ import { toUserKey } from "./privacy";
 import {
   clearStateStore,
   findInMemoryState,
+  getOrCreateStoredState,
   isPromiseLike,
   isRedisStateStoreEnabled,
   readState,
   type MaybePromise,
+  updateStoredState,
   writeState,
 } from "./stateStore";
 
@@ -188,14 +190,16 @@ function patchStateInMemory(psid: string, patch: PartialState, now = Date.now())
 }
 
 function patchStateInRedis(psid: string, patch: PartialState, now = Date.now()): Promise<MessengerUserState> {
-  return Promise.resolve(getOrCreateState(psid)).then(current => {
-    const nextState = normalizeState(psid, {
-      ...current,
-      ...patch,
-      updatedAt: now,
-    });
-    return Promise.resolve(saveState(psid, nextState));
-  });
+  return Promise.resolve(
+    updateStoredState<PartialState>(psid, current => {
+      const nextState = normalizeState(psid, {
+        ...normalizeState(psid, current),
+        ...patch,
+        updatedAt: now,
+      });
+      return nextState;
+    }),
+  );
 }
 
 function patchState(psid: string, patch: PartialState, now = Date.now()): MaybePromise<MessengerUserState> {
@@ -237,12 +241,8 @@ export function getOrCreateState(psid: string): MaybePromise<MessengerUserState>
     return saveState(psid, createdState);
   }
 
-  return getStateFromRedis(psid).then(state => {
-    if (state) {
-      return state;
-    }
-
-    return Promise.resolve(saveState(psid, createDefaultState(psid)));
+  return Promise.resolve(getOrCreateStoredState(psid, () => createDefaultState(psid))).then(state => {
+    return normalizeState(psid, state);
   });
 }
 
