@@ -31,35 +31,89 @@ function getSendApiUrl(): string {
   return `https://graph.facebook.com/${GRAPH_API_VERSION}/me/messages?access_token=${encodeURIComponent(getPageToken())}`;
 }
 
+function parsePositiveInt(name: string, fallback: number): number {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback;
+}
+
+function shouldRetry(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+function getRetryAfterMs(response: Response): number | null {
+  const header = response.headers.get("retry-after");
+  if (!header) {
+    return null;
+  }
+
+  const seconds = Number(header);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.floor(seconds * 1000);
+  }
+
+  return null;
+}
+
+async function delay(milliseconds: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
 async function sendMessage(
   psid: string,
   message: Record<string, unknown>
 ): Promise<void> {
-  const response = await fetch(getSendApiUrl(), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      recipient: { id: psid },
-      message,
-    }),
-  });
+  const maxRetries = parsePositiveInt("GRAPH_API_MAX_RETRIES", 3);
+  const retryBaseMs = parsePositiveInt("GRAPH_API_RETRY_BASE_MS", 300);
 
-  if (!response.ok) {
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    const response = await fetch(getSendApiUrl(), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        recipient: { id: psid },
+        message,
+      }),
+    });
+
+    if (response.ok) {
+      return;
+    }
+
     const body = await response.text();
-    throw new Error(`Messenger API error ${response.status}: ${body}`);
+    const canRetry = attempt < maxRetries && shouldRetry(response.status);
+    if (!canRetry) {
+      throw new Error(`Messenger API error ${response.status}: ${body}`);
+    }
+
+    const retryAfterMs = getRetryAfterMs(response);
+    const exponentialBackoffMs = retryBaseMs * 2 ** attempt;
+    const waitMs = retryAfterMs ?? exponentialBackoffMs;
+    await delay(waitMs);
   }
+
+  throw new Error("Messenger API error: retry loop exited unexpectedly");
 }
 
 function shouldDropLogKey(key: string): boolean {
   const lowered = key.toLowerCase();
-  return ["token", "psid", "text", "url", "payload", "attachment", "message", "sender", "body"].some(fragment =>
-    lowered.includes(fragment)
-  );
+  return [
+    "token",
+    "psid",
+    "text",
+    "url",
+    "payload",
+    "attachment",
+    "message",
+    "sender",
+    "body",
+  ].some(fragment => lowered.includes(fragment));
 }
 
-function redactLogDetails(details: Record<string, unknown>): Record<string, unknown> {
+function redactLogDetails(
+  details: Record<string, unknown>
+): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(details)
       .filter(([key]) => !shouldDropLogKey(key))
