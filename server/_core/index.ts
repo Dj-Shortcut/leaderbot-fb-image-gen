@@ -12,6 +12,7 @@ import { registerMetaWebhookRoutes } from "./messengerWebhook";
 import { assertPrivacyConfig } from "./privacy";
 import { getGeneratorStartupConfig } from "./imageService";
 import { assertAuthConfig } from "./env";
+import { applySecurityHeaders } from "./securityHeaders";
 import {
   captureMetaWebhookRawBody,
   verifyMetaWebhookSignature,
@@ -41,6 +42,8 @@ async function startServer() {
 
   const app = express();
   const server = createServer(app);
+
+  applySecurityHeaders(app);
 
   app.use(
     express.json({
