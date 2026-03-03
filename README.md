@@ -166,6 +166,29 @@ Behavior:
 - Successful logins receive an `admin_session` JWT cookie valid for 7 days.
 - `POST /auth/logout` clears the admin session.
 
+## Security: webhook signature verification
+
+Incoming `POST /webhook/facebook` requests are authenticated using Meta's `X-Hub-Signature-256` header.
+
+- Signature format must be `sha256=<hex-digest>`.
+- The server captures the **raw request body** (`express.json({ verify })`) and computes `HMAC-SHA256(rawBody, FB_APP_SECRET)`.
+- Signatures are compared with `timingSafeEqual` to avoid timing side channels.
+- Missing/invalid signatures return `403`.
+
+The signature middleware is only applied on the Messenger webhook POST route.
+
+## Security: request body limits
+
+The server uses a `10mb` limit for both `express.json` and `express.urlencoded` parsers.
+Oversized payloads return `413` with a friendly JSON response:
+
+```json
+{
+  "error": "Payload too large",
+  "message": "Request body exceeds the 10mb limit."
+}
+```
+
 ## Deployment notes
 
 This app is configured for Fly.io using `Dockerfile` + `fly.toml`.
