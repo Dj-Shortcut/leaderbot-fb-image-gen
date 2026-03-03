@@ -4,19 +4,13 @@ import * as ResizablePrimitive from "react-resizable-panels";
 
 import { cn } from "@/lib/utils";
 
-type ResizablePanelGroupProps = React.ComponentProps<
-  typeof ResizablePrimitive.Group
->;
+type ResizablePanelGroupProps = ResizablePrimitive.GroupProps;
 
-type ResizablePanelProps = React.ComponentProps<
-  typeof ResizablePrimitive.Panel
->;
+type ResizablePanelProps = ResizablePrimitive.PanelProps;
 
-type ResizableHandleProps = React.ComponentProps<
-  typeof ResizablePrimitive.Separator
-> & {
+interface ResizableHandleProps extends ResizablePrimitive.SeparatorProps {
   withHandle?: boolean;
-};
+}
 
 function ResizablePanelGroup({
   className,

@@ -1,0 +1,1 @@
+chore: fix resizable typings for eslint
