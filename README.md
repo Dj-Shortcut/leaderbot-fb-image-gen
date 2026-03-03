@@ -94,6 +94,10 @@ Related files:
 - `LOG_LEVEL`, `DEBUG_STATE_DUMP` (diagnostics)
 - `GENERATOR_MODE=mock` (forces mock generator)
 - `OPENAI_IMAGE_TIMEOUT_MS`, `FB_IMAGE_FETCH_TIMEOUT_MS` (timeouts)
+- `MESSENGER_MAX_IMAGE_JOBS` (global cap for concurrent image generations, default `3`)
+- `MESSENGER_PSID_COOLDOWN_MS` (optional per-PSID cooldown between generations, default `0`)
+- `MESSENGER_PSID_LOCK_TTL_MS` (per-PSID in-flight lock TTL, default `120000`)
+- `GRAPH_API_MAX_RETRIES`, `GRAPH_API_RETRY_BASE_MS` (retry policy for Meta Graph API 429/5xx responses)
 - `PORT` (default `8080`)
 
 Legacy/app-specific environment variables also exist for SDK and data API integrations in `server/_core/env.ts`.
