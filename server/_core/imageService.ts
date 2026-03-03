@@ -76,43 +76,10 @@ function getRequiredPublicBaseUrl(): string {
   return baseUrl;
 }
 
-
-function isJpegBuffer(buffer: Buffer): boolean {
-  return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
-}
-
-async function ensureJpegBuffer(buffer: Buffer): Promise<Buffer> {
-  if (isJpegBuffer(buffer)) {
-    return buffer;
-  }
-
-  try {
-    // @ts-expect-error sharp is optional at runtime in environments where OpenAI already returns JPEG.
-    const sharpModule = await import("sharp");
-    const sharpFn = (sharpModule.default ?? sharpModule) as (input: Buffer) => { jpeg: (opts: { quality: number }) => { toBuffer: () => Promise<Buffer> } };
-
-    return await sharpFn(buffer).jpeg({ quality: 90 }).toBuffer();
-  } catch {
-    return buffer;
-  }
-}
-
-async function removeGeneratedWebpArtifacts(absoluteDirPath: string): Promise<void> {
-  const existingFiles = await fs.readdir(absoluteDirPath, { withFileTypes: true });
-  const webpFiles = existingFiles
-    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".webp"))
-    .map((entry) => path.join(absoluteDirPath, entry.name));
-
-  if (webpFiles.length > 0) {
-    await Promise.all(webpFiles.map((filePath) => fs.unlink(filePath)));
-  }
-}
-
-async function persistGeneratedJpg(buffer: Buffer, style: Style): Promise<string> {
-  const timestamp = Date.now();
-  const normalizedStyle = style.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
-  const filename = `leaderbot-${normalizedStyle}-${timestamp}.jpg`;
-  const relativeFilePath = path.posix.join("generated", filename);
+async function persistGeneratedPng(buffer: Buffer): Promise<string> {
+  const publicId = `${Date.now()}-${randomUUID()}`;
+  const relativeFilePath = path.join("generated", `${publicId}.png`);
+  const publicRelativeFilePath = relativeFilePath.replaceAll(path.sep, "/");
   const absoluteDirPath = path.resolve(process.cwd(), "public", "generated");
   const absoluteFilePath = path.resolve(process.cwd(), "public", "generated", filename);
 
