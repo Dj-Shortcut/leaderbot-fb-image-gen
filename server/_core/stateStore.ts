@@ -89,6 +89,54 @@ export function writeState<T>(psid: string, value: T): MaybePromise<void> {
   });
 }
 
+export function getOrCreateStoredState<T>(psid: string, createValue: () => T): MaybePromise<T> {
+  const current = readState<T>(psid);
+
+  if (isPromiseLike(current)) {
+    return current.then(existing => {
+      if (existing) {
+        return existing;
+      }
+
+      const created = createValue();
+      return Promise.resolve(writeState(psid, created)).then(() => created);
+    });
+  }
+
+  if (current) {
+    return current;
+  }
+
+  const created = createValue();
+  const saved = writeState(psid, created);
+
+  if (isPromiseLike(saved)) {
+    return saved.then(() => created);
+  }
+
+  return created;
+}
+
+export function updateStoredState<T>(psid: string, updater: (current: T | null) => T): MaybePromise<T> {
+  const current = readState<T>(psid);
+
+  if (isPromiseLike(current)) {
+    return current.then(existing => {
+      const next = updater(existing);
+      return Promise.resolve(writeState(psid, next)).then(() => next);
+    });
+  }
+
+  const next = updater(current);
+  const saved = writeState(psid, next);
+
+  if (isPromiseLike(saved)) {
+    return saved.then(() => next);
+  }
+
+  return next;
+}
+
 export function findInMemoryState<T>(predicate: (value: T) => boolean): T | null {
   if (isRedisStateStoreEnabled()) {
     return null;

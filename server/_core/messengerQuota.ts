@@ -1,21 +1,60 @@
-import * as db from "../db";
+import { getDayKey, getOrCreateState, type MessengerUserState } from "./messengerState";
+import { updateStoredState } from "./stateStore";
 
 const FREE_DAILY_LIMIT = 1;
 
-/**
- * Check if a user can generate an image today based on their PSID.
- * Uses the database for persistence.
- */
-export async function canGenerate(psid: string): Promise<boolean> {
-  // In a perfect repo, we link PSID to a user. 
-  // For this PR, we'll check the database quota.
-  // Note: For now we'll allow it but in production we should link PSID to userId.
-  return true; 
+function withSyncedQuota(state: MessengerUserState, now = Date.now()): MessengerUserState {
+  const dayKey = getDayKey(now);
+
+  if (state.quota.dayKey === dayKey) {
+    return state;
+  }
+
+  return {
+    ...state,
+    quota: {
+      dayKey,
+      count: 0,
+    },
+    updatedAt: now,
+  };
 }
 
-/**
- * Increment the daily count for a user.
- */
+async function syncQuotaState(psid: string, now = Date.now()): Promise<MessengerUserState> {
+  const current = withSyncedQuota(await Promise.resolve(getOrCreateState(psid)), now);
+
+  return Promise.resolve(
+    updateStoredState<MessengerUserState>(psid, storedState => {
+      if (!storedState) {
+        return current;
+      }
+
+      return withSyncedQuota(storedState, now);
+    }),
+  );
+}
+
+export async function canGenerate(psid: string): Promise<boolean> {
+  const state = await syncQuotaState(psid);
+  return state.quota.count < FREE_DAILY_LIMIT;
+}
+
 export async function increment(psid: string): Promise<void> {
-  // Increment in DB
+  const now = Date.now();
+  const current = await syncQuotaState(psid, now);
+
+  await Promise.resolve(
+    updateStoredState<MessengerUserState>(psid, storedState => {
+      const baseState = withSyncedQuota(storedState ?? current, now);
+
+      return {
+        ...baseState,
+        quota: {
+          ...baseState.quota,
+          count: baseState.quota.count + 1,
+        },
+        updatedAt: now,
+      };
+    }),
+  );
 }
