@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   anonymizePsid,
   getOrCreateState,
@@ -9,9 +9,25 @@ import {
   setPendingImage,
 } from "./_core/messengerState";
 
+const TEST_PEPPER = "ci-test-pepper";
+const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
+
 describe("messenger state flow", () => {
+  beforeAll(() => {
+    process.env.PRIVACY_PEPPER = TEST_PEPPER;
+  });
+
   beforeEach(() => {
     resetStateStore();
+  });
+
+  afterAll(() => {
+    if (originalPrivacyPepper === undefined) {
+      delete process.env.PRIVACY_PEPPER;
+      return;
+    }
+
+    process.env.PRIVACY_PEPPER = originalPrivacyPepper;
   });
 
   it("handles photo-first transition", () => {
@@ -62,8 +78,6 @@ describe("messenger state flow", () => {
   });
 
   it("hashes PSID deterministically", () => {
-    process.env.PRIVACY_PEPPER = "test-pepper";
-
     const first = anonymizePsid("12345");
     const second = anonymizePsid("12345");
     const other = anonymizePsid("abcde");

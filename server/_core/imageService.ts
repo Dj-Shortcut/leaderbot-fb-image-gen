@@ -66,6 +66,7 @@ function getRequiredPublicBaseUrl(): string {
 async function persistGeneratedPng(buffer: Buffer): Promise<string> {
   const publicId = `${Date.now()}-${randomUUID()}`;
   const relativeFilePath = path.join("generated", `${publicId}.png`);
+  const publicRelativeFilePath = relativeFilePath.replaceAll(path.sep, "/");
   const absoluteDirPath = path.resolve(process.cwd(), "public", "generated");
   const absoluteFilePath = path.resolve(process.cwd(), "public", relativeFilePath);
 
@@ -77,7 +78,7 @@ async function persistGeneratedPng(buffer: Buffer): Promise<string> {
     throw new OpenAiGenerationError("Generated image file is empty");
   }
 
-  return relativeFilePath;
+  return publicRelativeFilePath;
 }
 
 export function getGeneratorStartupConfig(): { mode: GeneratorMode; resolvedBaseUrl: string | undefined } {
