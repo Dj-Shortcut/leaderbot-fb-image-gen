@@ -21,7 +21,7 @@ function createTempBuild() {
 function createGeneratedAssets() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leaderbot-generated-"));
   tempDirs.push(dir);
-  fs.writeFileSync(path.join(dir, "sample.png"), Buffer.from([137,80,78,71,13,10,26,10]));
+  fs.writeFileSync(path.join(dir, "sample.jpg"), Buffer.from([255, 216, 255, 224]));
   return dir;
 }
 async function listen(app: express.Express) {
@@ -97,7 +97,7 @@ describe("serveStatic production mode", () => {
     }
   });
 
-  it("serves generated PNGs from /generated with image content type", async () => {
+  it("serves generated JPGs from /generated with image content type", async () => {
     const app = express();
     const staticDir = createTempBuild();
     const generatedDir = createGeneratedAssets();
@@ -107,11 +107,11 @@ describe("serveStatic production mode", () => {
     const server = await listen(app);
 
     try {
-      const generatedResponse = await fetch(`${server.baseUrl}/generated/sample.png`);
+      const generatedResponse = await fetch(`${server.baseUrl}/generated/sample.jpg`);
       expect(generatedResponse.status).toBe(200);
-      expect(generatedResponse.headers.get("content-type")).toContain("image/png");
+      expect(generatedResponse.headers.get("content-type")).toContain("image/jpeg");
 
-      const missingGeneratedResponse = await fetch(`${server.baseUrl}/generated/missing.png`);
+      const missingGeneratedResponse = await fetch(`${server.baseUrl}/generated/missing.jpg`);
       expect(missingGeneratedResponse.status).toBe(200);
       expect(missingGeneratedResponse.headers.get("content-type")).toContain("text/html");
     } finally {

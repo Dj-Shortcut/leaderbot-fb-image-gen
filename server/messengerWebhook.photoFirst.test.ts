@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { sendImageMock, sendQuickRepliesMock, sendTextMock, safeLogMock } = vi.hoisted(() => ({
   sendImageMock: vi.fn(async () => undefined),
@@ -17,15 +17,30 @@ vi.mock("./_core/messengerApi", () => ({
 import { processFacebookWebhookPayload, resetMessengerEventDedupe } from "./_core/messengerWebhook";
 import { anonymizePsid, getState, resetStateStore } from "./_core/messengerState";
 
+const TEST_PEPPER = "ci-test-pepper";
+const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
+
 describe("photo-first onboarding", () => {
+  beforeAll(() => {
+    process.env.PRIVACY_PEPPER = TEST_PEPPER;
+  });
+
   beforeEach(() => {
-    process.env.PRIVACY_PEPPER = "test-pepper";
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
     safeLogMock.mockClear();
     resetStateStore();
     resetMessengerEventDedupe();
+  });
+
+  afterAll(() => {
+    if (originalPrivacyPepper === undefined) {
+      delete process.env.PRIVACY_PEPPER;
+      return;
+    }
+
+    process.env.PRIVACY_PEPPER = originalPrivacyPepper;
   });
 
   it("handles inbound image attachment by setting pending image and sending style picker", async () => {
@@ -52,7 +67,7 @@ describe("photo-first onboarding", () => {
     expect(userState?.stage).toBe("AWAITING_STYLE");
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
-      "Dank je. Kies hieronder een stijl.",
+      "Kies je stijl 👇",
       expect.arrayContaining([
         expect.objectContaining({ payload: "STYLE_CARICATURE" }),
       ]),
@@ -108,7 +123,7 @@ describe("photo-first onboarding", () => {
     expect(sendQuickRepliesMock).not.toHaveBeenCalled();
   });
 
-  it("handles DOWNLOAD_HD fallback without quick replies", async () => {
+  it("ignores unknown DOWNLOAD_HD payload without mutating state", async () => {
     const psid = "download-user";
 
     await processFacebookWebhookPayload({
@@ -125,12 +140,10 @@ describe("photo-first onboarding", () => {
     });
 
     const userState = getState(anonymizePsid(psid));
-    expect(userState?.stage).toBe("AWAITING_PHOTO");
-    expect(sendTextMock.mock.calls).toEqual([
-      [psid, "I can share HD downloads after I generate an image."],
-      [psid, "Stuur gerust een foto, dan kan ik een stijl voor je maken."],
-    ]);
+    expect(userState?.stage).toBe("IDLE");
+    expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).not.toHaveBeenCalled();
+    expect(safeLogMock).toHaveBeenCalledWith("unknown_payload", expect.any(Object));
   });
 
   it("returns privacy explanation on PRIVACY_INFO postback", async () => {
@@ -159,7 +172,7 @@ describe("photo-first onboarding", () => {
     );
   });
 
-  it("answers who is behind on user text", async () => {
+  it("routes free-form user text without photo into the photo prompt", async () => {
     const psid = "about-user";
 
     await processFacebookWebhookPayload({
@@ -177,7 +190,7 @@ describe("photo-first onboarding", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(
       psid,
-      "Leaderbot is gemaakt door Andy. Je mag hem gerust contacteren via Facebook.\nVolledige naam op vraag: Andy Arijs.",
+      "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
     );
   });
 
@@ -199,7 +212,7 @@ describe("photo-first onboarding", () => {
 
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
-      "Send a photo and I will make a special version of it in another style for free.",
+      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis.",
       expect.any(Array),
     );
 

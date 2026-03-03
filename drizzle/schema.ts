@@ -103,3 +103,22 @@ export const notificationLog = mysqlTable("notificationLog", {
 
 export type NotificationLog = typeof notificationLog.$inferSelect;
 export type InsertNotificationLog = typeof notificationLog.$inferInsert;
+
+/**
+ * Messenger user state tracking table.
+ * Persists user conversation stage and metadata across server restarts.
+ */
+export const messengerState = mysqlTable("messengerState", {
+  id: int("id").autoincrement().primaryKey(),
+  psid: varchar("psid", { length: 64 }).notNull().unique(), // Facebook Page-Scoped ID
+  userKey: varchar("userKey", { length: 64 }).notNull().unique(), // Anonymized PSID
+  stage: mysqlEnum("stage", ["IDLE", "AWAITING_PHOTO", "AWAITING_STYLE", "PROCESSING", "RESULT_READY", "FAILURE"]).default("IDLE").notNull(),
+  lastPhotoUrl: varchar("lastPhotoUrl", { length: 2048 }), // S3 URL for uploaded photo
+  selectedStyle: varchar("selectedStyle", { length: 64 }),
+  preferredLang: varchar("preferredLang", { length: 10 }).default("nl").notNull(),
+  lastGeneratedUrl: varchar("lastGeneratedUrl", { length: 2048 }),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type MessengerState = typeof messengerState.$inferSelect;
+export type InsertMessengerState = typeof messengerState.$inferInsert;

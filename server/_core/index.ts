@@ -16,6 +16,7 @@ import {
   verifyMetaWebhookSignature,
 } from "./webhookSignatureVerification";
 import { isDebugLogEnabled } from "./logLevel";
+import { ensureStateStoreReady } from "./stateStore";
 
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
@@ -33,6 +34,7 @@ async function startServer() {
   const generatorStartupConfig = getGeneratorStartupConfig();
   console.log("GENERATOR_STARTUP_CONFIG", generatorStartupConfig);
   assertPrivacyConfig();
+  await ensureStateStoreReady();
 
   const app = express();
   const server = createServer(app);
