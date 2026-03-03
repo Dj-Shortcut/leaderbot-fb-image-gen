@@ -20,10 +20,11 @@ import {
 } from "./webhookSignatureVerification";
 import { isDebugLogEnabled } from "./logLevel";
 import { ensureStateStoreReady } from "./stateStore";
+import { bodyParserErrorHandler } from "./bodyParserErrorHandler";
 
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
-const REQUEST_BODY_LIMIT = "1mb";
+const REQUEST_BODY_LIMIT = "10mb";
 
 function buildVersionPayload() {
   return {
@@ -239,6 +240,8 @@ async function startServer() {
       createContext,
     })
   );
+
+  app.use(bodyParserErrorHandler);
 
   const publicDir = path.join(process.cwd(), "public");
   app.use(
