@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { sendImageMock, sendQuickRepliesMock, sendTextMock, safeLogMock } = vi.hoisted(() => ({
   sendImageMock: vi.fn(async () => undefined),
@@ -22,6 +22,21 @@ import {
 } from "./_core/messengerWebhook";
 import { anonymizePsid, getState, resetStateStore, setFlowState } from "./_core/messengerState";
 
+const TEST_PEPPER = "ci-test-pepper";
+const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
+
+beforeAll(() => {
+  process.env.PRIVACY_PEPPER = TEST_PEPPER;
+});
+
+afterAll(() => {
+  if (originalPrivacyPepper === undefined) {
+    delete process.env.PRIVACY_PEPPER;
+    return;
+  }
+
+  process.env.PRIVACY_PEPPER = originalPrivacyPepper;
+});
 
 describe("webhook summary logging", () => {
   it("summarizes event types and flags without including message contents", () => {
@@ -105,7 +120,6 @@ describe("webhook summary logging", () => {
 describe("messenger webhook dedupe", () => {
   beforeEach(() => {
     process.env.MOCK_MODE = "true";
-    process.env.PRIVACY_PEPPER = "test-pepper";
     process.env.GENERATOR_MODE = "mock";
     delete process.env.OPENAI_API_KEY;
     sendImageMock.mockClear();
@@ -745,7 +759,6 @@ describe("messenger webhook dedupe", () => {
 
 describe("messenger greeting behavior", () => {
   beforeEach(() => {
-    process.env.PRIVACY_PEPPER = "test-pepper";
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
@@ -932,7 +945,6 @@ describe("messenger greeting behavior", () => {
 
 describe("acknowledgement edgecases", () => {
   beforeEach(() => {
-    process.env.PRIVACY_PEPPER = "test-pepper";
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();

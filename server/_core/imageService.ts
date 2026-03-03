@@ -125,7 +125,7 @@ async function persistGeneratedJpg(buffer: Buffer, style: Style): Promise<string
     throw new OpenAiGenerationError("Generated image file is empty");
   }
 
-  return relativeFilePath;
+  return publicRelativeFilePath;
 }
 
 export function getGeneratorStartupConfig(): { mode: GeneratorMode; resolvedBaseUrl: string | undefined } {

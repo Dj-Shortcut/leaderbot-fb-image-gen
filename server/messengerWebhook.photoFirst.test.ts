@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { sendImageMock, sendQuickRepliesMock, sendTextMock, safeLogMock } = vi.hoisted(() => ({
   sendImageMock: vi.fn(async () => undefined),
@@ -17,15 +17,30 @@ vi.mock("./_core/messengerApi", () => ({
 import { processFacebookWebhookPayload, resetMessengerEventDedupe } from "./_core/messengerWebhook";
 import { anonymizePsid, getState, resetStateStore } from "./_core/messengerState";
 
+const TEST_PEPPER = "ci-test-pepper";
+const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
+
 describe("photo-first onboarding", () => {
+  beforeAll(() => {
+    process.env.PRIVACY_PEPPER = TEST_PEPPER;
+  });
+
   beforeEach(() => {
-    process.env.PRIVACY_PEPPER = "test-pepper";
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
     safeLogMock.mockClear();
     resetStateStore();
     resetMessengerEventDedupe();
+  });
+
+  afterAll(() => {
+    if (originalPrivacyPepper === undefined) {
+      delete process.env.PRIVACY_PEPPER;
+      return;
+    }
+
+    process.env.PRIVACY_PEPPER = originalPrivacyPepper;
   });
 
   it("handles inbound image attachment by setting pending image and sending style picker", async () => {
