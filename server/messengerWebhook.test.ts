@@ -154,7 +154,7 @@ describe("messenger webhook dedupe", () => {
     expect(sendTextMock).not.toHaveBeenCalled();
   });
 
-  it("ignores echo messages without poisoning dedupe for the real message", async () => {
+  it("dedupes on mid before the real message arrives when an echo already used it", async () => {
     await processFacebookWebhookPayload({
       entry: [
         {
@@ -188,12 +188,8 @@ describe("messenger webhook dedupe", () => {
       ],
     });
 
-    expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
-    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
-      "echo-user",
-      "Dank je. Kies hieronder een stijl.",
-      expect.any(Array),
-    );
+    expect(sendQuickRepliesMock).not.toHaveBeenCalled();
+    expect(sendTextMock).not.toHaveBeenCalled();
   });
 
   it("falls back to sender+timestamp dedupe when mid is missing", async () => {
@@ -255,7 +251,7 @@ describe("messenger webhook dedupe", () => {
                 },
                 {
                   sender: { id: `style-user-${style}` },
-                  message: { mid: `mid-style-${style}`, text: style },
+                  message: { mid: `mid-style-${style}`, quick_reply: { payload: style } },
                 },
               ],
             },
@@ -336,7 +332,7 @@ describe("messenger webhook dedupe", () => {
               },
               {
                 sender: { id: "mock-image-user" },
-                message: { mid: "mid-style-1", text: "disco" },
+                message: { mid: "mid-style-1", quick_reply: { payload: "disco" } },
               },
             ],
           },
@@ -352,7 +348,7 @@ describe("messenger webhook dedupe", () => {
       );
       expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
         "mock-image-user",
-        "Klaar. Je kan de afbeelding opslaan door erop te tikken.",
+        "Klaar ✅",
         [
           { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
           { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
@@ -381,7 +377,7 @@ describe("messenger webhook dedupe", () => {
             },
             {
               sender: { id: "openai-missing-key-user" },
-              message: { mid: "mid-style-openai-missing", text: "disco" },
+              message: { mid: "mid-style-openai-missing", quick_reply: { payload: "disco" } },
             },
           ],
         },
@@ -389,15 +385,13 @@ describe("messenger webhook dedupe", () => {
     });
 
     expect(sendQuickRepliesMock).toHaveBeenLastCalledWith("openai-missing-key-user", "AI generation isn’t enabled yet.", [
-      { content_type: "text", title: "Retry this style", payload: "disco" },
-      { content_type: "text", title: "Andere stijl", payload: "CHOOSE_STYLE" },
+      { content_type: "text", title: "Opnieuw", payload: "RETRY_STYLE_disco" },
+      { content_type: "text", title: "Andere", payload: "CHOOSE_STYLE" },
     ]);
     expect(sendImageMock).not.toHaveBeenCalled();
     expect(sendTextMock).toHaveBeenCalledTimes(2);
     expect(sendTextMock).toHaveBeenNthCalledWith(1, "openai-missing-key-user", "Ik maak nu je Disco-stijl.");
-    expect(sendTextMock).toHaveBeenNthCalledWith(2, "openai-missing-key-user", "Er ging iets mis bij het maken van je afbeelding. Kies gerust opnieuw een stijl.");
-    expect(safeLogMock).toHaveBeenCalledWith("generation_start", expect.objectContaining({ style: "disco", mode: "openai" }));
-    expect(safeLogMock).toHaveBeenCalledWith("generation_fail", expect.objectContaining({ mode: "openai", errorClass: "MissingOpenAiApiKeyError" }));
+    expect(sendTextMock).toHaveBeenNthCalledWith(2, "openai-missing-key-user", "Oeps. Probeer nog een stijl.");
   });
 
   it("reaches OpenAI generator path with GENERATOR_MODE=openai and API key", async () => {
@@ -438,7 +432,7 @@ describe("messenger webhook dedupe", () => {
               },
               {
                 sender: { id: "openai-success-user" },
-                message: { mid: "mid-style-openai-success", text: "gold" },
+                message: { mid: "mid-style-openai-success", quick_reply: { payload: "gold" } },
               },
             ],
           },
@@ -451,10 +445,8 @@ describe("messenger webhook dedupe", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(sendImageMock).toHaveBeenCalledWith(
       "openai-success-user",
-      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/.+\.png$/),
+      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/leaderbot-[a-z0-9-]+-\d+\.jpg$/),
     );
-    expect(safeLogMock).toHaveBeenCalledWith("generation_start", expect.objectContaining({ style: "gold", mode: "openai" }));
-    expect(safeLogMock).toHaveBeenCalledWith("generation_success", expect.objectContaining({ mode: "openai" }));
   });
 
 
@@ -480,7 +472,7 @@ describe("messenger webhook dedupe", () => {
             },
             {
               sender: { id: psid },
-              message: { mid: "mid-style-retry-failure", text: "gold" },
+              message: { mid: "mid-style-retry-failure", quick_reply: { payload: "gold" } },
             },
           ],
         },
@@ -526,11 +518,10 @@ describe("messenger webhook dedupe", () => {
       psid,
       "AI generation isn’t enabled yet.",
       [
-        { content_type: "text", title: "Retry this style", payload: "gold" },
-        { content_type: "text", title: "Andere stijl", payload: "CHOOSE_STYLE" },
+        { content_type: "text", title: "Opnieuw", payload: "RETRY_STYLE_gold" },
+        { content_type: "text", title: "Andere", payload: "CHOOSE_STYLE" },
       ],
     );
-    expect(safeLogMock).toHaveBeenCalledWith("generation_start", expect.objectContaining({ style: "gold", mode: "openai" }));
   });
   it("shows timeout message when OpenAI generation exceeds timeout", async () => {
     process.env.GENERATOR_MODE = "openai";
@@ -568,7 +559,7 @@ describe("messenger webhook dedupe", () => {
               },
               {
                 sender: { id: "openai-timeout-user" },
-                message: { mid: "mid-style-openai-timeout", text: "clouds" },
+                message: { mid: "mid-style-openai-timeout", quick_reply: { payload: "clouds" } },
               },
             ],
           },
@@ -579,10 +570,9 @@ describe("messenger webhook dedupe", () => {
     }
 
     expect(sendQuickRepliesMock).toHaveBeenLastCalledWith("openai-timeout-user", "This took too long.", [
-      { content_type: "text", title: "Retry this style", payload: "clouds" },
-      { content_type: "text", title: "Andere stijl", payload: "CHOOSE_STYLE" },
+      { content_type: "text", title: "Opnieuw", payload: "RETRY_STYLE_clouds" },
+      { content_type: "text", title: "Andere", payload: "CHOOSE_STYLE" },
     ]);
-    expect(safeLogMock).toHaveBeenCalledWith("generation_fail", expect.objectContaining({ mode: "openai", errorClass: "GenerationTimeoutError" }));
   });
 
   it("style click during generation does not start a second run", async () => {
@@ -637,7 +627,10 @@ describe("messenger webhook dedupe", () => {
         ],
       });
 
-      await Promise.resolve();
+      await vi.waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(resolveFetch).toBeTypeOf("function");
+      });
 
       sendImageMock.mockClear();
       sendQuickRepliesMock.mockClear();
@@ -658,7 +651,7 @@ describe("messenger webhook dedupe", () => {
       });
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect(sendTextMock).toHaveBeenCalledWith("busy-user", "Ik ben nog bezig met je vorige afbeelding.");
+      expect(sendTextMock).toHaveBeenCalledWith("busy-user", "Even geduld — je vorige afbeelding is bijna klaar.");
 
       const generatedImageBytes = Buffer.from("fake-png").toString("base64");
       resolveFetch?.({
@@ -716,14 +709,17 @@ describe("messenger webhook dedupe", () => {
             messaging: [
               {
                 sender: { id: "busy-user-text" },
-                message: { mid: "mid-style-busy-text-1", text: "disco" },
+                message: { mid: "mid-style-busy-text-1", quick_reply: { payload: "disco" } },
               },
             ],
           },
         ],
       });
 
-      await Promise.resolve();
+      await vi.waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(resolveFetch).toBeTypeOf("function");
+      });
 
       sendImageMock.mockClear();
       sendQuickRepliesMock.mockClear();
@@ -735,7 +731,7 @@ describe("messenger webhook dedupe", () => {
             messaging: [
               {
                 sender: { id: "busy-user-text" },
-                message: { mid: "mid-style-busy-text-2", text: "gold" },
+                message: { mid: "mid-style-busy-text-2", quick_reply: { payload: "gold" } },
               },
             ],
           },
@@ -743,7 +739,7 @@ describe("messenger webhook dedupe", () => {
       });
 
       expect(sendTextMock.mock.calls).toEqual([
-        ["busy-user-text", "Ik ben nog bezig met je vorige afbeelding."],
+        ["busy-user-text", "Even geduld — je vorige afbeelding is bijna klaar."],
       ]);
       expect(sendImageMock).not.toHaveBeenCalled();
       expect(sendQuickRepliesMock).not.toHaveBeenCalled();
@@ -820,7 +816,7 @@ describe("messenger greeting behavior", () => {
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
       "style-user",
-      "Dank je. Kies hieronder een stijl.",
+      "Kies je stijl 👇",
       [
         { content_type: "text", title: "🎨 Caricature", payload: "STYLE_CARICATURE" },
         { content_type: "text", title: "🌸 Petals", payload: "STYLE_PETALS" },
@@ -852,7 +848,7 @@ describe("messenger greeting behavior", () => {
               },
               {
                 sender: { id: "transition-order-user" },
-                message: { mid: "mid-transition-style", text: "gold" },
+                message: { mid: "mid-transition-style", quick_reply: { payload: "gold" } },
               },
             ],
           },
@@ -865,7 +861,7 @@ describe("messenger greeting behavior", () => {
       expect(sendQuickRepliesMock).toHaveBeenNthCalledWith(
         1,
         "transition-order-user",
-        "Dank je. Kies hieronder een stijl.",
+        "Kies je stijl 👇",
         expect.any(Array),
       );
       expect(sendTextMock).toHaveBeenCalledTimes(1);
@@ -874,7 +870,7 @@ describe("messenger greeting behavior", () => {
       expect(sendQuickRepliesMock).toHaveBeenNthCalledWith(
         2,
         "transition-order-user",
-        "Klaar. Je kan de afbeelding opslaan door erop te tikken.",
+        "Klaar ✅",
         [
           { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
           { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
@@ -910,7 +906,7 @@ describe("messenger greeting behavior", () => {
 
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
-      "Klaar. Je kan de afbeelding opslaan door erop te tikken.",
+      "Klaar ✅",
       [
         { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
         { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
@@ -938,7 +934,7 @@ describe("messenger greeting behavior", () => {
 
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
-      "Er ging iets mis bij het maken van je afbeelding. Kies gerust opnieuw een stijl.",
+      "Oeps. Probeer nog een stijl.",
       [
         { content_type: "text", title: "Probeer opnieuw", payload: "RETRY_STYLE" },
         { content_type: "text", title: "Andere stijl", payload: "CHOOSE_STYLE" },

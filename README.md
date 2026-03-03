@@ -69,7 +69,7 @@ Optional HD download endpoint
 ### Key Design Decisions
 
 - Messenger is the funnel, not the product.
-- Backend is the backbone (stateless, secure, minimal).
+- Backend is the backbone (persistent state, secure, minimal).
 - Image normalization ensures consistent output.
 - HD delivery guarantees full quality independent of Messenger compression.
 - OAuth is optional and not required for core flow.
@@ -111,9 +111,11 @@ FB_PAGE_ACCESS_TOKEN
 FB_APP_SECRET
 APP_BASE_URL
 PRIVACY_PEPPER
+DATABASE_URL (MySQL)
 
 Optional:
 
+REDIS_URL (for session state, falls back to in-memory)
 ADMIN_TOKEN
 OAUTH_SERVER_URL
 
@@ -232,6 +234,10 @@ High quality
 Frictionless
 
 Everything else is optional.
+
+## 🛡 Code Audit
+A comprehensive code audit for solo-developer optimization was conducted on March 3, 2026.
+Read the full report here: [CODE_AUDIT_REPORT.md](./CODE_AUDIT_REPORT.md)
 
 
 ## 🧹 Linting
