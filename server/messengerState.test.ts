@@ -38,6 +38,7 @@ describe("messenger state flow", () => {
     const state = getOrCreateState(userId);
     expect(state.stage).toBe("AWAITING_STYLE");
     expect(state.lastPhoto).toBe("https://img.example/pic.jpg");
+    expect(state.hasSeenIntro).toBe(false);
   });
 
   it("handles style-first transition", () => {

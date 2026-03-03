@@ -44,6 +44,7 @@ export type MessengerUserState = {
   chosenStyle: string | null;
   preselectedStyle?: string | null;
   preferredLang?: Lang;
+  hasSeenIntro: boolean;
   pendingImageUrl?: string;
   pendingImageAt?: number;
   lastImageUrl?: string;
@@ -98,6 +99,7 @@ function createDefaultState(psid: string, now = Date.now()): MessengerUserState 
     chosenStyle: null,
     preselectedStyle: null,
     preferredLang: "nl",
+    hasSeenIntro: false,
     pendingImageUrl: undefined,
     pendingImageAt: undefined,
     lastImageUrl: undefined,
@@ -125,6 +127,7 @@ function normalizeState(psid: string, value: PartialState | null | undefined): M
     ...value,
     psid: resolvedPsid,
     userKey: value?.userKey ?? fallback.userKey,
+    hasSeenIntro: value?.hasSeenIntro ?? fallback.hasSeenIntro,
     stage,
     state: stage,
     lastPhotoUrl: lastPhoto,
@@ -321,6 +324,22 @@ export function setPreferredLang(psid: string, lang: Lang, now = Date.now()): Ma
     psid,
     {
       preferredLang: lang,
+    },
+    now,
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
+}
+
+export function markIntroSeen(psid: string, now = Date.now()): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      hasSeenIntro: true,
+      stage: "AWAITING_PHOTO",
+      state: "AWAITING_PHOTO",
     },
     now,
   );

@@ -75,7 +75,7 @@ describe("photo-first onboarding", () => {
     expect(sendTextMock).not.toHaveBeenCalled();
   });
 
-  it("routes text-only greeting into IDLE with quick replies", async () => {
+  it("shows intro once and moves user to AWAITING_PHOTO", async () => {
     const psid = "text-user";
 
     await processFacebookWebhookPayload({
@@ -92,13 +92,51 @@ describe("photo-first onboarding", () => {
     });
 
     const userState = getState(anonymizePsid(psid));
-    expect(userState?.stage).toBe("IDLE");
+    expect(userState?.stage).toBe("AWAITING_PHOTO");
+    expect(userState?.hasSeenIntro).toBe(true);
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
       "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis.",
       expect.any(Array),
     );
+  });
+
+
+  it("does not re-send intro on later greetings", async () => {
+    const psid = "repeat-hi-user";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: { mid: "mid-repeat-1", text: "Hi" },
+            },
+          ],
+        },
+      ],
+    });
+
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: { mid: "mid-repeat-2", text: "hi" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendQuickRepliesMock).not.toHaveBeenCalled();
+    expect(sendTextMock).toHaveBeenCalledWith(psid, "Stuur gerust een foto, dan kan ik een stijl voor je maken.");
   });
 
   it("guards style payload without pending image", async () => {
@@ -141,6 +179,7 @@ describe("photo-first onboarding", () => {
 
     const userState = getState(anonymizePsid(psid));
     expect(userState?.stage).toBe("IDLE");
+    expect(userState?.hasSeenIntro).toBe(false);
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).not.toHaveBeenCalled();
     expect(safeLogMock).toHaveBeenCalledWith("unknown_payload", expect.any(Object));
