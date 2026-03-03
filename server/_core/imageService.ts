@@ -38,6 +38,9 @@ type ErrorWithGenerationMetrics = Error & { generationMetrics?: GenerationMetric
 
 const MIN_INPUT_IMAGE_BYTES = 5 * 1024;
 const FB_IMAGE_FETCH_RETRY_LIMIT = 1;
+const OPENAI_RETRY_LIMIT_DEFAULT = 1;
+const OPENAI_RETRY_BASE_MS_DEFAULT = 500;
+const OPENAI_TIMEOUT_MS_DEFAULT = 30_000;
 
 function getConfiguredBaseUrl(): string | undefined {
   const configuredBaseUrl = process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
@@ -143,7 +146,7 @@ function getOpenAiTimeoutMs(): number {
     return raw;
   }
 
-  return 60_000;
+  return OPENAI_TIMEOUT_MS_DEFAULT;
 }
 
 function getInboundImageTimeoutMs(): number {
@@ -153,6 +156,30 @@ function getInboundImageTimeoutMs(): number {
   }
 
   return 10_000;
+}
+
+function getOpenAiRetryLimit(): number {
+  const raw = Number.parseInt(process.env.OPENAI_IMAGE_MAX_RETRIES ?? "", 10);
+  if (Number.isFinite(raw) && raw >= 0) {
+    return raw;
+  }
+
+  return OPENAI_RETRY_LIMIT_DEFAULT;
+}
+
+function getOpenAiRetryBaseMs(): number {
+  const raw = Number.parseInt(process.env.OPENAI_IMAGE_RETRY_BASE_MS ?? "", 10);
+  if (Number.isFinite(raw) && raw > 0) {
+    return raw;
+  }
+
+  return OPENAI_RETRY_BASE_MS_DEFAULT;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function finalizeMetrics(startedAt: number, partial: Omit<GenerationMetrics, "totalMs"> = {}): GenerationMetrics {
@@ -342,35 +369,71 @@ export class OpenAiImageGenerator implements ImageGenerator {
       throw new MissingOpenAiApiKeyError("OPENAI_API_KEY is missing");
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => {
-      controller.abort();
-    }, getOpenAiTimeoutMs());
-
     try {
       const { imageBuffer, contentType, incomingLen, incomingSha256, fbImageFetchMs } = await downloadSourceImageOrThrow(input.sourceImageUrl, input.reqId);
       partialMetrics.fbImageFetchMs = fbImageFetchMs;
       const openAiInputHash = sha256(imageBuffer);
       const openAiInputByteLen = safeLen(imageBuffer);
 
-      const formData = new FormData();
-      formData.set("model", "gpt-image-1");
-      formData.set("prompt", `Apply ${input.style} style to this photo.`);
-      formData.set("size", "1024x1024");
-      formData.set("output_format", "jpeg");
-      formData.set("image", new Blob([new Uint8Array(imageBuffer)], { type: contentType }), "source-image");
+      const openAiRetryLimit = getOpenAiRetryLimit();
+      const openAiRetryBaseMs = getOpenAiRetryBaseMs();
+      const openAiTimeoutMs = getOpenAiTimeoutMs();
 
-      const openAiStartedAt = Date.now();
-      const response = await fetch("https://api.openai.com/v1/images/edits", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        },
-        body: formData,
-        signal: controller.signal,
-      });
-      const openAiMs = Date.now() - openAiStartedAt;
-      partialMetrics.openAiMs = openAiMs;
+      const createOpenAiFormData = (): FormData => {
+        const formData = new FormData();
+        formData.set("model", "gpt-image-1");
+        formData.set("prompt", `Apply ${input.style} style to this photo.`);
+        formData.set("size", "1024x1024");
+        formData.set("output_format", "jpeg");
+        formData.set("image", new Blob([new Uint8Array(imageBuffer)], { type: contentType }), "source-image");
+        return formData;
+      };
+
+      let response: Response | undefined;
+      for (let attempt = 0; attempt <= openAiRetryLimit; attempt += 1) {
+        const openAiStartedAt = Date.now();
+        try {
+          response = await fetchWithTimeout(
+            "https://api.openai.com/v1/images/edits",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+              },
+              body: createOpenAiFormData(),
+            },
+            openAiTimeoutMs,
+          );
+        } catch (error) {
+          partialMetrics.openAiMs = (partialMetrics.openAiMs ?? 0) + (Date.now() - openAiStartedAt);
+          if (attempt < openAiRetryLimit && isTransientNetworkError(error)) {
+            const waitMs = openAiRetryBaseMs * 2 ** attempt;
+            console.warn("OPENAI_GENERATION_RETRY", { reqId: input.reqId, attempt: attempt + 1, waitMs, reason: (error as Error).name });
+            await wait(waitMs);
+            continue;
+          }
+
+          throw error;
+        }
+
+        partialMetrics.openAiMs = (partialMetrics.openAiMs ?? 0) + (Date.now() - openAiStartedAt);
+        if (response.ok) {
+          break;
+        }
+
+        if (attempt < openAiRetryLimit && isRetryableResponseStatus(response.status)) {
+          const waitMs = openAiRetryBaseMs * 2 ** attempt;
+          console.warn("OPENAI_GENERATION_RETRY", { reqId: input.reqId, attempt: attempt + 1, waitMs, status: response.status });
+          await wait(waitMs);
+          continue;
+        }
+
+        break;
+      }
+
+      if (!response) {
+        throw new OpenAiGenerationError("OpenAI request failed before receiving a response");
+      }
 
       if (!response.ok) {
         throw attachGenerationMetrics(
@@ -413,8 +476,6 @@ export class OpenAiImageGenerator implements ImageGenerator {
       }
 
       throw attachGenerationMetrics(error, finalizeMetrics(startedAt, getGenerationMetrics(error) ?? partialMetrics));
-    } finally {
-      clearTimeout(timeout);
     }
   }
 }
