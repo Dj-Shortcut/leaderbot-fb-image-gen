@@ -16,6 +16,7 @@ import {
   setPendingImage,
   setPreselectedStyle,
   setPreferredLang,
+  markIntroSeen,
   anonymizePsid,
   type ConversationState,
 } from "./messengerState";
@@ -62,6 +63,10 @@ export function createWebhookHandlers({ incomingEventDedupe, defaultLang, privac
 
   async function sendPhotoReceivedPrompt(psid: string, lang: Lang): Promise<void> {
     await sendStylePicker(psid, lang);
+  }
+
+  async function sendIntro(psid: string, lang: Lang): Promise<void> {
+    await sendStateQuickReplies(psid, "IDLE", t(lang, "flowExplanation"));
   }
 
   async function sendReferralPhotoPrompt(psid: string, style: Style, lang: Lang): Promise<void> {
@@ -269,6 +274,12 @@ export function createWebhookHandlers({ incomingEventDedupe, defaultLang, privac
 
     if (GREETINGS.has(normalizedText) || SMALLTALK.has(normalizedText)) {
       const state = await getOrCreateState(psid);
+      if (!state.hasSeenIntro && state.stage === "IDLE") {
+        await sendIntro(psid, lang);
+        await markIntroSeen(psid);
+        return;
+      }
+
       const response = getGreetingResponse(state.stage, lang);
       if (response.mode === "text") {
         await sendText(psid, response.text);
