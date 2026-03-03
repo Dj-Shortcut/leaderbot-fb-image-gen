@@ -13,6 +13,7 @@ import { assertPrivacyConfig } from "./privacy";
 import { getGeneratorStartupConfig } from "./imageService";
 import { assertAuthConfig } from "./env";
 import { applySecurityHeaders } from "./securityHeaders";
+import { registerGitHubAdminRoutes } from "./githubAdmin";
 import {
   captureMetaWebhookRawBody,
   verifyMetaWebhookSignature,
@@ -218,6 +219,8 @@ async function startServer() {
     </html>
   `);
   });
+
+  registerGitHubAdminRoutes(app);
 
   // Register webhook routes AFTER signature verification middleware
   registerMetaWebhookRoutes(app);

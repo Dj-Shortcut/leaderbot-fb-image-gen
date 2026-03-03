@@ -88,6 +88,8 @@ Related files:
 - `DEFAULT_MESSENGER_LANG` (`nl`/`en` fallback behavior)
 - `PRIVACY_POLICY_URL` (link sent in privacy quick reply)
 - `ADMIN_TOKEN` (protects `/debug/build`)
+- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL` (enable GitHub admin login)
+- `ADMIN_GITHUB_USERS` (comma-separated GitHub usernames allowed into `/admin`)
 - `OAUTH_SERVER_URL` (enables OAuth route initialization)
 - `LOG_LEVEL`, `DEBUG_STATE_DUMP` (diagnostics)
 - `GENERATOR_MODE=mock` (forces mock generator)
@@ -137,6 +139,32 @@ pnpm db:push
 ```
 
 The repository includes focused unit tests for webhook handling, state transitions, signature verification, and image generation behavior under mock/OpenAI configuration.
+
+## Admin login (GitHub OAuth)
+
+The same server can protect `/admin` using GitHub OAuth and a simple allowlist.
+
+Required environment variables for admin login:
+
+- `GITHUB_CLIENT_ID`
+- `GITHUB_CLIENT_SECRET`
+- `GITHUB_CALLBACK_URL` (example: `https://<app>/auth/github/callback`)
+- `ADMIN_GITHUB_USERS` (comma-separated GitHub usernames, example: `Dj-Shortcut`)
+- `JWT_SECRET` (used to sign the `admin_session` cookie)
+
+GitHub OAuth app setup:
+
+1. Create a GitHub OAuth App.
+2. Set the callback URL to the same value as `GITHUB_CALLBACK_URL`.
+3. Configure the server env vars above.
+4. Visit `/auth/github/start` or `/admin` to begin login.
+
+Behavior:
+
+- `/auth/github/start` redirects to GitHub with `read:user`.
+- `/auth/github/callback` validates the CSRF state cookie, fetches the GitHub user, and only allows usernames from `ADMIN_GITHUB_USERS`.
+- Successful logins receive an `admin_session` JWT cookie valid for 7 days.
+- `POST /auth/logout` clears the admin session.
 
 ## Deployment notes
 
