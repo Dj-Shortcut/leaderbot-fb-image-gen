@@ -199,7 +199,7 @@ function patchStateInRedis(psid: string, patch: PartialState, now = Date.now()):
       });
       return nextState;
     }),
-  );
+  ).then(state => normalizeState(psid, state));
 }
 
 function patchState(psid: string, patch: PartialState, now = Date.now()): MaybePromise<MessengerUserState> {

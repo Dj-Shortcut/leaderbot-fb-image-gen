@@ -1,11 +1,27 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { canGenerate, increment } from "./_core/messengerQuota";
 import { getOrCreateState, resetStateStore, setFlowState, setPendingImage } from "./_core/messengerState";
 
+const TEST_PEPPER = "ci-test-pepper";
+const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
+
 describe("messenger quota dayKey", () => {
+  beforeAll(() => {
+    process.env.PRIVACY_PEPPER = TEST_PEPPER;
+  });
+
   beforeEach(() => {
     resetStateStore();
     vi.useRealTimers();
+  });
+
+  afterAll(() => {
+    if (originalPrivacyPepper === undefined) {
+      delete process.env.PRIVACY_PEPPER;
+      return;
+    }
+
+    process.env.PRIVACY_PEPPER = originalPrivacyPepper;
   });
 
   it("initializes new state with the current server dayKey", async () => {
