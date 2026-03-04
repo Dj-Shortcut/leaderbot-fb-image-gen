@@ -13,6 +13,7 @@ import {
   setChosenStyle,
   setFlowState,
   setLastGenerated,
+  setLastUserMessageAt,
   setPendingImage,
   setPreselectedStyle,
   setPreferredLang,
@@ -301,6 +302,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
   ): Promise<void> {
     const message = event.message;
     if (!message || message.is_echo) return;
+    await setLastUserMessageAt(psid, event.timestamp ?? Date.now());
 
     const quickPayload = message.quick_reply?.payload;
     if (quickPayload) {

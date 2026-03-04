@@ -38,6 +38,7 @@ export type MessengerUserState = {
   userKey: string;
   stage: MessengerFlowState;
   state: MessengerFlowState;
+  lastUserMessageAt?: number;
   lastPhotoUrl: string | null;
   lastPhoto: string | null;
   selectedStyle: string | null;
@@ -99,6 +100,7 @@ function createDefaultState(psid: string, now = Date.now()): MessengerUserState 
     userKey: getUserKey(psid),
     stage: "IDLE",
     state: "IDLE",
+    lastUserMessageAt: undefined,
     lastPhotoUrl: null,
     lastPhoto: null,
     selectedStyle: null,
@@ -137,6 +139,7 @@ function normalizeState(psid: string, value: PartialState | null | undefined): M
     hasSeenIntro: value?.hasSeenIntro ?? fallback.hasSeenIntro,
     stage,
     state: stage,
+    lastUserMessageAt: value?.lastUserMessageAt ?? fallback.lastUserMessageAt,
     lastPhotoUrl: lastPhoto,
     lastPhoto,
     selectedStyle,
@@ -335,6 +338,20 @@ export function setPreferredLang(psid: string, lang: Lang, now = Date.now()): Ma
       preferredLang: lang,
     },
     now,
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
+}
+
+export function setLastUserMessageAt(psid: string, timestamp = Date.now()): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      lastUserMessageAt: timestamp,
+    },
+    timestamp,
   );
 
   if (isPromiseLike(result)) {
