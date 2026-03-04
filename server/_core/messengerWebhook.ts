@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { ZodError } from "zod";
 import { normalizeLang } from "./i18n";
 import { createWebhookHandlers } from "./webhookHandlers";
@@ -12,6 +13,13 @@ const DEFAULT_LANG = normalizeLang(process.env.DEFAULT_MESSENGER_LANG);
 const handlers = createWebhookHandlers({
   defaultLang: DEFAULT_LANG,
   privacyPolicyUrl: PRIVACY_POLICY_URL,
+});
+
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 export { detectAck, getGreetingResponse, summarizeWebhook };
@@ -37,6 +45,7 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
     return res.sendStatus(403);
   };
 
+  app.use("/webhook", webhookLimiter);
   app.get("/webhook", handleVerification);
   app.get("/webhook/facebook", handleVerification);
 
