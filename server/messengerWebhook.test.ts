@@ -215,6 +215,33 @@ describe("messenger webhook dedupe", () => {
     expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
   });
 
+  it("uses entry.id plus timestamp as replay key when mid is missing", async () => {
+    const payload = {
+      entry: [
+        {
+          id: "entry-123",
+          messaging: [
+            {
+              sender: { id: "psid-entry-fallback" },
+              timestamp: 1730000000001,
+              message: {
+                attachments: [{ type: "image", payload: { url: "https://img.example/c.jpg" } }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    await processFacebookWebhookPayload(payload);
+    await processFacebookWebhookPayload(payload);
+
+    expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
+    expect(safeLogMock).toHaveBeenCalledWith("webhook_replay_ignored", {
+      user: expect.any(String),
+    });
+  });
+
 
 
   it("returns local demo images for all canonical styles in MOCK_MODE", async () => {
