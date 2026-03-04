@@ -34,6 +34,7 @@ import {
 import {
   attachRequestTracing,
   getRequestId,
+  getTraceContext,
   recordHttpRequestMetric,
   registerMetricsRoute,
 } from "./observability";
@@ -86,6 +87,8 @@ async function startServer() {
       const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
       const log = {
         reqId: getRequestId(req),
+        traceId: getTraceContext(req)?.traceId,
+        spanId: getTraceContext(req)?.spanId,
         method: req.method,
         path: req.path,
         status: res.statusCode,
@@ -148,6 +151,7 @@ async function startServer() {
         globalHttpRateLimiterRedisBacked: isRedisHttpRateLimitEnabled(),
         metricsEndpointEnabled: true,
         requestTracingEnabled: true,
+        traceparentPropagationEnabled: true,
       },
     });
   });

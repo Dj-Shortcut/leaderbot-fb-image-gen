@@ -110,6 +110,7 @@ Recommended metrics / alerts:
 * alert on elevated `429` rates
 * alert on latency regressions for `/webhook/facebook` and `/api/chat`
 * use `X-Request-Id` to correlate logs across retries and downstream calls
+* propagate W3C `traceparent` headers so the service is OpenTelemetry-ready for distributed tracing
 
 Important rule:
 Secrets must never appear in logs.

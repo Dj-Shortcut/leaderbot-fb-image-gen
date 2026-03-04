@@ -1,8 +1,13 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type express from "express";
 
 type RequestWithId = express.Request & {
   requestId?: string;
+  traceContext?: {
+    traceId: string;
+    spanId: string;
+    traceparent: string;
+  };
 };
 
 type MetricKey = {
@@ -16,6 +21,7 @@ const durationSums = new Map<string, number>();
 const durationCounts = new Map<string, number>();
 const durationBuckets = new Map<string, number>();
 const latencyBucketBoundariesMs = [50, 100, 250, 500, 1000, 2500, 5000];
+const TRACEPARENT_REGEX = /^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/i;
 
 function escapeLabelValue(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -41,15 +47,29 @@ export function attachRequestTracing(): express.RequestHandler {
   return (req, res, next) => {
     const incomingRequestId = req.header("X-Request-Id")?.trim();
     const requestId = incomingRequestId || randomUUID();
+    const traceContext = parseOrCreateTraceContext(req.header("traceparent"));
 
     (req as RequestWithId).requestId = requestId;
+    (req as RequestWithId).traceContext = traceContext;
     res.setHeader("X-Request-Id", requestId);
+    res.setHeader("traceparent", traceContext.traceparent);
+    res.setHeader("X-Trace-Id", traceContext.traceId);
     next();
   };
 }
 
 export function getRequestId(req: express.Request): string | undefined {
   return (req as RequestWithId).requestId;
+}
+
+export function getTraceContext(req: express.Request):
+  | {
+      traceId: string;
+      spanId: string;
+      traceparent: string;
+    }
+  | undefined {
+  return (req as RequestWithId).traceContext;
 }
 
 export function recordHttpRequestMetric(method: string, path: string, statusCode: number, durationMs: number): void {
@@ -107,4 +127,17 @@ export function resetObservabilityMetrics(): void {
   durationSums.clear();
   durationCounts.clear();
   durationBuckets.clear();
+}
+
+function parseOrCreateTraceContext(traceparentHeader: string | undefined) {
+  const parsed = traceparentHeader ? TRACEPARENT_REGEX.exec(traceparentHeader.trim()) : null;
+  const traceId = parsed?.[1]?.toLowerCase() ?? randomBytes(16).toString("hex");
+  const spanId = randomBytes(8).toString("hex");
+  const traceFlags = parsed?.[3]?.toLowerCase() ?? "01";
+
+  return {
+    traceId,
+    spanId,
+    traceparent: `00-${traceId}-${spanId}-${traceFlags}`,
+  };
 }

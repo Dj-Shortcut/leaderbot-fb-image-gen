@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   attachRequestTracing,
   getRequestId,
+  getTraceContext,
   recordHttpRequestMetric,
   registerMetricsRoute,
   resetObservabilityMetrics,
@@ -56,7 +57,11 @@ describe("observability", () => {
   it("propagates incoming X-Request-Id headers", async () => {
     const server = await startServer(app => {
       app.get("/trace", (req, res) => {
-        res.status(200).json({ reqId: getRequestId(req) ?? null });
+        res.status(200).json({
+          reqId: getRequestId(req) ?? null,
+          traceId: getTraceContext(req)?.traceId ?? null,
+          spanId: getTraceContext(req)?.spanId ?? null,
+        });
       });
     });
 
@@ -69,7 +74,45 @@ describe("observability", () => {
 
       expect(response.status).toBe(200);
       expect(response.headers.get("x-request-id")).toBe("req-test-123");
-      expect(await response.json()).toEqual({ reqId: "req-test-123" });
+      expect(response.headers.get("x-trace-id")).toMatch(/^[0-9a-f]{32}$/);
+      expect(response.headers.get("traceparent")).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/);
+      expect(await response.json()).toEqual({
+        reqId: "req-test-123",
+        traceId: expect.stringMatching(/^[0-9a-f]{32}$/),
+        spanId: expect.stringMatching(/^[0-9a-f]{16}$/),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("continues an incoming traceparent and creates a fresh server span", async () => {
+    const incomingTraceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+    const server = await startServer(app => {
+      app.get("/traceparent", (req, res) => {
+        res.status(200).json({
+          traceparent: getTraceContext(req)?.traceparent ?? null,
+          traceId: getTraceContext(req)?.traceId ?? null,
+          spanId: getTraceContext(req)?.spanId ?? null,
+        });
+      });
+    });
+
+    try {
+      const response = await fetch(`${server.baseUrl}/traceparent`, {
+        headers: {
+          traceparent: incomingTraceparent,
+        },
+      });
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload.traceId).toBe("4bf92f3577b34da6a3ce929d0e0e4736");
+      expect(payload.spanId).toMatch(/^[0-9a-f]{16}$/);
+      expect(payload.spanId).not.toBe("00f067aa0ba902b7");
+      expect(response.headers.get("traceparent")).toMatch(
+        /^00-4bf92f3577b34da6a3ce929d0e0e4736-[0-9a-f]{16}-01$/,
+      );
     } finally {
       await server.close();
     }
