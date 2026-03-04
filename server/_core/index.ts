@@ -26,7 +26,11 @@ import {
   isRedisReplayProtectionEnabled,
 } from "./webhookReplayProtection";
 import { bodyParserErrorHandler } from "./bodyParserErrorHandler";
-import { createGlobalHttpRateLimiter } from "./httpRateLimit";
+import {
+  createGlobalHttpRateLimiter,
+  ensureHttpRateLimiterReady,
+  isRedisHttpRateLimitEnabled,
+} from "./httpRateLimit";
 
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
@@ -49,6 +53,7 @@ async function startServer() {
   assertProductionWebhookReplayProtectionConfig();
   await ensureStateStoreReady();
   await ensureWebhookReplayProtectionReady();
+  await ensureHttpRateLimiterReady();
 
   const app = express();
   const server = createServer(app);
@@ -126,6 +131,7 @@ async function startServer() {
         webhookReplayProtectionEnabled: true,
         webhookReplayProtectionRedisBacked: isRedisReplayProtectionEnabled(),
         globalHttpRateLimiterEnabled: true,
+        globalHttpRateLimiterRedisBacked: isRedisHttpRateLimitEnabled(),
       },
     });
   });

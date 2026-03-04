@@ -1,8 +1,10 @@
 import express from "express";
+import { ZodError } from "zod";
 import { normalizeLang } from "./i18n";
 import { createWebhookHandlers } from "./webhookHandlers";
 import { resetWebhookReplayProtection } from "./webhookReplayProtection";
 import { detectAck, getGreetingResponse, summarizeWebhook } from "./webhookHelpers";
+import { facebookWebhookPayloadSchema } from "./webhookSchemas";
 
 const PRIVACY_POLICY_URL = process.env.PRIVACY_POLICY_URL?.trim() || "<link>";
 const DEFAULT_LANG = normalizeLang(process.env.DEFAULT_MESSENGER_LANG);
@@ -39,6 +41,23 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
   app.get("/webhook/facebook", handleVerification);
 
   app.post("/webhook/facebook", (req, res) => {
+    try {
+      facebookWebhookPayloadSchema.parse(req.body);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({
+          error: "Invalid webhook payload",
+          issues: error.issues.map(issue => ({
+            path: issue.path.join("."),
+            message: issue.message,
+          })),
+        });
+        return;
+      }
+
+      throw error;
+    }
+
     res.sendStatus(200);
     setImmediate(() => {
       void processFacebookWebhookPayload(req.body).catch(console.error);

@@ -91,6 +91,7 @@ Typical protections include:
 * control character stripping
 * request size limits
 * JSON body validation
+* schema validation with Zod for webhook payloads and typed server inputs
 
 ## 5. Observability
 
