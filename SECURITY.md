@@ -43,6 +43,24 @@ Additional protections:
 * rate limiting
 * per-user quota
 * request body size limits
+* webhook replay protection with temporary event-key storage
+
+Replay protection:
+
+* primary dedupe key: `message.mid`
+* fallback key: `entry.id + sender + timestamp`
+* duplicate webhook events are ignored for a short TTL window
+* Redis-backed `SET NX EX` is recommended in production to survive restarts and multi-instance deploys
+
+Example strategy:
+
+```ts
+const claimed = await redis.set(`webhook-replay:${message.mid}`, "1", "EX", 300, "NX");
+
+if (claimed !== "OK") {
+  return res.sendStatus(200);
+}
+```
 
 ## 3. Rate limiting & abuse protection
 

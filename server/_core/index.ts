@@ -20,6 +20,10 @@ import {
 } from "./webhookSignatureVerification";
 import { isDebugLogEnabled } from "./logLevel";
 import { ensureStateStoreReady } from "./stateStore";
+import {
+  ensureWebhookReplayProtectionReady,
+  isRedisReplayProtectionEnabled,
+} from "./webhookReplayProtection";
 
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
@@ -40,6 +44,7 @@ async function startServer() {
   assertAuthConfig();
   assertPrivacyConfig();
   await ensureStateStoreReady();
+  await ensureWebhookReplayProtectionReady();
 
   const app = express();
   const server = createServer(app);
@@ -113,6 +118,8 @@ async function startServer() {
       securityStatus: {
         webhookSignatureVerificationEnabled: Boolean(process.env.FB_APP_SECRET),
         verifyTokenConfigured: Boolean(process.env.FB_VERIFY_TOKEN),
+        webhookReplayProtectionEnabled: true,
+        webhookReplayProtectionRedisBacked: isRedisReplayProtectionEnabled(),
       },
     });
   });

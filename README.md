@@ -152,6 +152,7 @@ Related files:
 ### Common optional
 
 - `REDIS_URL` (enable Redis state store)
+- `WEBHOOK_REPLAY_TTL_SECONDS` (override webhook replay-protection TTL, default `300`)
 - `DEFAULT_MESSENGER_LANG` (`nl`/`en` fallback behavior)
 - `PRIVACY_POLICY_URL` (link sent in privacy quick reply)
 - `ADMIN_TOKEN` (protects `/debug/build`)
