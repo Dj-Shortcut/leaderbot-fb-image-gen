@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "fs/promises";
 import path from "path";
-import { OpenAiImageGenerator } from "./_core/imageService";
+import { InvalidSourceImageUrlError, OpenAiImageGenerator } from "./_core/imageService";
 import { sha256 } from "./_core/imageProof";
 
 const GENERATED_IMAGE_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=";
+
+function toUrlString(url: string | URL): string {
+  return typeof url === "string" ? url : url.toString();
+}
 
 describe("OpenAi image-to-image proof", () => {
   afterEach(() => {
@@ -14,18 +18,20 @@ describe("OpenAi image-to-image proof", () => {
     delete process.env.OPENAI_IMAGE_MAX_RETRIES;
     delete process.env.OPENAI_IMAGE_RETRY_BASE_MS;
     delete process.env.OPENAI_IMAGE_TIMEOUT_MS;
+    delete process.env.SOURCE_IMAGE_ALLOWED_HOSTS;
   });
 
   it("sends the original image bytes in OpenAI edits request", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
 
     const fixture = Buffer.alloc(7000, 9);
     const fixtureHash = sha256(fixture);
-    const generatedImageBytes = GENERATED_IMAGE_BASE64;
 
-    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
-      if (url === "https://img.example/source.jpg") {
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
+        expect(init?.redirect).toBe("error");
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -33,7 +39,7 @@ describe("OpenAi image-to-image proof", () => {
         } as Response;
       }
 
-      expect(url).toBe("https://api.openai.com/v1/images/edits");
+      expect(toUrlString(url)).toBe("https://api.openai.com/v1/images/edits");
       const formData = init?.body as FormData;
       expect(formData).toBeInstanceOf(FormData);
       const imageBlob = formData.get("image");
@@ -45,7 +51,7 @@ describe("OpenAi image-to-image proof", () => {
 
       return {
         ok: true,
-        json: async () => ({ data: [{ b64_json: generatedImageBytes }] }),
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
       } as Response;
     });
 
@@ -69,10 +75,11 @@ describe("OpenAi image-to-image proof", () => {
   it("hard-fails before OpenAI call when input image is too small", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
 
     const tinyFixture = Buffer.alloc(1024, 1);
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url === "https://img.example/source.jpg") {
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -104,15 +111,15 @@ describe("OpenAi image-to-image proof", () => {
   it("retries the source image download once on transient network errors", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
 
     const fixture = Buffer.alloc(7000, 9);
-    const generatedImageBytes = GENERATED_IMAGE_BASE64;
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url === "https://img.example/source.jpg" && fetchMock.mock.calls.length === 1) {
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      if (toUrlString(url) === "https://img.example/source.jpg" && fetchMock.mock.calls.length === 1) {
         throw new TypeError("temporary network failure");
       }
 
-      if (url === "https://img.example/source.jpg") {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -122,7 +129,7 @@ describe("OpenAi image-to-image proof", () => {
 
       return {
         ok: true,
-        json: async () => ({ data: [{ b64_json: generatedImageBytes }] }),
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
       } as Response;
     });
 
@@ -141,17 +148,95 @@ describe("OpenAi image-to-image proof", () => {
     expect(result.metrics.fbImageFetchMs).toBeGreaterThanOrEqual(0);
   });
 
+  it("rejects localhost and private IP source image URLs before fetch", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await expect(
+      generator.generate({
+        style: "disco",
+        sourceImageUrl: "https://127.0.0.1/source.jpg",
+        userKey: "user-1",
+        reqId: "req-private-ip",
+      }),
+    ).rejects.toBeInstanceOf(InvalidSourceImageUrlError);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("enforces SOURCE_IMAGE_ALLOWED_HOSTS when configured", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example";
+
+    const fixture = Buffer.alloc(7000, 9);
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      if (toUrlString(url) === "https://cdn.img.example/source.jpg") {
+        return {
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => fixture,
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    const result = await generator.generate({
+      style: "disco",
+      sourceImageUrl: "https://cdn.img.example/source.jpg",
+      userKey: "user-1",
+      reqId: "req-allowlist",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.imageUrl).toMatch(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/leaderbot-disco-\d+\.jpg$/);
+  });
+
+  it("blocks hosts outside SOURCE_IMAGE_ALLOWED_HOSTS before fetch", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example";
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await expect(
+      generator.generate({
+        style: "disco",
+        sourceImageUrl: "https://other.example/source.jpg",
+        userKey: "user-1",
+        reqId: "req-deny-allowlist",
+      }),
+    ).rejects.toBeInstanceOf(InvalidSourceImageUrlError);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("removes leftover generated webp files", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
 
     const generatedDir = path.resolve(process.cwd(), "public", "generated");
     await fs.mkdir(generatedDir, { recursive: true });
     await fs.writeFile(path.join(generatedDir, "old-artifact.webp"), Buffer.from("webp"));
 
     const fixture = Buffer.alloc(7000, 9);
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url === "https://img.example/source.jpg") {
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -183,11 +268,12 @@ describe("OpenAi image-to-image proof", () => {
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     process.env.OPENAI_IMAGE_MAX_RETRIES = "1";
     process.env.OPENAI_IMAGE_RETRY_BASE_MS = "1";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
 
     const fixture = Buffer.alloc(7000, 9);
     let openAiCallCount = 0;
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url === "https://img.example/source.jpg") {
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -225,17 +311,76 @@ describe("OpenAi image-to-image proof", () => {
     expect(result.metrics.openAiMs).toBeGreaterThanOrEqual(0);
   });
 
+  it("fails closed when SOURCE_IMAGE_ALLOWED_HOSTS is not set", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await expect(
+      generator.generate({
+        style: "disco",
+        sourceImageUrl: "https://img.example/source.jpg",
+        userKey: "user-1",
+        reqId: "req-no-allowlist",
+      }),
+    ).rejects.toBeInstanceOf(InvalidSourceImageUrlError);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks redirects for source image fetches", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
+        expect(init?.redirect).toBe("error");
+        return {
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => Buffer.alloc(7000, 9),
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await generator.generate({
+      style: "disco",
+      sourceImageUrl: "https://img.example/source.jpg",
+      userKey: "user-1",
+      reqId: "req-redirect-error",
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.any(URL),
+      expect.objectContaining({ redirect: "error" }),
+    );
+  });
+
   it("retries OpenAI edits request after timeout aborts", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     process.env.OPENAI_IMAGE_MAX_RETRIES = "1";
     process.env.OPENAI_IMAGE_RETRY_BASE_MS = "1";
     process.env.OPENAI_IMAGE_TIMEOUT_MS = "5";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
 
     const fixture = Buffer.alloc(7000, 9);
     let openAiCallCount = 0;
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url === "https://img.example/source.jpg") {
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -270,6 +415,4 @@ describe("OpenAi image-to-image proof", () => {
     expect(result.imageUrl).toMatch(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/leaderbot-disco-\d+\.jpg$/);
     expect(result.metrics.openAiMs).toBeGreaterThanOrEqual(0);
   });
-
-
 });

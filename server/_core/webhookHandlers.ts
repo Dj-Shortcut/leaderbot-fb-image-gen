@@ -57,6 +57,14 @@ const SMALLTALK = new Set([
 ]);
 
 export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: HandlerDeps) {
+  function getAttachmentHostname(url: string): string | null {
+    try {
+      return new URL(url).hostname || null;
+    } catch {
+      return null;
+    }
+  }
+
   function logIncomingMessage(
     psid: string,
     userId: string,
@@ -426,10 +434,16 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       att => att.type === "image" && att.payload?.url
     );
     if (imageAttachment?.payload?.url) {
-      console.log("PHOTO_RECEIVED", {
-        psid,
-        hasAttachments: !!message.attachments,
-      });
+      console.log(
+        JSON.stringify({
+          level: "debug",
+          msg: "photo_received",
+          reqId,
+          psidHash: anonymizePsid(psid).slice(0, 12),
+          hasAttachments: !!message.attachments,
+          attachmentHostname: getAttachmentHostname(imageAttachment.payload.url),
+        })
+      );
 
       const state = await getOrCreateState(psid);
       logUserState(psid, userId, state, reqId, "image_received");
