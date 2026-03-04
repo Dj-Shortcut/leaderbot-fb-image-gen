@@ -146,12 +146,13 @@ Related files:
 - `FB_VERIFY_TOKEN` (Webhook verification)
 - `FB_PAGE_ACCESS_TOKEN` (Messenger send API)
 - `FB_APP_SECRET` (Webhook signature validation)
+- `REDIS_URL` (required in production for webhook replay protection)
 - `APP_BASE_URL` (required in OpenAI mode for public generated image URLs)
 - `OPENAI_API_KEY` (required in OpenAI mode)
 
 ### Common optional
 
-- `REDIS_URL` (enable Redis state store)
+- `REDIS_URL` (enable Redis state store; required in production)
 - `WEBHOOK_REPLAY_TTL_SECONDS` (override webhook replay-protection TTL, default `300`)
 - `DEFAULT_MESSENGER_LANG` (`nl`/`en` fallback behavior)
 - `PRIVACY_POLICY_URL` (link sent in privacy quick reply)

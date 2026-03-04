@@ -76,6 +76,16 @@ export function isRedisReplayProtectionEnabled(): boolean {
   return Boolean(getRedisUrl());
 }
 
+export function assertProductionWebhookReplayProtectionConfig(): void {
+  if (process.env.NODE_ENV !== "production") {
+    return;
+  }
+
+  if (!isRedisReplayProtectionEnabled()) {
+    throw new Error("REDIS_URL must be configured in production for webhook replay protection");
+  }
+}
+
 export async function ensureWebhookReplayProtectionReady(): Promise<void> {
   if (!isRedisReplayProtectionEnabled()) {
     return;

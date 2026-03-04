@@ -51,6 +51,7 @@ Replay protection:
 * fallback key: `entry.id + sender + timestamp`
 * duplicate webhook events are ignored for a short TTL window
 * Redis-backed `SET NX EX` is recommended in production to survive restarts and multi-instance deploys
+* in Leaderbot production, `REDIS_URL` is required so replay protection cannot silently fall back to in-memory storage
 
 Example strategy:
 

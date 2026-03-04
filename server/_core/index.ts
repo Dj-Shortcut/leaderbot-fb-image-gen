@@ -21,6 +21,7 @@ import {
 import { isDebugLogEnabled } from "./logLevel";
 import { ensureStateStoreReady } from "./stateStore";
 import {
+  assertProductionWebhookReplayProtectionConfig,
   ensureWebhookReplayProtectionReady,
   isRedisReplayProtectionEnabled,
 } from "./webhookReplayProtection";
@@ -43,6 +44,7 @@ async function startServer() {
   console.log("GENERATOR_STARTUP_CONFIG", generatorStartupConfig);
   assertAuthConfig();
   assertPrivacyConfig();
+  assertProductionWebhookReplayProtectionConfig();
   await ensureStateStoreReady();
   await ensureWebhookReplayProtectionReady();
 
