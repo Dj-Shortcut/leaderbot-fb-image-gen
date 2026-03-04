@@ -3,10 +3,12 @@ import fs from "fs";
 import { type Server } from "http";
 import { nanoid } from "nanoid";
 import path from "path";
+import { createGlobalHttpRateLimiter } from "./httpRateLimit";
 
 type ViteCreateServer = (typeof import("vite"))["createServer"];
 
 export async function setupVite(app: Express, server: Server, createViteServer: ViteCreateServer) {
+  app.use(createGlobalHttpRateLimiter());
 
   const serverOptions = {
     middlewareMode: true,

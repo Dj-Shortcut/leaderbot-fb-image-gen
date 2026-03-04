@@ -313,7 +313,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit | un
   try {
     return await fetch(input, {
       ...init,
-      redirect: init?.redirect ?? "follow",
+      redirect: init?.redirect ?? "error",
       signal: controller.signal,
     });
   } finally {

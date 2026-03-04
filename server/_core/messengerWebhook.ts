@@ -45,13 +45,7 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
       facebookWebhookPayloadSchema.parse(req.body);
     } catch (error) {
       if (error instanceof ZodError) {
-        res.status(400).json({
-          error: "Invalid webhook payload",
-          issues: error.issues.map(issue => ({
-            path: issue.path.join("."),
-            message: issue.message,
-          })),
-        });
+        res.status(400).json({ error: "Invalid webhook payload" });
         return;
       }
 
