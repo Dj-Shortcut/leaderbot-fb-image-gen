@@ -4,19 +4,86 @@ A zero-friction Facebook Messenger bot that transforms user photos into AI-style
 
 ## Architecture
 
-The runtime is a single Node/Express process that exposes both the Messenger webhook and the public/static endpoints.
+The runtime is a single Node/Express process that handles Messenger webhook traffic, AI image generation orchestration, static asset serving, admin auth, and operational endpoints.
+
+ASCII version:
 
 ```text
-Facebook Messenger
-  -> GET/POST /webhook/facebook (verification + inbound events)
-  -> webhookHandlers (state transitions, dedupe, language handling)
-  -> imageService (mock/openai generator)
-  -> Messenger send API (text, quick replies, generated image)
+                         +----------------------+
+                         |   Meta Messenger     |
+                         |  Webhook + Send API  |
+                         +----------+-----------+
+                                    |
+                                    v
+                    +----------------------------------+
+                    |  Leaderbot Server (Node/Express) |
+                    |----------------------------------|
+                    | Routes:                          |
+                    | - /webhook/facebook              |
+                    | - /api/trpc                      |
+                    | - /auth/github/*                 |
+                    | - /healthz, /__version, /metrics|
+                    | - /generated/*, /demo/*         |
+                    +----+---------------+-------------+
+                         |               |
+          inbound events |               | outbound API / auth / storage
+                         v               v
+        +--------------------------+   +----------------------+
+        | Webhook Handlers         |   | Supporting Services  |
+        | - signature verification |   | - GitHub OAuth       |
+        | - dedupe + i18n          |   | - static file serve  |
+        | - state transitions      |   | - health/debug       |
+        | - quota checks           |   +----------------------+
+        +------------+-------------+
+                     |
+                     v
+        +--------------------------+
+        | Image Service            |
+        | - mock generator         |
+        | - OpenAI generator       |
+        +------------+-------------+
+                     |
+          +----------+----------+
+          |                     |
+          v                     v
+        +-------------------+   +----------------------+
+        | Redis / State     |   | OpenAI Images API    |
+        | - state store     |   | - generation backend |
+        | - rate limit base |   +----------------------+
+        +-------------------+
+```
 
-Browser/Admin/Monitoring
-  -> /healthz, /health, /__version, /debug/build
-  -> /generated/* and /demo/* static assets
-  -> /api/trpc and optional OAuth/chat routes
+Mermaid version:
+
+```mermaid
+flowchart TD
+    MM["Meta Messenger<br/>Webhook + Send API"]
+    UA["Admin / Browser / Monitoring"]
+
+    subgraph LB["Leaderbot Server (Node/Express)"]
+        WH["/webhook/facebook"]
+        TRPC["/api/trpc"]
+        AUTH["/auth/github/*"]
+        OPS["/healthz, /__version, /generated/*, /demo/*"]
+        HANDLERS["Webhook handlers<br/>signature check, dedupe, i18n,<br/>state transitions, quota checks"]
+        IMG["Image service<br/>mock or OpenAI"]
+    end
+
+    REDIS[("Redis / state store")]
+    OPENAI["OpenAI Images API"]
+    GITHUB["GitHub OAuth"]
+
+    MM --> WH
+    WH --> HANDLERS
+    HANDLERS --> IMG
+    HANDLERS <--> REDIS
+    IMG --> OPENAI
+    IMG --> MM
+
+    UA --> TRPC
+    UA --> AUTH
+    UA --> OPS
+    AUTH --> GITHUB
 ```
 
 Key server entrypoint: `server/_core/index.ts`.
@@ -79,12 +146,16 @@ Related files:
 - `FB_VERIFY_TOKEN` (Webhook verification)
 - `FB_PAGE_ACCESS_TOKEN` (Messenger send API)
 - `FB_APP_SECRET` (Webhook signature validation)
+- `REDIS_URL` (required in production for webhook replay protection)
 - `APP_BASE_URL` (required in OpenAI mode for public generated image URLs)
 - `OPENAI_API_KEY` (required in OpenAI mode)
 
 ### Common optional
 
-- `REDIS_URL` (enable Redis state store)
+- `REDIS_URL` (enable Redis state store; required in production)
+- `WEBHOOK_REPLAY_TTL_SECONDS` (override webhook replay-protection TTL, default `300`)
+- `HTTP_RATE_LIMIT_WINDOW_MS` (global HTTP rate-limit window, default `60000`; Redis-backed when `REDIS_URL` is set)
+- `HTTP_RATE_LIMIT_MAX_REQUESTS` (max requests per IP per window, default `120`)
 - `DEFAULT_MESSENGER_LANG` (`nl`/`en` fallback behavior)
 - `PRIVACY_POLICY_URL` (link sent in privacy quick reply)
 - `ADMIN_TOKEN` (protects `/debug/build`)
@@ -92,6 +163,8 @@ Related files:
 - `ADMIN_GITHUB_USERS` (comma-separated GitHub usernames allowed into `/admin`)
 - `OAUTH_SERVER_URL` (enables OAuth route initialization)
 - `LOG_LEVEL`, `DEBUG_STATE_DUMP` (diagnostics)
+- `X-Request-Id` (optional inbound tracing header; server echoes it or generates one)
+- `traceparent` (optional W3C Trace Context header; server continues the trace and emits a new server span)
 - `GENERATOR_MODE=mock` (forces mock generator)
 - `OPENAI_IMAGE_TIMEOUT_MS`, `FB_IMAGE_FETCH_TIMEOUT_MS` (per-request timeouts; OpenAI defaults to 30000ms and applies per retry attempt)
 - `OPENAI_IMAGE_MAX_RETRIES`, `OPENAI_IMAGE_RETRY_BASE_MS` (retry policy for OpenAI image edits on 408/429/5xx/transient network errors)
@@ -122,6 +195,7 @@ Useful checks while developing:
 ```bash
 curl http://localhost:8080/healthz
 curl http://localhost:8080/__version
+curl http://localhost:8080/metrics
 ```
 
 Production build locally:
@@ -206,6 +280,7 @@ This app is configured for Fly.io using `Dockerfile` + `fly.toml`.
 Typical deployment flow:
 
 ```bash
+fly secrets set REDIS_URL=redis://<user>:<password>@<host>:<port> -a <app-name>
 fly secrets set KEY=value -a <app-name>
 fly deploy -a <app-name>
 fly logs -a <app-name>
@@ -214,6 +289,10 @@ fly logs -a <app-name>
 Operational notes:
 
 - `NODE_ENV=production` and `PORT=8080` are expected in runtime.
+- `REDIS_URL` must be set in Fly secrets before deploy; production startup now fails without it.
 - Health check endpoint is `/healthz`.
+- `/metrics` exposes Prometheus-style request counters and latency histograms.
+- Each request carries an `X-Request-Id` header for simple request tracing across logs and downstream calls.
+- The server accepts and returns `traceparent` so it can plug into OpenTelemetry-compatible tracing later without changing route behavior.
 - `APP_BASE_URL` must be publicly reachable in OpenAI mode so Messenger can fetch generated images from `/generated/<id>.png`.
 - Keep `FB_APP_SECRET` configured to enforce webhook signature verification middleware.

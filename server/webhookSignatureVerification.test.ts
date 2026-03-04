@@ -116,4 +116,5 @@ describe("Meta webhook signature verification", () => {
     expect(response.status).toBe(403);
     expect(response.payload).toContain("Signature verification failed");
   });
+
 });

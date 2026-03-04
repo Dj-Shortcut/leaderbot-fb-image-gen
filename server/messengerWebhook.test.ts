@@ -215,6 +215,92 @@ describe("messenger webhook dedupe", () => {
     expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
   });
 
+  it("uses entry.id plus timestamp as replay key when mid is missing", async () => {
+    const payload = {
+      entry: [
+        {
+          id: "entry-123",
+          messaging: [
+            {
+              sender: { id: "psid-entry-fallback" },
+              timestamp: 1730000000001,
+              message: {
+                attachments: [{ type: "image", payload: { url: "https://img.example/c.jpg" } }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    await processFacebookWebhookPayload(payload);
+    await processFacebookWebhookPayload(payload);
+
+    expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
+    expect(safeLogMock).toHaveBeenCalledWith("webhook_replay_ignored", {
+      user: expect.any(String),
+      eventId: expect.stringContaining("entry:entry-123:"),
+    });
+  });
+
+  it("updates lastUserMessageAt only for inbound user messages", async () => {
+    const psid = "window-user";
+    const userId = anonymizePsid(psid);
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              timestamp: 1730000000000,
+              read: { watermark: 1730000000000 },
+            },
+            {
+              sender: { id: psid },
+              timestamp: 1730000000001,
+              delivery: { mids: ["mid-delivery"] },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(getState(userId)?.lastUserMessageAt).toBeUndefined();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              timestamp: 1730000000123,
+              message: { mid: "mid-window-1", text: "Hi" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(getState(userId)?.lastUserMessageAt).toBe(1730000000123);
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              timestamp: 1730000000999,
+              message: { mid: "mid-window-echo", is_echo: true, text: "echo" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(getState(userId)?.lastUserMessageAt).toBe(1730000000123);
+  });
+
 
 
   it("returns local demo images for all canonical styles in MOCK_MODE", async () => {

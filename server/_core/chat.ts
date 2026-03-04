@@ -75,13 +75,42 @@ const tools = {
   }),
 };
 
-function isModelMessage(value: unknown): value is ModelMessage {
-  if (typeof value !== "object" || value === null) {
-    return false;
+const modelMessageSchema = z.object({
+  role: z.string().min(1),
+  content: z.unknown(),
+}).passthrough();
+
+const chatRequestSchema = z.object({
+  messages: z.array(modelMessageSchema),
+}).passthrough();
+
+function parseChatRequestBody(body: unknown): { messages: ModelMessage[] } {
+  if (typeof body !== "object" || body === null) {
+    throw new Error("messages array is required");
   }
 
-  const candidate = value as { role?: unknown; content?: unknown };
-  return typeof candidate.role === "string" && "content" in candidate;
+  const parsed = chatRequestSchema.safeParse(body);
+
+  if (!parsed.success) {
+    const missingMessages = parsed.error.issues.some(
+      issue =>
+        issue.path.length === 1 &&
+        issue.path[0] === "messages" &&
+        (issue.code === "invalid_type" || issue.code === "unrecognized_keys" || issue.code === "custom"),
+    );
+
+    const invalidMessages = parsed.error.issues.some(issue => issue.path[0] === "messages" && issue.path.length > 1);
+
+    if (missingMessages && !invalidMessages) {
+      throw new Error("messages array is required");
+    }
+
+    throw new Error("messages must be valid model messages");
+  }
+
+  return {
+    messages: parsed.data.messages as ModelMessage[],
+  };
 }
 
 function evaluateMathExpression(expression: string): number {
@@ -216,26 +245,17 @@ export function registerChatRoutes(app: Express) {
 
   app.post("/api/chat", (req, res) => {
     try {
-      const requestBody: unknown = req.body;
+      let messages: ModelMessage[];
+      try {
+        ({ messages } = parseChatRequestBody(req.body));
+      } catch (error) {
+        if (error instanceof Error) {
+          res.status(400).json({ error: error.message });
+          return;
+        }
 
-      if (typeof requestBody !== "object" || requestBody === null) {
-        res.status(400).json({ error: "messages array is required" });
-        return;
+        throw error;
       }
-
-      const messagesValue = (requestBody as { messages?: unknown }).messages;
-
-      if (!Array.isArray(messagesValue)) {
-        res.status(400).json({ error: "messages array is required" });
-        return;
-      }
-
-      if (!messagesValue.every(isModelMessage)) {
-        res.status(400).json({ error: "messages must be valid model messages" });
-        return;
-      }
-
-      const messages: ModelMessage[] = messagesValue;
 
       const result = streamText({
         model: openai.chat("gpt-4o"),
@@ -256,4 +276,4 @@ export function registerChatRoutes(app: Express) {
   });
 }
 
-export { tools };
+export { parseChatRequestBody, tools };

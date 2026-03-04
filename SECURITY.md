@@ -43,6 +43,25 @@ Additional protections:
 * rate limiting
 * per-user quota
 * request body size limits
+* webhook replay protection with temporary event-key storage
+
+Replay protection:
+
+* primary dedupe key: `message.mid`
+* fallback key: `entry.id + sender + timestamp`
+* duplicate webhook events are ignored for a short TTL window
+* Redis-backed `SET NX EX` is recommended in production to survive restarts and multi-instance deploys
+* in Leaderbot production, `REDIS_URL` is required so replay protection cannot silently fall back to in-memory storage
+
+Example strategy:
+
+```ts
+const claimed = await redis.set(`webhook-replay:${message.mid}`, "1", "EX", 300, "NX");
+
+if (claimed !== "OK") {
+  return res.sendStatus(200);
+}
+```
 
 ## 3. Rate limiting & abuse protection
 
@@ -50,6 +69,7 @@ AI endpoints must be protected against abuse.
 
 Implemented / planned protections:
 
+* global HTTP rate limiting
 * Redis-backed rate limiting
 * per user quota
 * daily usage limits
@@ -71,6 +91,7 @@ Typical protections include:
 * control character stripping
 * request size limits
 * JSON body validation
+* schema validation with Zod for webhook payloads and typed server inputs
 
 ## 5. Observability
 
@@ -79,8 +100,17 @@ Production systems require monitoring and structured logging.
 Goals:
 
 * structured logs
+* Prometheus-style metrics
 * request tracing
 * alerting
+
+Recommended metrics / alerts:
+
+* alert on sustained `5xx` rate spikes
+* alert on elevated `429` rates
+* alert on latency regressions for `/webhook/facebook` and `/api/chat`
+* use `X-Request-Id` to correlate logs across retries and downstream calls
+* propagate W3C `traceparent` headers so the service is OpenTelemetry-ready for distributed tracing
 
 Important rule:
 Secrets must never appear in logs.

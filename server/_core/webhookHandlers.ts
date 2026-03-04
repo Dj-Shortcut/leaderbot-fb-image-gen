@@ -13,6 +13,7 @@ import {
   setChosenStyle,
   setFlowState,
   setLastGenerated,
+  setLastUserMessageAt,
   setPendingImage,
   setPreselectedStyle,
   setPreferredLang,
@@ -22,10 +23,11 @@ import {
 } from "./messengerState";
 import { normalizeLang, t, type Lang } from "./i18n";
 import { toLogUser, toUserKey } from "./privacy";
-import { TtlDedupeSet } from "./dedupe";
 import type { Style } from "./messengerStyles";
+import { claimWebhookReplayKey } from "./webhookReplayProtection";
 import {
   detectAck,
+  type FacebookWebhookEntry,
   FacebookWebhookEvent,
   getEventDedupeKey,
   getGreetingResponse,
@@ -39,7 +41,6 @@ import {
 import { runGuardedGeneration } from "./generationGuard";
 
 type HandlerDeps = {
-  incomingEventDedupe: TtlDedupeSet;
   defaultLang: Lang;
   privacyPolicyUrl: string;
 };
@@ -55,11 +56,7 @@ const SMALLTALK = new Set([
   "thank you",
 ]);
 
-export function createWebhookHandlers({
-  incomingEventDedupe,
-  defaultLang,
-  privacyPolicyUrl,
-}: HandlerDeps) {
+export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: HandlerDeps) {
   function logIncomingMessage(
     psid: string,
     userId: string,
@@ -417,6 +414,7 @@ export function createWebhookHandlers({
   ): Promise<void> {
     const message = event.message;
     if (!message || message.is_echo) return;
+    await setLastUserMessageAt(psid, event.timestamp ?? Date.now());
 
     const quickPayload = message.quick_reply?.payload;
     if (quickPayload) {
@@ -492,7 +490,7 @@ export function createWebhookHandlers({
     await sendLoggedText(psid, t(lang, "flowExplanation"), reqId);
   }
 
-  async function handleEvent(event: FacebookWebhookEvent): Promise<void> {
+  async function handleEvent(event: FacebookWebhookEvent, entryId?: string): Promise<void> {
     const psid = event.sender?.id;
     if (!psid) return;
 
@@ -508,8 +506,17 @@ export function createWebhookHandlers({
       await setPreferredLang(psid, localeLang);
     }
 
-    const dedupeKey = getEventDedupeKey(event, userId);
-    if (dedupeKey && incomingEventDedupe.seen(dedupeKey)) return;
+    const dedupeKey = getEventDedupeKey(event, userId, entryId);
+    if (dedupeKey) {
+      const claimed = await claimWebhookReplayKey(dedupeKey);
+      if (!claimed) {
+        safeLog("webhook_replay_ignored", {
+          user: toLogUser(userId),
+          eventId: dedupeKey,
+        });
+        return;
+      }
+    }
 
     const referralStyle = parseReferralStyle(
       event.postback?.referral?.ref ?? event.referral?.ref
@@ -533,10 +540,10 @@ export function createWebhookHandlers({
     payload: unknown
   ): Promise<void> {
     const entries = (payload as any)?.entry || [];
-    for (const entry of entries) {
+    for (const entry of entries as FacebookWebhookEntry[]) {
       const events = entry?.messaging || [];
       for (const event of events) {
-        await handleEvent(event);
+        await handleEvent(event, entry?.id);
       }
     }
   }

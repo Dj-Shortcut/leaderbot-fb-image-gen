@@ -8,9 +8,92 @@ Leaderbot runs as one Node.js process (Express + HTTP server):
 - Executes conversation flow + generation orchestration.
 - Serves static assets (`/demo`, `/generated`, web build output).
 - Exposes health/version/debug endpoints.
+- Exposes Prometheus-style metrics and request tracing hooks.
 - Optionally mounts OAuth and additional chat routes.
 
 Primary bootstrap is in `server/_core/index.ts`.
+
+## Architecture diagrams
+
+ASCII version:
+
+```text
+                         +----------------------+
+                         |   Meta Messenger     |
+                         |  Webhook + Send API  |
+                         +----------+-----------+
+                                    |
+                                    v
+                    +----------------------------------+
+                    |  Leaderbot Server (Node/Express) |
+                    |----------------------------------|
+                    | Routes:                          |
+                    | - /webhook/facebook              |
+                    | - /api/trpc                      |
+                    | - /auth/github/*                 |
+                    | - /healthz, /__version          |
+                    | - /generated/*, /demo/*         |
+                    +----+---------------+-------------+
+                         |               |
+          inbound events |               | outbound API / auth / storage
+                         v               v
+        +--------------------------+   +----------------------+
+        | Webhook Handlers         |   | Supporting Services  |
+        | - signature verification |   | - GitHub OAuth       |
+        | - dedupe + i18n          |   | - static file serve  |
+        | - state transitions      |   | - health/debug       |
+        | - quota checks           |   +----------------------+
+        +------------+-------------+
+                     |
+                     v
+        +--------------------------+
+        | Image Service            |
+        | - mock generator         |
+        | - OpenAI generator       |
+        +------------+-------------+
+                     |
+          +----------+----------+
+          |                     |
+          v                     v
+        +-------------------+   +----------------------+
+        | Redis / State     |   | OpenAI Images API    |
+        | - state store     |   | - generation backend |
+        | - rate limit base |   +----------------------+
+        +-------------------+
+```
+
+Mermaid version:
+
+```mermaid
+flowchart TD
+    MM["Meta Messenger<br/>Webhook + Send API"]
+    UA["Admin / Browser / Monitoring"]
+
+    subgraph LB["Leaderbot Server (Node/Express)"]
+        WH["/webhook/facebook"]
+        TRPC["/api/trpc"]
+        AUTH["/auth/github/*"]
+        OPS["/healthz, /__version, /generated/*, /demo/*"]
+        HANDLERS["Webhook handlers<br/>signature check, dedupe, i18n,<br/>state transitions, quota checks"]
+        IMG["Image service<br/>mock or OpenAI"]
+    end
+
+    REDIS[("Redis / state store")]
+    OPENAI["OpenAI Images API"]
+    GITHUB["GitHub OAuth"]
+
+    MM --> WH
+    WH --> HANDLERS
+    HANDLERS --> IMG
+    HANDLERS <--> REDIS
+    IMG --> OPENAI
+    IMG --> MM
+
+    UA --> TRPC
+    UA --> AUTH
+    UA --> OPS
+    AUTH --> GITHUB
+```
 
 ## 2) Request flow (Messenger)
 

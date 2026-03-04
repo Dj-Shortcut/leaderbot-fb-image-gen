@@ -1,15 +1,15 @@
 import express from "express";
-import { TtlDedupeSet } from "./dedupe";
+import { ZodError } from "zod";
 import { normalizeLang } from "./i18n";
 import { createWebhookHandlers } from "./webhookHandlers";
+import { resetWebhookReplayProtection } from "./webhookReplayProtection";
 import { detectAck, getGreetingResponse, summarizeWebhook } from "./webhookHelpers";
+import { facebookWebhookPayloadSchema } from "./webhookSchemas";
 
-const incomingEventDedupe = new TtlDedupeSet(10 * 60 * 1000);
 const PRIVACY_POLICY_URL = process.env.PRIVACY_POLICY_URL?.trim() || "<link>";
 const DEFAULT_LANG = normalizeLang(process.env.DEFAULT_MESSENGER_LANG);
 
 const handlers = createWebhookHandlers({
-  incomingEventDedupe,
   defaultLang: DEFAULT_LANG,
   privacyPolicyUrl: PRIVACY_POLICY_URL,
 });
@@ -17,7 +17,7 @@ const handlers = createWebhookHandlers({
 export { detectAck, getGreetingResponse, summarizeWebhook };
 
 export function resetMessengerEventDedupe(): void {
-  incomingEventDedupe.clear();
+  resetWebhookReplayProtection();
 }
 
 export async function processFacebookWebhookPayload(payload: unknown): Promise<void> {
@@ -41,6 +41,23 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
   app.get("/webhook/facebook", handleVerification);
 
   app.post("/webhook/facebook", (req, res) => {
+    try {
+      facebookWebhookPayloadSchema.parse(req.body);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({
+          error: "Invalid webhook payload",
+          issues: error.issues.map(issue => ({
+            path: issue.path.join("."),
+            message: issue.message,
+          })),
+        });
+        return;
+      }
+
+      throw error;
+    }
+
     res.sendStatus(200);
     setImmediate(() => {
       void processFacebookWebhookPayload(req.body).catch(console.error);

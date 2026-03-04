@@ -20,6 +20,11 @@ export type FacebookWebhookEvent = {
   timestamp?: number;
 };
 
+export type FacebookWebhookEntry = {
+  id?: string;
+  messaging?: FacebookWebhookEvent[];
+};
+
 export type WebhookSummaryEvent = {
   type: "message" | "postback" | "read" | "delivery" | "unknown";
   hasText: boolean;
@@ -53,13 +58,22 @@ type GreetingResponse =
   | { mode: "text"; text: string }
   | { mode: "quick_replies"; state: ConversationState; text: string };
 
-export function getEventDedupeKey(event: FacebookWebhookEvent, userKey: string): string | undefined {
+export function getEventDedupeKey(
+  event: FacebookWebhookEvent,
+  userKey: string,
+  entryId?: string,
+): string | undefined {
   const messageId = event.message?.mid?.trim();
   if (messageId) {
     return `mid:${messageId}`;
   }
 
   const timestamp = event.timestamp;
+  const normalizedEntryId = entryId?.trim();
+  if (normalizedEntryId && Number.isFinite(timestamp)) {
+    return `entry:${normalizedEntryId}:user:${userKey}:ts:${timestamp}`;
+  }
+
   if (Number.isFinite(timestamp)) {
     return `fallback:${userKey}:${timestamp}`;
   }
