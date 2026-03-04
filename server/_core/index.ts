@@ -31,6 +31,13 @@ import {
   ensureHttpRateLimiterReady,
   isRedisHttpRateLimitEnabled,
 } from "./httpRateLimit";
+import {
+  attachRequestTracing,
+  getRequestId,
+  getTraceContext,
+  recordHttpRequestMetric,
+  registerMetricsRoute,
+} from "./observability";
 
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
@@ -59,6 +66,7 @@ async function startServer() {
   const server = createServer(app);
 
   applySecurityHeaders(app);
+  app.use(attachRequestTracing());
   app.use(createGlobalHttpRateLimiter());
 
   app.use(
@@ -78,14 +86,22 @@ async function startServer() {
     res.on("finish", () => {
       const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
       const log = {
+        reqId: getRequestId(req),
+        traceId: getTraceContext(req)?.traceId,
+        spanId: getTraceContext(req)?.spanId,
         method: req.method,
         path: req.path,
         status: res.statusCode,
         ms: Number(durationMs.toFixed(1)),
       };
+      recordHttpRequestMetric(req.method, req.path, res.statusCode, durationMs);
 
       // Keep info logs compact: skip webhook and health checks unless debug logging is enabled.
-      const shouldLogAtInfo = !req.path.startsWith("/webhook") && req.path !== "/healthz" && req.path !== "/health";
+      const shouldLogAtInfo =
+        !req.path.startsWith("/webhook") &&
+        req.path !== "/healthz" &&
+        req.path !== "/health" &&
+        req.path !== "/metrics";
       if (isDebugLogEnabled() || shouldLogAtInfo) {
         console.log(JSON.stringify(log));
       }
@@ -104,6 +120,7 @@ async function startServer() {
   app.get("/__version", (_req, res) => {
     res.status(200).json(buildVersionPayload());
   });
+  registerMetricsRoute(app);
 
   app.get("/debug/build", (req, res) => {
     const adminToken = process.env.ADMIN_TOKEN;
@@ -132,6 +149,9 @@ async function startServer() {
         webhookReplayProtectionRedisBacked: isRedisReplayProtectionEnabled(),
         globalHttpRateLimiterEnabled: true,
         globalHttpRateLimiterRedisBacked: isRedisHttpRateLimitEnabled(),
+        metricsEndpointEnabled: true,
+        requestTracingEnabled: true,
+        traceparentPropagationEnabled: true,
       },
     });
   });

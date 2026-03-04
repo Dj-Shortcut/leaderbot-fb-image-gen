@@ -391,7 +391,10 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     if (dedupeKey) {
       const claimed = await claimWebhookReplayKey(dedupeKey);
       if (!claimed) {
-        safeLog("webhook_replay_ignored", { user: toLogUser(userId) });
+        safeLog("webhook_replay_ignored", {
+          user: toLogUser(userId),
+          eventId: dedupeKey,
+        });
         return;
       }
     }

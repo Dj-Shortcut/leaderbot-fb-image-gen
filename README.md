@@ -22,7 +22,7 @@ ASCII version:
                     | - /webhook/facebook              |
                     | - /api/trpc                      |
                     | - /auth/github/*                 |
-                    | - /healthz, /__version          |
+                    | - /healthz, /__version, /metrics|
                     | - /generated/*, /demo/*         |
                     +----+---------------+-------------+
                          |               |
@@ -163,6 +163,8 @@ Related files:
 - `ADMIN_GITHUB_USERS` (comma-separated GitHub usernames allowed into `/admin`)
 - `OAUTH_SERVER_URL` (enables OAuth route initialization)
 - `LOG_LEVEL`, `DEBUG_STATE_DUMP` (diagnostics)
+- `X-Request-Id` (optional inbound tracing header; server echoes it or generates one)
+- `traceparent` (optional W3C Trace Context header; server continues the trace and emits a new server span)
 - `GENERATOR_MODE=mock` (forces mock generator)
 - `OPENAI_IMAGE_TIMEOUT_MS`, `FB_IMAGE_FETCH_TIMEOUT_MS` (per-request timeouts; OpenAI defaults to 30000ms and applies per retry attempt)
 - `OPENAI_IMAGE_MAX_RETRIES`, `OPENAI_IMAGE_RETRY_BASE_MS` (retry policy for OpenAI image edits on 408/429/5xx/transient network errors)
@@ -193,6 +195,7 @@ Useful checks while developing:
 ```bash
 curl http://localhost:8080/healthz
 curl http://localhost:8080/__version
+curl http://localhost:8080/metrics
 ```
 
 Production build locally:
@@ -288,5 +291,8 @@ Operational notes:
 - `NODE_ENV=production` and `PORT=8080` are expected in runtime.
 - `REDIS_URL` must be set in Fly secrets before deploy; production startup now fails without it.
 - Health check endpoint is `/healthz`.
+- `/metrics` exposes Prometheus-style request counters and latency histograms.
+- Each request carries an `X-Request-Id` header for simple request tracing across logs and downstream calls.
+- The server accepts and returns `traceparent` so it can plug into OpenTelemetry-compatible tracing later without changing route behavior.
 - `APP_BASE_URL` must be publicly reachable in OpenAI mode so Messenger can fetch generated images from `/generated/<id>.png`.
 - Keep `FB_APP_SECRET` configured to enforce webhook signature verification middleware.
