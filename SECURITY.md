@@ -69,6 +69,7 @@ AI endpoints must be protected against abuse.
 
 Implemented / planned protections:
 
+* global HTTP rate limiting
 * Redis-backed rate limiting
 * per user quota
 * daily usage limits
