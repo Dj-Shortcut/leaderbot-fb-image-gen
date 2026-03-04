@@ -1,3 +1,5 @@
+import { hasOpenMessengerResponseWindow } from "./messengerState";
+
 const GRAPH_API_VERSION = "v21.0";
 
 type QuickReply = {
@@ -62,6 +64,11 @@ async function sendMessage(
   psid: string,
   message: Record<string, unknown>
 ): Promise<void> {
+  const withinResponseWindow = await Promise.resolve(hasOpenMessengerResponseWindow(psid));
+  if (!withinResponseWindow) {
+    throw new Error("Messenger response window is closed");
+  }
+
   const maxRetries = parsePositiveInt("GRAPH_API_MAX_RETRIES", 3);
   const retryBaseMs = parsePositiveInt("GRAPH_API_RETRY_BASE_MS", 300);
 
@@ -72,6 +79,7 @@ async function sendMessage(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        messaging_type: "RESPONSE",
         recipient: { id: psid },
         message,
       }),

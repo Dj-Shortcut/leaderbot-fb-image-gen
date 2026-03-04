@@ -237,12 +237,41 @@ export function getDayKey(now = Date.now()): string {
   return new Date(now).toISOString().slice(0, 10);
 }
 
+export function getMessengerResponseWindowMs(): number {
+  const configured = Number(process.env.MESSENGER_RESPONSE_WINDOW_MS);
+  if (Number.isFinite(configured) && configured >= 0) {
+    return Math.floor(configured);
+  }
+
+  return 24 * 60 * 60 * 1000;
+}
+
 export function getState(psid: string): MaybePromise<MessengerUserState | null> {
   if (!isRedisStateStoreEnabled()) {
     return getStateFromMemory(psid);
   }
 
   return getStateFromRedis(psid);
+}
+
+export function hasOpenMessengerResponseWindow(psid: string, now = Date.now()): MaybePromise<boolean> {
+  const state = getState(psid);
+
+  if (isPromiseLike(state)) {
+    return state.then(current => {
+      if (!current?.lastUserMessageAt) {
+        return false;
+      }
+
+      return now - current.lastUserMessageAt <= getMessengerResponseWindowMs();
+    });
+  }
+
+  if (!state?.lastUserMessageAt) {
+    return false;
+  }
+
+  return now - state.lastUserMessageAt <= getMessengerResponseWindowMs();
 }
 
 export function getOrCreateState(psid: string): MaybePromise<MessengerUserState> {
