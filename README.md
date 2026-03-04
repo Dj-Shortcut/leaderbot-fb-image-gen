@@ -4,19 +4,86 @@ A zero-friction Facebook Messenger bot that transforms user photos into AI-style
 
 ## Architecture
 
-The runtime is a single Node/Express process that exposes both the Messenger webhook and the public/static endpoints.
+The runtime is a single Node/Express process that handles Messenger webhook traffic, AI image generation orchestration, static asset serving, admin auth, and operational endpoints.
+
+ASCII version:
 
 ```text
-Facebook Messenger
-  -> GET/POST /webhook/facebook (verification + inbound events)
-  -> webhookHandlers (state transitions, dedupe, language handling)
-  -> imageService (mock/openai generator)
-  -> Messenger send API (text, quick replies, generated image)
+                         +----------------------+
+                         |   Meta Messenger     |
+                         |  Webhook + Send API  |
+                         +----------+-----------+
+                                    |
+                                    v
+                    +----------------------------------+
+                    |  Leaderbot Server (Node/Express) |
+                    |----------------------------------|
+                    | Routes:                          |
+                    | - /webhook/facebook              |
+                    | - /api/trpc                      |
+                    | - /auth/github/*                 |
+                    | - /healthz, /__version          |
+                    | - /generated/*, /demo/*         |
+                    +----+---------------+-------------+
+                         |               |
+          inbound events |               | outbound API / auth / storage
+                         v               v
+        +--------------------------+   +----------------------+
+        | Webhook Handlers         |   | Supporting Services  |
+        | - signature verification |   | - GitHub OAuth       |
+        | - dedupe + i18n          |   | - static file serve  |
+        | - state transitions      |   | - health/debug       |
+        | - quota checks           |   +----------------------+
+        +------------+-------------+
+                     |
+                     v
+        +--------------------------+
+        | Image Service            |
+        | - mock generator         |
+        | - OpenAI generator       |
+        +------------+-------------+
+                     |
+          +----------+----------+
+          |                     |
+          v                     v
+        +-------------------+   +----------------------+
+        | Redis / State     |   | OpenAI Images API    |
+        | - state store     |   | - generation backend |
+        | - rate limit base |   +----------------------+
+        +-------------------+
+```
 
-Browser/Admin/Monitoring
-  -> /healthz, /health, /__version, /debug/build
-  -> /generated/* and /demo/* static assets
-  -> /api/trpc and optional OAuth/chat routes
+Mermaid version:
+
+```mermaid
+flowchart TD
+    MM["Meta Messenger<br/>Webhook + Send API"]
+    UA["Admin / Browser / Monitoring"]
+
+    subgraph LB["Leaderbot Server (Node/Express)"]
+        WH["/webhook/facebook"]
+        TRPC["/api/trpc"]
+        AUTH["/auth/github/*"]
+        OPS["/healthz, /__version, /generated/*, /demo/*"]
+        HANDLERS["Webhook handlers<br/>signature check, dedupe, i18n,<br/>state transitions, quota checks"]
+        IMG["Image service<br/>mock or OpenAI"]
+    end
+
+    REDIS[("Redis / state store")]
+    OPENAI["OpenAI Images API"]
+    GITHUB["GitHub OAuth"]
+
+    MM --> WH
+    WH --> HANDLERS
+    HANDLERS --> IMG
+    HANDLERS <--> REDIS
+    IMG --> OPENAI
+    IMG --> MM
+
+    UA --> TRPC
+    UA --> AUTH
+    UA --> OPS
+    AUTH --> GITHUB
 ```
 
 Key server entrypoint: `server/_core/index.ts`.
