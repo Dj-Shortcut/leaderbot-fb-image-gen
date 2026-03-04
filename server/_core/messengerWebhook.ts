@@ -37,12 +37,19 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
     const mode = req.query["hub.mode"];
     const verifyToken = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
-    const configuredToken = process.env.FB_VERIFY_TOKEN;
+    const configuredToken = process.env.FB_VERIFY_TOKEN?.trim();
 
-    if (mode === "subscribe" && verifyToken === configuredToken) {
-      return res.status(200).type("text/plain").send(challenge);
+    if (
+      !configuredToken ||
+      mode !== "subscribe" ||
+      typeof verifyToken !== "string" ||
+      verifyToken !== configuredToken ||
+      typeof challenge !== "string"
+    ) {
+      return res.sendStatus(403);
     }
-    return res.sendStatus(403);
+
+    return res.status(200).type("text/plain").send(challenge);
   };
 
   app.use("/webhook", webhookLimiter);
