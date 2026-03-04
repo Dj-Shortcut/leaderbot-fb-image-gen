@@ -103,6 +103,11 @@ Related files:
 
 Legacy/app-specific environment variables also exist for SDK and data API integrations in `server/_core/env.ts`.
 
+### Secret hygiene
+
+- Never commit real `.env` files; only keep `.env.example` in git.
+- If a secret appears in GitHub code search (for example by searching for `.env` in this repo), rotate all exposed credentials immediately.
+
 ## Local dev
 
 ```bash
