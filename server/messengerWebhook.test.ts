@@ -25,6 +25,10 @@ import { anonymizePsid, getState, resetStateStore, setFlowState } from "./_core/
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
 
+function toUrlString(url: string | URL): string {
+  return typeof url === "string" ? url : url.toString();
+}
+
 beforeAll(() => {
   process.env.PRIVACY_PEPPER = TEST_PEPPER;
 });
@@ -121,6 +125,7 @@ describe("messenger webhook dedupe", () => {
   beforeEach(() => {
     process.env.MOCK_MODE = "true";
     process.env.GENERATOR_MODE = "mock";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
     delete process.env.OPENAI_API_KEY;
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
@@ -241,6 +246,55 @@ describe("messenger webhook dedupe", () => {
       user: expect.any(String),
       eventId: expect.stringContaining("entry:entry-123:"),
     });
+  });
+
+  it("logs only the attachment hostname for inbound photo messages", async () => {
+    const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    try {
+      const expectedPsidHash = anonymizePsid("psid-host-log").slice(0, 12);
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "psid-host-log" },
+                message: {
+                  mid: "mid-host-log",
+                  attachments: [
+                    {
+                      type: "image",
+                      payload: {
+                        url: "https://lookaside.fbsbx.com/path/to/file.jpg?token=secret",
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      });
+      const photoReceivedCall = consoleLogSpy.mock.calls
+        .map(args => args[0])
+        .find(
+          value =>
+            typeof value === "string" &&
+            value.includes("\"msg\":\"photo_received\"")
+        );
+
+      expect(photoReceivedCall).toBeDefined();
+      expect(JSON.parse(photoReceivedCall as string)).toEqual({
+        level: "debug",
+        msg: "photo_received",
+        reqId: expect.any(String),
+        psidHash: expectedPsidHash,
+        hasAttachments: true,
+        attachmentHostname: "lookaside.fbsbx.com",
+      });
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
   });
 
   it("updates lastUserMessageAt only for inbound user messages", async () => {
@@ -487,8 +541,8 @@ describe("messenger webhook dedupe", () => {
 
     const sourceImage = Buffer.alloc(6000, 7);
     const generatedImageBytes = Buffer.from("fake-png").toString("base64");
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url === "https://img.example/source.jpg") {
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -617,8 +671,8 @@ describe("messenger webhook dedupe", () => {
     const timeoutError = new Error("aborted");
     timeoutError.name = "AbortError";
     const sourceImage = Buffer.alloc(6000, 7);
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url === "https://img.example/source.jpg") {
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -668,8 +722,8 @@ describe("messenger webhook dedupe", () => {
 
     let resolveFetch: ((value: { ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }) => void) | undefined;
     const sourceImage = Buffer.alloc(6000, 7);
-    const fetchMock = vi.fn((url: string) => {
-      if (url === "https://img.example/source.jpg") {
+    const fetchMock = vi.fn((url: string | URL) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
         return Promise.resolve({
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -757,8 +811,8 @@ describe("messenger webhook dedupe", () => {
 
     let resolveFetch: ((value: { ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }) => void) | undefined;
     const sourceImage = Buffer.alloc(6000, 7);
-    const fetchMock = vi.fn((url: string) => {
-      if (url === "https://img.example/source.jpg") {
+    const fetchMock = vi.fn((url: string | URL) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
         return Promise.resolve({
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -845,6 +899,7 @@ describe("messenger webhook dedupe", () => {
 
 describe("messenger greeting behavior", () => {
   beforeEach(() => {
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
