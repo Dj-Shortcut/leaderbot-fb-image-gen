@@ -92,4 +92,18 @@ describe("messenger webhook payload validation", () => {
     expect(response.status).toBe(400);
     expect(response.payload).toContain("Invalid webhook payload");
   });
+
+  it("rate limits repeated signed webhook requests from the same IP", async () => {
+    const secret = "test-secret";
+    process.env.FB_APP_SECRET = secret;
+
+    const body = JSON.stringify({ object: "page", entry: [] });
+    let response: { status: number; payload: string } | undefined;
+
+    for (let attempt = 0; attempt < 61; attempt += 1) {
+      response = await postWebhook(body, buildSignature(body, secret));
+    }
+
+    expect(response?.status).toBe(429);
+  });
 });
