@@ -69,6 +69,7 @@ AI endpoints must be protected against abuse.
 
 Implemented / planned protections:
 
+* global HTTP rate limiting
 * Redis-backed rate limiting
 * per user quota
 * daily usage limits
@@ -90,6 +91,7 @@ Typical protections include:
 * control character stripping
 * request size limits
 * JSON body validation
+* schema validation with Zod for webhook payloads and typed server inputs
 
 ## 5. Observability
 

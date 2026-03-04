@@ -154,6 +154,8 @@ Related files:
 
 - `REDIS_URL` (enable Redis state store; required in production)
 - `WEBHOOK_REPLAY_TTL_SECONDS` (override webhook replay-protection TTL, default `300`)
+- `HTTP_RATE_LIMIT_WINDOW_MS` (global HTTP rate-limit window, default `60000`; Redis-backed when `REDIS_URL` is set)
+- `HTTP_RATE_LIMIT_MAX_REQUESTS` (max requests per IP per window, default `120`)
 - `DEFAULT_MESSENGER_LANG` (`nl`/`en` fallback behavior)
 - `PRIVACY_POLICY_URL` (link sent in privacy quick reply)
 - `ADMIN_TOKEN` (protects `/debug/build`)
