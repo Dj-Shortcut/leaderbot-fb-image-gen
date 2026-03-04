@@ -11,6 +11,9 @@ describe("OpenAi image-to-image proof", () => {
     vi.unstubAllGlobals();
     delete process.env.OPENAI_API_KEY;
     delete process.env.APP_BASE_URL;
+    delete process.env.OPENAI_IMAGE_MAX_RETRIES;
+    delete process.env.OPENAI_IMAGE_RETRY_BASE_MS;
+    delete process.env.OPENAI_IMAGE_TIMEOUT_MS;
   });
 
   it("sends the original image bytes in OpenAI edits request", async () => {
@@ -174,5 +177,99 @@ describe("OpenAi image-to-image proof", () => {
 
     await expect(fs.access(path.join(generatedDir, "old-artifact.webp"))).rejects.toThrow();
   });
+
+  it("retries OpenAI edits request on retryable status codes", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.OPENAI_IMAGE_MAX_RETRIES = "1";
+    process.env.OPENAI_IMAGE_RETRY_BASE_MS = "1";
+
+    const fixture = Buffer.alloc(7000, 9);
+    let openAiCallCount = 0;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "https://img.example/source.jpg") {
+        return {
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => fixture,
+        } as Response;
+      }
+
+      openAiCallCount += 1;
+      if (openAiCallCount === 1) {
+        return {
+          ok: false,
+          status: 429,
+          statusText: "Too Many Requests",
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    const result = await generator.generate({
+      style: "disco",
+      sourceImageUrl: "https://img.example/source.jpg",
+      userKey: "user-1",
+      reqId: "req-openai-retry",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(result.imageUrl).toMatch(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/leaderbot-disco-\d+\.jpg$/);
+    expect(result.metrics.openAiMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("retries OpenAI edits request after timeout aborts", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.OPENAI_IMAGE_MAX_RETRIES = "1";
+    process.env.OPENAI_IMAGE_RETRY_BASE_MS = "1";
+    process.env.OPENAI_IMAGE_TIMEOUT_MS = "5";
+
+    const fixture = Buffer.alloc(7000, 9);
+    let openAiCallCount = 0;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "https://img.example/source.jpg") {
+        return {
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => fixture,
+        } as Response;
+      }
+
+      openAiCallCount += 1;
+      if (openAiCallCount === 1) {
+        const abortError = new Error("request aborted");
+        abortError.name = "AbortError";
+        throw abortError;
+      }
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    const result = await generator.generate({
+      style: "disco",
+      sourceImageUrl: "https://img.example/source.jpg",
+      userKey: "user-1",
+      reqId: "req-openai-timeout-retry",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(result.imageUrl).toMatch(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/leaderbot-disco-\d+\.jpg$/);
+    expect(result.metrics.openAiMs).toBeGreaterThanOrEqual(0);
+  });
+
 
 });

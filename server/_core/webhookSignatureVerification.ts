@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Request, Response, NextFunction } from "express";
 
 type MetaWebhookRequest = Request & { rawBody?: Buffer };
@@ -37,6 +37,13 @@ export function verifyMetaWebhookSignature(
     return;
   }
 
+  // Enforce expected Meta signature format
+  if (!signature.startsWith("sha256=")) {
+    console.warn("[Webhook] Invalid X-Hub-Signature-256 format");
+    res.status(403).json({ error: "Signature verification failed" });
+    return;
+  }
+
   // Recreate signature
   const expectedSignature = createHmac("sha256", appSecret)
     .update(rawBody)
@@ -45,7 +52,7 @@ export function verifyMetaWebhookSignature(
   const expectedHeader = `sha256=${expectedSignature}`;
 
   // Compare signatures using constant-time comparison to prevent timing attacks
-  const isValid = constantTimeCompare(signature, expectedHeader);
+  const isValid = safeCompare(signature, expectedHeader);
 
   if (!isValid) {
     console.warn("[Webhook] Signature verification failed", {
@@ -63,17 +70,15 @@ export function verifyMetaWebhookSignature(
 /**
  * Constant-time string comparison to prevent timing attacks
  */
-function constantTimeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) {
+function safeCompare(a: string, b: string): boolean {
+  const left = Buffer.from(a, "utf8");
+  const right = Buffer.from(b, "utf8");
+
+  if (left.length !== right.length) {
     return false;
   }
 
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-
-  return result === 0;
+  return timingSafeEqual(left, right);
 }
 
 export function captureMetaWebhookRawBody(

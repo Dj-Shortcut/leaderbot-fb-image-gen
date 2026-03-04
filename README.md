@@ -162,10 +162,20 @@ Related files:
 - `OAUTH_SERVER_URL` (enables OAuth route initialization)
 - `LOG_LEVEL`, `DEBUG_STATE_DUMP` (diagnostics)
 - `GENERATOR_MODE=mock` (forces mock generator)
-- `OPENAI_IMAGE_TIMEOUT_MS`, `FB_IMAGE_FETCH_TIMEOUT_MS` (timeouts)
+- `OPENAI_IMAGE_TIMEOUT_MS`, `FB_IMAGE_FETCH_TIMEOUT_MS` (per-request timeouts; OpenAI defaults to 30000ms and applies per retry attempt)
+- `OPENAI_IMAGE_MAX_RETRIES`, `OPENAI_IMAGE_RETRY_BASE_MS` (retry policy for OpenAI image edits on 408/429/5xx/transient network errors)
+- `MESSENGER_MAX_IMAGE_JOBS` (global cap for concurrent image generations, default `3`)
+- `MESSENGER_PSID_COOLDOWN_MS` (optional per-PSID cooldown between generations, default `0`)
+- `MESSENGER_PSID_LOCK_TTL_MS` (per-PSID in-flight lock TTL, default `120000`)
+- `GRAPH_API_MAX_RETRIES`, `GRAPH_API_RETRY_BASE_MS` (retry policy for Meta Graph API 429/5xx responses)
 - `PORT` (default `8080`)
 
 Legacy/app-specific environment variables also exist for SDK and data API integrations in `server/_core/env.ts`.
+
+### Secret hygiene
+
+- Never commit real `.env` files; only keep `.env.example` in git.
+- If a secret appears in GitHub code search (for example by searching for `.env` in this repo), rotate all exposed credentials immediately.
 
 ## Local dev
 
@@ -234,6 +244,29 @@ Behavior:
 - `/auth/github/callback` validates the CSRF state cookie, fetches the GitHub user, and only allows usernames from `ADMIN_GITHUB_USERS`.
 - Successful logins receive an `admin_session` JWT cookie valid for 7 days.
 - `POST /auth/logout` clears the admin session.
+
+## Security: webhook signature verification
+
+Incoming `POST /webhook/facebook` requests are authenticated using Meta's `X-Hub-Signature-256` header.
+
+- Signature format must be `sha256=<hex-digest>`.
+- The server captures the **raw request body** (`express.json({ verify })`) and computes `HMAC-SHA256(rawBody, FB_APP_SECRET)`.
+- Signatures are compared with `timingSafeEqual` to avoid timing side channels.
+- Missing/invalid signatures return `403`.
+
+The signature middleware is only applied on the Messenger webhook POST route.
+
+## Security: request body limits
+
+The server uses a `10mb` limit for both `express.json` and `express.urlencoded` parsers.
+Oversized payloads return `413` with a friendly JSON response:
+
+```json
+{
+  "error": "Payload too large",
+  "message": "Request body exceeds the 10mb limit."
+}
+```
 
 ## Deployment notes
 

@@ -12,7 +12,7 @@ function buildSignature(body: string, secret: string): string {
   return `sha256=${digest}`;
 }
 
-async function postWebhook(body: string, signature: string): Promise<{ status: number; payload: string }> {
+async function postWebhook(body: string, signature?: string): Promise<{ status: number; payload: string }> {
   const app = express();
 
   app.use(
@@ -34,6 +34,15 @@ async function postWebhook(body: string, signature: string): Promise<{ status: n
     throw new Error("Failed to bind test server");
   }
 
+  const headers: Record<string, string | number> = {
+    "content-type": "application/json",
+    "content-length": Buffer.byteLength(body),
+  };
+
+  if (signature) {
+    headers["x-hub-signature-256"] = signature;
+  }
+
   const result = await new Promise<{ status: number; payload: string }>((resolve, reject) => {
     const request = http.request(
       {
@@ -41,11 +50,7 @@ async function postWebhook(body: string, signature: string): Promise<{ status: n
         port: address.port,
         path: "/webhook/facebook",
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "content-length": Buffer.byteLength(body),
-          "x-hub-signature-256": signature,
-        },
+        headers,
       },
       (response) => {
         let payload = "";
@@ -79,6 +84,16 @@ async function postWebhook(body: string, signature: string): Promise<{ status: n
 describe("Meta webhook signature verification", () => {
   afterEach(() => {
     delete process.env.FB_APP_SECRET;
+  });
+
+  it("rejects webhook requests with a missing signature", async () => {
+    process.env.FB_APP_SECRET = "test-secret";
+
+    const body = JSON.stringify({ object: "page", entry: [] });
+    const response = await postWebhook(body);
+
+    expect(response.status).toBe(403);
+    expect(response.payload).toContain("Signature verification failed");
   });
 
   it("accepts webhook requests with a valid signature", async () => {

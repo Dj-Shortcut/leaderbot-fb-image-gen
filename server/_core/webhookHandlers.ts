@@ -37,6 +37,7 @@ import {
   stylePayloadToStyle,
   toMessengerReplies,
 } from "./webhookHelpers";
+import { runGuardedGeneration } from "./generationGuard";
 
 type HandlerDeps = {
   defaultLang: Lang;
@@ -44,7 +45,15 @@ type HandlerDeps = {
 };
 
 const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
-const SMALLTALK = new Set(["how are you", "how are you?", "sup", "what's up", "whats up", "thanks", "thank you"]);
+const SMALLTALK = new Set([
+  "how are you",
+  "how are you?",
+  "sup",
+  "what's up",
+  "whats up",
+  "thanks",
+  "thank you",
+]);
 
 export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: HandlerDeps) {
   async function sendStateQuickReplies(psid: string, state: ConversationState, text: string): Promise<void> {
@@ -61,7 +70,10 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     await sendStateQuickReplies(psid, "AWAITING_STYLE", t(lang, "stylePicker"));
   }
 
-  async function sendPhotoReceivedPrompt(psid: string, lang: Lang): Promise<void> {
+  async function sendPhotoReceivedPrompt(
+    psid: string,
+    lang: Lang
+  ): Promise<void> {
     await sendStylePicker(psid, lang);
   }
 
@@ -69,7 +81,11 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     await sendStateQuickReplies(psid, "IDLE", t(lang, "flowExplanation"));
   }
 
-  async function sendReferralPhotoPrompt(psid: string, style: Style, lang: Lang): Promise<void> {
+  async function sendReferralPhotoPrompt(
+    psid: string,
+    style: Style,
+    lang: Lang
+  ): Promise<void> {
     const styleLabel = STYLE_LABELS[style];
     const text =
       lang === "en"
@@ -78,89 +94,133 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     await sendText(psid, text);
   }
 
-  async function runStyleGeneration(psid: string, userId: string, style: Style, reqId: string, lang: Lang): Promise<void> {
-    const { mode, generator } = createImageGenerator();
+  async function runStyleGeneration(
+    psid: string,
+    userId: string,
+    style: Style,
+    reqId: string,
+    lang: Lang
+  ): Promise<void> {
+    const didRun = await runGuardedGeneration(psid, async () => {
+      const { mode, generator } = createImageGenerator();
 
-    await setFlowState(psid, "PROCESSING");
-    await sendText(psid, t(lang, "generatingPrompt", { styleLabel: STYLE_LABELS[style] }));
-
-    const state = await getOrCreateState(psid);
-    const lastImageUrl = state.lastPhotoUrl;
-
-    try {
-      const { imageUrl, proof, metrics } = await generator.generate({
-        style,
-        sourceImageUrl: lastImageUrl ?? undefined,
-        userKey: userId,
-        reqId,
-      });
-
-      console.info(JSON.stringify({
-        level: "info",
-        msg: "generation_summary",
-        reqId,
+      await setFlowState(psid, "PROCESSING");
+      await sendText(
         psid,
-        mode,
-        style,
-        ok: true,
-        fb_image_fetch_ms: metrics.fbImageFetchMs,
-        openai_ms: metrics.openAiMs,
-        upload_or_serve_ms: metrics.uploadOrServeMs,
-        total_ms: metrics.totalMs,
-      }));
+        t(lang, "generatingPrompt", { styleLabel: STYLE_LABELS[style] })
+      );
 
-      console.log("PROOF_SUMMARY", JSON.stringify({
-        reqId,
-        psidHash: anonymizePsid(psid).slice(0, 12),
-        style,
-        incomingLen: proof.incomingLen,
-        incomingSha256: proof.incomingSha256,
-        openaiInputLen: proof.openaiInputLen,
-        openaiInputSha256: proof.openaiInputSha256,
-        outputUrl: imageUrl,
-        totalMs: metrics.totalMs,
-        ok: true,
-      }));
+      const state = await getOrCreateState(psid);
+      const lastImageUrl = state.lastPhotoUrl;
 
-      await sendImage(psid, imageUrl);
-      await setLastGenerated(psid, imageUrl);
-      await sendStateQuickReplies(psid, "RESULT_READY", t(lang, "success"));
-    } catch (error) {
-      console.error("OPENAI_CALL_ERROR", { psid, error: error instanceof Error ? error.message : undefined });
+      try {
+        const { imageUrl, proof, metrics } = await generator.generate({
+          style,
+          sourceImageUrl: lastImageUrl ?? undefined,
+          userKey: userId,
+          reqId,
+        });
 
-      const errorClass = error instanceof Error ? error.constructor.name : "UnknownError";
-      getGenerationMetrics(error) ?? { totalMs: 0 };
+        console.info(
+          JSON.stringify({
+            level: "info",
+            msg: "generation_summary",
+            reqId,
+            psid,
+            mode,
+            style,
+            ok: true,
+            fb_image_fetch_ms: metrics.fbImageFetchMs,
+            openai_ms: metrics.openAiMs,
+            upload_or_serve_ms: metrics.uploadOrServeMs,
+            total_ms: metrics.totalMs,
+          })
+        );
 
-      console.log("PROOF_SUMMARY", JSON.stringify({
-        reqId,
-        psidHash: anonymizePsid(psid).slice(0, 12),
-        style,
-        ok: false,
-        errorCode: errorClass,
-      }));
+        console.log(
+          "PROOF_SUMMARY",
+          JSON.stringify({
+            reqId,
+            psidHash: anonymizePsid(psid).slice(0, 12),
+            style,
+            incomingLen: proof.incomingLen,
+            incomingSha256: proof.incomingSha256,
+            openaiInputLen: proof.openaiInputLen,
+            openaiInputSha256: proof.openaiInputSha256,
+            outputUrl: imageUrl,
+            totalMs: metrics.totalMs,
+            ok: true,
+          })
+        );
 
-      let failureText = t(lang, "generationGenericFailure");
-      if (error instanceof MissingInputImageError) {
-        await sendText(psid, t(lang, "missingInputImage"));
-        await setFlowState(psid, "AWAITING_PHOTO");
-        return;
-      } else if (error instanceof MissingOpenAiApiKeyError || error instanceof MissingAppBaseUrlError) {
-        failureText = t(lang, "generationUnavailable");
-      } else if (error instanceof GenerationTimeoutError) {
-        failureText = t(lang, "generationTimeout");
+        await sendImage(psid, imageUrl);
+        await setLastGenerated(psid, imageUrl);
+        await sendStateQuickReplies(psid, "RESULT_READY", t(lang, "success"));
+      } catch (error) {
+        console.error("OPENAI_CALL_ERROR", {
+          psid,
+          error: error instanceof Error ? error.message : undefined,
+        });
+
+        const errorClass =
+          error instanceof Error ? error.constructor.name : "UnknownError";
+        getGenerationMetrics(error) ?? { totalMs: 0 };
+
+        console.log(
+          "PROOF_SUMMARY",
+          JSON.stringify({
+            reqId,
+            psidHash: anonymizePsid(psid).slice(0, 12),
+            style,
+            ok: false,
+            errorCode: errorClass,
+          })
+        );
+
+        let failureText = t(lang, "generationGenericFailure");
+        if (error instanceof MissingInputImageError) {
+          await sendText(psid, t(lang, "missingInputImage"));
+          await setFlowState(psid, "AWAITING_PHOTO");
+          return;
+        } else if (
+          error instanceof MissingOpenAiApiKeyError ||
+          error instanceof MissingAppBaseUrlError
+        ) {
+          failureText = t(lang, "generationUnavailable");
+        } else if (error instanceof GenerationTimeoutError) {
+          failureText = t(lang, "generationTimeout");
+        }
+
+        await sendText(psid, t(lang, "failure"));
+        await setFlowState(psid, "FAILURE");
+
+        await sendQuickReplies(psid, failureText, [
+          {
+            content_type: "text",
+            title: t(lang, "retryThisStyle"),
+            payload: `RETRY_STYLE_${style}`,
+          },
+          {
+            content_type: "text",
+            title: t(lang, "otherStyle"),
+            payload: "CHOOSE_STYLE",
+          },
+        ]);
       }
+    });
 
-      await sendText(psid, t(lang, "failure"));
-      await setFlowState(psid, "FAILURE");
-
-      await sendQuickReplies(psid, failureText, [
-        { content_type: "text", title: t(lang, "retryThisStyle"), payload: `RETRY_STYLE_${style}` },
-        { content_type: "text", title: t(lang, "otherStyle"), payload: "CHOOSE_STYLE" },
-      ]);
+    if (didRun === null) {
+      await sendText(psid, t(lang, "processingBlocked"));
     }
   }
 
-  async function handleStyleSelection(psid: string, userId: string, selectedStyle: Style, reqId: string, lang: Lang): Promise<void> {
+  async function handleStyleSelection(
+    psid: string,
+    userId: string,
+    selectedStyle: Style,
+    reqId: string,
+    lang: Lang
+  ): Promise<void> {
     const state = await getOrCreateState(psid);
     if (state.stage === "PROCESSING") {
       await sendText(psid, t(lang, "processingBlocked"));
@@ -177,7 +237,13 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     await runStyleGeneration(psid, userId, selectedStyle, reqId, lang);
   }
 
-  async function handlePayload(psid: string, userId: string, payload: string, reqId: string, lang: Lang): Promise<void> {
+  async function handlePayload(
+    psid: string,
+    userId: string,
+    payload: string,
+    reqId: string,
+    lang: Lang
+  ): Promise<void> {
     if (payload.startsWith("RETRY_STYLE_")) {
       const retryStyle = normalizeStyle(payload.slice("RETRY_STYLE_".length));
       if (retryStyle) {
@@ -226,7 +292,13 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     safeLog("unknown_payload", { user: toLogUser(userId) });
   }
 
-  async function handleMessage(psid: string, userId: string, event: FacebookWebhookEvent, reqId: string, lang: Lang): Promise<void> {
+  async function handleMessage(
+    psid: string,
+    userId: string,
+    event: FacebookWebhookEvent,
+    reqId: string,
+    lang: Lang
+  ): Promise<void> {
     const message = event.message;
     if (!message || message.is_echo) return;
 
@@ -236,7 +308,9 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       return;
     }
 
-    const imageAttachment = message.attachments?.find(att => att.type === "image" && att.payload?.url);
+    const imageAttachment = message.attachments?.find(
+      att => att.type === "image" && att.payload?.url
+    );
     if (imageAttachment?.payload?.url) {
       console.log("PHOTO_RECEIVED", {
         psid,
@@ -322,7 +396,9 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       }
     }
 
-    const referralStyle = parseReferralStyle(event.postback?.referral?.ref ?? event.referral?.ref);
+    const referralStyle = parseReferralStyle(
+      event.postback?.referral?.ref ?? event.referral?.ref
+    );
     if (referralStyle) {
       await clearPendingImageState(psid);
       await setPreselectedStyle(psid, referralStyle);
@@ -338,7 +414,9 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     await handleMessage(psid, userId, event, reqId, lang);
   }
 
-  async function processFacebookWebhookPayload(payload: unknown): Promise<void> {
+  async function processFacebookWebhookPayload(
+    payload: unknown
+  ): Promise<void> {
     const entries = (payload as any)?.entry || [];
     for (const entry of entries as FacebookWebhookEntry[]) {
       const events = entry?.messaging || [];
