@@ -242,6 +242,7 @@ This app is configured for Fly.io using `Dockerfile` + `fly.toml`.
 Typical deployment flow:
 
 ```bash
+fly secrets set REDIS_URL=redis://<user>:<password>@<host>:<port> -a <app-name>
 fly secrets set KEY=value -a <app-name>
 fly deploy -a <app-name>
 fly logs -a <app-name>
@@ -250,6 +251,7 @@ fly logs -a <app-name>
 Operational notes:
 
 - `NODE_ENV=production` and `PORT=8080` are expected in runtime.
+- `REDIS_URL` must be set in Fly secrets before deploy; production startup now fails without it.
 - Health check endpoint is `/healthz`.
 - `APP_BASE_URL` must be publicly reachable in OpenAI mode so Messenger can fetch generated images from `/generated/<id>.png`.
 - Keep `FB_APP_SECRET` configured to enforce webhook signature verification middleware.

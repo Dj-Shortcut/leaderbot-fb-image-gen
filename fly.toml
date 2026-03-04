@@ -7,6 +7,7 @@ primary_region = "ams"
 [env]
   NODE_ENV = "production"
   PORT = "8080"
+  # REDIS_URL must be provided via Fly secrets for production startup.
 
 [http_service]
   internal_port = 8080
