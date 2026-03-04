@@ -1,4 +1,4 @@
-app = "groepsscore"
+app = "leaderbot-fb-image-gen"
 primary_region = "ams"
 
 [build]

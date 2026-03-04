@@ -57,42 +57,152 @@ const SMALLTALK = new Set([
 ]);
 
 export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: HandlerDeps) {
-  async function sendStateQuickReplies(psid: string, state: ConversationState, text: string): Promise<void> {
-    const replies = toMessengerReplies(state);
-    if (replies.length === 0) {
-      await sendText(psid, text);
-      return;
-    }
+  function logIncomingMessage(
+    psid: string,
+    userId: string,
+    event: FacebookWebhookEvent,
+    reqId: string
+  ): void {
+    console.log(
+      JSON.stringify({
+        level: "debug",
+        msg: "incoming_message",
+        reqId,
+        user: toLogUser(userId),
+        psidHash: anonymizePsid(psid).slice(0, 12),
+        isEcho: Boolean(event.message?.is_echo),
+        text: event.message?.text ?? null,
+        quickReplyPayload: event.message?.quick_reply?.payload ?? null,
+        attachments:
+          event.message?.attachments?.map(attachment => ({
+            type: attachment.type,
+            hasUrl: Boolean(attachment.payload?.url),
+          })) ?? [],
+        postbackPayload: event.postback?.payload ?? null,
+        referralRef: event.postback?.referral?.ref ?? event.referral?.ref ?? null,
+      })
+    );
+  }
 
+  function logUserState(
+    psid: string,
+    userId: string,
+    state: Awaited<ReturnType<typeof getOrCreateState>>,
+    reqId: string,
+    context: string
+  ): void {
+    console.log(
+      JSON.stringify({
+        level: "debug",
+        msg: "user_state",
+        context,
+        reqId,
+        user: toLogUser(userId),
+        psidHash: anonymizePsid(psid).slice(0, 12),
+        stage: state.stage,
+        hasSeenIntro: state.hasSeenIntro,
+        hasLastPhoto: Boolean(state.lastPhotoUrl),
+        selectedStyle: state.selectedStyle ?? null,
+        preselectedStyle: state.preselectedStyle ?? null,
+        preferredLang: state.preferredLang ?? null,
+      })
+    );
+  }
+
+  async function sendLoggedText(psid: string, text: string, reqId: string): Promise<void> {
+    console.log(
+      JSON.stringify({
+        level: "debug",
+        msg: "outgoing_message",
+        kind: "text",
+        reqId,
+        psidHash: anonymizePsid(psid).slice(0, 12),
+        text,
+      })
+    );
+    await sendText(psid, text);
+  }
+
+  async function sendLoggedQuickReplies(
+    psid: string,
+    text: string,
+    replies: Parameters<typeof sendQuickReplies>[2],
+    reqId: string
+  ): Promise<void> {
+    console.log(
+      JSON.stringify({
+        level: "debug",
+        msg: "outgoing_message",
+        kind: "quick_replies",
+        reqId,
+        psidHash: anonymizePsid(psid).slice(0, 12),
+        text,
+        quickReplies: replies.map(reply => ({
+          title: reply.title,
+          payload: reply.payload,
+        })),
+      })
+    );
     await sendQuickReplies(psid, text, replies);
   }
 
-  async function sendStylePicker(psid: string, lang: Lang): Promise<void> {
-    await sendStateQuickReplies(psid, "AWAITING_STYLE", t(lang, "stylePicker"));
+  async function sendLoggedImage(psid: string, imageUrl: string, reqId: string): Promise<void> {
+    console.log(
+      JSON.stringify({
+        level: "debug",
+        msg: "outgoing_message",
+        kind: "image",
+        reqId,
+        psidHash: anonymizePsid(psid).slice(0, 12),
+        imageUrl,
+      })
+    );
+    await sendImage(psid, imageUrl);
+  }
+
+  async function sendStateQuickReplies(
+    psid: string,
+    state: ConversationState,
+    text: string,
+    reqId: string
+  ): Promise<void> {
+    const replies = toMessengerReplies(state);
+    if (replies.length === 0) {
+      await sendLoggedText(psid, text, reqId);
+      return;
+    }
+
+    await sendLoggedQuickReplies(psid, text, replies, reqId);
+  }
+
+  async function sendStylePicker(psid: string, lang: Lang, reqId: string): Promise<void> {
+    await sendStateQuickReplies(psid, "AWAITING_STYLE", t(lang, "stylePicker"), reqId);
   }
 
   async function sendPhotoReceivedPrompt(
     psid: string,
-    lang: Lang
+    lang: Lang,
+    reqId: string
   ): Promise<void> {
-    await sendStylePicker(psid, lang);
+    await sendStylePicker(psid, lang, reqId);
   }
 
-  async function sendIntro(psid: string, lang: Lang): Promise<void> {
-    await sendStateQuickReplies(psid, "IDLE", t(lang, "flowExplanation"));
+  async function sendIntro(psid: string, lang: Lang, reqId: string): Promise<void> {
+    await sendStateQuickReplies(psid, "IDLE", t(lang, "flowExplanation"), reqId);
   }
 
   async function sendReferralPhotoPrompt(
     psid: string,
     style: Style,
-    lang: Lang
+    lang: Lang,
+    reqId: string
   ): Promise<void> {
     const styleLabel = STYLE_LABELS[style];
     const text =
       lang === "en"
         ? `You came in via ${styleLabel}. Send a photo to start `
         : `Je bent binnengekomen via ${styleLabel}. Stuur een foto om te starten `;
-    await sendText(psid, text);
+    await sendLoggedText(psid, text, reqId);
   }
 
   async function runStyleGeneration(
@@ -106,9 +216,10 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       const { mode, generator } = createImageGenerator();
 
       await setFlowState(psid, "PROCESSING");
-      await sendText(
+      await sendLoggedText(
         psid,
-        t(lang, "generatingPrompt", { styleLabel: STYLE_LABELS[style] })
+        t(lang, "generatingPrompt", { styleLabel: STYLE_LABELS[style] }),
+        reqId
       );
 
       const state = await getOrCreateState(psid);
@@ -154,9 +265,10 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
           })
         );
 
-        await sendImage(psid, imageUrl);
+        await sendLoggedImage(psid, imageUrl, reqId);
         await setLastGenerated(psid, imageUrl);
-        await sendStateQuickReplies(psid, "RESULT_READY", t(lang, "success"));
+        await sendStateQuickReplies(psid, "RESULT_READY", t(lang, "success"), reqId);
+        await setFlowState(psid, "IDLE");
       } catch (error) {
         console.error("OPENAI_CALL_ERROR", {
           psid,
@@ -180,7 +292,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
 
         let failureText = t(lang, "generationGenericFailure");
         if (error instanceof MissingInputImageError) {
-          await sendText(psid, t(lang, "missingInputImage"));
+          await sendLoggedText(psid, t(lang, "missingInputImage"), reqId);
           await setFlowState(psid, "AWAITING_PHOTO");
           return;
         } else if (
@@ -192,10 +304,10 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
           failureText = t(lang, "generationTimeout");
         }
 
-        await sendText(psid, t(lang, "failure"));
+        await sendLoggedText(psid, t(lang, "failure"), reqId);
         await setFlowState(psid, "FAILURE");
 
-        await sendQuickReplies(psid, failureText, [
+        await sendLoggedQuickReplies(psid, failureText, [
           {
             content_type: "text",
             title: t(lang, "retryThisStyle"),
@@ -206,12 +318,12 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
             title: t(lang, "otherStyle"),
             payload: "CHOOSE_STYLE",
           },
-        ]);
+        ], reqId);
       }
     });
 
     if (didRun === null) {
-      await sendText(psid, t(lang, "processingBlocked"));
+      await sendLoggedText(psid, t(lang, "processingBlocked"), reqId);
     }
   }
 
@@ -224,14 +336,14 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
   ): Promise<void> {
     const state = await getOrCreateState(psid);
     if (state.stage === "PROCESSING") {
-      await sendText(psid, t(lang, "processingBlocked"));
+      await sendLoggedText(psid, t(lang, "processingBlocked"), reqId);
       return;
     }
 
     await setChosenStyle(psid, selectedStyle);
     if (!state.lastPhotoUrl) {
       await setFlowState(psid, "AWAITING_PHOTO");
-      await sendText(psid, t(lang, "styleWithoutPhoto"));
+      await sendLoggedText(psid, t(lang, "styleWithoutPhoto"), reqId);
       return;
     }
 
@@ -262,7 +374,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     if (payload === "CHOOSE_STYLE") {
       await setPreselectedStyle(psid, null);
       await setFlowState(psid, "AWAITING_STYLE");
-      await sendStylePicker(psid, lang);
+      await sendStylePicker(psid, lang, reqId);
       return;
     }
 
@@ -276,17 +388,17 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       }
 
       await setFlowState(psid, "AWAITING_STYLE");
-      await sendStylePicker(psid, lang);
+      await sendStylePicker(psid, lang, reqId);
       return;
     }
 
     if (payload === "WHAT_IS_THIS") {
-      await sendText(psid, t(lang, "flowExplanation"));
+      await sendLoggedText(psid, t(lang, "flowExplanation"), reqId);
       return;
     }
 
     if (payload === "PRIVACY_INFO") {
-      await sendText(psid, t(lang, "privacy", { link: privacyPolicyUrl }));
+      await sendLoggedText(psid, t(lang, "privacy", { link: privacyPolicyUrl }), reqId);
       return;
     }
 
@@ -320,6 +432,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       });
 
       const state = await getOrCreateState(psid);
+      logUserState(psid, userId, state, reqId, "image_received");
       const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");
       await setPendingImage(psid, imageAttachment.payload.url);
 
@@ -331,7 +444,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       }
 
       await setFlowState(psid, "AWAITING_STYLE");
-      await sendPhotoReceivedPrompt(psid, lang);
+      await sendPhotoReceivedPrompt(psid, lang, reqId);
       return;
     }
 
@@ -350,29 +463,31 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
 
     if (GREETINGS.has(normalizedText) || SMALLTALK.has(normalizedText)) {
       const state = await getOrCreateState(psid);
+      logUserState(psid, userId, state, reqId, "greeting");
       if (!state.hasSeenIntro && state.stage === "IDLE") {
-        await sendIntro(psid, lang);
+        await sendIntro(psid, lang, reqId);
         await markIntroSeen(psid);
         return;
       }
 
       const response = getGreetingResponse(state.stage, lang);
       if (response.mode === "text") {
-        await sendText(psid, response.text);
+        await sendLoggedText(psid, response.text, reqId);
       } else {
-        await sendStateQuickReplies(psid, response.state, response.text);
+        await sendStateQuickReplies(psid, response.state, response.text, reqId);
       }
       return;
     }
 
     const state = await getOrCreateState(psid);
+    logUserState(psid, userId, state, reqId, "text_message");
     if (!state.lastPhotoUrl) {
       await setFlowState(psid, "AWAITING_PHOTO");
-      await sendText(psid, t(lang, "textWithoutPhoto"));
+      await sendLoggedText(psid, t(lang, "textWithoutPhoto"), reqId);
       return;
     }
 
-    await sendText(psid, t(lang, "flowExplanation"));
+    await sendLoggedText(psid, t(lang, "flowExplanation"), reqId);
   }
 
   async function handleEvent(event: FacebookWebhookEvent, entryId?: string): Promise<void> {
@@ -383,6 +498,8 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     const reqId = `${psid}-${Date.now()}`;
     const localeLang = normalizeLang(event.sender?.locale);
     const state = await getOrCreateState(psid);
+    logIncomingMessage(psid, userId, event, reqId);
+    logUserState(psid, userId, state, reqId, "handle_event");
     const lang = state.preferredLang || localeLang || defaultLang;
 
     if (localeLang && localeLang !== state.preferredLang) {
@@ -408,7 +525,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       await clearPendingImageState(psid);
       await setPreselectedStyle(psid, referralStyle);
       await setFlowState(psid, "AWAITING_PHOTO");
-      return sendReferralPhotoPrompt(psid, referralStyle, lang);
+      return sendReferralPhotoPrompt(psid, referralStyle, lang, reqId);
     }
 
     if (event.postback?.payload) {
