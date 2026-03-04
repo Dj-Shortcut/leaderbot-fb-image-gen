@@ -1,1 +1,0 @@
-SSRF mitigation: allowlist source image hosts (fail-closed)
