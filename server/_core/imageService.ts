@@ -321,50 +321,6 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit | un
   }
 }
 
-/**
- * Validate a source image URL coming from user-controlled state to prevent SSRF.
- * Throws MissingInputImageError if the URL is invalid or targets disallowed hosts.
- */
-function validateSourceImageUrlOrThrow(sourceImageUrl: string): URL {
-  let url: URL;
-  try {
-    url = new URL(sourceImageUrl);
-  } catch {
-    throw new MissingInputImageError("Invalid sourceImageUrl");
-  }
-
-  // Only allow http(s) schemes; block others such as file:, data:, etc.
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new MissingInputImageError("Invalid sourceImageUrl protocol");
-  }
-
-  const hostname = url.hostname.toLowerCase();
-
-  // Block obvious local/loopback hostnames.
-  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
-    throw new MissingInputImageError("Disallowed sourceImageUrl host");
-  }
-
-  // Best-effort check against private IPv4 ranges.
-  const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (ipv4Match) {
-    const [_, aStr, bStr] = ipv4Match;
-    const a = Number(aStr);
-    const b = Number(bStr);
-
-    if (
-      a === 10 || // 10.0.0.0/8
-      (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12
-      (a === 192 && b === 168) || // 192.168.0.0/16
-      (a === 169 && b === 254) // 169.254.0.0/16 (link-local)
-    ) {
-      throw new MissingInputImageError("Disallowed sourceImageUrl host");
-    }
-  }
-
-  return url;
-}
-
 class MockImageGenerator implements ImageGenerator {
   generate(input: { style: Style; sourceImageUrl?: string; userKey: string; reqId: string }): Promise<{
     imageUrl: string;
