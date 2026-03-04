@@ -8,6 +8,7 @@ Leaderbot runs as one Node.js process (Express + HTTP server):
 - Executes conversation flow + generation orchestration.
 - Serves static assets (`/demo`, `/generated`, web build output).
 - Exposes health/version/debug endpoints.
+- Exposes Prometheus-style metrics and request tracing hooks.
 - Optionally mounts OAuth and additional chat routes.
 
 Primary bootstrap is in `server/_core/index.ts`.
