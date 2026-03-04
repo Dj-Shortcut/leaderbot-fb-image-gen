@@ -239,6 +239,7 @@ describe("messenger webhook dedupe", () => {
     expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
     expect(safeLogMock).toHaveBeenCalledWith("webhook_replay_ignored", {
       user: expect.any(String),
+      eventId: expect.stringContaining("entry:entry-123:"),
     });
   });
 
