@@ -66,7 +66,8 @@ async function sendMessage(
 ): Promise<void> {
   const withinResponseWindow = await Promise.resolve(hasOpenMessengerResponseWindow(psid));
   if (!withinResponseWindow) {
-    throw new Error("Messenger response window is closed");
+    safeLog("messenger_send_skipped", { reason: "response_window_closed" });
+    return;
   }
 
   const maxRetries = parsePositiveInt("GRAPH_API_MAX_RETRIES", 3);

@@ -92,16 +92,14 @@ describe("messengerApi retries", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
-  it("rejects outbound messages when the 24h Messenger response window is closed", async () => {
+  it("skips outbound messages when the 24h Messenger response window is closed", async () => {
     const now = Date.now();
     setLastUserMessageAt("psid-1", now - 24 * 60 * 60 * 1000 - 1);
 
     const fetchMock = vi.fn<typeof fetch>();
     global.fetch = fetchMock;
 
-    await expect(sendText("psid-1", "hello")).rejects.toThrow(
-      "Messenger response window is closed"
-    );
+    await expect(sendText("psid-1", "hello")).resolves.toBeUndefined();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
