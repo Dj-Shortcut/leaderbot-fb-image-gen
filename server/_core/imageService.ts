@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import net from "node:net";
 import os from "node:os";
 import { STYLE_TO_DEMO_FILE, type Style } from "./messengerStyles";
 import fs from "fs/promises";
@@ -26,6 +27,7 @@ export class GenerationTimeoutError extends Error {}
 export class OpenAiGenerationError extends Error {}
 export class MissingAppBaseUrlError extends Error {}
 export class MissingInputImageError extends Error {}
+export class InvalidSourceImageUrlError extends Error {}
 
 export type GenerationMetrics = {
   fbImageFetchMs?: number;
@@ -217,6 +219,91 @@ function isTransientNetworkError(error: unknown): boolean {
   return error.name === "AbortError" || error instanceof TypeError;
 }
 
+function parseAllowedHostsFromEnv(): string[] {
+  return (process.env.SOURCE_IMAGE_ALLOWED_HOSTS ?? "")
+    .split(",")
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function isPrivateIPv4(ip: string): boolean {
+  const parts = ip.split(".").map(x => Number(x));
+  if (parts.length !== 4 || parts.some(n => !Number.isInteger(n) || n < 0 || n > 255)) {
+    return true;
+  }
+
+  const [a, b] = parts;
+
+  if (a === 10) return true;
+  if (a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+
+  return false;
+}
+
+function hostnameMatchesAllowedHost(hostname: string, allowedHost: string): boolean {
+  return hostname === allowedHost || hostname.endsWith(`.${allowedHost}`);
+}
+
+function isBlockedHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+
+  if (h === "localhost" || h.endsWith(".localhost")) return true;
+
+  const ipType = net.isIP(h);
+  if (ipType === 4) return isPrivateIPv4(h);
+  if (ipType === 6) {
+    if (h === "::1") return true;
+    if (h.startsWith("fc") || h.startsWith("fd")) return true;
+    if (h.startsWith("fe8") || h.startsWith("fe9") || h.startsWith("fea") || h.startsWith("feb")) return true;
+    return true;
+  }
+
+  return false;
+}
+
+export function validateSourceImageUrlOrThrow(sourceImageUrl: string, reqId?: string): URL {
+  let parsedUrl: URL;
+
+  try {
+    parsedUrl = new URL(sourceImageUrl);
+  } catch {
+    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "invalid_url" });
+    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+  }
+
+  const hostname = parsedUrl.hostname.toLowerCase();
+  if (parsedUrl.protocol !== "https:") {
+    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "invalid_scheme", protocol: parsedUrl.protocol });
+    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+  }
+
+  if (parsedUrl.username || parsedUrl.password) {
+    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "embedded_credentials" });
+    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+  }
+
+  if (isBlockedHostname(hostname)) {
+    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "blocked_hostname", hostname });
+    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+  }
+
+  const allowedHosts = parseAllowedHostsFromEnv();
+  if (allowedHosts.length === 0) {
+    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "allowlist_not_configured" });
+    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+  }
+
+  if (!allowedHosts.some(allowedHost => hostnameMatchesAllowedHost(hostname, allowedHost))) {
+    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "host_not_allowed", hostname });
+    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+  }
+
+  return parsedUrl;
+}
+
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit | undefined, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => {
@@ -226,6 +313,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit | un
   try {
     return await fetch(input, {
       ...init,
+      redirect: init?.redirect ?? "follow",
       signal: controller.signal,
     });
   } finally {
@@ -262,6 +350,7 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
   incomingSha256: string;
   fbImageFetchMs: number;
 }> {
+  const validatedSourceImageUrl = validateSourceImageUrlOrThrow(sourceImageUrl, reqId);
   const timeoutMs = getInboundImageTimeoutMs();
   let totalFetchMs = 0;
 
@@ -269,7 +358,7 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
     const attemptStartedAt = Date.now();
 
     try {
-      const response = await fetchWithTimeout(sourceImageUrl, undefined, timeoutMs);
+      const response = await fetchWithTimeout(validatedSourceImageUrl, { redirect: "error" }, timeoutMs);
       const contentType = response.headers.get("content-type") ?? "application/octet-stream";
 
       if (!response.ok) {
@@ -318,7 +407,7 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
         fbImageFetchMs: totalFetchMs,
       };
     } catch (error) {
-      if (error instanceof MissingInputImageError) {
+      if (error instanceof MissingInputImageError || error instanceof InvalidSourceImageUrlError) {
         throw error;
       }
 

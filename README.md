@@ -149,11 +149,13 @@ Related files:
 - `REDIS_URL` (required in production for webhook replay protection)
 - `APP_BASE_URL` (required in OpenAI mode for public generated image URLs)
 - `OPENAI_API_KEY` (required in OpenAI mode)
+- `SOURCE_IMAGE_ALLOWED_HOSTS` (required for inbound source-image fetching; if unset, source-image fetches are blocked)
 
 ### Common optional
 
 - `REDIS_URL` (enable Redis state store; required in production)
 - `WEBHOOK_REPLAY_TTL_SECONDS` (override webhook replay-protection TTL, default `300`)
+- `SOURCE_IMAGE_ALLOWED_HOSTS` (comma-separated host allowlist for inbound source images, for example `fbcdn.net,fbsbx.com`; fail-closed when unset)
 - `HTTP_RATE_LIMIT_WINDOW_MS` (global HTTP rate-limit window, default `60000`; Redis-backed when `REDIS_URL` is set)
 - `HTTP_RATE_LIMIT_MAX_REQUESTS` (max requests per IP per window, default `120`)
 - `DEFAULT_MESSENGER_LANG` (`nl`/`en` fallback behavior)
@@ -296,3 +298,4 @@ Operational notes:
 - The server accepts and returns `traceparent` so it can plug into OpenTelemetry-compatible tracing later without changing route behavior.
 - `APP_BASE_URL` must be publicly reachable in OpenAI mode so Messenger can fetch generated images from `/generated/<id>.png`.
 - Keep `FB_APP_SECRET` configured to enforce webhook signature verification middleware.
+- Set `SOURCE_IMAGE_ALLOWED_HOSTS` in production. Source-image fetches fail closed when it is unset. `fbcdn.net,fbsbx.com` is a conservative Meta-focused starting point, but the preferred setup is to narrow this to the exact attachment hostnames you observe in your Messenger webhook traffic.
