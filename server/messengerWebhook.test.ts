@@ -243,6 +243,64 @@ describe("messenger webhook dedupe", () => {
     });
   });
 
+  it("updates lastUserMessageAt only for inbound user messages", async () => {
+    const psid = "window-user";
+    const userId = anonymizePsid(psid);
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              timestamp: 1730000000000,
+              read: { watermark: 1730000000000 },
+            },
+            {
+              sender: { id: psid },
+              timestamp: 1730000000001,
+              delivery: { mids: ["mid-delivery"] },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(getState(userId)?.lastUserMessageAt).toBeUndefined();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              timestamp: 1730000000123,
+              message: { mid: "mid-window-1", text: "Hi" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(getState(userId)?.lastUserMessageAt).toBe(1730000000123);
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              timestamp: 1730000000999,
+              message: { mid: "mid-window-echo", is_echo: true, text: "echo" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(getState(userId)?.lastUserMessageAt).toBe(1730000000123);
+  });
+
 
 
   it("returns local demo images for all canonical styles in MOCK_MODE", async () => {
