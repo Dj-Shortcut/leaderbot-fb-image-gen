@@ -40,6 +40,7 @@ describe("OpenAi image-to-image proof", () => {
       }
 
       expect(toUrlString(url)).toBe("https://api.openai.com/v1/images/edits");
+      expect(init?.redirect).toBe("error");
       const formData = init?.body as FormData;
       expect(formData).toBeInstanceOf(FormData);
       const imageBlob = formData.get("image");
