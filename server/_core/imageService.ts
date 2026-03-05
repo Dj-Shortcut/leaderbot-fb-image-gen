@@ -313,7 +313,7 @@ export function validateSourceImageUrlOrThrow(sourceImageUrl: string, reqId?: st
   return parsedUrl;
 }
 
-async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit | undefined, timeoutMs: number): Promise<Response> {
+async function fetchWithTimeout(input: URL, init: RequestInit | undefined, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => {
     controller.abort();
@@ -502,7 +502,7 @@ export class OpenAiImageGenerator implements ImageGenerator {
         const openAiStartedAt = Date.now();
         try {
           response = await fetchWithTimeout(
-            "https://api.openai.com/v1/images/edits",
+            new URL("https://api.openai.com/v1/images/edits"),
             {
               method: "POST",
               headers: {
