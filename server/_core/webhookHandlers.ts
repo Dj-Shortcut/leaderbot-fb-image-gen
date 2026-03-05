@@ -39,6 +39,7 @@ import {
   toMessengerReplies,
 } from "./webhookHelpers";
 import { runGuardedGeneration } from "./generationGuard";
+import { canGenerate, increment } from "./messengerQuota";
 
 type HandlerDeps = {
   defaultLang: Lang;
@@ -222,6 +223,11 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
   ): Promise<void> {
     const didRun = await runGuardedGeneration(psid, async () => {
       const { mode, generator } = createImageGenerator();
+      if (!(await canGenerate(psid))) {
+        await sendLoggedText(psid, lang === "en" ? "You used your free credits for today. Come back tomorrow." : "Je hebt je gratis credits voor vandaag opgebruikt. Kom morgen terug.", reqId);
+        await setFlowState(psid, "AWAITING_STYLE");
+        return;
+      }
 
       await setFlowState(psid, "PROCESSING");
       await sendLoggedText(
@@ -274,6 +280,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         );
 
         await sendLoggedImage(psid, imageUrl, reqId);
+        await increment(psid);
         await setLastGenerated(psid, imageUrl);
         await sendStateQuickReplies(psid, "RESULT_READY", t(lang, "success"), reqId);
         await setFlowState(psid, "IDLE");
