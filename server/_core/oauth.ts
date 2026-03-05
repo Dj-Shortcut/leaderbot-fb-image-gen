@@ -27,13 +27,10 @@ function getCookieValue(req: Request, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-function clearOAuthStateCookie(res: Response) {
-  res.append(
-    "Set-Cookie",
-    `${OAUTH_STATE_COOKIE_NAME}=; Path=/api/oauth/callback; HttpOnly; SameSite=Lax; Max-Age=0`
-  );
+function clearOAuthStateCookie(req: Request, res: Response) {
+  const cookieOptions = getSessionCookieOptions(req);
+  res.clearCookie(OAUTH_STATE_COOKIE_NAME, { ...cookieOptions, path: "/api/oauth/callback", sameSite: "lax" });
 }
-
 export function parseOAuthState(state: string): OAuthStatePayload | null {
   try {
     const decoded = Buffer.from(state, "base64").toString("utf8");
@@ -78,14 +75,14 @@ export function registerOAuthRoutes(app: Express) {
       const state = getQueryParam(req, "state");
 
       if (!code || !state) {
-        clearOAuthStateCookie(res);
+        clearOAuthStateCookie(req, res);
         res.status(400).json({ error: "code and state are required" });
         return;
       }
 
       const validatedState = validateOAuthState(req, state);
       if (!validatedState) {
-        clearOAuthStateCookie(res);
+        clearOAuthStateCookie(req, res);
         res.status(400).json({ error: "invalid oauth state" });
         return;
       }
@@ -96,7 +93,7 @@ export function registerOAuthRoutes(app: Express) {
         const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
 
         if (!userInfo.openId) {
-          clearOAuthStateCookie(res);
+          clearOAuthStateCookie(req, res);
           res.status(400).json({ error: "openId missing from user info" });
           return;
         }
@@ -116,11 +113,11 @@ export function registerOAuthRoutes(app: Express) {
 
         const cookieOptions = getSessionCookieOptions(req);
         res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-        clearOAuthStateCookie(res);
+        clearOAuthStateCookie(req, res);
 
         res.redirect(302, "/");
       } catch (error) {
-        clearOAuthStateCookie(res);
+        clearOAuthStateCookie(req, res);
         console.error("[OAuth] Callback failed", error);
         res.status(500).json({ error: "OAuth callback failed" });
       }
