@@ -57,6 +57,9 @@ const SMALLTALK = new Set([
   "thank you",
 ]);
 
+const IN_FLIGHT_MESSAGE = "\u23F3 even geduld, ik ben nog bezig met jouw restyle";
+const inFlightNoticeSent = new Set();
+
 export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: HandlerDeps) {
   function getAttachmentHostname(url: string): string | null {
     try {
@@ -64,6 +67,21 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     } catch {
       return null;
     }
+  }
+
+  async function maybeSendInFlightMessage(psid: string, reqId: string) {
+    if (!(await hasInFlightGeneration(psid))) {
+      inFlightNoticeSent.delete(psid);
+      return false;
+    }
+
+    if (inFlightNoticeSent.has(psid)) {
+      return true;
+    }
+
+    inFlightNoticeSent.add(psid);
+    await sendLoggedText(psid, IN_FLIGHT_MESSAGE, reqId);
+    return true;
   }
 
   function logIncomingMessage(
@@ -343,8 +361,10 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     });
 
     if (didRun === null) {
-      await sendLoggedText(psid, t(lang, "processingBlocked"), reqId);
+      await maybeSendInFlightMessage(psid, reqId);
+      return;
     }
+    inFlightNoticeSent.delete(psid);
   }
 
   async function handleStyleSelection(
@@ -356,7 +376,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
   ): Promise<void> {
     const state = await getOrCreateState(psid);
     if (state.stage === "PROCESSING") {
-      await sendLoggedText(psid, t(lang, "processingBlocked"), reqId);
+      await maybeSendInFlightMessage(psid, reqId);
       return;
     }
 
@@ -377,6 +397,10 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     reqId: string,
     lang: Lang
   ): Promise<void> {
+    if (await maybeSendInFlightMessage(psid, reqId)) {
+      return;
+    }
+
     if (payload.startsWith("RETRY_STYLE_")) {
       const retryStyle = normalizeStyle(payload.slice("RETRY_STYLE_".length));
       if (retryStyle) {
@@ -436,6 +460,10 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     if (!message || message.is_echo) return;
     await setLastUserMessageAt(psid, event.timestamp ?? Date.now());
 
+    if (await maybeSendInFlightMessage(psid, reqId)) {
+      return;
+    }
+
     const quickPayload = message.quick_reply?.payload;
     if (quickPayload) {
       await handlePayload(psid, userId, quickPayload, reqId, lang);
@@ -446,10 +474,6 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       att => att.type === "image" && att.payload?.url
     );
     if (imageAttachment?.payload?.url) {
-      if (await hasInFlightGeneration(psid)) {
-        await sendLoggedText(psid, "⏳ even geduld, ik ben nog bezig met jouw restyle", reqId);
-        return;
-      }
       console.log(
         JSON.stringify({
           level: "debug",
