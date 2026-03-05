@@ -3,12 +3,15 @@ import fs from "fs";
 import { type Server } from "http";
 import { nanoid } from "nanoid";
 import path from "path";
-import { createGlobalHttpRateLimiter } from "./httpRateLimit";
+import { createGlobalHttpRateLimiter, DEFAULT_MAX_REQUESTS, DEFAULT_WINDOW_MS } from "./httpRateLimit";
+import rateLimit from "express-rate-limit";
 
 type ViteCreateServer = (typeof import("vite"))["createServer"];
 
 export async function setupVite(app: Express, server: Server, createViteServer: ViteCreateServer) {
   app.use(createGlobalHttpRateLimiter());
+
+  app.use(rateLimit({windowMs:DEFAULT_WINDOW_MS,limit:DEFAULT_MAX_REQUESTS,standardHeaders:true,legacyHeaders:false}));
 
   const serverOptions = {
     middlewareMode: true,
@@ -53,6 +56,8 @@ export async function setupVite(app: Express, server: Server, createViteServer: 
 
 export function serveStatic(app: Express, staticRoot?: string, generatedRoot?: string) {
   app.use(createGlobalHttpRateLimiter());
+
+  app.use(rateLimit({windowMs:DEFAULT_WINDOW_MS,limit:DEFAULT_MAX_REQUESTS,standardHeaders:true,legacyHeaders:false}));
   const distPathCandidates = staticRoot
     ? [path.resolve(staticRoot)]
     : [
