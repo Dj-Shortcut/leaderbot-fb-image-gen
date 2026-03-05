@@ -1,17 +1,7 @@
 import { getDayKey, getOrCreateState, type MessengerUserState } from "./messengerState";
 import { updateStoredState } from "./stateStore";
 
-const FREE_DAILY_LIMIT = 2;
-
-function hasQuotaBypass(psid: string, userKey: string): boolean {
-  const raw = process.env.MESSENGER_QUOTA_BYPASS_IDS ?? "";
-  if (!raw.trim()) {
-    return false;
-  }
-
-  const ids = new Set(raw.split(",").map(item => item.trim()).filter(Boolean));
-  return ids.has(psid) || ids.has(userKey);
-}
+const FREE_DAILY_LIMIT = 1;
 
 function withSyncedQuota(state: MessengerUserState, now = Date.now()): MessengerUserState {
   const dayKey = getDayKey(now);
@@ -46,19 +36,12 @@ async function syncQuotaState(psid: string, now = Date.now()): Promise<Messenger
 
 export async function canGenerate(psid: string): Promise<boolean> {
   const state = await syncQuotaState(psid);
-  if (hasQuotaBypass(psid, state.userKey)) {
-    return true;
-  }
-
   return state.quota.count < FREE_DAILY_LIMIT;
 }
 
 export async function increment(psid: string): Promise<void> {
   const now = Date.now();
   const current = await syncQuotaState(psid, now);
-  if (hasQuotaBypass(psid, current.userKey)) {
-    return;
-  }
 
   await Promise.resolve(
     updateStoredState<MessengerUserState>(psid, storedState => {

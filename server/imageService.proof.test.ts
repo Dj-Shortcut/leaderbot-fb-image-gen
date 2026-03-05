@@ -46,7 +46,7 @@ describe("OpenAi image-to-image proof", () => {
       expect(imageBlob).toBeInstanceOf(Blob);
       const imageBuffer = Buffer.from(await (imageBlob as Blob).arrayBuffer());
       expect(sha256(imageBuffer)).toBe(fixtureHash);
-      expect(formData.get("prompt")).toContain("disco party portrait");
+      expect(formData.get("prompt")).toContain("Apply disco style to this photo");
       expect(formData.get("output_format")).toBe("jpeg");
 
       return {
