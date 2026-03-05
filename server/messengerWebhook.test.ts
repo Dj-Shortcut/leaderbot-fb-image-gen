@@ -791,7 +791,7 @@ describe("messenger webhook dedupe", () => {
       });
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect(sendTextMock).toHaveBeenCalledWith("busy-user", "Even geduld — je vorige afbeelding is bijna klaar.");
+      expect(sendTextMock).toHaveBeenCalledWith("busy-user", "⏳ even geduld, ik ben nog bezig met jouw restyle");
 
       const generatedImageBytes = Buffer.from("fake-png").toString("base64");
       resolveFetch?.({
@@ -879,7 +879,7 @@ describe("messenger webhook dedupe", () => {
       });
 
       expect(sendTextMock.mock.calls).toEqual([
-        ["busy-user-text", "Even geduld — je vorige afbeelding is bijna klaar."],
+        ["busy-user-text", "⏳ even geduld, ik ben nog bezig met jouw restyle"],
       ]);
       expect(sendImageMock).not.toHaveBeenCalled();
       expect(sendQuickRepliesMock).not.toHaveBeenCalled();
