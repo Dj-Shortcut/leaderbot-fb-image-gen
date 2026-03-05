@@ -247,6 +247,10 @@ function hostnameMatchesAllowedHost(hostname: string, allowedHost: string): bool
   return hostname === allowedHost || hostname.endsWith(`.${allowedHost}`);
 }
 
+function isRedirectStatus(status: number): boolean {
+  return status >= 300 && status <= 399 && status !== 304;
+}
+
 function isBlockedHostname(hostname: string): boolean {
   const h = hostname.toLowerCase();
 
@@ -276,12 +280,17 @@ export function validateSourceImageUrlOrThrow(sourceImageUrl: string, reqId?: st
 
   const hostname = parsedUrl.hostname.toLowerCase();
   if (parsedUrl.protocol !== "https:") {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "invalid_scheme", protocol: parsedUrl.protocol });
+    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "non_https", protocol: parsedUrl.protocol });
     throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
   if (parsedUrl.username || parsedUrl.password) {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "embedded_credentials" });
+    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "credentials_in_url" });
+    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+  }
+
+  if (parsedUrl.port && parsedUrl.port !== "443") {
+    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "non_standard_port", port: parsedUrl.port });
     throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
@@ -313,7 +322,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit | un
   try {
     return await fetch(input, {
       ...init,
-      redirect: init?.redirect ?? "error",
+      redirect: init?.redirect ?? "manual",
       signal: controller.signal,
     });
   } finally {
@@ -358,8 +367,18 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
     const attemptStartedAt = Date.now();
 
     try {
-      const response = await fetchWithTimeout(validatedSourceImageUrl, { redirect: "error" }, timeoutMs);
+      const response = await fetchWithTimeout(validatedSourceImageUrl, { redirect: "manual" }, timeoutMs);
       const contentType = response.headers.get("content-type") ?? "application/octet-stream";
+
+      if (isRedirectStatus(response.status)) {
+        console.warn("SOURCE_IMAGE_URL_BLOCKED", {
+          reqId,
+          reason: "redirect_not_allowed",
+          status: response.status,
+          location: response.headers.get("location") ?? undefined,
+        });
+        throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+      }
 
       if (!response.ok) {
         totalFetchMs += Date.now() - attemptStartedAt;
