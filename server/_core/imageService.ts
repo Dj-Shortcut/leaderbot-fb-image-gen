@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import net from "node:net";
 import os from "node:os";
-import { STYLE_TO_DEMO_FILE, type Style } from "./messengerStyles";
+import { getStylePrompt, STYLE_TO_DEMO_FILE, type PromptProfile, type Style } from "./messengerStyles";
 import fs from "fs/promises";
 import path from "path";
 import { safeLen, sha256 } from "./imageProof";
@@ -14,6 +14,7 @@ export interface ImageGenerator {
     sourceImageUrl?: string;
     userKey: string;
     reqId: string;
+    promptProfile?: PromptProfile;
   }): Promise<{
     imageUrl: string;
     proof: { incomingLen: number; incomingSha256: string; openaiInputLen: number; openaiInputSha256: string };
@@ -331,7 +332,7 @@ async function fetchWithTimeout(input: URL, init: RequestInit | undefined, timeo
 }
 
 class MockImageGenerator implements ImageGenerator {
-  generate(input: { style: Style; sourceImageUrl?: string; userKey: string; reqId: string }): Promise<{
+  generate(input: { style: Style; sourceImageUrl?: string; userKey: string; reqId: string; promptProfile?: PromptProfile }): Promise<{
     imageUrl: string;
     proof: { incomingLen: number; incomingSha256: string; openaiInputLen: number; openaiInputSha256: string };
     metrics: GenerationMetrics;
@@ -457,7 +458,7 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
 }
 
 export class OpenAiImageGenerator implements ImageGenerator {
-  async generate(input: { style: Style; sourceImageUrl?: string; userKey: string; reqId: string }): Promise<{
+  async generate(input: { style: Style; sourceImageUrl?: string; userKey: string; reqId: string; promptProfile?: PromptProfile }): Promise<{
     imageUrl: string;
     proof: { incomingLen: number; incomingSha256: string; openaiInputLen: number; openaiInputSha256: string };
     metrics: GenerationMetrics;
@@ -490,7 +491,9 @@ export class OpenAiImageGenerator implements ImageGenerator {
       const createOpenAiFormData = (): FormData => {
         const formData = new FormData();
         formData.set("model", "gpt-image-1");
-        formData.set("prompt", `Apply ${input.style} style to this photo.`);
+        const promptProfile = input.promptProfile ?? "base";
+        const prompt = getStylePrompt(input.style, promptProfile);
+        formData.set("prompt", prompt);
         formData.set("size", "1024x1024");
         formData.set("output_format", "jpeg");
         formData.set("image", new Blob([new Uint8Array(imageBuffer)], { type: contentType }), "source-image");

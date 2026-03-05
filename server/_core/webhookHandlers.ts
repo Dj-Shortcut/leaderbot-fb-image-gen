@@ -23,7 +23,7 @@ import {
 } from "./messengerState";
 import { normalizeLang, t, type Lang } from "./i18n";
 import { toLogUser, toUserKey } from "./privacy";
-import type { Style } from "./messengerStyles";
+import type { PromptProfile, Style } from "./messengerStyles";
 import { claimWebhookReplayKey } from "./webhookReplayProtection";
 import {
   detectAck,
@@ -232,6 +232,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
 
       const state = await getOrCreateState(psid);
       const lastImageUrl = state.lastPhotoUrl;
+      const promptProfile: PromptProfile = state.lastGeneratedAt ? "wow" : "base";
 
       try {
         const { imageUrl, proof, metrics } = await generator.generate({
@@ -239,6 +240,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
           sourceImageUrl: lastImageUrl ?? undefined,
           userKey: userId,
           reqId,
+          promptProfile,
         });
 
         console.info(
@@ -249,7 +251,8 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
             psid,
             mode,
             style,
-            ok: true,
+          prompt_profile: promptProfile,
+          ok: true,
             fb_image_fetch_ms: metrics.fbImageFetchMs,
             openai_ms: metrics.openAiMs,
             upload_or_serve_ms: metrics.uploadOrServeMs,

@@ -13,6 +13,7 @@ describe("messenger quota dayKey", () => {
   beforeEach(() => {
     resetStateStore();
     vi.useRealTimers();
+    delete process.env.MESSENGER_QUOTA_BYPASS_IDS;
   });
 
   afterAll(() => {
@@ -40,10 +41,14 @@ describe("messenger quota dayKey", () => {
 
     await increment(userId);
 
+    expect(await canGenerate(userId)).toBe(true);
+
+    await increment(userId);
+
     expect(await canGenerate(userId)).toBe(false);
     expect((await Promise.resolve(getOrCreateState(userId))).quota).toEqual({
       dayKey: initialDayKey,
-      count: 1,
+      count: 2,
     });
   });
 
@@ -79,4 +84,17 @@ describe("messenger quota dayKey", () => {
     expect(state.lastPhoto).toBe("https://img.example/photo.jpg");
     expect(state.quota.count).toBe(1);
   });
+
+  it("skips quota limits for configured bypass ids", async () => {
+    const userId = "bypass-user";
+    process.env.MESSENGER_QUOTA_BYPASS_IDS = "bypass-user";
+
+    await increment(userId);
+    await increment(userId);
+    await increment(userId);
+
+    expect(await canGenerate(userId)).toBe(true);
+    expect((await Promise.resolve(getOrCreateState(userId))).quota.count).toBe(0);
+  });
+
 });
