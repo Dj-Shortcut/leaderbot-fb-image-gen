@@ -38,7 +38,7 @@ import {
   stylePayloadToStyle,
   toMessengerReplies,
 } from "./webhookHelpers";
-import { runGuardedGeneration } from "./generationGuard";
+import { hasInFlightGeneration, runGuardedGeneration } from "./generationGuard";
 import { canGenerate, increment } from "./messengerQuota";
 
 type HandlerDeps = {
@@ -223,7 +223,12 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
   ): Promise<void> {
     const didRun = await runGuardedGeneration(psid, async () => {
       const { mode, generator } = createImageGenerator();
-      if (!(await canGenerate(psid))) {
+      const allowed = await canGenerate(psid);
+      const quotaState = await getOrCreateState(psid);
+      const bypassRaw = process.env.MESSENGER_QUOTA_BYPASS_IDS ?? "";
+      const bypassApplied = bypassRaw.includes(psid) || bypassRaw.includes(quotaState.userKey);
+      console.log(JSON.stringify({ level: "info", msg: "quota_decision", action: "check", psidHash: anonymizePsid(psid).slice(0, 12), count: quotaState.quota.count, limit: 2, bypassApplied, allowed }));
+      if (!allowed) {
         await sendLoggedText(psid, lang === "en" ? "You used your free credits for today. Come back tomorrow." : "Je hebt je gratis credits voor vandaag opgebruikt. Kom morgen terug.", reqId);
         await setFlowState(psid, "AWAITING_STYLE");
         return;
@@ -441,6 +446,10 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       att => att.type === "image" && att.payload?.url
     );
     if (imageAttachment?.payload?.url) {
+      if (await hasInFlightGeneration(psid)) {
+        await sendLoggedText(psid, "⏳ even geduld, ik ben nog bezig met jouw restyle", reqId);
+        return;
+      }
       console.log(
         JSON.stringify({
           level: "debug",
@@ -498,6 +507,15 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         await sendStateQuickReplies(psid, response.state, response.text, reqId);
       }
       return;
+    }
+
+    if (normalizedText === "nieuwe stijl" || normalizedText === "new style") {
+      const quickState = await getOrCreateState(psid);
+      if (quickState.lastPhotoUrl) {
+        await setFlowState(psid, "AWAITING_STYLE");
+        await sendStylePicker(psid, lang, reqId);
+        return;
+      }
     }
 
     const state = await getOrCreateState(psid);

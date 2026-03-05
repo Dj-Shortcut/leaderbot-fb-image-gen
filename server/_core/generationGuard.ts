@@ -88,3 +88,7 @@ export async function runGuardedGeneration<T>(
     }
   }
 }
+
+export async function hasInFlightGeneration(psid: string): Promise<boolean> {
+  return hasEphemeralKey(lockKey(psid));
+}
