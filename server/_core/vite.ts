@@ -52,6 +52,7 @@ export async function setupVite(app: Express, server: Server, createViteServer: 
 }
 
 export function serveStatic(app: Express, staticRoot?: string, generatedRoot?: string) {
+  app.use(createGlobalHttpRateLimiter());
   const distPathCandidates = staticRoot
     ? [path.resolve(staticRoot)]
     : [
