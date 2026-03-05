@@ -6,8 +6,6 @@ export type Style =
   | "cinematic"
   | "disco";
 
-export type PromptProfile = "base" | "wow";
-
 export const STYLE_TO_DEMO_FILE: Record<Style, string> = {
   caricature: "01-caricature.png",
   petals: "02-petals.png",
@@ -108,27 +106,4 @@ export function getStyleById(styleId: StyleId): StyleConfig {
 
 export function getDemoThumbnailUrl(style: Style): string {
   return getLocalDemoUrl(style);
-}
-
-
-export const STYLE_PROMPTS_BASE: Record<Style, string> = {
-  caricature: "Create a playful caricature portrait. Keep identity recognizable.",
-  petals: "Create a soft floral portrait with floating petals. Keep identity recognizable.",
-  gold: "Create a luxury golden portrait with elegant highlights. Keep identity recognizable.",
-  cinematic: "Create a cinematic portrait with dramatic lighting and filmic grading. Keep identity recognizable.",
-  disco: "Create a disco party portrait with neon lights and sparkles. Keep identity recognizable.",
-  clouds: "Create a dreamy portrait with soft clouds and pastel atmosphere. Keep identity recognizable.",
-};
-
-export const STYLE_PROMPTS_WOW: Record<Style, string> = {
-  caricature: "High-end editorial caricature with crisp contours, rich color separation, and premium studio finish. Preserve identity and likeness.",
-  petals: "Cinematic floral fantasy with layered petals, depth-rich bokeh, and romantic backlight. Preserve identity and likeness.",
-  gold: "Premium luxury gold aesthetic with metallic accents, glossy highlights, and beauty-grade finish. Preserve identity and likeness.",
-  cinematic: "Dramatic cinematic key-art look with directional movie lighting, atmospheric depth, and filmic contrast. Preserve identity and likeness.",
-  disco: "Vibrant disco night scene with neon interplay, reflective sparkles, and high-fashion nightlife finish. Preserve identity and likeness.",
-  clouds: "Ethereal sky dreamscape with volumetric soft clouds, airy pastel light, and serene depth haze. Preserve identity and likeness.",
-};
-
-export function getStylePrompt(style: Style, profile: PromptProfile): string {
-  return profile === "wow" ? STYLE_PROMPTS_WOW[style] : STYLE_PROMPTS_BASE[style];
 }

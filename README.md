@@ -120,7 +120,7 @@ Relevant files:
 
 ## Quota model
 
-There are two quota layers in the codebase, each with a 2-image/day free limit:
+There are two quota layers in the codebase, each with a 1-image/day free limit:
 
 1. **Messenger flow quota in state** (`server/_core/messengerQuota.ts`)
    - Stored with `quota.dayKey` + `quota.count` in the user conversation state.
@@ -173,7 +173,6 @@ Related files:
 - `MESSENGER_MAX_IMAGE_JOBS` (global cap for concurrent image generations, default `3`)
 - `MESSENGER_PSID_COOLDOWN_MS` (optional per-PSID cooldown between generations, default `0`)
 - `MESSENGER_PSID_LOCK_TTL_MS` (per-PSID in-flight lock TTL, default `120000`)
-- `MESSENGER_QUOTA_BYPASS_IDS` (comma-separated PSIDs or hashed user keys that skip Messenger daily quota; intended for internal testing/admin)
 - `GRAPH_API_MAX_RETRIES`, `GRAPH_API_RETRY_BASE_MS` (retry policy for Meta Graph API 429/5xx responses)
 - `PORT` (default `8080`)
 
