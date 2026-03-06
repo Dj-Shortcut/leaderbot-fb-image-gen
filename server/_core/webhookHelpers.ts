@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { normalizeLang, t, type Lang } from "./i18n";
 import { getQuickRepliesForState, type ConversationState } from "./messengerState";
 import { type Style } from "./messengerStyles";
@@ -68,11 +69,19 @@ export function getEventDedupeKey(
     return `mid:${messageId}`;
   }
 
+  const hashToken = (value: string | undefined): string => {
+    const normalizedValue = value?.trim();
+    if (!normalizedValue) {
+      return "none";
+    }
+
+    return createHash("sha256").update(normalizedValue).digest("hex").slice(0, 12);
+  };
+
   const eventType = event.message ? "message" : event.postback ? "postback" : "other";
-  const postbackPayload = event.postback?.payload?.trim() || "none";
-  const quickReplyPayload = event.message?.quick_reply?.payload?.trim() || "none";
+  const postbackPayloadHash = hashToken(event.postback?.payload);
+  const quickReplyPayloadHash = hashToken(event.message?.quick_reply?.payload);
   const hasText = event.message?.text?.trim() ? "1" : "0";
-  const senderId = event.sender?.id?.trim() || userKey;
   const attachmentTypeCounts = (() => {
     const counts = new Map<string, number>();
     for (const attachment of event.message?.attachments ?? []) {
@@ -87,9 +96,8 @@ export function getEventDedupeKey(
   })();
   const fallbackEventFingerprint = [
     eventType,
-    `sender:${senderId}`,
-    `postback:${postbackPayload}`,
-    `quickReply:${quickReplyPayload}`,
+    `postback:${postbackPayloadHash}`,
+    `quickReply:${quickReplyPayloadHash}`,
     `hasText:${hasText}`,
     `attachments:${attachmentTypeCounts}`,
   ].join("|");
