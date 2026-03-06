@@ -11,26 +11,35 @@ import type { ModelMessage } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import type { Express } from "express";
 import { z } from "zod/v4";
-import { ENV } from "./env";
 import { createPatchedFetch } from "./patchedFetch";
 
 let hasLoggedChatDisabledOnStartup = false;
 
+function getChatConfig() {
+  const apiUrl = (process.env.BUILT_IN_FORGE_API_URL ?? "").trim();
+  const apiKey = (process.env.BUILT_IN_FORGE_API_KEY ?? "").trim();
+
+  return {
+    apiUrl,
+    apiKey,
+  };
+}
+
 export function isChatConfigured(): boolean {
-  return ENV.forgeApiUrl.trim().length > 0 && ENV.forgeApiKey.trim().length > 0;
+  const { apiUrl, apiKey } = getChatConfig();
+  return apiUrl.length > 0 && apiKey.length > 0;
 }
 
 /**
  * Creates an OpenAI-compatible provider with patched fetch.
  */
 function createLLMProvider() {
-  const baseURL = ENV.forgeApiUrl.endsWith("/v1")
-    ? ENV.forgeApiUrl
-    : `${ENV.forgeApiUrl}/v1`;
+  const { apiUrl, apiKey } = getChatConfig();
+  const baseURL = apiUrl.endsWith("/v1") ? apiUrl : `${apiUrl}/v1`;
 
   return createOpenAI({
     baseURL,
-    apiKey: ENV.forgeApiKey,
+    apiKey,
     fetch: createPatchedFetch(fetch),
   });
 }
@@ -81,14 +90,18 @@ const tools = {
   }),
 };
 
-const modelMessageSchema = z.object({
-  role: z.string().min(1),
-  content: z.unknown(),
-}).passthrough();
+const modelMessageSchema = z
+  .object({
+    role: z.string().min(1),
+    content: z.unknown(),
+  })
+  .passthrough();
 
-const chatRequestSchema = z.object({
-  messages: z.array(modelMessageSchema),
-}).passthrough();
+const chatRequestSchema = z
+  .object({
+    messages: z.array(modelMessageSchema),
+  })
+  .passthrough();
 
 function parseChatRequestBody(body: unknown): { messages: ModelMessage[] } {
   if (typeof body !== "object" || body === null) {
@@ -102,10 +115,14 @@ function parseChatRequestBody(body: unknown): { messages: ModelMessage[] } {
       issue =>
         issue.path.length === 1 &&
         issue.path[0] === "messages" &&
-        (issue.code === "invalid_type" || issue.code === "unrecognized_keys" || issue.code === "custom"),
+        (issue.code === "invalid_type" ||
+          issue.code === "unrecognized_keys" ||
+          issue.code === "custom")
     );
 
-    const invalidMessages = parsed.error.issues.some(issue => issue.path[0] === "messages" && issue.path.length > 1);
+    const invalidMessages = parsed.error.issues.some(
+      issue => issue.path[0] === "messages" && issue.path.length > 1
+    );
 
     if (missingMessages && !invalidMessages) {
       throw new Error("messages array is required");
@@ -205,7 +222,9 @@ function evaluateMathExpression(expression: string): number {
 
     if (
       token === "-" &&
-      (i === 0 || previous === "(" || (previous !== undefined && /[+\-*/%]/.test(previous)))
+      (i === 0 ||
+        previous === "(" ||
+        (previous !== undefined && /[+\-*/%]/.test(previous)))
     ) {
       values.push(0);
     }

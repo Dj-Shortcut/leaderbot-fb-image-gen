@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 async function postJson(
   app: express.Express,
   path: string,
-  body: unknown,
+  body: unknown
 ): Promise<{ status: number; payload: string }> {
   const server = http.createServer(app);
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -16,34 +16,36 @@ async function postJson(
     throw new Error("Failed to bind test server");
   }
 
-  const response = await new Promise<{ status: number; payload: string }>((resolve, reject) => {
-    const request = http.request(
-      {
-        hostname: "127.0.0.1",
-        port: address.port,
-        path,
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+  const response = await new Promise<{ status: number; payload: string }>(
+    (resolve, reject) => {
+      const request = http.request(
+        {
+          hostname: "127.0.0.1",
+          port: address.port,
+          path,
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
         },
-      },
-      res => {
-        let payload = "";
-        res.on("data", chunk => {
-          payload += chunk;
-        });
-        res.on("end", () => {
-          resolve({
-            status: res.statusCode ?? 0,
-            payload,
+        res => {
+          let payload = "";
+          res.on("data", chunk => {
+            payload += chunk;
           });
-        });
-      },
-    );
+          res.on("end", () => {
+            resolve({
+              status: res.statusCode ?? 0,
+              payload,
+            });
+          });
+        }
+      );
 
-    request.on("error", reject);
-    request.end(JSON.stringify(body));
-  });
+      request.on("error", reject);
+      request.end(JSON.stringify(body));
+    }
+  );
 
   await new Promise<void>((resolve, reject) => {
     server.close(error => {
@@ -98,6 +100,23 @@ describe("chat route configuration", () => {
     expect(isChatConfigured()).toBe(true);
   });
 
+  it("registers active /api/chat when config is present", async () => {
+    process.env.BUILT_IN_FORGE_API_URL = " https://example.test/forge ";
+    process.env.BUILT_IN_FORGE_API_KEY = " secret-token ";
+
+    vi.resetModules();
+    const { registerChatRoutes } = await import("./_core/chat");
+
+    const app = express();
+    app.use(express.json());
+    registerChatRoutes(app);
+
+    const response = await postJson(app, "/api/chat", {});
+
+    expect(response.status).toBe(400);
+    expect(response.payload).toContain("messages array is required");
+  });
+
   it("returns 503 when /api/chat is disabled by missing config", async () => {
     process.env.BUILT_IN_FORGE_API_URL = "";
     process.env.BUILT_IN_FORGE_API_KEY = "";
@@ -123,7 +142,9 @@ describe("chat route configuration", () => {
 
     vi.resetModules();
     const { registerChatRoutes } = await import("./_core/chat");
-    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const infoSpy = vi
+      .spyOn(console, "info")
+      .mockImplementation(() => undefined);
 
     const app = express();
     app.use(express.json());
@@ -133,7 +154,7 @@ describe("chat route configuration", () => {
 
     expect(infoSpy).toHaveBeenCalledTimes(1);
     expect(infoSpy).toHaveBeenCalledWith(
-      "[Chat] /api/chat disabled: missing BUILT_IN_FORGE_API_URL and/or BUILT_IN_FORGE_API_KEY",
+      "[Chat] /api/chat disabled: missing BUILT_IN_FORGE_API_URL and/or BUILT_IN_FORGE_API_KEY"
     );
   });
 });
