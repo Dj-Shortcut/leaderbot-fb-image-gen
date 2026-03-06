@@ -68,14 +68,40 @@ export function getEventDedupeKey(
     return `mid:${messageId}`;
   }
 
+  const eventType = event.message ? "message" : event.postback ? "postback" : "other";
+  const postbackPayload = event.postback?.payload?.trim() || "none";
+  const quickReplyPayload = event.message?.quick_reply?.payload?.trim() || "none";
+  const hasText = event.message?.text?.trim() ? "1" : "0";
+  const senderId = event.sender?.id?.trim() || userKey;
+  const attachmentTypeCounts = (() => {
+    const counts = new Map<string, number>();
+    for (const attachment of event.message?.attachments ?? []) {
+      const type = attachment.type?.trim() || "unknown";
+      counts.set(type, (counts.get(type) ?? 0) + 1);
+    }
+
+    return Array.from(counts.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([type, count]) => `${type}:${count}`)
+      .join(",") || "none";
+  })();
+  const fallbackEventFingerprint = [
+    eventType,
+    `sender:${senderId}`,
+    `postback:${postbackPayload}`,
+    `quickReply:${quickReplyPayload}`,
+    `hasText:${hasText}`,
+    `attachments:${attachmentTypeCounts}`,
+  ].join("|");
+
   const timestamp = event.timestamp;
   const normalizedEntryId = entryId?.trim();
   if (normalizedEntryId && Number.isFinite(timestamp)) {
-    return `entry:${normalizedEntryId}:user:${userKey}:ts:${timestamp}`;
+    return `entry:${normalizedEntryId}:user:${userKey}:ts:${timestamp}:event:${fallbackEventFingerprint}`;
   }
 
   if (Number.isFinite(timestamp)) {
-    return `fallback:${userKey}:${timestamp}`;
+    return `fallback:${userKey}:${timestamp}:event:${fallbackEventFingerprint}`;
   }
 
   return undefined;
