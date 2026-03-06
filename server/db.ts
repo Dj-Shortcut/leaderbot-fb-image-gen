@@ -423,17 +423,11 @@ export async function updateMessengerState(psid: string, updates: Partial<Insert
 /**
  * Check and increment daily quota for a PSID (Messenger specific)
  */
-export async function checkAndIncrementMessengerQuota(psid: string, limit = 1): Promise<boolean> {
+export async function checkAndIncrementMessengerQuota(): Promise<boolean> {
   const db = await getDb();
   if (!db) return true; // Fail open for quota if DB is down
 
-  const today = getTodayUTC();
-  const existing = await db
-    .select()
-    .from(dailyQuota)
-    .where(and(eq(dailyQuota.userId, -1), eq(dailyQuota.date, today))) // Using -1 as a special marker or we should link PSID to a user
-    .limit(1);
-
+  // TODO: Persist and enforce quota in DB. Current implementation is fail-open for compatibility.
   // Note: For a "perfect" repo, we should link PSID to a real user in the 'users' table.
   // But to keep it simple and effective, we can use PSID as the unique identifier in a new quota table or reuse dailyQuota.
   // For now, let's stick to the current plan of using the database for persistence.

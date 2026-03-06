@@ -17,7 +17,7 @@ type RedisLike = {
 };
 
 type RedisModule = {
-  default: new (url: string) => RedisLike;
+  default: new (url: string, ...args: unknown[]) => RedisLike;
 };
 
 const buckets = new Map<string, RateLimitBucket>();
@@ -50,8 +50,7 @@ function isRedisHttpRateLimitEnabled(): boolean {
 }
 
 async function importRedisModule(): Promise<RedisModule> {
-  const dynamicImport = Function("specifier", "return import(specifier)") as (specifier: string) => Promise<unknown>;
-  return (await dynamicImport("ioredis")) as RedisModule;
+  return (await import("ioredis")) as unknown as RedisModule;
 }
 
 async function createRedisClient(): Promise<RedisLike> {
@@ -73,14 +72,6 @@ async function getRedisClient(): Promise<RedisLike> {
 }
 
 function getClientIp(req: express.Request): string {
-  const forwardedFor = req.headers["x-forwarded-for"];
-  if (typeof forwardedFor === "string") {
-    const firstIp = forwardedFor.split(",")[0]?.trim();
-    if (firstIp) {
-      return firstIp;
-    }
-  }
-
   return req.ip || req.socket.remoteAddress || "unknown";
 }
 

@@ -26,8 +26,19 @@ afterEach(() => {
   }
 });
 
-async function startServer() {
+async function startServer(options?: { forceIp?: string }) {
   const app = express();
+
+  if (options?.forceIp) {
+    app.use((req, _res, next) => {
+      Object.defineProperty(req, "ip", {
+        value: options.forceIp,
+        configurable: true,
+      });
+      next();
+    });
+  }
+
   app.use(createGlobalHttpRateLimiter());
   app.get("/limited", (_req, res) => {
     res.status(200).json({ ok: true });
@@ -100,6 +111,31 @@ describe("global http rate limiter", () => {
       expect(first.status).toBe(200);
       expect(second.status).toBe(200);
       expect(third.status).toBe(200);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("does not trust caller-controlled x-forwarded-for when req.ip is already resolved", async () => {
+    process.env.HTTP_RATE_LIMIT_WINDOW_MS = "60000";
+    process.env.HTTP_RATE_LIMIT_MAX_REQUESTS = "1";
+
+    const server = await startServer({ forceIp: "203.0.113.10" });
+
+    try {
+      const first = await fetch(`${server.baseUrl}/limited`, {
+        headers: {
+          "X-Forwarded-For": "198.51.100.1",
+        },
+      });
+      const second = await fetch(`${server.baseUrl}/limited`, {
+        headers: {
+          "X-Forwarded-For": "198.51.100.2",
+        },
+      });
+
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(429);
     } finally {
       await server.close();
     }
