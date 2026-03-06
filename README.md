@@ -174,6 +174,7 @@ Related files:
 - `LOG_LEVEL`, `DEBUG_STATE_DUMP`, `DEBUG_IMAGE_PROOF` (diagnostics)
 - `MESSENGER_QUOTA_BYPASS_IDS` (comma-separated PSIDs or hashed user keys that skip Messenger daily quota; intended for internal testing/admin)
 - `PORT` (default `8080`)
+- `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY` (opt-in for `/api/chat`; when either is missing/blank, chat stays disabled and returns HTTP 503)
 - `VITE_APP_ID`, `DATABASE_URL`, `OWNER_OPEN_ID`, `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY` (app/data integrations exposed via `server/_core/env.ts`)
 
 Legacy/app-specific environment variables also exist for SDK and data API integrations in `server/_core/env.ts`.
