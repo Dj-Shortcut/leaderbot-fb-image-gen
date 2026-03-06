@@ -21,6 +21,7 @@ import {
   summarizeWebhook,
 } from "./_core/messengerWebhook";
 import { anonymizePsid, getState, resetStateStore, setFlowState } from "./_core/messengerState";
+import { getEventDedupeKey } from "./_core/webhookHelpers";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
@@ -216,6 +217,98 @@ describe("messenger webhook dedupe", () => {
 
     await processFacebookWebhookPayload(payload);
     await processFacebookWebhookPayload(payload);
+
+    expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not collide fallback keys for different events with identical timestamps", () => {
+    const timestamp = 1730000000002;
+
+    const imageEventKey = getEventDedupeKey(
+      {
+        sender: { id: "psid-same-ts" },
+        timestamp,
+        message: {
+          attachments: [{ type: "image", payload: { url: "https://img.example/a.jpg" } }],
+        },
+      },
+      "psid-same-ts",
+    );
+
+    const textEventKey = getEventDedupeKey(
+      {
+        sender: { id: "psid-same-ts" },
+        timestamp,
+        message: {
+          text: "hello",
+        },
+      },
+      "psid-same-ts",
+    );
+
+    expect(imageEventKey).toBeDefined();
+    expect(textEventKey).toBeDefined();
+    expect(imageEventKey).not.toBe(textEventKey);
+  });
+
+  it("keeps fallback key deterministic for true duplicates without mid", () => {
+    const duplicateEvent = {
+      sender: { id: "psid-dup-ts" },
+      timestamp: 1730000000003,
+      postback: { payload: "STYLE_DISCO" },
+    };
+
+    const first = getEventDedupeKey(duplicateEvent, "psid-dup-ts", "entry-dup");
+    const second = getEventDedupeKey(duplicateEvent, "psid-dup-ts", "entry-dup");
+
+    expect(first).toBe(second);
+    expect(first).toContain("entry:entry-dup");
+    expect(first).toMatch(/postback:[a-f0-9]{12}/);
+  });
+
+  it("does not include raw sender id or payload text in fallback key", () => {
+    const key = getEventDedupeKey(
+      {
+        sender: { id: "psid-sensitive" },
+        timestamp: 1730000000005,
+        postback: { payload: "VERY_SENSITIVE_PAYLOAD" },
+        message: {
+          quick_reply: { payload: "ANOTHER_SECRET" },
+        },
+      },
+      "anonymized-user-key",
+      "entry-sensitive",
+    );
+
+    expect(key).toBeDefined();
+    expect(key).toContain("entry:entry-sensitive");
+    expect(key).toContain("user:anonymized-user-key");
+    expect(key).not.toContain("psid-sensitive");
+    expect(key).not.toContain("VERY_SENSITIVE_PAYLOAD");
+    expect(key).not.toContain("ANOTHER_SECRET");
+    expect(key).toMatch(/postback:[a-f0-9]{12}/);
+    expect(key).toMatch(/quickReply:[a-f0-9]{12}/);
+  });
+
+  it("still blocks duplicate fallback events in replay protection", async () => {
+    const duplicatePayload = {
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "psid-replay" },
+              timestamp: 1730000000004,
+              message: {
+                attachments: [{ type: "image", payload: { url: "https://img.example/replay.jpg" } }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    await processFacebookWebhookPayload(duplicatePayload);
+    await processFacebookWebhookPayload(duplicatePayload);
 
     expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
   });
