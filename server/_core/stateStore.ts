@@ -12,7 +12,7 @@ type RedisLike = {
 };
 
 type RedisModule = {
-  default: new (url: string) => RedisLike;
+  default: new (url: string, ...args: unknown[]) => RedisLike;
 };
 
 export type MaybePromise<T> = T | Promise<T>;
@@ -31,10 +31,7 @@ function isPromiseLike<T>(value: MaybePromise<T>): value is Promise<T> {
 }
 
 async function importRedisModule(): Promise<RedisModule> {
-  const dynamicImport = Function("specifier", "return import(specifier)") as (
-    specifier: string
-  ) => Promise<unknown>;
-  return (await dynamicImport("ioredis")) as RedisModule;
+  return (await import("ioredis")) as unknown as RedisModule;
 }
 
 async function createRedisClient(): Promise<RedisLike> {

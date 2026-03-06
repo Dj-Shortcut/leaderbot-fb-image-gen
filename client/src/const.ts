@@ -6,12 +6,24 @@ const getOptionalEnvString = (value: unknown): string | undefined => {
 
 const OAUTH_STATE_COOKIE_NAME = "lb_oauth_state_nonce";
 
-function createOAuthNonce(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
+function bytesToHex(value: Uint8Array): string {
+  return Array.from(value, byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export function createOAuthNonce(): string {
+  const webCrypto = globalThis.crypto;
+
+  if (typeof webCrypto?.randomUUID === "function") {
+    return webCrypto.randomUUID();
   }
 
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 18)}`;
+  if (typeof webCrypto?.getRandomValues === "function") {
+    const nonceBytes = new Uint8Array(16);
+    webCrypto.getRandomValues(nonceBytes);
+    return bytesToHex(nonceBytes);
+  }
+
+  throw new Error("Secure random generator unavailable for OAuth state nonce");
 }
 
 function encodeOAuthState(redirectUri: string, nonce: string): string {

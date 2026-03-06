@@ -83,25 +83,6 @@ function getRequiredPublicBaseUrl(): string {
   return baseUrl;
 }
 
-async function persistGeneratedPng(buffer: Buffer): Promise<string> {
-  const publicId = `${Date.now()}-${randomUUID()}`;
-  const relativeFilePath = path.join("generated", `${publicId}.png`);
-  const publicRelativeFilePath = relativeFilePath.replaceAll(path.sep, "/");
-  const absoluteDirPath = path.resolve(process.cwd(), "public", "generated");
-  const absoluteFilePath = path.resolve(process.cwd(), "public", relativeFilePath);
-
-  await fs.mkdir(absoluteDirPath, { recursive: true });
-  await removeGeneratedWebpArtifacts(absoluteDirPath);
-  await fs.writeFile(absoluteFilePath, buffer);
-
-  const stats = await fs.stat(absoluteFilePath);
-  if (stats.size <= 0) {
-    throw new OpenAiGenerationError("Generated image file is empty");
-  }
-
-  return publicRelativeFilePath;
-}
-
 async function persistGeneratedJpg(buffer: Buffer, style: Style): Promise<string> {
   const filename = `leaderbot-${style}-${Date.now()}.jpg`;
   const relativeFilePath = path.join("generated", filename);
@@ -131,7 +112,7 @@ async function removeGeneratedWebpArtifacts(dirPath: string): Promise<void> {
   );
 }
 
-async function ensureJpegBuffer(buffer: Buffer): Promise<Buffer> {
+function ensureJpegBuffer(buffer: Buffer): Buffer {
   return buffer;
 }
 
@@ -558,7 +539,7 @@ export class OpenAiImageGenerator implements ImageGenerator {
       }
 
       const imageBufferResult = Buffer.from(base64Image, "base64");
-      const jpegBuffer = await ensureJpegBuffer(imageBufferResult);
+      const jpegBuffer = ensureJpegBuffer(imageBufferResult);
       const uploadStartedAt = Date.now();
       const relativeFilePath = await persistGeneratedJpg(jpegBuffer, input.style);
       const uploadOrServeMs = Date.now() - uploadStartedAt;

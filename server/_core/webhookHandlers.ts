@@ -315,7 +315,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
 
         const errorClass =
           error instanceof Error ? error.constructor.name : "UnknownError";
-        getGenerationMetrics(error) ?? { totalMs: 0 };
+        const metrics = getGenerationMetrics(error) ?? { totalMs: 0 };
 
         console.log(
           "PROOF_SUMMARY",
@@ -325,6 +325,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
             style,
             ok: false,
             errorCode: errorClass,
+            totalMs: metrics.totalMs,
           })
         );
 
@@ -602,9 +603,12 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
   async function processFacebookWebhookPayload(
     payload: unknown
   ): Promise<void> {
-    const entries = (payload as any)?.entry || [];
-    for (const entry of entries as FacebookWebhookEntry[]) {
-      const events = entry?.messaging || [];
+    const entries = Array.isArray((payload as { entry?: unknown[] } | null | undefined)?.entry)
+      ? ((payload as { entry: FacebookWebhookEntry[] }).entry ?? [])
+      : [];
+
+    for (const entry of entries) {
+      const events = Array.isArray(entry?.messaging) ? entry.messaging : [];
       for (const event of events) {
         await handleEvent(event, entry?.id);
       }

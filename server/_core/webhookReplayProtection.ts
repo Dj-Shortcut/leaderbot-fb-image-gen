@@ -8,7 +8,7 @@ type RedisLike = {
 };
 
 type RedisModule = {
-  default: new (url: string) => RedisLike;
+  default: new (url: string, ...args: unknown[]) => RedisLike;
 };
 
 const memoryReplayKeys = new Map<string, number>();
@@ -29,8 +29,7 @@ function getReplayTtlSeconds(): number {
 }
 
 async function importRedisModule(): Promise<RedisModule> {
-  const dynamicImport = Function("specifier", "return import(specifier)") as (specifier: string) => Promise<unknown>;
-  return (await dynamicImport("ioredis")) as RedisModule;
+  return (await import("ioredis")) as unknown as RedisModule;
 }
 
 async function createRedisClient(): Promise<RedisLike> {
