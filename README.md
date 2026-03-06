@@ -176,6 +176,7 @@ Related files:
 - `MESSENGER_QUOTA_BYPASS_IDS` (comma-separated PSIDs or hashed user keys that skip Messenger daily quota; intended for internal testing/admin)
 - `GRAPH_API_MAX_RETRIES`, `GRAPH_API_RETRY_BASE_MS` (retry policy for Meta Graph API 429/5xx responses)
 - `PORT` (default `8080`)
+- `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY` (opt-in for `/api/chat`; when either is missing/blank, chat stays disabled and returns HTTP 503)
 
 Legacy/app-specific environment variables also exist for SDK and data API integrations in `server/_core/env.ts`.
 

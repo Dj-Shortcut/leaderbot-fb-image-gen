@@ -14,6 +14,12 @@ import { z } from "zod/v4";
 import { ENV } from "./env";
 import { createPatchedFetch } from "./patchedFetch";
 
+let hasLoggedChatDisabledOnStartup = false;
+
+export function isChatConfigured(): boolean {
+  return ENV.forgeApiUrl.trim().length > 0 && ENV.forgeApiKey.trim().length > 0;
+}
+
 /**
  * Creates an OpenAI-compatible provider with patched fetch.
  */
@@ -241,6 +247,24 @@ function evaluateMathExpression(expression: string): number {
  * ```
  */
 export function registerChatRoutes(app: Express) {
+  if (!isChatConfigured()) {
+    if (!hasLoggedChatDisabledOnStartup) {
+      console.info(
+        "[Chat] /api/chat disabled: missing BUILT_IN_FORGE_API_URL and/or BUILT_IN_FORGE_API_KEY"
+      );
+      hasLoggedChatDisabledOnStartup = true;
+    }
+
+    app.post("/api/chat", (_req, res) => {
+      res.status(503).json({
+        error:
+          "Chat API is disabled: configure BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY",
+      });
+    });
+
+    return;
+  }
+
   const openai = createLLMProvider();
 
   app.post("/api/chat", (req, res) => {
