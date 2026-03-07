@@ -40,6 +40,7 @@ import {
 } from "./webhookHelpers";
 import { hasInFlightGeneration, runGuardedGeneration } from "./generationGuard";
 import { canGenerate, increment } from "./messengerQuota";
+import { isDebugLogEnabled } from "./logLevel";
 
 type HandlerDeps = {
   defaultLang: Lang;
@@ -61,6 +62,14 @@ const IN_FLIGHT_MESSAGE = "\u23F3 even geduld, ik ben nog bezig met jouw restyle
 const inFlightNoticeSent = new Set();
 
 export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: HandlerDeps) {
+  function debugWebhookLog(message: Record<string, unknown>): void {
+    if (!isDebugLogEnabled()) {
+      return;
+    }
+
+    console.log(JSON.stringify(message));
+  }
+
   function getAttachmentHostname(url: string): string | null {
     try {
       return new URL(url).hostname || null;
@@ -90,8 +99,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     event: FacebookWebhookEvent,
     reqId: string
   ): void {
-    console.log(
-      JSON.stringify({
+    debugWebhookLog({
         level: "debug",
         msg: "incoming_message",
         reqId,
@@ -104,11 +112,10 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
           event.message?.attachments?.map(attachment => ({
             type: attachment.type,
             hasUrl: Boolean(attachment.payload?.url),
-          })) ?? [],
+        })) ?? [],
         postbackPayload: event.postback?.payload ?? null,
         referralRef: event.postback?.referral?.ref ?? event.referral?.ref ?? null,
-      })
-    );
+      });
   }
 
   function logUserState(
@@ -118,8 +125,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     reqId: string,
     context: string
   ): void {
-    console.log(
-      JSON.stringify({
+    debugWebhookLog({
         level: "debug",
         msg: "user_state",
         context,
@@ -132,21 +138,18 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         selectedStyle: state.selectedStyle ?? null,
         preselectedStyle: state.preselectedStyle ?? null,
         preferredLang: state.preferredLang ?? null,
-      })
-    );
+      });
   }
 
   async function sendLoggedText(psid: string, text: string, reqId: string): Promise<void> {
-    console.log(
-      JSON.stringify({
+    debugWebhookLog({
         level: "debug",
         msg: "outgoing_message",
         kind: "text",
         reqId,
         psidHash: anonymizePsid(psid).slice(0, 12),
         text,
-      })
-    );
+      });
     await sendText(psid, text);
   }
 
@@ -156,8 +159,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     replies: Parameters<typeof sendQuickReplies>[2],
     reqId: string
   ): Promise<void> {
-    console.log(
-      JSON.stringify({
+    debugWebhookLog({
         level: "debug",
         msg: "outgoing_message",
         kind: "quick_replies",
@@ -168,22 +170,19 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
           title: reply.title,
           payload: reply.payload,
         })),
-      })
-    );
+      });
     await sendQuickReplies(psid, text, replies);
   }
 
   async function sendLoggedImage(psid: string, imageUrl: string, reqId: string): Promise<void> {
-    console.log(
-      JSON.stringify({
+    debugWebhookLog({
         level: "debug",
         msg: "outgoing_message",
         kind: "image",
         reqId,
         psidHash: anonymizePsid(psid).slice(0, 12),
         imageUrl,
-      })
-    );
+      });
     await sendImage(psid, imageUrl);
   }
 
@@ -275,7 +274,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
             level: "info",
             msg: "generation_summary",
             reqId,
-            psid,
+            psidHash: anonymizePsid(psid).slice(0, 12),
             mode,
             style,
             ok: true,
@@ -309,7 +308,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         await setFlowState(psid, "IDLE");
       } catch (error) {
         console.error("OPENAI_CALL_ERROR", {
-          psid,
+          psidHash: anonymizePsid(psid).slice(0, 12),
           error: error instanceof Error ? error.message : undefined,
         });
 
@@ -475,16 +474,14 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       att => att.type === "image" && att.payload?.url
     );
     if (imageAttachment?.payload?.url) {
-      console.log(
-        JSON.stringify({
+      debugWebhookLog({
           level: "debug",
           msg: "photo_received",
           reqId,
           psidHash: anonymizePsid(psid).slice(0, 12),
           hasAttachments: !!message.attachments,
           attachmentHostname: getAttachmentHostname(imageAttachment.payload.url),
-        })
-      );
+        });
 
       const state = await getOrCreateState(psid);
       logUserState(psid, userId, state, reqId, "image_received");

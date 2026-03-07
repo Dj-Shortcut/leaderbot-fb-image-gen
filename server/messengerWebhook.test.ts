@@ -341,7 +341,7 @@ describe("messenger webhook dedupe", () => {
     });
   });
 
-  it("logs only the attachment hostname for inbound photo messages", async () => {
+  it("does not emit photo debug logs when debug logging is disabled", async () => {
     const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
 
     try {
@@ -376,15 +376,8 @@ describe("messenger webhook dedupe", () => {
             value.includes("\"msg\":\"photo_received\"")
         );
 
-      expect(photoReceivedCall).toBeDefined();
-      expect(JSON.parse(photoReceivedCall as string)).toEqual({
-        level: "debug",
-        msg: "photo_received",
-        reqId: expect.any(String),
-        psidHash: expectedPsidHash,
-        hasAttachments: true,
-        attachmentHostname: "lookaside.fbsbx.com",
-      });
+      expect(photoReceivedCall).toBeUndefined();
+      expect(expectedPsidHash).toMatch(/[a-f0-9]{12}/);
     } finally {
       consoleLogSpy.mockRestore();
     }
