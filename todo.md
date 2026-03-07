@@ -9,7 +9,7 @@
 - [x] Test webhook connectivity
 
 ## Phase 2: Backend Messenger Bot Integration
-- [x] Create Messenger webhook handler (/api/webhook/facebook)
+- [x] Create Messenger webhook handler (/webhook/facebook)
 - [x] Implement message receiving and parsing
 - [x] Set up user authentication flow with Manus OAuth
 - [x] Create message sending to users via Messenger API
@@ -57,3 +57,5 @@
 - [ ] Document filter options and seasonal updates
 - [ ] Provide cost monitoring dashboard
 - [ ] Create user-facing bot instructions
+
+> Note: Legacy route `/api/webhook/facebook` is deprecated and no longer used.
