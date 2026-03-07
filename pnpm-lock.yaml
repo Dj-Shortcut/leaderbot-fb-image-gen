@@ -160,7 +160,7 @@ importers:
         specifier: ^4.21.2
         version: 4.22.1
       express-rate-limit:
-        specifier: ^8.2.2
+        specifier: 8.2.2
         version: 8.2.2(express@4.22.1)
       framer-motion:
         specifier: ^12.23.22
