@@ -1,7 +1,7 @@
 # Leaderbot Image Generator — Primary Backlog (`todo.md`)
 
 > Dit bestand is de **enige bron van waarheid** voor open werk.  
-> Audit-bestanden (`AUDIT_REPORT.md`, `CODE_AUDIT_REPORT.md`) zijn historisch; open punten daaruit worden hier beheerd.
+> Audit-bestanden (`docs/security/AUDIT_REPORT.md`, `docs/security/CODE_AUDIT_REPORT.md`) zijn historisch; open punten daaruit worden hier beheerd.
 
 ## Verified snapshot
 - Last reviewed against code: **2026-03-07**
