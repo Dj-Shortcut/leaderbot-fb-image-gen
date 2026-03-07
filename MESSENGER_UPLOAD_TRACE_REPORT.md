@@ -87,16 +87,17 @@ From webhook event to generated image send:
 
 ## 4) Mock mode investigation
 
-- `mode: "mock"` is produced by `createImageGenerator(...)` when `GENERATOR_MODE !== "openai"`.
-- In other words, **default mode is mock** unless env var is explicitly set to `openai`.
+- `mode: "mock"` is produced by `createImageGenerator(...)` only when `process.env.GENERATOR_MODE === "mock"`.
+- In all other cases (unset or any other value), mode resolves to `openai`.
 - Mock generator returns:
   - `imageUrl = "${baseUrl}/demo/<style-file>.png"`
   - `baseUrl` comes from `APP_BASE_URL` (fallback `BASE_URL`), else defaults to `http://localhost:3000`.
 - `/demo/*` files are static files under `public/demo`, served by Express static middleware in production.
 
 Reachability implications:
-- If `APP_BASE_URL` is absent/invalid, mock mode emits `http://localhost:3000/demo/...`, which is **not publicly reachable by Meta**.
-- If `APP_BASE_URL` is present and public (e.g. Fly domain), URLs are intended to be externally reachable.
+- The `http://localhost:3000/demo/...` fallback applies **only when running in explicit mock mode** (`GENERATOR_MODE=mock`) and base URL config is missing/invalid.
+- In `openai` mode, the service requires a valid public base URL (`APP_BASE_URL` or valid `BASE_URL`) and throws when missing/invalid; it does not intentionally continue with a localhost fallback URL.
+- Therefore, troubleshooting should treat localhost fallback URLs as a **mock-mode/configuration signal**, not as the default production-path assumption.
 
 ## 5) Most likely root causes for Messenger 400 "Bijlage uploaden is mislukt"
 
@@ -104,7 +105,7 @@ Based on current code and payload shape:
 
 1. **Generated image URL not publicly reachable from Meta**
    - Code always sends by URL (`payload.url`) and never uploads binary.
-   - In mock mode, fallback URL is `http://localhost:3000/...` if base URL config is missing/invalid.
+   - In explicit mock mode (`GENERATOR_MODE=mock`), fallback URL is `http://localhost:3000/...` if base URL config is missing/invalid.
 
 2. **OpenAI returned URL may be temporary/expired or inaccessible at send time**
    - OpenAI path takes `result.data[0].url` and immediately forwards that URL to Messenger with no persistence/proxying.
