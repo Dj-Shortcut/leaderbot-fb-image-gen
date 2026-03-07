@@ -1,4 +1,6 @@
 # Code Audit Report - Leaderbot Facebook Image Generator
+**Last verified:** 2026-03-07 (commit `9380024`)  
+**Backlog authority:** zie `todo.md` voor actuele open acties.  
 **Date:** February 24, 2026  
 **Auditor:** Manus Agent  
 **Status:** ✅ EXCELLENT - Production Ready with Minor Notes
@@ -195,16 +197,16 @@ export async function generateImage(styleId: StyleId, imageUrl: string) {
 
 **Webhook UX remains unchanged** - excellent separation of concerns.
 
-### Real Image Generation Checklist
+### Real Image Generation Checklist (Historical snapshot re-verified)
 
-- [ ] Add OpenAI API integration
-- [ ] Implement image upload from Messenger to S3
-- [ ] Add cost tracking (€0.04 per image)
-- [ ] Implement €100/month cost cap
-- [ ] Add database persistence for quota (currently in-memory)
-- [ ] Add user authentication (Manus OAuth)
-- [ ] Implement premium tier (currently free-only)
-- [ ] Add image gallery/history
+- [x] Add OpenAI API integration **(historical/resolved)**
+- [ ] Implement image upload from Messenger to S3 **(open; tracked in `todo.md`)**
+- [ ] Add cost tracking (€0.04 per image) **(open; tracked in `todo.md`)**
+- [ ] Implement €100/month cost cap **(open; tracked in `todo.md`)**
+- [x] Add database persistence for quota **(historical/resolved; DB helpers exist, Messenger runtime quota still state-based)**
+- [x] Add user authentication (Manus OAuth) **(historical/resolved)**
+- [ ] Implement premium tier (currently free-only) **(open; tracked in `todo.md`)**
+- [ ] Add image gallery/history **(open; tracked in `todo.md`)**
 
 ---
 
@@ -291,13 +293,13 @@ The following TypeScript errors exist in template components and are **NOT** fro
    # Should return: test123
    ```
 
-### Short-term (Next Sprint)
+### Short-term (Next Sprint, re-verified)
 
-1. Integrate real image generation (OpenAI)
-2. Add database persistence for quota
-3. Implement Manus OAuth authentication
-4. Add cost tracking and €10/month cap
-5. Create admin dashboard for monitoring
+1. [x] Integrate real image generation (OpenAI) **(historical/resolved)**
+2. [x] Add database persistence for quota **(historical/resolved at DB layer)**
+3. [x] Implement Manus OAuth authentication **(historical/resolved)**
+4. [ ] Add cost tracking and €100/month cap **(open; see `todo.md`)**
+5. [ ] Create admin dashboard for monitoring **(open; see `todo.md`)**
 
 ### Medium-term (Growth Phase)
 
@@ -391,7 +393,7 @@ fly logs -a groepsscore
 
 *Report Generated: 2026-02-24*  
 *Updated: 2026-02-24 with latest improvements*  
-*Next Review: After real image generation integration*
+*Next Review: Based on open items tracked in `todo.md`*
 
 ---
 
