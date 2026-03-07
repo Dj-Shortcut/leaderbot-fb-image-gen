@@ -3,10 +3,10 @@
 ## 1) Repo Health Snapshot (Very Light)
 
 ### CI Status Overview
-- **Status:** ⚠️ Matig / Verbeterbaar.
+- **Status:** ✅ Goed op orde.
 - **Workflow:** Eén workflow (`.github/workflows/ci.yml`) die draait op PR's en pushes naar `main`.
-- **Huidige Gates:** Installatie van dependencies, lint (`pnpm run lint`) en build (`pnpm run build`).
-- **Ontbrekend:** Geen expliciete server-linting (`lint:server`), geen typecheck (`check`) en geen geautomatiseerde tests (`test`) in de CI-pijplijn.
+- **Huidige Gates:** Installatie van dependencies, lint (`pnpm run lint`), test (`pnpm run test`), build (`pnpm run build`) en security-audit (`pnpm audit --prod --audit-level=high`).
+- **Ontbrekend:** `pnpm run check` (typecheck) en `pnpm run lint:server` draaien nog niet in CI.
 
 ### Lint/Typecheck Setup Summary
 - **TypeScript:** Staat in `strict` mode (`"strict": true`). Handmatige check mogelijk via `pnpm run check`.
