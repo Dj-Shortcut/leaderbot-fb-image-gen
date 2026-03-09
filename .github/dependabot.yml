@@ -9,8 +9,8 @@ updates:
       prefix: "chore"
     groups:
   security:
-    applies-to: security-updates
-    patterns:
+      applies-to: security-updates
+      patterns:
       - "*"
 
   frontend:
