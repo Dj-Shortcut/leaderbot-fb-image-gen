@@ -109,7 +109,7 @@
     "eslint": "^10.0.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
-    "pnpm": "^10.15.1",
+    "pnpm": "^10.31.0",
     "postcss": "^8.4.47",
     "prettier": "^3.8.1",
     "tailwindcss": "^4.1.14",
