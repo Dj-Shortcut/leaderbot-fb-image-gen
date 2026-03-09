@@ -8,20 +8,27 @@ updates:
     commit-message:
       prefix: "chore"
     groups:
-      frontend:
-        patterns:
-          - "react*"
-          - "@radix-ui/*"
-          - "@tanstack/*"
-          - "@trpc/*"
-          - "vite*"
-      aws:
-        patterns:
-          - "@aws-sdk/*"
-      tooling:
-        patterns:
-          - "eslint*"
-          - "typescript*"
-          - "vitest"
-          - "prettier"
-          - "drizzle*"
+  security:
+    applies-to: security-updates
+    patterns:
+      - "*"
+
+  frontend:
+    patterns:
+      - "react*"
+      - "@radix-ui/*"
+      - "@tanstack/*"
+      - "@trpc/*"
+      - "vite*"
+
+  aws:
+    patterns:
+      - "@aws-sdk/*"
+
+  tooling:
+    patterns:
+      - "eslint*"
+      - "typescript*"
+      - "vitest"
+      - "prettier"
+      - "drizzle*"
