@@ -18,7 +18,7 @@
     "lint:server:fix": "eslint server --fix"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^3.0.12",
+    "@ai-sdk/openai": "^3.0.41",
     "@ai-sdk/react": "^3.0.40",
     "@aws-sdk/client-s3": "^3.1004.0",
     "@aws-sdk/s3-request-presigner": "^3.1004.0",
