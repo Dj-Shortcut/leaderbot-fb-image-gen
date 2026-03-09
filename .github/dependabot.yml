@@ -1,6 +1,6 @@
 version: 2
 updates:
-  - package-ecosystem: "npm"
+  - package-ecosystem: "pnpm"
     directory: "/"
     schedule:
       interval: "weekly"
@@ -8,27 +8,27 @@ updates:
     commit-message:
       prefix: "chore"
     groups:
-  security:
-      applies-to: security-updates
-      patterns:
-      - "*"
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"
 
-  frontend:
-    patterns:
-      - "react*"
-      - "@radix-ui/*"
-      - "@tanstack/*"
-      - "@trpc/*"
-      - "vite*"
+      frontend:
+        patterns:
+          - "react*"
+          - "@radix-ui/*"
+          - "@tanstack/*"
+          - "@trpc/*"
+          - "vite*"
 
-  aws:
-    patterns:
-      - "@aws-sdk/*"
+      aws:
+        patterns:
+          - "@aws-sdk/*"
 
-  tooling:
-    patterns:
-      - "eslint*"
-      - "typescript*"
-      - "vitest"
-      - "prettier"
-      - "drizzle*"
+      tooling:
+        patterns:
+          - "eslint*"
+          - "typescript*"
+          - "vitest"
+          - "prettier"
+          - "drizzle*"
