@@ -1,14 +1,24 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 import { normalizeLang } from "./i18n";
 import { createWebhookHandlers } from "./webhookHandlers";
 import { resetWebhookReplayProtection } from "./webhookReplayProtection";
-import { detectAck, getGreetingResponse, summarizeWebhook } from "./webhookHelpers";
+import {
+  detectAck,
+  getGreetingResponse,
+  summarizeWebhook,
+} from "./webhookHelpers";
 import { facebookWebhookPayloadSchema } from "./webhookSchemas";
 
 const PRIVACY_POLICY_URL = process.env.PRIVACY_POLICY_URL?.trim() || "<link>";
 const DEFAULT_LANG = normalizeLang(process.env.DEFAULT_MESSENGER_LANG);
+
+const webhookVerificationQuerySchema = z.object({
+  "hub.mode": z.literal("subscribe"),
+  "hub.verify_token": z.string().min(1),
+  "hub.challenge": z.string().min(1),
+});
 
 const handlers = createWebhookHandlers({
   defaultLang: DEFAULT_LANG,
@@ -28,28 +38,29 @@ export function resetMessengerEventDedupe(): void {
   resetWebhookReplayProtection();
 }
 
-export async function processFacebookWebhookPayload(payload: unknown): Promise<void> {
+export async function processFacebookWebhookPayload(
+  payload: unknown
+): Promise<void> {
   await handlers.processFacebookWebhookPayload(payload);
 }
 
 export function registerMetaWebhookRoutes(app: express.Express): void {
   const handleVerification: express.RequestHandler = (req, res) => {
-    const mode = req.query["hub.mode"];
-    const verifyToken = req.query["hub.verify_token"];
-    const challenge = req.query["hub.challenge"];
     const configuredToken = process.env.FB_VERIFY_TOKEN?.trim();
+    const parsedQuery = webhookVerificationQuerySchema.safeParse(req.query);
 
     if (
       !configuredToken ||
-      mode !== "subscribe" ||
-      typeof verifyToken !== "string" ||
-      verifyToken !== configuredToken ||
-      typeof challenge !== "string"
+      !parsedQuery.success ||
+      parsedQuery.data["hub.verify_token"] !== configuredToken
     ) {
       return res.sendStatus(403);
     }
 
-    return res.status(200).type("text/plain").send(challenge);
+    return res
+      .status(200)
+      .type("text/plain")
+      .send(parsedQuery.data["hub.challenge"]);
   };
 
   app.use("/webhook", webhookLimiter);

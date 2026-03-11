@@ -3,21 +3,20 @@ import express from "express";
 import path from "path";
 import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
+import { assertAuthConfig, registerOAuthRoutes } from "./auth";
 import { registerChatRoutes } from "./chat";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./vite";
-import { registerMetaWebhookRoutes } from "./messengerWebhook";
-import { assertPrivacyConfig } from "./privacy";
-import { getGeneratorStartupConfig } from "./imageService";
-import { assertAuthConfig } from "./env";
-import { applySecurityHeaders } from "./securityHeaders";
-import { registerGitHubAdminRoutes } from "./githubAdmin";
 import {
   captureMetaWebhookRawBody,
+  registerMetaWebhookRoutes,
   verifyMetaWebhookSignature,
-} from "./webhookSignatureVerification";
+} from "./messenger";
+import { assertPrivacyConfig } from "./privacy";
+import { getGeneratorStartupConfig } from "./image-generation";
+import { applySecurityHeaders } from "./securityHeaders";
+import { registerGitHubAdminRoutes } from "./githubAdmin";
 import { isDebugLogEnabled } from "./logLevel";
 import { ensureStateStoreReady } from "./stateStore";
 import {
@@ -26,6 +25,7 @@ import {
   isRedisReplayProtectionEnabled,
 } from "./webhookReplayProtection";
 import { bodyParserErrorHandler } from "./bodyParserErrorHandler";
+import { z } from "zod";
 import {
   createGlobalHttpRateLimiter,
   ensureHttpRateLimiterReady,
@@ -42,6 +42,72 @@ import {
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
 const REQUEST_BODY_LIMIT = "10mb";
+const SHUTDOWN_GRACE_PERIOD_MS = 5_000;
+
+function toError(reason: unknown): Error {
+  if (reason instanceof Error) {
+    return reason;
+  }
+
+  return new Error(typeof reason === "string" ? reason : "Unknown error");
+}
+
+function setupGlobalErrorHandlers(server: ReturnType<typeof createServer>) {
+  let shuttingDown = false;
+
+  const shutdown = (reason: unknown) => {
+    if (shuttingDown) {
+      return;
+    }
+
+    shuttingDown = true;
+    const reasonError = toError(reason);
+
+    console.error("[fatal] shutting down server", {
+      name: reasonError.name,
+      message: reasonError.message,
+      stack: reasonError.stack,
+    });
+
+    const forcedShutdownTimer = setTimeout(() => {
+      console.error("[fatal] forced shutdown after grace period elapsed");
+      process.exit(1);
+    }, SHUTDOWN_GRACE_PERIOD_MS);
+    forcedShutdownTimer.unref();
+
+    server.close((closeError) => {
+      if (closeError) {
+        console.error("[fatal] failed to close server cleanly", closeError);
+      }
+      process.exit(1);
+    });
+  };
+
+  process.on("unhandledRejection", (reason) => {
+    shutdown(toError(reason));
+  });
+  process.on("uncaughtException", (error) => {
+    shutdown(error);
+  });
+
+  process.on("SIGTERM", () => {
+    if (shuttingDown) {
+      return;
+    }
+    shuttingDown = true;
+    server.close((closeError) => {
+      if (closeError) {
+        console.error("[shutdown] SIGTERM close failed", closeError);
+        process.exit(1);
+      }
+      process.exit(0);
+    });
+  });
+}
+
+const debugBuildHeadersSchema = z.object({
+  "x-admin-token": z.string().min(1).optional(),
+});
 
 function buildVersionPayload() {
   return {
@@ -65,6 +131,7 @@ async function startServer() {
   const app = express();
   app.set("trust proxy", 1);
   const server = createServer(app);
+  setupGlobalErrorHandlers(server);
 
   applySecurityHeaders(app);
   app.use(attachRequestTracing());
@@ -85,7 +152,8 @@ async function startServer() {
     const startTime = process.hrtime.bigint();
 
     res.on("finish", () => {
-      const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
+      const durationMs =
+        Number(process.hrtime.bigint() - startTime) / 1_000_000;
       const log = {
         reqId: getRequestId(req),
         traceId: getTraceContext(req)?.traceId,
@@ -125,9 +193,12 @@ async function startServer() {
 
   app.get("/debug/build", (req, res) => {
     const adminToken = process.env.ADMIN_TOKEN;
-    const providedToken = req.header("X-Admin-Token");
+    const parsedHeaders = debugBuildHeadersSchema.safeParse(req.headers);
+    const providedToken = parsedHeaders.success
+      ? parsedHeaders.data["x-admin-token"]
+      : undefined;
 
-    if (!adminToken || providedToken !== adminToken) {
+    if (!adminToken || !providedToken || providedToken !== adminToken) {
       return res.sendStatus(403);
     }
 
@@ -269,7 +340,9 @@ async function startServer() {
   if (oauthServerUrl) {
     registerOAuthRoutes(app);
   } else {
-    console.info("[OAuth] OAUTH_SERVER_URL not set, skipping OAuth route initialization");
+    console.info(
+      "[OAuth] OAUTH_SERVER_URL not set, skipping OAuth route initialization"
+    );
   }
   registerChatRoutes(app);
   app.use(
@@ -311,4 +384,7 @@ async function startServer() {
   });
 }
 
-startServer().catch(console.error);
+startServer().catch((error) => {
+  console.error("[startup] failed to start server", error);
+  process.exit(1);
+});

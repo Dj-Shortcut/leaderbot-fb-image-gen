@@ -1,6 +1,7 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { parse as parseCookieHeader } from "cookie";
 import type { Express, Request, Response } from "express";
+import { z } from "zod";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 
@@ -10,6 +11,16 @@ type OAuthStatePayload = {
   nonce: string;
   redirectUri: string;
 };
+
+const oauthCallbackQuerySchema = z.object({
+  code: z.string().min(1),
+  state: z.string().min(1),
+});
+
+const oauthStateSchema = z.object({
+  nonce: z.string().min(16),
+  redirectUri: z.string().url(),
+});
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -29,32 +40,30 @@ function getCookieValue(req: Request, key: string): string | undefined {
 
 function clearOAuthStateCookie(req: Request, res: Response) {
   const cookieOptions = getSessionCookieOptions(req);
-  res.clearCookie(OAUTH_STATE_COOKIE_NAME, { ...cookieOptions, path: "/api/oauth/callback", sameSite: "lax" });
+  res.clearCookie(OAUTH_STATE_COOKIE_NAME, {
+    ...cookieOptions,
+    path: "/api/oauth/callback",
+    sameSite: "lax",
+  });
 }
 export function parseOAuthState(state: string): OAuthStatePayload | null {
   try {
     const decoded = Buffer.from(state, "base64").toString("utf8");
-    const parsed = JSON.parse(decoded) as Partial<OAuthStatePayload>;
-
-    if (
-      typeof parsed.redirectUri !== "string" ||
-      parsed.redirectUri.length === 0 ||
-      typeof parsed.nonce !== "string" ||
-      parsed.nonce.length < 16
-    ) {
+    const parsed = oauthStateSchema.safeParse(JSON.parse(decoded));
+    if (!parsed.success) {
       return null;
     }
 
-    return {
-      redirectUri: parsed.redirectUri,
-      nonce: parsed.nonce,
-    };
+    return parsed.data;
   } catch {
     return null;
   }
 }
 
-export function validateOAuthState(req: Request, state: string): OAuthStatePayload | null {
+export function validateOAuthState(
+  req: Request,
+  state: string
+): OAuthStatePayload | null {
   const parsedState = parseOAuthState(state);
   if (!parsedState) {
     return null;
@@ -71,14 +80,18 @@ export function validateOAuthState(req: Request, state: string): OAuthStatePaylo
 export function registerOAuthRoutes(app: Express) {
   app.get("/api/oauth/callback", (req: Request, res: Response) => {
     void (async () => {
-      const code = getQueryParam(req, "code");
-      const state = getQueryParam(req, "state");
+      const parsedQuery = oauthCallbackQuerySchema.safeParse({
+        code: getQueryParam(req, "code"),
+        state: getQueryParam(req, "state"),
+      });
 
-      if (!code || !state) {
+      if (!parsedQuery.success) {
         clearOAuthStateCookie(req, res);
         res.status(400).json({ error: "code and state are required" });
         return;
       }
+
+      const { code, state } = parsedQuery.data;
 
       const validatedState = validateOAuthState(req, state);
       if (!validatedState) {
@@ -89,7 +102,10 @@ export function registerOAuthRoutes(app: Express) {
 
       try {
         const { sdk } = await import("./sdk");
-        const tokenResponse = await sdk.exchangeCodeForToken(code, validatedState.redirectUri);
+        const tokenResponse = await sdk.exchangeCodeForToken(
+          code,
+          validatedState.redirectUri
+        );
         const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
 
         if (!userInfo.openId) {
@@ -112,7 +128,10 @@ export function registerOAuthRoutes(app: Express) {
         });
 
         const cookieOptions = getSessionCookieOptions(req);
-        res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        res.cookie(COOKIE_NAME, sessionToken, {
+          ...cookieOptions,
+          maxAge: ONE_YEAR_MS,
+        });
         clearOAuthStateCookie(req, res);
 
         res.redirect(302, "/");
