@@ -267,6 +267,44 @@ describe("OpenAi image-to-image proof", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("requires https APP_BASE_URL in production for openai mode", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "http://leaderbot.example";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example";
+
+    const fixture = Buffer.alloc(7000, 9);
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
+        return {
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => fixture,
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await expect(
+      generator.generate({
+        style: "disco",
+        sourceImageUrl: "https://img.example/source.jpg",
+        userKey: "user-1",
+        reqId: "req-insecure-app-base-url",
+      }),
+    ).rejects.toThrow("APP_BASE_URL is missing or invalid");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    delete process.env.NODE_ENV;
+  });
+
   it("removes leftover generated webp files", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";

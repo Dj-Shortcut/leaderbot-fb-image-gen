@@ -16,7 +16,7 @@
  *   });
  */
 import { storagePut } from "server/storage";
-import { ENV } from "./env";
+import { ENV, getForgeApiBaseUrlOrThrow } from "./env";
 
 export type GenerateImageOptions = {
   prompt: string;
@@ -42,9 +42,10 @@ export async function generateImage(
   }
 
   // Build the full URL by appending the service path to the base URL
-  const baseUrl = ENV.forgeApiUrl.endsWith("/")
-    ? ENV.forgeApiUrl
-    : `${ENV.forgeApiUrl}/`;
+  const forgeApiUrl = getForgeApiBaseUrlOrThrow();
+  const baseUrl = forgeApiUrl.endsWith("/")
+    ? forgeApiUrl
+    : `${forgeApiUrl}/`;
   const fullUrl = new URL(
     "images.v1.ImageService/GenerateImage",
     baseUrl

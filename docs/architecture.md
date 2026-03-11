@@ -171,16 +171,94 @@ Configuration is environment-variable driven.
 
 See README env section for operationally relevant variables.
 
-## 6) Deployment model (Fly.io)
+## 6) Deployment model
+
+Leaderbot ships as a standard Node.js service and can run on multiple targets.
+The canonical runtime contract across all platforms is:
 
 - Build artifact is produced with `pnpm build` (Vite client + bundled server).
 - Runtime starts `node dist/index.js`.
-- `fly.toml` defines app runtime, HTTP service, and `/healthz` checks.
-- Must expose a public `APP_BASE_URL` for Messenger to fetch generated files.
+- Health endpoint is `/healthz`.
+- `APP_BASE_URL` must be publicly reachable so Messenger can fetch `/generated/<id>.png` assets.
 
-## 7) Failure handling and resilience
+### A. Docker
+
+- Repository includes a production `Dockerfile`; `.dockerignore` excludes local/dev artifacts (`node_modules`, `.env*`, `.git`, etc.) to keep image builds clean and deterministic.
+- Typical flow:
+  1. Build image: `docker build -t leaderbot:latest .`
+  2. Run container with required env vars (`REDIS_URL`, Messenger secrets, generator settings).
+  3. Expose `PORT` (default runtime expectation is `8080` in production deployments).
+
+### B. Fly.io
+
+- `fly.toml` defines app runtime, HTTP service, and `/healthz` checks.
+- Deploy using `fly deploy` after setting secrets (`fly secrets set ...`).
+- Keep `REDIS_URL` and other credentials in Fly secrets (not in image or Git).
+
+### C. Kubernetes
+
+- Use the same container image produced by the `Dockerfile`.
+- Recommended resource split:
+  - `Deployment` for the app pods,
+  - `Service` for internal routing,
+  - `Ingress` (or Gateway) for public HTTPS endpoint required by Messenger webhooks.
+- Wire health probes to `/healthz`:
+  - `livenessProbe` and `readinessProbe` as HTTP GET checks.
+- Store sensitive configuration (`REDIS_URL`, `DATABASE_URL`, API keys) in `Secret` objects and inject via environment variables.
+
+## 7) Production configuration for `REDIS_URL` and `DATABASE_URL`
+
+`REDIS_URL` and `DATABASE_URL` should be treated as deployment-time secrets.
+
+### `REDIS_URL`
+
+- Purpose:
+  - durable flow state storage,
+  - webhook replay/dedupe protection,
+  - shared rate-limit state in multi-instance deployments.
+- Production guidance:
+  - Use a managed Redis endpoint with TLS/auth where supported.
+  - Inject via platform secret store (Fly secrets, Kubernetes Secret, Docker runtime env).
+  - Do **not** bake into images, commit into `.env` files, or expose in logs.
+  - Validate connectivity during deployment rollout and alert on reconnect/error metrics.
+
+### `DATABASE_URL`
+
+- Purpose:
+  - DB-backed quota and user/account-centric data flows.
+- Production guidance:
+  - Use provider connection strings with least-privileged credentials.
+  - Prefer pooled/proxy URLs when running many app replicas.
+  - Rotate credentials through platform secret management and restart/reload workloads.
+  - Keep migrations in release workflow so schema stays in lockstep with runtime.
+
+### Secret management patterns by platform
+
+- Docker / Compose:
+  - Pass at runtime (`docker run -e REDIS_URL=... -e DATABASE_URL=...`).
+  - For Compose, use environment references from an external secret source instead of committed `.env` values.
+- Fly.io:
+  - `fly secrets set REDIS_URL=... DATABASE_URL=... -a <app>`
+  - Verify with `fly secrets list -a <app>` and redeploy.
+- Kubernetes:
+  - Create/update `Secret` objects (`kubectl create secret generic ...`).
+  - Reference with `envFrom`/`valueFrom.secretKeyRef` in the `Deployment`.
+  - Rotate by updating Secret + restarting rollout (`kubectl rollout restart deployment/<name>`).
+
+## 8) Failure handling and resilience
 
 - Webhook acknowledgement is immediate; heavy work is deferred.
 - Inbound dedupe reduces duplicate event processing.
 - Generation failures produce user-facing retry options.
 - Health endpoints + version endpoint support simple monitoring.
+
+## 8) Core module boundaries
+
+To keep `server/_core` from growing into a single flat namespace, domain entrypoints are now grouped by responsibility:
+
+- `server/_core/auth/index.ts` for auth-related bootstrap imports (OAuth route registration and auth env assertions).
+- `server/_core/messenger/index.ts` for webhook ingress concerns (raw-body capture, signature verification, webhook route registration).
+- `server/_core/image-generation/index.ts` for image-generator startup wiring.
+
+These entrypoints let server bootstrap code import by domain while remaining backward compatible with existing module files.
+
