@@ -233,6 +233,13 @@ pnpm db:push
 
 The repository includes focused unit tests for webhook handling, state transitions, signature verification, and image generation behavior under mock/OpenAI configuration.
 
+## Documentation standards
+
+- Prefer JSDoc/TSDoc comments for exported functions, classes, interfaces, and non-trivial internal helpers.
+- Write comments so they are parsable by tooling (for example, typed params/returns and clear behavior notes), making API-document generation easier.
+- Keep documentation comments synchronized with implementation changes; when behavior, inputs, or outputs change, update the docblock in the same PR.
+- Remove stale comments rather than leaving outdated guidance in place.
+
 ## Admin login (GitHub OAuth)
 
 The same server can protect `/admin` using GitHub OAuth and a simple allowlist.
