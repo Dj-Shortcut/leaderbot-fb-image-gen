@@ -26,6 +26,7 @@ import {
   isRedisReplayProtectionEnabled,
 } from "./webhookReplayProtection";
 import { bodyParserErrorHandler } from "./bodyParserErrorHandler";
+import { z } from "zod";
 import {
   createGlobalHttpRateLimiter,
   ensureHttpRateLimiterReady,
@@ -42,6 +43,10 @@ import {
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
 const REQUEST_BODY_LIMIT = "10mb";
+
+const debugBuildHeadersSchema = z.object({
+  "x-admin-token": z.string().min(1).optional(),
+});
 
 function buildVersionPayload() {
   return {
@@ -85,7 +90,8 @@ async function startServer() {
     const startTime = process.hrtime.bigint();
 
     res.on("finish", () => {
-      const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
+      const durationMs =
+        Number(process.hrtime.bigint() - startTime) / 1_000_000;
       const log = {
         reqId: getRequestId(req),
         traceId: getTraceContext(req)?.traceId,
@@ -125,9 +131,12 @@ async function startServer() {
 
   app.get("/debug/build", (req, res) => {
     const adminToken = process.env.ADMIN_TOKEN;
-    const providedToken = req.header("X-Admin-Token");
+    const parsedHeaders = debugBuildHeadersSchema.safeParse(req.headers);
+    const providedToken = parsedHeaders.success
+      ? parsedHeaders.data["x-admin-token"]
+      : undefined;
 
-    if (!adminToken || providedToken !== adminToken) {
+    if (!adminToken || !providedToken || providedToken !== adminToken) {
       return res.sendStatus(403);
     }
 
@@ -269,7 +278,9 @@ async function startServer() {
   if (oauthServerUrl) {
     registerOAuthRoutes(app);
   } else {
-    console.info("[OAuth] OAUTH_SERVER_URL not set, skipping OAuth route initialization");
+    console.info(
+      "[OAuth] OAUTH_SERVER_URL not set, skipping OAuth route initialization"
+    );
   }
   registerChatRoutes(app);
   app.use(
