@@ -67,7 +67,7 @@
     "embla-carousel-react": "^8.6.0",
     "express": "^4.21.2",
     "express-rate-limit": "8.2.2",
-    "framer-motion": "^12.23.22",
+    "framer-motion": "^12.35.2",
     "input-otp": "^1.4.2",
     "ioredis": "^5.10.0",
     "jose": "6.1.0",
