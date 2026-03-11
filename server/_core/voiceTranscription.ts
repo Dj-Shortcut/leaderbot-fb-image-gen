@@ -25,7 +25,7 @@
  * });
  * ```
  */
-import { ENV } from "./env";
+import { ENV, assertOutboundHttpsUrl, getForgeApiBaseUrlOrThrow } from "./env";
 
 export type TranscribeOptions = {
   audioUrl: string; // URL to the audio file (e.g., S3 URL)
@@ -94,6 +94,7 @@ export async function transcribeAudio(
     let audioBuffer: Buffer;
     let mimeType: string;
     try {
+      assertOutboundHttpsUrl(options.audioUrl, "audioUrl");
       const response = await fetch(options.audioUrl);
       if (!response.ok) {
         return {
@@ -143,9 +144,10 @@ export async function transcribeAudio(
     formData.append("prompt", prompt);
 
     // Step 4: Call the transcription service
-    const baseUrl = ENV.forgeApiUrl.endsWith("/")
-      ? ENV.forgeApiUrl
-      : `${ENV.forgeApiUrl}/`;
+    const forgeApiUrl = getForgeApiBaseUrlOrThrow();
+    const baseUrl = forgeApiUrl.endsWith("/")
+      ? forgeApiUrl
+      : `${forgeApiUrl}/`;
     
     const fullUrl = new URL(
       "v1/audio/transcriptions",

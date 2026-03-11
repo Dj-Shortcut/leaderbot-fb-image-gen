@@ -47,11 +47,19 @@ const OPENAI_TIMEOUT_MS_DEFAULT = 30_000;
 function getConfiguredBaseUrl(): string | undefined {
   const configuredBaseUrl = process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
 
-  if (configuredBaseUrl && /^https?:\/\//.test(configuredBaseUrl)) {
-    return configuredBaseUrl.replace(/\/$/, "");
+  if (!configuredBaseUrl || !/^https?:\/\//.test(configuredBaseUrl)) {
+    return undefined;
   }
 
-  return undefined;
+  if (process.env.NODE_ENV === "production" && !configuredBaseUrl.startsWith("https://")) {
+    console.error("APP_BASE_URL must use https:// in production", {
+      hasConfiguredBaseUrl: true,
+      protocol: configuredBaseUrl.split(":")[0],
+    });
+    return undefined;
+  }
+
+  return configuredBaseUrl.replace(/\/$/, "");
 }
 
 function getBaseUrl(): string {
