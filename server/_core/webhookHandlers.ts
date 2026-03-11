@@ -328,24 +328,15 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
           })
         );
 
-        let failureText = t(lang, "generationGenericFailure");
-        if (error instanceof MissingInputImageError) {
-          await sendLoggedText(psid, t(lang, "missingInputImage"), reqId);
-          await setFlowState(psid, "AWAITING_PHOTO");
+        const errorResponse = getGenerationErrorResponse(error, lang);
+        await sendLoggedText(psid, errorResponse.introText, reqId);
+        await setFlowState(psid, errorResponse.nextState);
+
+        if (!errorResponse.failureText) {
           return;
-        } else if (
-          error instanceof MissingOpenAiApiKeyError ||
-          error instanceof MissingAppBaseUrlError
-        ) {
-          failureText = t(lang, "generationUnavailable");
-        } else if (error instanceof GenerationTimeoutError) {
-          failureText = t(lang, "generationTimeout");
         }
 
-        await sendLoggedText(psid, t(lang, "failure"), reqId);
-        await setFlowState(psid, "FAILURE");
-
-        await sendLoggedQuickReplies(psid, failureText, [
+        await sendLoggedQuickReplies(psid, errorResponse.failureText, [
           {
             content_type: "text",
             title: t(lang, "retryThisStyle"),
@@ -365,6 +356,41 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       return;
     }
     inFlightNoticeSent.delete(psid);
+  }
+
+  function getGenerationErrorResponse(error: unknown, lang: Lang): {
+    introText: string;
+    failureText?: string;
+    nextState: ConversationState;
+  } {
+    if (error instanceof MissingInputImageError) {
+      return {
+        introText: t(lang, "missingInputImage"),
+        nextState: "AWAITING_PHOTO",
+      };
+    }
+
+    if (error instanceof MissingOpenAiApiKeyError || error instanceof MissingAppBaseUrlError) {
+      return {
+        introText: t(lang, "failure"),
+        failureText: t(lang, "generationUnavailable"),
+        nextState: "FAILURE",
+      };
+    }
+
+    if (error instanceof GenerationTimeoutError) {
+      return {
+        introText: t(lang, "failure"),
+        failureText: t(lang, "generationTimeout"),
+        nextState: "FAILURE",
+      };
+    }
+
+    return {
+      introText: t(lang, "failure"),
+      failureText: t(lang, "generationGenericFailure"),
+      nextState: "FAILURE",
+    };
   }
 
   async function handleStyleSelection(
