@@ -4,7 +4,7 @@
  *     query: { gl: "US", hl: "en", q: "manus" },
  *   })
  */
-import { ENV } from "./env";
+import { ENV, getForgeApiBaseUrlOrThrow } from "./env";
 
 export type DataApiCallOptions = {
   query?: Record<string, unknown>;
@@ -25,7 +25,8 @@ export async function callDataApi(
   }
 
   // Build the full URL by appending the service path to the base URL
-  const baseUrl = ENV.forgeApiUrl.endsWith("/") ? ENV.forgeApiUrl : `${ENV.forgeApiUrl}/`;
+  const forgeApiUrl = getForgeApiBaseUrlOrThrow();
+  const baseUrl = forgeApiUrl.endsWith("/") ? forgeApiUrl : `${forgeApiUrl}/`;
   const fullUrl = new URL("webdevtoken.v1.WebDevService/CallApi", baseUrl).toString();
 
   const response = await fetch(fullUrl, {
