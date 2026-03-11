@@ -12,12 +12,17 @@ import { createOpenAI } from "@ai-sdk/openai";
 import type { Express } from "express";
 import { z } from "zod/v4";
 import { createPatchedFetch } from "./patchedFetch";
+import { getForgeApiBaseUrlOrThrow } from "./env";
 
 let hasLoggedChatDisabledOnStartup = false;
 
 function getChatConfig() {
-  const apiUrl = (process.env.BUILT_IN_FORGE_API_URL ?? "").trim();
   const apiKey = (process.env.BUILT_IN_FORGE_API_KEY ?? "").trim();
+
+  let apiUrl = "";
+  if ((process.env.BUILT_IN_FORGE_API_URL ?? "").trim().length > 0) {
+    apiUrl = getForgeApiBaseUrlOrThrow();
+  }
 
   return {
     apiUrl,
