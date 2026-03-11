@@ -42,6 +42,68 @@ import {
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
 const REQUEST_BODY_LIMIT = "10mb";
+const SHUTDOWN_GRACE_PERIOD_MS = 5_000;
+
+function toError(reason: unknown): Error {
+  if (reason instanceof Error) {
+    return reason;
+  }
+
+  return new Error(typeof reason === "string" ? reason : "Unknown error");
+}
+
+function setupGlobalErrorHandlers(server: ReturnType<typeof createServer>) {
+  let shuttingDown = false;
+
+  const shutdown = (reason: unknown) => {
+    if (shuttingDown) {
+      return;
+    }
+
+    shuttingDown = true;
+    const reasonError = toError(reason);
+
+    console.error("[fatal] shutting down server", {
+      name: reasonError.name,
+      message: reasonError.message,
+      stack: reasonError.stack,
+    });
+
+    const forcedShutdownTimer = setTimeout(() => {
+      console.error("[fatal] forced shutdown after grace period elapsed");
+      process.exit(1);
+    }, SHUTDOWN_GRACE_PERIOD_MS);
+    forcedShutdownTimer.unref();
+
+    server.close((closeError) => {
+      if (closeError) {
+        console.error("[fatal] failed to close server cleanly", closeError);
+      }
+      process.exit(1);
+    });
+  };
+
+  process.on("unhandledRejection", (reason) => {
+    shutdown(toError(reason));
+  });
+  process.on("uncaughtException", (error) => {
+    shutdown(error);
+  });
+
+  process.on("SIGTERM", () => {
+    if (shuttingDown) {
+      return;
+    }
+    shuttingDown = true;
+    server.close((closeError) => {
+      if (closeError) {
+        console.error("[shutdown] SIGTERM close failed", closeError);
+        process.exit(1);
+      }
+      process.exit(0);
+    });
+  });
+}
 
 function buildVersionPayload() {
   return {
@@ -65,6 +127,7 @@ async function startServer() {
   const app = express();
   app.set("trust proxy", 1);
   const server = createServer(app);
+  setupGlobalErrorHandlers(server);
 
   applySecurityHeaders(app);
   app.use(attachRequestTracing());
@@ -311,4 +374,7 @@ async function startServer() {
   });
 }
 
-startServer().catch(console.error);
+startServer().catch((error) => {
+  console.error("[startup] failed to start server", error);
+  process.exit(1);
+});
