@@ -3,21 +3,20 @@ import express from "express";
 import path from "path";
 import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
+import { assertAuthConfig, registerOAuthRoutes } from "./auth";
 import { registerChatRoutes } from "./chat";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./vite";
-import { registerMetaWebhookRoutes } from "./messengerWebhook";
-import { assertPrivacyConfig } from "./privacy";
-import { getGeneratorStartupConfig } from "./imageService";
-import { assertAuthConfig } from "./env";
-import { applySecurityHeaders } from "./securityHeaders";
-import { registerGitHubAdminRoutes } from "./githubAdmin";
 import {
   captureMetaWebhookRawBody,
+  registerMetaWebhookRoutes,
   verifyMetaWebhookSignature,
-} from "./webhookSignatureVerification";
+} from "./messenger";
+import { assertPrivacyConfig } from "./privacy";
+import { getGeneratorStartupConfig } from "./image-generation";
+import { applySecurityHeaders } from "./securityHeaders";
+import { registerGitHubAdminRoutes } from "./githubAdmin";
 import { isDebugLogEnabled } from "./logLevel";
 import { ensureStateStoreReady } from "./stateStore";
 import {

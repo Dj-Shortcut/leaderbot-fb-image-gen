@@ -251,3 +251,14 @@ The canonical runtime contract across all platforms is:
 - Inbound dedupe reduces duplicate event processing.
 - Generation failures produce user-facing retry options.
 - Health endpoints + version endpoint support simple monitoring.
+
+## 8) Core module boundaries
+
+To keep `server/_core` from growing into a single flat namespace, domain entrypoints are now grouped by responsibility:
+
+- `server/_core/auth/index.ts` for auth-related bootstrap imports (OAuth route registration and auth env assertions).
+- `server/_core/messenger/index.ts` for webhook ingress concerns (raw-body capture, signature verification, webhook route registration).
+- `server/_core/image-generation/index.ts` for image-generator startup wiring.
+
+These entrypoints let server bootstrap code import by domain while remaining backward compatible with existing module files.
+
