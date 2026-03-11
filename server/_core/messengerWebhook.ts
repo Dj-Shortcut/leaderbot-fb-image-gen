@@ -2,7 +2,7 @@ import express from "express";
 import rateLimit from "express-rate-limit";
 import { z, ZodError } from "zod";
 import { normalizeLang } from "./i18n";
-import { createWebhookHandler } from "./webhookHandlers";
+import { createWebhookHandlers } from "./webhookHandlers";
 import { resetWebhookReplayProtection } from "./webhookReplayProtection";
 import {
   detectAck,
@@ -20,7 +20,7 @@ const webhookVerificationQuerySchema = z.object({
   "hub.challenge": z.string().min(1),
 });
 
-const handlers = createWebhookHandler({
+const handlers = createWebhookHandlers({
   defaultLang: DEFAULT_LANG,
   privacyPolicyUrl: PRIVACY_POLICY_URL,
 });
