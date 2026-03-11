@@ -1,7 +1,14 @@
 import { randomBytes } from "node:crypto";
 import { parse as parseCookieHeader } from "cookie";
-import type { Express, NextFunction, Request, RequestHandler, Response } from "express";
+import type {
+  Express,
+  NextFunction,
+  Request,
+  RequestHandler,
+  Response,
+} from "express";
 import { SignJWT, jwtVerify } from "jose";
+import { z } from "zod";
 import { getAdminCookieOptions } from "./cookies";
 import { getConfiguredJwtSecret } from "./env";
 
@@ -13,6 +20,11 @@ const STATE_COOKIE_TTL_MS = 10 * 60 * 1000;
 const GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
 const GITHUB_ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token";
 const GITHUB_USER_URL = "https://api.github.com/user";
+
+const githubCallbackQuerySchema = z.object({
+  code: z.string().min(1),
+  state: z.string().min(1),
+});
 
 type GitHubTokenResponse = {
   access_token?: string;
@@ -203,7 +215,9 @@ function clearAdminSessionCookie(req: Request, res: Response): void {
   clearCookie(res, req, ADMIN_SESSION_COOKIE_NAME);
 }
 
-export function parseAdminGithubUsers(raw = process.env.ADMIN_GITHUB_USERS ?? ""): Set<string> {
+export function parseAdminGithubUsers(
+  raw = process.env.ADMIN_GITHUB_USERS ?? ""
+): Set<string> {
   return new Set(
     raw
       .split(",")
@@ -222,13 +236,17 @@ export async function createAdminSessionToken(login: string): Promise<string> {
     .sign(getJwtSecretKey());
 }
 
-export async function verifyAdminSessionToken(token: string): Promise<string | null> {
+export async function verifyAdminSessionToken(
+  token: string
+): Promise<string | null> {
   try {
     const { payload } = await jwtVerify(token, getJwtSecretKey(), {
       algorithms: ["HS256"],
     });
 
-    return typeof payload.sub === "string" && payload.sub.length > 0 ? payload.sub : null;
+    return typeof payload.sub === "string" && payload.sub.length > 0
+      ? payload.sub
+      : null;
   } catch {
     return null;
   }
@@ -262,7 +280,11 @@ function sendUnauthorizedAdminResponse(req: Request, res: Response): void {
   res.status(401).type("text/plain").send("Admin login required");
 }
 
-export const requireAdmin: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
+export const requireAdmin: RequestHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   void (async () => {
     const login = await getAdminLoginFromRequest(req);
     if (!login) {
@@ -281,7 +303,10 @@ export function registerGitHubAdminRoutes(app: Express): void {
   app.get("/auth/github/start", (req, res) => {
     const config = getGitHubAdminConfig();
     if (!config) {
-      res.status(503).type("text/plain").send("GitHub admin auth is not configured");
+      res
+        .status(503)
+        .type("text/plain")
+        .send("GitHub admin auth is not configured");
       return;
     }
 
@@ -301,19 +326,30 @@ export function registerGitHubAdminRoutes(app: Express): void {
     void (async () => {
       const config = getGitHubAdminConfig();
       if (!config) {
-        res.status(503).type("text/plain").send("GitHub admin auth is not configured");
+        res
+          .status(503)
+          .type("text/plain")
+          .send("GitHub admin auth is not configured");
         return;
       }
 
-      const code = getQueryParam(req, "code");
-      const state = getQueryParam(req, "state");
+      const parsedQuery = githubCallbackQuerySchema.safeParse({
+        code: getQueryParam(req, "code"),
+        state: getQueryParam(req, "state"),
+      });
       const expectedState = getCookieValue(req, GITHUB_ADMIN_STATE_COOKIE_NAME);
       clearStateCookie(req, res);
 
-      if (!code || !state || !expectedState || state !== expectedState) {
+      if (
+        !parsedQuery.success ||
+        !expectedState ||
+        parsedQuery.data.state !== expectedState
+      ) {
         res.status(400).type("text/plain").send("Invalid GitHub OAuth state");
         return;
       }
+
+      const { code } = parsedQuery.data;
 
       try {
         const accessToken = await exchangeCodeForAccessToken(code, config);
