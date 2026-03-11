@@ -350,7 +350,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
           return;
         }
 
-        await sendLoggedQuickReplies(psid, errorResponse.failureText, [
+        const retryReplies: Parameters<typeof sendQuickReplies>[2] = [
           {
             content_type: "text",
             title: t(lang, "retryThisStyle"),
@@ -361,7 +361,9 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
             title: t(lang, "otherStyle"),
             payload: "CHOOSE_STYLE",
           },
-        ], reqId);
+        ];
+
+        await sendLoggedQuickReplies(psid, errorResponse.failureText, retryReplies, reqId);
       }
     });
 
