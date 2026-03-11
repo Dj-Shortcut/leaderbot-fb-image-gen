@@ -225,7 +225,7 @@ function createEventLogger(reqId: string) {
   };
 }
 
-export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: HandlerDeps) {
+export function createWebhookHandler({ defaultLang, privacyPolicyUrl }: HandlerDeps) {
   async function maybeSendInFlightMessage(ctx: MessengerEventContext): Promise<boolean> {
     if (!(await hasInFlightGeneration(ctx.psid))) {
       inFlightNoticeSent.delete(ctx.psid);
