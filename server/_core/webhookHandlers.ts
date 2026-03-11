@@ -47,6 +47,13 @@ type HandlerDeps = {
   privacyPolicyUrl: string;
 };
 
+type MessengerEventContext = {
+  psid: string;
+  userId: string;
+  reqId: string;
+  lang: Lang;
+};
+
 const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
 const SMALLTALK = new Set([
   "how are you",
@@ -62,6 +69,13 @@ const IN_FLIGHT_MESSAGE = "\u23F3 even geduld, ik ben nog bezig met jouw restyle
 const inFlightNoticeSent = new Set();
 
 export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: HandlerDeps) {
+  function createMessengerSender(reqId: string) {
+    return {
+      sendText: async (psid: string, text: string) => sendLoggedText(psid, text, reqId),
+      sendStylePicker: async (psid: string, lang: Lang) => sendStylePicker(psid, lang, reqId),
+    };
+  }
+
   function debugWebhookLog(message: Record<string, unknown>): void {
     if (!isDebugLogEnabled()) {
       return;
@@ -328,24 +342,15 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
           })
         );
 
-        let failureText = t(lang, "generationGenericFailure");
-        if (error instanceof MissingInputImageError) {
-          await sendLoggedText(psid, t(lang, "missingInputImage"), reqId);
-          await setFlowState(psid, "AWAITING_PHOTO");
+        const errorResponse = getGenerationErrorResponse(error, lang);
+        await sendLoggedText(psid, errorResponse.introText, reqId);
+        await setFlowState(psid, errorResponse.nextState);
+
+        if (!errorResponse.failureText) {
           return;
-        } else if (
-          error instanceof MissingOpenAiApiKeyError ||
-          error instanceof MissingAppBaseUrlError
-        ) {
-          failureText = t(lang, "generationUnavailable");
-        } else if (error instanceof GenerationTimeoutError) {
-          failureText = t(lang, "generationTimeout");
         }
 
-        await sendLoggedText(psid, t(lang, "failure"), reqId);
-        await setFlowState(psid, "FAILURE");
-
-        await sendLoggedQuickReplies(psid, failureText, [
+        const retryReplies: Parameters<typeof sendQuickReplies>[2] = [
           {
             content_type: "text",
             title: t(lang, "retryThisStyle"),
@@ -356,7 +361,9 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
             title: t(lang, "otherStyle"),
             payload: "CHOOSE_STYLE",
           },
-        ], reqId);
+        ];
+
+        await sendLoggedQuickReplies(psid, errorResponse.failureText, retryReplies, reqId);
       }
     });
 
@@ -367,27 +374,59 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     inFlightNoticeSent.delete(psid);
   }
 
-  async function handleStyleSelection(
-    psid: string,
-    userId: string,
-    selectedStyle: Style,
-    reqId: string,
-    lang: Lang
-  ): Promise<void> {
-    const state = await getOrCreateState(psid);
+  function getGenerationErrorResponse(error: unknown, lang: Lang): {
+    introText: string;
+    failureText?: string;
+    nextState: ConversationState;
+  } {
+    if (error instanceof MissingInputImageError) {
+      return {
+        introText: t(lang, "missingInputImage"),
+        nextState: "AWAITING_PHOTO",
+      };
+    }
+
+    if (error instanceof MissingOpenAiApiKeyError || error instanceof MissingAppBaseUrlError) {
+      return {
+        introText: t(lang, "failure"),
+        failureText: t(lang, "generationUnavailable"),
+        nextState: "FAILURE",
+      };
+    }
+
+    if (error instanceof GenerationTimeoutError) {
+      return {
+        introText: t(lang, "failure"),
+        failureText: t(lang, "generationTimeout"),
+        nextState: "FAILURE",
+      };
+    }
+
+    return {
+      introText: t(lang, "failure"),
+      failureText: t(lang, "generationGenericFailure"),
+      nextState: "FAILURE",
+    };
+  }
+
+  async function handleStyleSelection(ctx: MessengerEventContext, selectedStyle: Style): Promise<void> {
+    const sender = createMessengerSender(ctx.reqId);
+    const state = await getOrCreateState(ctx.psid);
+    const lang = ctx.lang;
+
     if (state.stage === "PROCESSING") {
-      await maybeSendInFlightMessage(psid, reqId);
+      await maybeSendInFlightMessage(ctx.psid, ctx.reqId);
       return;
     }
 
-    await setChosenStyle(psid, selectedStyle);
+    await setChosenStyle(ctx.psid, selectedStyle);
     if (!state.lastPhotoUrl) {
-      await setFlowState(psid, "AWAITING_PHOTO");
-      await sendLoggedText(psid, t(lang, "styleWithoutPhoto"), reqId);
+      await setFlowState(ctx.psid, "AWAITING_PHOTO");
+      await sender.sendText(ctx.psid, t(lang, "styleWithoutPhoto"));
       return;
     }
 
-    await runStyleGeneration(psid, userId, selectedStyle, reqId, lang);
+    await runStyleGeneration(ctx.psid, ctx.userId, selectedStyle, ctx.reqId, lang);
   }
 
   async function handlePayload(
@@ -411,7 +450,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
 
     const selectedStyle = stylePayloadToStyle(payload);
     if (selectedStyle) {
-      await handleStyleSelection(psid, userId, selectedStyle, reqId, lang);
+      await handleStyleSelection({ psid, userId, reqId, lang }, selectedStyle);
       return;
     }
 
@@ -427,7 +466,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       const retryStyle = chosenStyle ? parseStyle(chosenStyle) : undefined;
 
       if (retryStyle) {
-        await handleStyleSelection(psid, userId, retryStyle, reqId, lang);
+        await handleStyleSelection({ psid, userId, reqId, lang }, retryStyle);
         return;
       }
 
