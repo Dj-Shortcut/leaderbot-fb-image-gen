@@ -147,9 +147,9 @@ Related files:
 - `FB_VERIFY_TOKEN` (Webhook verification)
 - `FB_PAGE_ACCESS_TOKEN` (Messenger send API)
 - `FB_APP_SECRET` (Webhook signature validation)
-- `SOURCE_IMAGE_ALLOWED_HOSTS` (required for inbound source-image fetching; if unset, source-image fetches are blocked)
+- `SOURCE_IMAGE_ALLOWED_HOSTS` (required for inbound source-image fetching; if unset, source-image fetches are blocked; review regularly and keep only trusted domains)
 - `REDIS_URL` (required in production for webhook replay protection)
-- `APP_BASE_URL` (required when `GENERATOR_MODE=openai` for public generated image URLs)
+- `APP_BASE_URL` (required when `GENERATOR_MODE=openai` for public generated image URLs; must be `https://` in production)
 - `OPENAI_API_KEY` (required when `GENERATOR_MODE=openai`)
 
 ### Common optional
@@ -183,6 +183,12 @@ Legacy/app-specific environment variables also exist for SDK and data API integr
 
 - Never commit real `.env` files; only keep `.env.example` in git.
 - If a secret appears in GitHub code search (for example by searching for `.env` in this repo), rotate all exposed credentials immediately.
+
+## API documentation
+
+The API is served through `tRPC` at `/api/trpc`, with types inferred directly from server routers.
+
+For a human-readable reference of current procedures, auth requirements, and input/output shapes, see [`docs/trpc-api.md`](docs/trpc-api.md).
 
 ## Local dev
 
@@ -226,6 +232,13 @@ pnpm db:push
 ```
 
 The repository includes focused unit tests for webhook handling, state transitions, signature verification, and image generation behavior under mock/OpenAI configuration.
+
+## Documentation standards
+
+- Prefer JSDoc/TSDoc comments for exported functions, classes, interfaces, and non-trivial internal helpers.
+- Write comments so they are parsable by tooling (for example, typed params/returns and clear behavior notes), making API-document generation easier.
+- Keep documentation comments synchronized with implementation changes; when behavior, inputs, or outputs change, update the docblock in the same PR.
+- Remove stale comments rather than leaving outdated guidance in place.
 
 ## Admin login (GitHub OAuth)
 

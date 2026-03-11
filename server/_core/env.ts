@@ -24,3 +24,43 @@ export function assertAuthConfig(): void {
     );
   }
 }
+
+
+function parseUrlOrThrow(rawUrl: string, envName: string): URL {
+  try {
+    return new URL(rawUrl);
+  } catch {
+    throw new Error(`${envName} must be a valid absolute URL`);
+  }
+}
+
+function enforceHttpsInProduction(url: URL, label: string): void {
+  if (process.env.NODE_ENV === "production" && url.protocol !== "https:") {
+    throw new Error(`${label} must use HTTPS in production`);
+  }
+}
+
+export function getForgeApiBaseUrlOrThrow(): string {
+  const raw = (process.env.BUILT_IN_FORGE_API_URL ?? "").trim();
+
+  if (!raw) {
+    throw new Error("BUILT_IN_FORGE_API_URL is not configured");
+  }
+
+  const parsed = parseUrlOrThrow(raw, "BUILT_IN_FORGE_API_URL");
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error("BUILT_IN_FORGE_API_URL must start with http:// or https://");
+  }
+
+  enforceHttpsInProduction(parsed, "BUILT_IN_FORGE_API_URL");
+  return parsed.toString();
+}
+
+export function assertOutboundHttpsUrl(rawUrl: string, label = "outbound URL"): void {
+  const parsed = parseUrlOrThrow(rawUrl, label);
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error(`${label} must start with http:// or https://`);
+  }
+
+  enforceHttpsInProduction(parsed, label);
+}
