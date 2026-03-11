@@ -7,7 +7,7 @@
  * See API examples below the type definitions for usage patterns.
  */
 
-import { ENV } from "./env";
+import { ENV, getForgeApiBaseUrlOrThrow } from "./env";
 
 // ============================================================================
 // Configuration
@@ -19,7 +19,7 @@ type MapsConfig = {
 };
 
 function getMapsConfig(): MapsConfig {
-  const baseUrl = ENV.forgeApiUrl;
+  const baseUrl = getForgeApiBaseUrlOrThrow();
   const apiKey = ENV.forgeApiKey;
 
   if (!baseUrl || !apiKey) {

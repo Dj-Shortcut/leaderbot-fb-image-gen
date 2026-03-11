@@ -147,9 +147,9 @@ Related files:
 - `FB_VERIFY_TOKEN` (Webhook verification)
 - `FB_PAGE_ACCESS_TOKEN` (Messenger send API)
 - `FB_APP_SECRET` (Webhook signature validation)
-- `SOURCE_IMAGE_ALLOWED_HOSTS` (required for inbound source-image fetching; if unset, source-image fetches are blocked)
+- `SOURCE_IMAGE_ALLOWED_HOSTS` (required for inbound source-image fetching; if unset, source-image fetches are blocked; review regularly and keep only trusted domains)
 - `REDIS_URL` (required in production for webhook replay protection)
-- `APP_BASE_URL` (required when `GENERATOR_MODE=openai` for public generated image URLs)
+- `APP_BASE_URL` (required when `GENERATOR_MODE=openai` for public generated image URLs; must be `https://` in production)
 - `OPENAI_API_KEY` (required when `GENERATOR_MODE=openai`)
 
 ### Common optional

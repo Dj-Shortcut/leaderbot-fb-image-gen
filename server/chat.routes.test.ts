@@ -63,6 +63,7 @@ async function postJson(
 describe("chat route configuration", () => {
   const originalForgeApiUrl = process.env.BUILT_IN_FORGE_API_URL;
   const originalForgeApiKey = process.env.BUILT_IN_FORGE_API_KEY;
+  const originalNodeEnv = process.env.NODE_ENV;
 
   afterEach(() => {
     if (originalForgeApiUrl === undefined) {
@@ -75,6 +76,12 @@ describe("chat route configuration", () => {
       delete process.env.BUILT_IN_FORGE_API_KEY;
     } else {
       process.env.BUILT_IN_FORGE_API_KEY = originalForgeApiKey;
+    }
+
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
     }
 
     vi.restoreAllMocks();
@@ -98,6 +105,19 @@ describe("chat route configuration", () => {
     const { isChatConfigured } = await import("./_core/chat");
 
     expect(isChatConfigured()).toBe(true);
+  });
+
+
+
+  it("rejects non-https forge URL in production", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.BUILT_IN_FORGE_API_URL = "http://example.test/forge";
+    process.env.BUILT_IN_FORGE_API_KEY = "secret-token";
+
+    vi.resetModules();
+    const { isChatConfigured } = await import("./_core/chat");
+
+    expect(() => isChatConfigured()).toThrow("BUILT_IN_FORGE_API_URL must use HTTPS in production");
   });
 
   it("registers active /api/chat when config is present", async () => {
