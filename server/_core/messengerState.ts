@@ -78,13 +78,7 @@ const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
   ],
 };
 
-type LegacyMessengerState = {
-  currentStep?: MessengerFlowState;
-  lastImage?: string | null;
-  style?: string | null;
-};
-
-type PartialState = Partial<MessengerUserState> & LegacyMessengerState;
+type PartialState = Partial<MessengerUserState>;
 
 function looksLikeUserKey(value: string): boolean {
   return /^[a-f0-9]{64}$/i.test(value);
@@ -126,10 +120,10 @@ function createDefaultState(psid: string, now = Date.now()): MessengerUserState 
 function normalizeState(psid: string, value: PartialState | null | undefined): MessengerUserState {
   const resolvedPsid = value?.psid ?? psid;
   const fallback = createDefaultState(resolvedPsid);
-  const stage = value?.stage ?? value?.state ?? value?.currentStep ?? fallback.stage;
-  const lastPhoto = value?.lastPhoto ?? value?.lastPhotoUrl ?? fallback.lastPhoto;
-  const selectedStyle = value?.selectedStyle ?? value?.chosenStyle ?? value?.style ?? fallback.selectedStyle;
-  const lastGeneratedUrl = value?.lastGeneratedUrl ?? value?.lastImageUrl ?? value?.lastImage ?? fallback.lastGeneratedUrl;
+  const stage = value?.stage ?? value?.state ?? fallback.stage;
+  const lastPhoto = value?.lastPhotoUrl ?? value?.lastPhoto ?? fallback.lastPhoto;
+  const selectedStyle = value?.selectedStyle ?? value?.chosenStyle ?? fallback.selectedStyle;
+  const lastGeneratedUrl = value?.lastGeneratedUrl ?? value?.lastImageUrl ?? fallback.lastGeneratedUrl;
 
   return {
     ...fallback,
