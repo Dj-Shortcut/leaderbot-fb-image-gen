@@ -1,7 +1,7 @@
 import { getDayKey, getOrCreateState, type MessengerUserState } from "./messengerState";
 import { updateStoredState } from "./stateStore";
 
-const FREE_DAILY_LIMIT = 2;
+export const FREE_DAILY_LIMIT = 2;
 
 function hasQuotaBypass(psid: string, userKey: string): boolean {
   const raw = process.env.MESSENGER_QUOTA_BYPASS_IDS ?? "";

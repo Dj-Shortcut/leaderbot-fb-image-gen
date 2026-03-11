@@ -39,7 +39,7 @@ import {
   toMessengerReplies,
 } from "./webhookHelpers";
 import { hasInFlightGeneration, runGuardedGeneration } from "./generationGuard";
-import { canGenerate, increment } from "./messengerQuota";
+import { canGenerate, FREE_DAILY_LIMIT, increment } from "./messengerQuota";
 import { isDebugLogEnabled } from "./logLevel";
 
 type HandlerDeps = {
@@ -58,8 +58,21 @@ const SMALLTALK = new Set([
   "thank you",
 ]);
 
-const IN_FLIGHT_MESSAGE = "\u23F3 even geduld, ik ben nog bezig met jouw restyle";
+const IN_FLIGHT_MESSAGE = "⏳ even geduld, ik ben nog bezig met jouw restyle";
 const inFlightNoticeSent = new Set();
+
+const RETRY_STYLE_PREFIX = "RETRY_STYLE_";
+const CHOOSE_STYLE_PAYLOAD = "CHOOSE_STYLE";
+const RETRY_STYLE_PAYLOAD = "RETRY_STYLE";
+const WHAT_IS_THIS_PAYLOAD = "WHAT_IS_THIS";
+const PRIVACY_INFO_PAYLOAD = "PRIVACY_INFO";
+const NEW_STYLE_TEXTS = new Set(["nieuwe stijl", "new style"]);
+const REFERRAL_PHOTO_PROMPT_EN = "You came in via {style}. Send a photo to start ";
+const REFERRAL_PHOTO_PROMPT_NL = "Je bent binnengekomen via {style}. Stuur een foto om te starten ";
+const FREE_CREDITS_EXHAUSTED_TEXT = {
+  en: "You used your free credits for today. Come back tomorrow.",
+  nl: "Je hebt je gratis credits voor vandaag opgebruikt. Kom morgen terug.",
+} as const;
 
 export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: HandlerDeps) {
   function debugWebhookLog(message: Record<string, unknown>): void {
@@ -226,8 +239,8 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     const styleLabel = STYLE_LABELS[style];
     const text =
       lang === "en"
-        ? `You came in via ${styleLabel}. Send a photo to start `
-        : `Je bent binnengekomen via ${styleLabel}. Stuur een foto om te starten `;
+        ? REFERRAL_PHOTO_PROMPT_EN.replace("{style}", styleLabel)
+        : REFERRAL_PHOTO_PROMPT_NL.replace("{style}", styleLabel);
     await sendLoggedText(psid, text, reqId);
   }
 
@@ -244,9 +257,9 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       const quotaState = await getOrCreateState(psid);
       const bypassRaw = process.env.MESSENGER_QUOTA_BYPASS_IDS ?? "";
       const bypassApplied = bypassRaw.includes(psid) || bypassRaw.includes(quotaState.userKey);
-      console.log(JSON.stringify({ level: "info", msg: "quota_decision", action: "check", psidHash: anonymizePsid(psid).slice(0, 12), count: quotaState.quota.count, limit: 2, bypassApplied, allowed }));
+      console.log(JSON.stringify({ level: "info", msg: "quota_decision", action: "check", psidHash: anonymizePsid(psid).slice(0, 12), count: quotaState.quota.count, limit: FREE_DAILY_LIMIT, bypassApplied, allowed }));
       if (!allowed) {
-        await sendLoggedText(psid, lang === "en" ? "You used your free credits for today. Come back tomorrow." : "Je hebt je gratis credits voor vandaag opgebruikt. Kom morgen terug.", reqId);
+        await sendLoggedText(psid, lang === "en" ? FREE_CREDITS_EXHAUSTED_TEXT.en : FREE_CREDITS_EXHAUSTED_TEXT.nl, reqId);
         await setFlowState(psid, "AWAITING_STYLE");
         return;
       }
@@ -354,7 +367,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
           {
             content_type: "text",
             title: t(lang, "otherStyle"),
-            payload: "CHOOSE_STYLE",
+            payload: CHOOSE_STYLE_PAYLOAD,
           },
         ], reqId);
       }
@@ -390,6 +403,76 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     await runStyleGeneration(psid, userId, selectedStyle, reqId, lang);
   }
 
+  async function handleRetryPayload(
+    psid: string,
+    userId: string,
+    payload: string,
+    reqId: string,
+    lang: Lang
+  ): Promise<boolean> {
+    if (!payload.startsWith(RETRY_STYLE_PREFIX)) {
+      return false;
+    }
+
+    const retryStyle = normalizeStyle(payload.slice(RETRY_STYLE_PREFIX.length));
+    if (!retryStyle) {
+      return true;
+    }
+
+    await runStyleGeneration(psid, userId, retryStyle, reqId, lang);
+    return true;
+  }
+
+  async function handleControlPayload(
+    psid: string,
+    userId: string,
+    payload: string,
+    reqId: string,
+    lang: Lang
+  ): Promise<boolean> {
+    if (payload === CHOOSE_STYLE_PAYLOAD) {
+      await setPreselectedStyle(psid, null);
+      await setFlowState(psid, "AWAITING_STYLE");
+      await sendStylePicker(psid, lang, reqId);
+      return true;
+    }
+
+    if (payload !== RETRY_STYLE_PAYLOAD) {
+      return false;
+    }
+
+    const chosenStyle = (await getOrCreateState(psid)).selectedStyle;
+    const retryStyle = chosenStyle ? parseStyle(chosenStyle) : undefined;
+
+    if (retryStyle) {
+      await handleStyleSelection(psid, userId, retryStyle, reqId, lang);
+      return true;
+    }
+
+    await setFlowState(psid, "AWAITING_STYLE");
+    await sendStylePicker(psid, lang, reqId);
+    return true;
+  }
+
+  async function handleInfoPayload(
+    psid: string,
+    payload: string,
+    reqId: string,
+    lang: Lang
+  ): Promise<boolean> {
+    if (payload === WHAT_IS_THIS_PAYLOAD) {
+      await sendLoggedText(psid, t(lang, "flowExplanation"), reqId);
+      return true;
+    }
+
+    if (payload === PRIVACY_INFO_PAYLOAD) {
+      await sendLoggedText(psid, t(lang, "privacy", { link: privacyPolicyUrl }), reqId);
+      return true;
+    }
+
+    return false;
+  }
+
   async function handlePayload(
     psid: string,
     userId: string,
@@ -401,12 +484,8 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       return;
     }
 
-    if (payload.startsWith("RETRY_STYLE_")) {
-      const retryStyle = normalizeStyle(payload.slice("RETRY_STYLE_".length));
-      if (retryStyle) {
-        await runStyleGeneration(psid, userId, retryStyle, reqId, lang);
-        return;
-      }
+    if (await handleRetryPayload(psid, userId, payload, reqId, lang)) {
+      return;
     }
 
     const selectedStyle = stylePayloadToStyle(payload);
@@ -415,38 +494,109 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       return;
     }
 
-    if (payload === "CHOOSE_STYLE") {
-      await setPreselectedStyle(psid, null);
-      await setFlowState(psid, "AWAITING_STYLE");
-      await sendStylePicker(psid, lang, reqId);
+    if (await handleControlPayload(psid, userId, payload, reqId, lang)) {
       return;
     }
 
-    if (payload === "RETRY_STYLE") {
-      const chosenStyle = (await getOrCreateState(psid)).selectedStyle;
-      const retryStyle = chosenStyle ? parseStyle(chosenStyle) : undefined;
-
-      if (retryStyle) {
-        await handleStyleSelection(psid, userId, retryStyle, reqId, lang);
-        return;
-      }
-
-      await setFlowState(psid, "AWAITING_STYLE");
-      await sendStylePicker(psid, lang, reqId);
-      return;
-    }
-
-    if (payload === "WHAT_IS_THIS") {
-      await sendLoggedText(psid, t(lang, "flowExplanation"), reqId);
-      return;
-    }
-
-    if (payload === "PRIVACY_INFO") {
-      await sendLoggedText(psid, t(lang, "privacy", { link: privacyPolicyUrl }), reqId);
+    if (await handleInfoPayload(psid, payload, reqId, lang)) {
       return;
     }
 
     safeLog("unknown_payload", { user: toLogUser(userId) });
+  }
+
+  async function handleImageMessage(
+    psid: string,
+    userId: string,
+    imageUrl: string,
+    reqId: string,
+    lang: Lang,
+    hasAttachments: boolean
+  ): Promise<boolean> {
+    debugWebhookLog({
+      level: "debug",
+      msg: "photo_received",
+      reqId,
+      psidHash: anonymizePsid(psid).slice(0, 12),
+      hasAttachments,
+      attachmentHostname: getAttachmentHostname(imageUrl),
+    });
+
+    const state = await getOrCreateState(psid);
+    logUserState(psid, userId, state, reqId, "image_received");
+    const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");
+    await setPendingImage(psid, imageUrl);
+
+    if (preselectedStyle) {
+      await setPreselectedStyle(psid, null);
+      await setChosenStyle(psid, preselectedStyle);
+      await runStyleGeneration(psid, userId, preselectedStyle, reqId, lang);
+      return true;
+    }
+
+    await setFlowState(psid, "AWAITING_STYLE");
+    await sendPhotoReceivedPrompt(psid, lang, reqId);
+    return true;
+  }
+
+  async function handleGreetingMessage(
+    psid: string,
+    userId: string,
+    normalizedText: string,
+    reqId: string,
+    lang: Lang
+  ): Promise<boolean> {
+    if (!GREETINGS.has(normalizedText) && !SMALLTALK.has(normalizedText)) {
+      return false;
+    }
+
+    const state = await getOrCreateState(psid);
+    logUserState(psid, userId, state, reqId, "greeting");
+    if (!state.hasSeenIntro && state.stage === "IDLE") {
+      await sendIntro(psid, lang, reqId);
+      await markIntroSeen(psid);
+      return true;
+    }
+
+    const response = getGreetingResponse(state.stage, lang);
+    if (response.mode === "text") {
+      await sendLoggedText(psid, response.text, reqId);
+    } else {
+      await sendStateQuickReplies(psid, response.state, response.text, reqId);
+    }
+
+    return true;
+  }
+
+  async function handleTextMessage(
+    psid: string,
+    userId: string,
+    normalizedText: string,
+    reqId: string,
+    lang: Lang
+  ): Promise<void> {
+    if (await handleGreetingMessage(psid, userId, normalizedText, reqId, lang)) {
+      return;
+    }
+
+    if (NEW_STYLE_TEXTS.has(normalizedText)) {
+      const quickState = await getOrCreateState(psid);
+      if (quickState.lastPhotoUrl) {
+        await setFlowState(psid, "AWAITING_STYLE");
+        await sendStylePicker(psid, lang, reqId);
+        return;
+      }
+    }
+
+    const state = await getOrCreateState(psid);
+    logUserState(psid, userId, state, reqId, "text_message");
+    if (!state.lastPhotoUrl) {
+      await setFlowState(psid, "AWAITING_PHOTO");
+      await sendLoggedText(psid, t(lang, "textWithoutPhoto"), reqId);
+      return;
+    }
+
+    await sendLoggedText(psid, t(lang, "flowExplanation"), reqId);
   }
 
   async function handleMessage(
@@ -474,29 +624,14 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       att => att.type === "image" && att.payload?.url
     );
     if (imageAttachment?.payload?.url) {
-      debugWebhookLog({
-          level: "debug",
-          msg: "photo_received",
-          reqId,
-          psidHash: anonymizePsid(psid).slice(0, 12),
-          hasAttachments: !!message.attachments,
-          attachmentHostname: getAttachmentHostname(imageAttachment.payload.url),
-        });
-
-      const state = await getOrCreateState(psid);
-      logUserState(psid, userId, state, reqId, "image_received");
-      const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");
-      await setPendingImage(psid, imageAttachment.payload.url);
-
-      if (preselectedStyle) {
-        await setPreselectedStyle(psid, null);
-        await setChosenStyle(psid, preselectedStyle);
-        await runStyleGeneration(psid, userId, preselectedStyle, reqId, lang);
-        return;
-      }
-
-      await setFlowState(psid, "AWAITING_STYLE");
-      await sendPhotoReceivedPrompt(psid, lang, reqId);
+      await handleImageMessage(
+        psid,
+        userId,
+        imageAttachment.payload.url,
+        reqId,
+        lang,
+        Boolean(message.attachments)
+      );
       return;
     }
 
@@ -513,42 +648,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       return;
     }
 
-    if (GREETINGS.has(normalizedText) || SMALLTALK.has(normalizedText)) {
-      const state = await getOrCreateState(psid);
-      logUserState(psid, userId, state, reqId, "greeting");
-      if (!state.hasSeenIntro && state.stage === "IDLE") {
-        await sendIntro(psid, lang, reqId);
-        await markIntroSeen(psid);
-        return;
-      }
-
-      const response = getGreetingResponse(state.stage, lang);
-      if (response.mode === "text") {
-        await sendLoggedText(psid, response.text, reqId);
-      } else {
-        await sendStateQuickReplies(psid, response.state, response.text, reqId);
-      }
-      return;
-    }
-
-    if (normalizedText === "nieuwe stijl" || normalizedText === "new style") {
-      const quickState = await getOrCreateState(psid);
-      if (quickState.lastPhotoUrl) {
-        await setFlowState(psid, "AWAITING_STYLE");
-        await sendStylePicker(psid, lang, reqId);
-        return;
-      }
-    }
-
-    const state = await getOrCreateState(psid);
-    logUserState(psid, userId, state, reqId, "text_message");
-    if (!state.lastPhotoUrl) {
-      await setFlowState(psid, "AWAITING_PHOTO");
-      await sendLoggedText(psid, t(lang, "textWithoutPhoto"), reqId);
-      return;
-    }
-
-    await sendLoggedText(psid, t(lang, "flowExplanation"), reqId);
+    await handleTextMessage(psid, userId, normalizedText, reqId, lang);
   }
 
   async function handleEvent(event: FacebookWebhookEvent, entryId?: string): Promise<void> {
