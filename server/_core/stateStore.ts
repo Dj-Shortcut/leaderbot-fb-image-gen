@@ -53,7 +53,11 @@ async function getRedisClient(): Promise<RedisLike> {
 }
 
 function getStateKey(psid: string): string {
-  return `psid:${psid}`;
+  return getScopedStateKey("psid", psid);
+}
+
+function getScopedStateKey(scope: string, key: string): string {
+  return `${scope}:${key}`;
 }
 
 export function isRedisStateStoreEnabled(): boolean {
@@ -69,31 +73,69 @@ export async function ensureStateStoreReady(): Promise<void> {
   await redis.ping();
 }
 
-export function readState<T>(psid: string): MaybePromise<T | null> {
+export function readRawState<T>(storageKey: string): MaybePromise<T | null> {
   if (!isRedisStateStoreEnabled()) {
-    const payload = memoryState.get(getStateKey(psid));
+    const payload = memoryState.get(storageKey);
     return payload ? (JSON.parse(payload) as T) : null;
   }
 
   return getRedisClient().then(async redis => {
-    const payload = await redis.get(getStateKey(psid));
+    const payload = await redis.get(storageKey);
     return payload ? (JSON.parse(payload) as T) : null;
   });
 }
 
-export function writeState<T>(psid: string, value: T): MaybePromise<void> {
+export function writeRawState<T>(
+  storageKey: string,
+  value: T,
+  ttlSeconds = STATE_TTL_SECONDS
+): MaybePromise<void> {
   const payload = JSON.stringify(value);
 
   if (!isRedisStateStoreEnabled()) {
-    memoryState.set(getStateKey(psid), payload);
+    memoryState.set(storageKey, payload);
     return;
   }
 
   return getRedisClient().then(redis => {
     return redis
-      .set(getStateKey(psid), payload, "EX", STATE_TTL_SECONDS)
+      .set(storageKey, payload, "EX", ttlSeconds)
       .then(() => undefined);
   });
+}
+
+export function deleteRawState(storageKey: string): MaybePromise<void> {
+  if (!isRedisStateStoreEnabled()) {
+    memoryState.delete(storageKey);
+    return;
+  }
+
+  return getRedisClient().then(redis => redis.del(storageKey).then(() => undefined));
+}
+
+export function readScopedState<T>(scope: string, key: string): MaybePromise<T | null> {
+  return readRawState<T>(getScopedStateKey(scope, key));
+}
+
+export function writeScopedState<T>(
+  scope: string,
+  key: string,
+  value: T,
+  ttlSeconds = STATE_TTL_SECONDS
+): MaybePromise<void> {
+  return writeRawState(getScopedStateKey(scope, key), value, ttlSeconds);
+}
+
+export function deleteScopedState(scope: string, key: string): MaybePromise<void> {
+  return deleteRawState(getScopedStateKey(scope, key));
+}
+
+export function readState<T>(psid: string): MaybePromise<T | null> {
+  return readRawState<T>(getStateKey(psid));
+}
+
+export function writeState<T>(psid: string, value: T): MaybePromise<void> {
+  return writeRawState(getStateKey(psid), value, STATE_TTL_SECONDS);
 }
 
 export function getOrCreateStoredState<T>(

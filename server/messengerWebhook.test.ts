@@ -1,10 +1,14 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { sendImageMock, sendQuickRepliesMock, sendTextMock, safeLogMock } = vi.hoisted(() => ({
+const { sendImageMock, sendQuickRepliesMock, sendTextMock, safeLogMock, generateMessengerReplyMock } = vi.hoisted(() => ({
   sendImageMock: vi.fn(async () => undefined),
   sendQuickRepliesMock: vi.fn(async () => undefined),
   sendTextMock: vi.fn(async () => undefined),
   safeLogMock: vi.fn(),
+  generateMessengerReplyMock: vi.fn(async () => ({
+    text: "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
+    source: "fallback",
+  })),
 }));
 
 vi.mock("./_core/messengerApi", () => ({
@@ -12,6 +16,10 @@ vi.mock("./_core/messengerApi", () => ({
   sendQuickReplies: sendQuickRepliesMock,
   sendText: sendTextMock,
   safeLog: safeLogMock,
+}));
+
+vi.mock("./_core/messengerResponsesService", () => ({
+  generateMessengerReply: generateMessengerReplyMock,
 }));
 
 import {
@@ -41,6 +49,17 @@ afterAll(() => {
   }
 
   process.env.PRIVACY_PEPPER = originalPrivacyPepper;
+});
+
+beforeEach(() => {
+  delete process.env.MESSENGER_CHAT_ENGINE;
+  delete process.env.MESSENGER_CHAT_CANARY_PERCENT;
+
+  generateMessengerReplyMock.mockReset();
+  generateMessengerReplyMock.mockResolvedValue({
+    text: "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
+    source: "fallback",
+  });
 });
 
 describe("webhook summary logging", () => {
@@ -981,6 +1000,208 @@ describe("messenger webhook dedupe", () => {
     }
   });
 
+});
+
+describe("messenger text brain rollout", () => {
+  beforeEach(() => {
+    process.env.GENERATOR_MODE = "mock";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+    safeLogMock.mockClear();
+    resetStateStore();
+    resetMessengerEventDedupe();
+  });
+
+  it("keeps legacy free-text behavior when engine is legacy", async () => {
+    process.env.MESSENGER_CHAT_ENGINE = "legacy";
+    process.env.MESSENGER_CHAT_CANARY_PERCENT = "100";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "legacy-user" },
+              message: {
+                mid: "mid-legacy-photo",
+                attachments: [{ type: "image", payload: { url: "https://img.example/legacy.jpg" } }],
+              },
+            },
+            {
+              sender: { id: "legacy-user" },
+              message: { mid: "mid-legacy-text", text: "Wat kan ik nu doen?" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(generateMessengerReplyMock).not.toHaveBeenCalled();
+    expect(sendTextMock).toHaveBeenLastCalledWith(
+      "legacy-user",
+      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis.",
+    );
+  });
+
+  it("uses responses engine on canary hit and passes userKey instead of raw psid", async () => {
+    process.env.MESSENGER_CHAT_ENGINE = "responses";
+    process.env.MESSENGER_CHAT_CANARY_PERCENT = "100";
+    generateMessengerReplyMock.mockResolvedValue({
+      text: "Kies een stijl via de knoppen hieronder.",
+      source: "responses",
+    });
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "responses-user" },
+              message: {
+                mid: "mid-responses-photo",
+                attachments: [{ type: "image", payload: { url: "https://img.example/responses.jpg" } }],
+              },
+            },
+            {
+              sender: { id: "responses-user" },
+              message: { mid: "mid-responses-text", text: "Wat kan ik nu doen?" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(generateMessengerReplyMock).toHaveBeenCalledTimes(1);
+    expect(generateMessengerReplyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        psid: "responses-user",
+        userKey: anonymizePsid("responses-user"),
+        hasPhoto: true,
+        stage: "AWAITING_STYLE",
+        text: "Wat kan ik nu doen?",
+      }),
+    );
+    expect(generateMessengerReplyMock.mock.calls[0]?.[0]?.userKey).not.toBe("responses-user");
+    expect(sendTextMock).toHaveBeenLastCalledWith(
+      "responses-user",
+      "Kies een stijl via de knoppen hieronder.",
+    );
+  });
+
+  it("falls back to legacy response when canary misses", async () => {
+    process.env.MESSENGER_CHAT_ENGINE = "responses";
+    process.env.MESSENGER_CHAT_CANARY_PERCENT = "0";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "canary-miss-user" },
+              message: {
+                mid: "mid-canary-photo",
+                attachments: [{ type: "image", payload: { url: "https://img.example/canary.jpg" } }],
+              },
+            },
+            {
+              sender: { id: "canary-miss-user" },
+              message: { mid: "mid-canary-text", text: "Wat kan ik nu doen?" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(generateMessengerReplyMock).not.toHaveBeenCalled();
+    expect(sendTextMock).toHaveBeenLastCalledWith(
+      "canary-miss-user",
+      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis.",
+    );
+  });
+
+  it("uses deterministic fallback text and keeps stage stable when responses falls back", async () => {
+    process.env.MESSENGER_CHAT_ENGINE = "responses";
+    process.env.MESSENGER_CHAT_CANARY_PERCENT = "100";
+    generateMessengerReplyMock.mockResolvedValue({
+      text: "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
+      source: "fallback",
+    });
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "responses-fallback-user" },
+              message: { mid: "mid-fallback-text", text: "Wie ben jij?" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(generateMessengerReplyMock).toHaveBeenCalledTimes(1);
+    expect(sendTextMock).toHaveBeenLastCalledWith(
+      "responses-fallback-user",
+      "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
+    );
+    expect(getState(anonymizePsid("responses-fallback-user"))?.stage).toBe("AWAITING_PHOTO");
+  });
+
+  it("falls back to deterministic text when responses service throws", async () => {
+    process.env.MESSENGER_CHAT_ENGINE = "responses";
+    process.env.MESSENGER_CHAT_CANARY_PERCENT = "100";
+    generateMessengerReplyMock.mockRejectedValue(new Error("boom"));
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "responses-error-user" },
+              message: { mid: "mid-fallback-error", text: "Wie ben jij?" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenLastCalledWith(
+      "responses-error-user",
+      "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
+    );
+    expect(getState(anonymizePsid("responses-error-user"))?.stage).toBe("AWAITING_PHOTO");
+  });
+
+  it("does not affect attachment/style/image generation path when responses engine is enabled", async () => {
+    process.env.MESSENGER_CHAT_ENGINE = "responses";
+    process.env.MESSENGER_CHAT_CANARY_PERCENT = "100";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "responses-image-user" },
+              message: {
+                mid: "mid-responses-image-photo",
+                attachments: [{ type: "image", payload: { url: "https://img.example/image-path.jpg" } }],
+              },
+            },
+            {
+              sender: { id: "responses-image-user" },
+              message: { mid: "mid-responses-image-style", quick_reply: { payload: "disco" } },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(generateMessengerReplyMock).not.toHaveBeenCalled();
+    expect(sendImageMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("messenger greeting behavior", () => {

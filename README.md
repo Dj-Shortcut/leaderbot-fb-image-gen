@@ -166,6 +166,13 @@ Related files:
 - `MESSENGER_PSID_COOLDOWN_MS` (optional per-PSID cooldown between generations, default `0`)
 - `MESSENGER_PSID_LOCK_TTL_MS` (per-PSID in-flight lock TTL, default `120000`)
 - `GRAPH_API_MAX_RETRIES`, `GRAPH_API_RETRY_BASE_MS` (retry policy for Meta Graph API `429`/`5xx` responses)
+- `MESSENGER_CHAT_ENGINE` (`legacy|responses`; defaults to `legacy`)
+- `MESSENGER_CHAT_CANARY_PERCENT` (0-100 deterministic rollout for Messenger free-text responses; default `0`)
+- `OPENAI_TEXT_MODEL` (model for Messenger free-text Responses API, default `gpt-4.1-mini`)
+- `MESSENGER_CHAT_HISTORY_LIMIT` (chat-memory window size for Messenger free-text, default `12`)
+- `MESSENGER_CHAT_HISTORY_TTL_SECONDS` (chat-memory TTL for Messenger free-text, default `604800`)
+- `OPENAI_TEXT_TIMEOUT_MS` (timeout per Responses text request, default `12000`)
+- `OPENAI_TEXT_MAX_RETRIES` (retry attempts for retryable Responses failures, default `1`)
 - `ADMIN_TOKEN` (protects `/debug/build`)
 - `NODE_ENV` (set to `production` to enforce production-only checks such as required `REDIS_URL`)
 - `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL` (enable GitHub admin login)
@@ -178,6 +185,13 @@ Related files:
 - `VITE_APP_ID`, `DATABASE_URL`, `OWNER_OPEN_ID`, `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY` (app/data integrations exposed via `server/_core/env.ts`)
 
 Legacy/app-specific environment variables also exist for SDK and data API integrations in `server/_core/env.ts`.
+
+### Messenger text brain rollout (hybrid fallback)
+
+- `legacy` mode keeps deterministic behavior for free-text fallback responses.
+- `responses` mode enables OpenAI Responses API only for unmatched free-text messages.
+- Canary is deterministic per user key: set `MESSENGER_CHAT_ENGINE=responses` and gradually raise `MESSENGER_CHAT_CANARY_PERCENT` (for example: `10`, `25`, `50`, `100`).
+- If Responses fails (timeout, API error, invalid output, missing key), the webhook falls back to the existing deterministic text behavior without changing image/state/quota logic.
 
 ### Secret hygiene
 
