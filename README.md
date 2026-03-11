@@ -184,6 +184,12 @@ Legacy/app-specific environment variables also exist for SDK and data API integr
 - Never commit real `.env` files; only keep `.env.example` in git.
 - If a secret appears in GitHub code search (for example by searching for `.env` in this repo), rotate all exposed credentials immediately.
 
+## API documentation
+
+The API is served through `tRPC` at `/api/trpc`, with types inferred directly from server routers.
+
+For a human-readable reference of current procedures, auth requirements, and input/output shapes, see [`docs/trpc-api.md`](docs/trpc-api.md).
+
 ## Local dev
 
 ```bash
