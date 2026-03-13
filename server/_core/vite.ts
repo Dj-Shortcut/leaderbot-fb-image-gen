@@ -20,7 +20,7 @@ export async function setupVite(app: Express, server: Server, createViteServer: 
   };
 
   const vite = await createViteServer({
-    configFile: false,
+    configFile: path.resolve(import.meta.dirname, "../..", "vite.config.ts"),
     server: serverOptions,
     appType: "custom",
   });
