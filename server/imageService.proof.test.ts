@@ -459,4 +459,40 @@ describe("OpenAi image-to-image proof", () => {
     expect(result.imageUrl).toMatch(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/);
     expect(result.metrics.openAiMs).toBeGreaterThanOrEqual(0);
   });
+
+  it("fails when OpenAI base64 payload decodes to an empty image buffer", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+
+    const fixture = Buffer.alloc(7000, 9);
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
+        return {
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => fixture,
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: "!!!" }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await expect(
+      generator.generate({
+        style: "disco",
+        sourceImageUrl: "https://img.example/source.jpg",
+        userKey: "user-1",
+        reqId: "req-empty-output-buffer",
+      }),
+    ).rejects.toThrow("OpenAI response image data was empty after base64 decode");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

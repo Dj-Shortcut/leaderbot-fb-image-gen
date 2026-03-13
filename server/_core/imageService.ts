@@ -536,6 +536,10 @@ export class OpenAiImageGenerator implements ImageGenerator {
       }
 
       const imageBufferResult = Buffer.from(base64Image, "base64");
+      if (imageBufferResult.length <= 0) {
+        throw new OpenAiGenerationError("OpenAI response image data was empty after base64 decode");
+      }
+
       const jpegBuffer = ensureJpegBuffer(imageBufferResult);
       const uploadStartedAt = Date.now();
       const imageUrl = await publishGeneratedImage(jpegBuffer, input.style);
