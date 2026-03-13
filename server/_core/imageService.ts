@@ -108,7 +108,6 @@ async function publishGeneratedImage(jpegBuffer: Buffer, style: Style): Promise<
   const publicBaseUrl = getRequiredPublicBaseUrl();
   return buildGeneratedImageUrl(publicBaseUrl, token);
 }
-
 function ensureJpegBuffer(buffer: Buffer): Buffer {
   return buffer;
 }
