@@ -6,6 +6,7 @@ import fs from "fs/promises";
 import path from "path";
 import { safeLen, sha256 } from "./imageProof";
 import { buildGeneratedImageUrl, putGeneratedImage } from "./generatedImageStore";
+import { storagePut } from "../storage";
 
 export type GeneratorMode = "mock" | "openai";
 
@@ -90,6 +91,22 @@ function getRequiredPublicBaseUrl(): string {
   }
 
   return baseUrl;
+}
+
+function hasObjectStorageConfig(): boolean {
+  return Boolean(process.env.BUILT_IN_FORGE_API_URL?.trim() && process.env.BUILT_IN_FORGE_API_KEY?.trim());
+}
+
+async function publishGeneratedImage(jpegBuffer: Buffer, style: Style): Promise<string> {
+  if (hasObjectStorageConfig()) {
+    const key = `generated/${style}/${Date.now()}-${randomUUID()}.jpg`;
+    const { url } = await storagePut(key, jpegBuffer, "image/jpeg");
+    return url;
+  }
+
+  const token = putGeneratedImage(jpegBuffer, "image/jpeg");
+  const publicBaseUrl = getRequiredPublicBaseUrl();
+  return buildGeneratedImageUrl(publicBaseUrl, token);
 }
 
 function ensureJpegBuffer(buffer: Buffer): Buffer {
@@ -521,13 +538,12 @@ export class OpenAiImageGenerator implements ImageGenerator {
       const imageBufferResult = Buffer.from(base64Image, "base64");
       const jpegBuffer = ensureJpegBuffer(imageBufferResult);
       const uploadStartedAt = Date.now();
-      const token = putGeneratedImage(jpegBuffer, "image/jpeg");
+      const imageUrl = await publishGeneratedImage(jpegBuffer, input.style);
       const uploadOrServeMs = Date.now() - uploadStartedAt;
       partialMetrics.uploadOrServeMs = uploadOrServeMs;
-      const publicBaseUrl = getRequiredPublicBaseUrl();
 
       return {
-        imageUrl: buildGeneratedImageUrl(publicBaseUrl, token),
+        imageUrl,
         proof: {
           incomingLen,
           incomingSha256,
