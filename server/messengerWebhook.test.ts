@@ -690,7 +690,7 @@ describe("messenger webhook dedupe", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(sendImageMock).toHaveBeenCalledWith(
       "openai-success-user",
-      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/leaderbot-[a-z0-9-]+-\d+\.jpg$/),
+      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/),
     );
   });
 

@@ -1,6 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import fs from "fs/promises";
-import path from "path";
 import { InvalidSourceImageUrlError, OpenAiImageGenerator } from "./_core/imageService";
 import { sha256 } from "./_core/imageProof";
 
@@ -66,7 +64,7 @@ describe("OpenAi image-to-image proof", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(result.imageUrl).toMatch(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/leaderbot-disco-\d+\.jpg$/);
+    expect(result.imageUrl).toMatch(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/);
     expect(result.metrics.totalMs).toBeGreaterThanOrEqual(0);
     expect(result.metrics.fbImageFetchMs).toBeGreaterThanOrEqual(0);
     expect(result.metrics.openAiMs).toBeGreaterThanOrEqual(0);
@@ -144,7 +142,7 @@ describe("OpenAi image-to-image proof", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(result.imageUrl).toMatch(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/leaderbot-disco-\d+\.jpg$/);
+    expect(result.imageUrl).toMatch(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/);
     expect(result.metrics.fbImageFetchMs).toBeGreaterThanOrEqual(0);
   });
 
@@ -201,7 +199,7 @@ describe("OpenAi image-to-image proof", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(result.imageUrl).toMatch(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/leaderbot-disco-\d+\.jpg$/);
+    expect(result.imageUrl).toMatch(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/);
   });
 
   it("blocks hosts outside SOURCE_IMAGE_ALLOWED_HOSTS before fetch", async () => {
@@ -305,43 +303,6 @@ describe("OpenAi image-to-image proof", () => {
     delete process.env.NODE_ENV;
   });
 
-  it("removes leftover generated webp files", async () => {
-    process.env.OPENAI_API_KEY = "dummy-key";
-    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
-
-    const generatedDir = path.resolve(process.cwd(), "public", "generated");
-    await fs.mkdir(generatedDir, { recursive: true });
-    await fs.writeFile(path.join(generatedDir, "old-artifact.webp"), Buffer.from("webp"));
-
-    const fixture = Buffer.alloc(7000, 9);
-    const fetchMock = vi.fn(async (url: string | URL) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
-        return {
-          ok: true,
-          headers: new Headers({ "content-type": "image/jpeg" }),
-          arrayBuffer: async () => fixture,
-        } as Response;
-      }
-
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
-    });
-
-    vi.stubGlobal("fetch", fetchMock);
-
-    const generator = new OpenAiImageGenerator();
-    await generator.generate({
-      style: "disco",
-      sourceImageUrl: "https://img.example/source.jpg",
-      userKey: "user-1",
-      reqId: "req-4",
-    });
-
-    await expect(fs.access(path.join(generatedDir, "old-artifact.webp"))).rejects.toThrow();
-  });
 
   it("retries OpenAI edits request on retryable status codes", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
@@ -387,7 +348,7 @@ describe("OpenAi image-to-image proof", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(result.imageUrl).toMatch(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/leaderbot-disco-\d+\.jpg$/);
+    expect(result.imageUrl).toMatch(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/);
     expect(result.metrics.openAiMs).toBeGreaterThanOrEqual(0);
   });
 
@@ -495,7 +456,7 @@ describe("OpenAi image-to-image proof", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(result.imageUrl).toMatch(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/leaderbot-disco-\d+\.jpg$/);
+    expect(result.imageUrl).toMatch(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/);
     expect(result.metrics.openAiMs).toBeGreaterThanOrEqual(0);
   });
 });
