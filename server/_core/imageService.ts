@@ -5,6 +5,7 @@ import { STYLE_TO_DEMO_FILE, type Style } from "./messengerStyles";
 import fs from "fs/promises";
 import path from "path";
 import { safeLen, sha256 } from "./imageProof";
+import { buildGeneratedImageUrl, putGeneratedImage } from "./generatedImageStore";
 
 export type GeneratorMode = "mock" | "openai";
 
@@ -89,35 +90,6 @@ function getRequiredPublicBaseUrl(): string {
   }
 
   return baseUrl;
-}
-
-async function persistGeneratedJpg(buffer: Buffer, style: Style): Promise<string> {
-  const filename = `leaderbot-${style}-${Date.now()}.jpg`;
-  const relativeFilePath = path.join("generated", filename);
-  const publicRelativeFilePath = relativeFilePath.replaceAll(path.sep, "/");
-  const absoluteDirPath = path.resolve(process.cwd(), "public", "generated");
-  const absoluteFilePath = path.resolve(process.cwd(), "public", relativeFilePath);
-
-  await fs.mkdir(absoluteDirPath, { recursive: true });
-  await removeGeneratedWebpArtifacts(absoluteDirPath);
-  await fs.writeFile(absoluteFilePath, buffer);
-
-  const stats = await fs.stat(absoluteFilePath);
-  if (stats.size <= 0) {
-    throw new OpenAiGenerationError("Generated image file is empty");
-  }
-
-  return publicRelativeFilePath;
-}
-
-async function removeGeneratedWebpArtifacts(dirPath: string): Promise<void> {
-  const entries = await fs.readdir(dirPath, { withFileTypes: true }).catch(() => []);
-
-  await Promise.all(
-    entries
-      .filter(entry => entry.isFile() && entry.name.endsWith(".webp"))
-      .map(entry => fs.unlink(path.join(dirPath, entry.name)).catch(() => undefined))
-  );
 }
 
 function ensureJpegBuffer(buffer: Buffer): Buffer {
@@ -549,13 +521,13 @@ export class OpenAiImageGenerator implements ImageGenerator {
       const imageBufferResult = Buffer.from(base64Image, "base64");
       const jpegBuffer = ensureJpegBuffer(imageBufferResult);
       const uploadStartedAt = Date.now();
-      const relativeFilePath = await persistGeneratedJpg(jpegBuffer, input.style);
+      const token = putGeneratedImage(jpegBuffer, "image/jpeg");
       const uploadOrServeMs = Date.now() - uploadStartedAt;
       partialMetrics.uploadOrServeMs = uploadOrServeMs;
       const publicBaseUrl = getRequiredPublicBaseUrl();
 
       return {
-        imageUrl: `${publicBaseUrl}/${relativeFilePath}`,
+        imageUrl: buildGeneratedImageUrl(publicBaseUrl, token),
         proof: {
           incomingLen,
           incomingSha256,
