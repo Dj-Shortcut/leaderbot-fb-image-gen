@@ -17,13 +17,6 @@ function createTempBuild() {
   return dir;
 }
 
-
-function createGeneratedAssets() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leaderbot-generated-"));
-  tempDirs.push(dir);
-  fs.writeFileSync(path.join(dir, "sample.jpg"), Buffer.from([255, 216, 255, 224]));
-  return dir;
-}
 async function listen(app: express.Express) {
   return await new Promise<{
     baseUrl: string;
@@ -92,28 +85,6 @@ describe("serveStatic production mode", () => {
       });
       expect(webhookResponse.status).toBe(200);
       expect(await webhookResponse.json()).toEqual({ received: true });
-    } finally {
-      await server.close();
-    }
-  });
-
-  it("serves generated JPGs from /generated with image content type", async () => {
-    const app = express();
-    const staticDir = createTempBuild();
-    const generatedDir = createGeneratedAssets();
-
-    serveStatic(app, staticDir, generatedDir);
-
-    const server = await listen(app);
-
-    try {
-      const generatedResponse = await fetch(`${server.baseUrl}/generated/sample.jpg`);
-      expect(generatedResponse.status).toBe(200);
-      expect(generatedResponse.headers.get("content-type")).toContain("image/jpeg");
-
-      const missingGeneratedResponse = await fetch(`${server.baseUrl}/generated/missing.jpg`);
-      expect(missingGeneratedResponse.status).toBe(200);
-      expect(missingGeneratedResponse.headers.get("content-type")).toContain("text/html");
     } finally {
       await server.close();
     }

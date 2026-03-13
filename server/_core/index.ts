@@ -17,6 +17,7 @@ import { assertPrivacyConfig } from "./privacy";
 import { getGeneratorStartupConfig } from "./image-generation";
 import { applySecurityHeaders } from "./securityHeaders";
 import { registerGitHubAdminRoutes } from "./githubAdmin";
+import { getGeneratedImage } from "./generatedImageStore";
 import { isDebugLogEnabled } from "./logLevel";
 import { ensureStateStoreReady } from "./stateStore";
 import {
@@ -360,10 +361,17 @@ async function startServer() {
     "/demo",
     express.static(path.join(publicDir, "demo"), { fallthrough: false })
   );
-  app.use(
-    "/generated",
-    express.static(path.join(publicDir, "generated"), { fallthrough: false })
-  );
+  app.get("/generated/:token.jpg", (req, res) => {
+    const generatedImage = getGeneratedImage(req.params.token);
+    if (!generatedImage) {
+      res.status(404).send("Not found");
+      return;
+    }
+
+    res.setHeader("Content-Type", generatedImage.contentType);
+    res.setHeader("Cache-Control", "private, no-store, max-age=0");
+    res.status(200).send(generatedImage.buffer);
+  });
   app.use(express.static(publicDir));
 
   if (process.env.NODE_ENV !== "production") {

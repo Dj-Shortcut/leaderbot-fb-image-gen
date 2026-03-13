@@ -5,6 +5,8 @@ import { STYLE_TO_DEMO_FILE, type Style } from "./messengerStyles";
 import fs from "fs/promises";
 import path from "path";
 import { safeLen, sha256 } from "./imageProof";
+import { buildGeneratedImageUrl, putGeneratedImage } from "./generatedImageStore";
+import { storagePut } from "../storage";
 
 export type GeneratorMode = "mock" | "openai";
 
@@ -91,33 +93,20 @@ function getRequiredPublicBaseUrl(): string {
   return baseUrl;
 }
 
-async function persistGeneratedJpg(buffer: Buffer, style: Style): Promise<string> {
-  const filename = `leaderbot-${style}-${Date.now()}.jpg`;
-  const relativeFilePath = path.join("generated", filename);
-  const publicRelativeFilePath = relativeFilePath.replaceAll(path.sep, "/");
-  const absoluteDirPath = path.resolve(process.cwd(), "public", "generated");
-  const absoluteFilePath = path.resolve(process.cwd(), "public", relativeFilePath);
-
-  await fs.mkdir(absoluteDirPath, { recursive: true });
-  await removeGeneratedWebpArtifacts(absoluteDirPath);
-  await fs.writeFile(absoluteFilePath, buffer);
-
-  const stats = await fs.stat(absoluteFilePath);
-  if (stats.size <= 0) {
-    throw new OpenAiGenerationError("Generated image file is empty");
-  }
-
-  return publicRelativeFilePath;
+function hasObjectStorageConfig(): boolean {
+  return Boolean(process.env.BUILT_IN_FORGE_API_URL?.trim() && process.env.BUILT_IN_FORGE_API_KEY?.trim());
 }
 
-async function removeGeneratedWebpArtifacts(dirPath: string): Promise<void> {
-  const entries = await fs.readdir(dirPath, { withFileTypes: true }).catch(() => []);
+async function publishGeneratedImage(jpegBuffer: Buffer, style: Style): Promise<string> {
+  if (hasObjectStorageConfig()) {
+    const key = `generated/${style}/${Date.now()}-${randomUUID()}.jpg`;
+    const { url } = await storagePut(key, jpegBuffer, "image/jpeg");
+    return url;
+  }
 
-  await Promise.all(
-    entries
-      .filter(entry => entry.isFile() && entry.name.endsWith(".webp"))
-      .map(entry => fs.unlink(path.join(dirPath, entry.name)).catch(() => undefined))
-  );
+  const token = putGeneratedImage(jpegBuffer, "image/jpeg");
+  const publicBaseUrl = getRequiredPublicBaseUrl();
+  return buildGeneratedImageUrl(publicBaseUrl, token);
 }
 
 function ensureJpegBuffer(buffer: Buffer): Buffer {
@@ -547,15 +536,18 @@ export class OpenAiImageGenerator implements ImageGenerator {
       }
 
       const imageBufferResult = Buffer.from(base64Image, "base64");
+      if (imageBufferResult.length <= 0) {
+        throw new OpenAiGenerationError("OpenAI response image data was empty after base64 decode");
+      }
+
       const jpegBuffer = ensureJpegBuffer(imageBufferResult);
       const uploadStartedAt = Date.now();
-      const relativeFilePath = await persistGeneratedJpg(jpegBuffer, input.style);
+      const imageUrl = await publishGeneratedImage(jpegBuffer, input.style);
       const uploadOrServeMs = Date.now() - uploadStartedAt;
       partialMetrics.uploadOrServeMs = uploadOrServeMs;
-      const publicBaseUrl = getRequiredPublicBaseUrl();
 
       return {
-        imageUrl: `${publicBaseUrl}/${relativeFilePath}`,
+        imageUrl,
         proof: {
           incomingLen,
           incomingSha256,
