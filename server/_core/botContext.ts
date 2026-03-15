@@ -28,6 +28,7 @@ type BotContextBase = {
     state: ConversationState,
     text: string
   ): Promise<void>;
+  preselectStyle(style: Style | null): Promise<void>;
   chooseStyle(style: Style): Promise<void>;
   runStyleGeneration(
     style: Style,

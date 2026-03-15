@@ -1758,4 +1758,56 @@ describe("bot remix feature", () => {
     expect(getState(anonymizePsid("style-command-user"))?.selectedStyle).toBe("cyberpunk");
     expect(getState(anonymizePsid("style-command-user"))?.lastStyle).toBe("cyberpunk");
   });
+
+  it("persists /style cyberpunk for the next photo upload", async () => {
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "style-preselect-user" },
+              message: { mid: "mid-style-preselect-text", text: "/style cyberpunk" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      "style-preselect-user",
+      "✅ Stijl ingesteld op cyberpunk.",
+    );
+    expect(sendImageMock).not.toHaveBeenCalled();
+
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "style-preselect-user" },
+              message: {
+                mid: "mid-style-preselect-photo",
+                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      "style-preselect-user",
+      "Ik maak nu je Cyberpunk-stijl.",
+    );
+    expect(sendImageMock).toHaveBeenCalledWith(
+      "style-preselect-user",
+      "http://localhost:3000/demo/05-paparazzi.png",
+    );
+    expect(getState(anonymizePsid("style-preselect-user"))?.preselectedStyle).toBeNull();
+    expect(getState(anonymizePsid("style-preselect-user"))?.selectedStyle).toBe("cyberpunk");
+  });
 });

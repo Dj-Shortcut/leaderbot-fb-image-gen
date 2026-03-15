@@ -26,11 +26,13 @@ export const styleCommandsFeature: BotFeature = {
     }
 
     if (!ctx.state.lastPhotoUrl && !ctx.state.lastPhoto) {
+      await ctx.preselectStyle(requestedStyle);
       await ctx.sendText(
         ctx.lang === "en"
           ? `✅ Style set to ${requestedStyle}.`
           : `✅ Stijl ingesteld op ${requestedStyle}.`
       );
+      return { handled: true };
     }
 
     await ctx.chooseStyle(requestedStyle);

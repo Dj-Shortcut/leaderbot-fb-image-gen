@@ -39,6 +39,7 @@ function makeContext(overrides: Partial<BotTextContext> = {}): BotTextContext {
     sendImage: vi.fn(async () => undefined),
     sendQuickReplies: vi.fn(async () => undefined),
     sendStateQuickReplies: vi.fn(async () => undefined),
+    preselectStyle: vi.fn(async () => undefined),
     chooseStyle: vi.fn(async () => undefined),
     runStyleGeneration: vi.fn(async () => undefined),
     getRuntimeStats: () => ({
@@ -66,6 +67,10 @@ describe("styleCommandsFeature", () => {
   it("accepts /style cyberpunk and delegates style selection", async () => {
     const chooseStyle = vi.fn(async () => undefined);
     const context = makeContext({
+      state: makeState({
+        lastPhotoUrl: "https://img.example/source.jpg",
+        lastPhoto: "https://img.example/source.jpg",
+      }),
       messageText: "/style cyberpunk",
       normalizedText: "/style cyberpunk",
       chooseStyle,
@@ -79,18 +84,21 @@ describe("styleCommandsFeature", () => {
 
   it("confirms style changes when no photo context exists yet", async () => {
     const sendText = vi.fn(async () => undefined);
+    const preselectStyle = vi.fn(async () => undefined);
     const chooseStyle = vi.fn(async () => undefined);
     const context = makeContext({
       messageText: "style: cyberpunk",
       normalizedText: "style: cyberpunk",
       sendText,
+      preselectStyle,
       chooseStyle,
     });
 
     await styleCommandsFeature.onText?.(context);
 
+    expect(preselectStyle).toHaveBeenCalledWith("cyberpunk");
     expect(sendText).toHaveBeenCalledWith("✅ Style set to cyberpunk.");
-    expect(chooseStyle).toHaveBeenCalledWith("cyberpunk");
+    expect(chooseStyle).not.toHaveBeenCalled();
   });
 
   it("falls through on invalid style commands", async () => {
