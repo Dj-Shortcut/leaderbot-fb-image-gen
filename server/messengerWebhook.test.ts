@@ -1642,4 +1642,71 @@ describe("bot remix feature", () => {
       "http://localhost:3000/demo/06-clouds.png",
     );
   });
+
+  it("uses conversational edit text to regenerate the latest image", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+
+    const originalFetch = global.fetch;
+    const interpreterFetch = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output_text:
+            '{"shouldEdit":true,"style":"gold","promptHint":"make it darker with warm glow"}',
+        }),
+        { status: 200 }
+      )
+    );
+    global.fetch = interpreterFetch;
+
+    try {
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "edit-text-user" },
+                message: {
+                  mid: "mid-edit-photo",
+                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                },
+              },
+              {
+                sender: { id: "edit-text-user" },
+                message: { mid: "mid-edit-style", quick_reply: { payload: "disco" } },
+              },
+            ],
+          },
+        ],
+      });
+
+      sendImageMock.mockClear();
+      sendQuickRepliesMock.mockClear();
+      sendTextMock.mockClear();
+
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "edit-text-user" },
+                message: { mid: "mid-edit-command", text: "make it darker and more gold" },
+              },
+            ],
+          },
+        ],
+      });
+
+      expect(sendTextMock).toHaveBeenCalledWith(
+        "edit-text-user",
+        "Ik maak nu je Gold-stijl.",
+      );
+      expect(sendImageMock).toHaveBeenCalledWith(
+        "edit-text-user",
+        "http://localhost:3000/demo/03-gold.png",
+      );
+      expect(interpreterFetch).toHaveBeenCalledTimes(1);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });
