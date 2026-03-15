@@ -13,6 +13,8 @@ Leaderbot runs as one Node.js process (Express + HTTP server):
 
 Primary bootstrap is in `server/_core/index.ts`.
 
+The bot runtime now has an explicit boundary in `server/_core/bot/index.ts`, with future feature hooks centralized in `server/_core/bot/features.ts`.
+
 ## Architecture diagrams
 
 ASCII version:
@@ -259,6 +261,8 @@ To keep `server/_core` from growing into a single flat namespace, domain entrypo
 - `server/_core/auth/index.ts` for auth-related bootstrap imports (OAuth route registration and auth env assertions).
 - `server/_core/messenger/index.ts` for webhook ingress concerns (raw-body capture, signature verification, webhook route registration).
 - `server/_core/image-generation/index.ts` for image-generator startup wiring.
+- `server/_core/bot/index.ts` for the bot-product boundary used by server bootstrap.
+- `server/_core/bot/features.ts` as the canonical extension point for future bot features, with registration centralized through `registerBotFeature(...)`.
 
 These entrypoints let server bootstrap code import by domain while remaining backward compatible with existing module files.
 

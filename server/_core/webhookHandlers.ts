@@ -43,6 +43,7 @@ import { canGenerate, increment } from "./messengerQuota";
 import { isDebugLogEnabled } from "./logLevel";
 import { getChatRolloutDecision } from "./chatRollout";
 import { generateMessengerReply } from "./messengerResponsesService";
+import { getBotFeatures } from "./bot/features";
 
 type HandlerDeps = {
   defaultLang: Lang;
@@ -403,6 +404,27 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       return;
     }
 
+    const state = await getOrCreateState(psid);
+    for (const feature of getBotFeatures()) {
+      const handled = await feature.onPayload?.(
+        {
+          psid,
+          userId,
+          reqId,
+          lang,
+          state,
+          payload,
+        },
+        {
+          sendText: sendLoggedText,
+          sendStateQuickReplies,
+        }
+      );
+      if (handled) {
+        return;
+      }
+    }
+
     if (payload.startsWith("RETRY_STYLE_")) {
       const retryStyle = normalizeStyle(payload.slice("RETRY_STYLE_".length));
       if (retryStyle) {
@@ -486,6 +508,25 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         });
 
       const state = await getOrCreateState(psid);
+      for (const feature of getBotFeatures()) {
+        const handled = await feature.onImage?.(
+          {
+            psid,
+            userId,
+            reqId,
+            lang,
+            state,
+            imageUrl: imageAttachment.payload.url,
+          },
+          {
+            sendText: sendLoggedText,
+            sendStateQuickReplies,
+          }
+        );
+        if (handled) {
+          return;
+        }
+      }
       logUserState(psid, userId, state, reqId, "image_received");
       const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");
       await setPendingImage(psid, imageAttachment.payload.url);
@@ -543,8 +584,28 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     }
 
     const state = await getOrCreateState(psid);
-    logUserState(psid, userId, state, reqId, "text_message");
     const hasPhoto = Boolean(state.lastPhotoUrl);
+    for (const feature of getBotFeatures()) {
+      const handled = await feature.onText?.(
+        {
+          psid,
+          userId,
+          reqId,
+          lang,
+          state,
+          text: trimmedText,
+          hasPhoto,
+        },
+        {
+          sendText: sendLoggedText,
+          sendStateQuickReplies,
+        }
+      );
+      if (handled) {
+        return;
+      }
+    }
+    logUserState(psid, userId, state, reqId, "text_message");
     if (!hasPhoto) {
       await setFlowState(psid, "AWAITING_PHOTO");
     }
