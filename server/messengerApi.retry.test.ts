@@ -106,6 +106,19 @@ describe("messengerApi retries", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  it("retries transient network failures for image sends", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new TypeError("network down"))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    global.fetch = fetchMock;
+
+    await sendImage("psid-1", "https://img.example/generated.jpg");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("does not stack image retries on top of configured global retries", async () => {
     process.env.GRAPH_API_MAX_RETRIES = "10";
 
