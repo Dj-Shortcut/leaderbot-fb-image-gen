@@ -90,4 +90,27 @@ describe("bot features", () => {
     );
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
+
+  it("handles help command via bot feature without calling chat engine", async () => {
+    const psid = "help-user";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: { mid: "mid-help", text: "help" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      psid,
+      expect.stringContaining("Stuur gerust een foto")
+    );
+    expect(generateMessengerReplyMock).not.toHaveBeenCalled();
+  });
 });
