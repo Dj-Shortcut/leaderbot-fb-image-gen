@@ -70,6 +70,46 @@ describe("OpenAi image-to-image proof", () => {
     expect(result.metrics.openAiMs).toBeGreaterThanOrEqual(0);
   });
 
+  it("forwards remix prompt hints to the OpenAI edits prompt", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+
+    const fixture = Buffer.alloc(7000, 9);
+
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
+        return {
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => fixture,
+        } as Response;
+      }
+
+      const formData = init?.body as FormData;
+      expect(formData.get("prompt")).toContain("Apply disco style to this photo.");
+      expect(formData.get("prompt")).toContain("Additional direction: neon rain.");
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await generator.generate({
+      style: "disco",
+      sourceImageUrl: "https://img.example/source.jpg",
+      promptHint: "neon rain",
+      userKey: "user-1",
+      reqId: "req-remix-prompt",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("hard-fails before OpenAI call when input image is too small", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";

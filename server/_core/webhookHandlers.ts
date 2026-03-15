@@ -391,6 +391,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         const { imageUrl, proof, metrics } = await generator.generate({
           style,
           sourceImageUrl: lastImageUrl ?? undefined,
+          promptHint,
           userKey: userId,
           reqId,
         });

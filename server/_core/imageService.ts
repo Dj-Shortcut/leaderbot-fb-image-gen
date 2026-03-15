@@ -14,6 +14,7 @@ export interface ImageGenerator {
   generate(input: {
     style: Style;
     sourceImageUrl?: string;
+    promptHint?: string;
     userKey: string;
     reqId: string;
   }): Promise<{
@@ -308,7 +309,7 @@ async function fetchWithTimeout(input: URL, init: RequestInit | undefined, timeo
 }
 
 class MockImageGenerator implements ImageGenerator {
-  generate(input: { style: Style; sourceImageUrl?: string; userKey: string; reqId: string }): Promise<{
+  generate(input: { style: Style; sourceImageUrl?: string; promptHint?: string; userKey: string; reqId: string }): Promise<{
     imageUrl: string;
     proof: { incomingLen: number; incomingSha256: string; openaiInputLen: number; openaiInputSha256: string };
     metrics: GenerationMetrics;
@@ -434,7 +435,7 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
 }
 
 export class OpenAiImageGenerator implements ImageGenerator {
-  async generate(input: { style: Style; sourceImageUrl?: string; userKey: string; reqId: string }): Promise<{
+  async generate(input: { style: Style; sourceImageUrl?: string; promptHint?: string; userKey: string; reqId: string }): Promise<{
     imageUrl: string;
     proof: { incomingLen: number; incomingSha256: string; openaiInputLen: number; openaiInputSha256: string };
     metrics: GenerationMetrics;
@@ -466,8 +467,11 @@ export class OpenAiImageGenerator implements ImageGenerator {
 
       const createOpenAiFormData = (): FormData => {
         const formData = new FormData();
+        const prompt = input.promptHint?.trim()
+          ? `Apply ${input.style} style to this photo. Additional direction: ${input.promptHint.trim()}.`
+          : `Apply ${input.style} style to this photo.`;
         formData.set("model", "gpt-image-1");
-        formData.set("prompt", `Apply ${input.style} style to this photo.`);
+        formData.set("prompt", prompt);
         formData.set("size", "1024x1024");
         formData.set("output_format", "jpeg");
         formData.set("image", new Blob([new Uint8Array(imageBuffer)], { type: contentType }), "source-image");

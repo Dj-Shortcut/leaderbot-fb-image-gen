@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { ensureDefaultBotFeaturesRegistered } from "./_core/bot/defaultFeatures";
 import { remixFeature } from "./_core/bot/features/remixFeature";
+import { rateLimitFeature } from "./_core/bot/features/rateLimitFeature";
 import type { BotTextContext } from "./_core/botContext";
 import type { MessengerUserState } from "./_core/messengerState";
+import { resetStateStore } from "./_core/messengerState";
 
 function makeState(overrides: Partial<MessengerUserState> = {}): MessengerUserState {
   return {
@@ -83,5 +85,50 @@ describe("remixFeature", () => {
       "https://img.example/source.jpg",
       "more contrast | cyberpunk neon rain",
     );
+  });
+});
+
+describe("rateLimitFeature", () => {
+  it("resets the in-memory bucket after the 60 second window", async () => {
+    resetStateStore();
+
+    const sendText = vi.fn(async () => undefined);
+    const baseTime = 1_700_000_000_000;
+    const nowSpy = vi.spyOn(Date, "now");
+
+    try {
+      nowSpy.mockReturnValue(baseTime);
+      for (let index = 0; index < 11; index += 1) {
+        await rateLimitFeature.onText?.(
+          makeContext({
+            senderId: "rate-limit-memory-user",
+            userId: "u-rate",
+            messageText: `hello-${index}`,
+            normalizedText: `hello-${index}`,
+            sendText,
+          })
+        );
+      }
+
+      expect(sendText).toHaveBeenCalledTimes(1);
+
+      sendText.mockClear();
+      nowSpy.mockReturnValue(baseTime + 61_000);
+
+      const result = await rateLimitFeature.onText?.(
+        makeContext({
+          senderId: "rate-limit-memory-user",
+          userId: "u-rate",
+          messageText: "fresh-window",
+          normalizedText: "fresh-window",
+          sendText,
+        })
+      );
+
+      expect(result).toEqual({ handled: false });
+      expect(sendText).not.toHaveBeenCalled();
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });
