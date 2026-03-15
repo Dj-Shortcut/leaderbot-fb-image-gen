@@ -13,6 +13,7 @@ import {
   setChosenStyle,
   setFlowState,
   setLastGenerated,
+  setLastGenerationContext,
   setLastUserMessageAt,
   setPendingImage,
   setPreselectedStyle,
@@ -43,7 +44,14 @@ import { canGenerate, increment } from "./messengerQuota";
 import { isDebugLogEnabled } from "./logLevel";
 import { getChatRolloutDecision } from "./chatRollout";
 import { generateMessengerReply } from "./messengerResponsesService";
-import { getBotFeatures } from "./bot/features";
+import { createBotFeatureContext, getBotFeatures } from "./bot/features";
+import { ensureDefaultBotFeaturesRegistered } from "./bot/defaultFeatures";
+import {
+  getTodayRuntimeStats,
+  recordActiveUserToday,
+  recordGenerationError,
+  recordGenerationSuccess,
+} from "./botRuntimeStats";
 
 type HandlerDeps = {
   defaultLang: Lang;
@@ -65,6 +73,8 @@ const IN_FLIGHT_MESSAGE = "\u23F3 even geduld, ik ben nog bezig met jouw restyle
 const inFlightNoticeSent = new Set();
 
 export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: HandlerDeps) {
+  ensureDefaultBotFeaturesRegistered();
+
   function debugWebhookLog(message: Record<string, unknown>): void {
     if (!isDebugLogEnabled()) {
       return;
@@ -239,7 +249,9 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     userId: string,
     style: Style,
     reqId: string,
-    lang: Lang
+    lang: Lang,
+    sourceImageUrl?: string,
+    promptHint?: string
   ): Promise<void> {
     const didRun = await runGuardedGeneration(psid, async () => {
       const { mode, generator } = createImageGenerator();
@@ -262,7 +274,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       );
 
       const state = await getOrCreateState(psid);
-      const lastImageUrl = state.lastPhotoUrl;
+      const lastImageUrl = sourceImageUrl ?? state.lastPhotoUrl;
 
       try {
         const { imageUrl, proof, metrics } = await generator.generate({
@@ -307,6 +319,8 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         await sendLoggedImage(psid, imageUrl, reqId);
         await increment(psid);
         await setLastGenerated(psid, imageUrl);
+        await setLastGenerationContext(psid, { style, prompt: promptHint });
+        recordGenerationSuccess(metrics.totalMs);
         await sendStateQuickReplies(psid, "RESULT_READY", t(lang, "success"), reqId);
         await setFlowState(psid, "IDLE");
       } catch (error) {
@@ -330,6 +344,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
             totalMs: metrics.totalMs,
           })
         );
+        recordGenerationError();
 
         let failureText = t(lang, "generationGenericFailure");
         if (error instanceof MissingInputImageError) {
@@ -407,18 +422,17 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     const state = await getOrCreateState(psid);
     for (const feature of getBotFeatures()) {
       const handled = await feature.onPayload?.(
-        {
-          psid,
-          userId,
-          reqId,
-          lang,
-          state,
-          payload,
-        },
-        {
-          sendText: sendLoggedText,
-          sendStateQuickReplies,
-        }
+        createBotFeatureContext(
+          { psid, userId, reqId, lang, state, payload },
+          {
+            sendText: sendLoggedText,
+            sendImage: sendLoggedImage,
+            sendStateQuickReplies,
+            runStyleGeneration,
+            getRuntimeStats: getTodayRuntimeStats,
+            logger: console,
+          }
+        )
       );
       if (handled) {
         return;
@@ -510,18 +524,24 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       const state = await getOrCreateState(psid);
       for (const feature of getBotFeatures()) {
         const handled = await feature.onImage?.(
-          {
-            psid,
-            userId,
-            reqId,
-            lang,
-            state,
-            imageUrl: imageAttachment.payload.url,
-          },
-          {
-            sendText: sendLoggedText,
-            sendStateQuickReplies,
-          }
+          createBotFeatureContext(
+            {
+              psid,
+              userId,
+              reqId,
+              lang,
+              state,
+              imageUrl: imageAttachment.payload.url,
+            },
+            {
+              sendText: sendLoggedText,
+              sendImage: sendLoggedImage,
+              sendStateQuickReplies,
+              runStyleGeneration,
+              getRuntimeStats: getTodayRuntimeStats,
+              logger: console,
+            }
+          )
         );
         if (handled) {
           return;
@@ -587,19 +607,25 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     const hasPhoto = Boolean(state.lastPhotoUrl);
     for (const feature of getBotFeatures()) {
       const handled = await feature.onText?.(
-        {
-          psid,
-          userId,
-          reqId,
-          lang,
-          state,
-          text: trimmedText,
-          hasPhoto,
-        },
-        {
-          sendText: sendLoggedText,
-          sendStateQuickReplies,
-        }
+        createBotFeatureContext(
+          {
+            psid,
+            userId,
+            reqId,
+            lang,
+            state,
+            text: trimmedText,
+            hasPhoto,
+          },
+          {
+            sendText: sendLoggedText,
+            sendImage: sendLoggedImage,
+            sendStateQuickReplies,
+            runStyleGeneration,
+            getRuntimeStats: getTodayRuntimeStats,
+            logger: console,
+          }
+        )
       );
       if (handled) {
         return;
@@ -662,6 +688,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     if (!psid) return;
 
     const userId = toUserKey(psid);
+    recordActiveUserToday(userId);
     const reqId = `${psid}-${Date.now()}`;
     const localeLang = normalizeLang(event.sender?.locale);
     const state = await getOrCreateState(psid);

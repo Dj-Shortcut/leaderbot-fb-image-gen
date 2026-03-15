@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { sendText } from "./_core/messengerApi";
+import { sendImage, sendText } from "./_core/messengerApi";
 import { resetStateStore, setLastUserMessageAt } from "./_core/messengerState";
 
 describe("messengerApi retries", () => {
@@ -89,6 +89,36 @@ describe("messengerApi retries", () => {
     await expect(sendText("psid-1", "hello")).rejects.toThrow(
       "Messenger API error 429"
     );
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("retries image sends with bounded attempts", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("fail-1", { status: 500 }))
+      .mockResolvedValueOnce(new Response("fail-2", { status: 500 }))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    global.fetch = fetchMock;
+
+    await sendImage("psid-1", "https://img.example/generated.jpg");
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not stack image retries on top of configured global retries", async () => {
+    process.env.GRAPH_API_MAX_RETRIES = "10";
+
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("fail-1", { status: 500 }))
+      .mockResolvedValueOnce(new Response("fail-2", { status: 500 }))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    global.fetch = fetchMock;
+
+    await sendImage("psid-1", "https://img.example/generated.jpg");
+
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 

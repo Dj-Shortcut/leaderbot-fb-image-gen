@@ -51,6 +51,7 @@ export type MessengerUserState = {
   lastImageUrl?: string;
   lastGeneratedUrl?: string | null;
   lastStyle?: Style;
+  lastPrompt?: string;
   lastGeneratedAt?: number;
   lastVariantCursor?: number;
   quota: QuotaState;
@@ -107,6 +108,7 @@ function createDefaultState(psid: string, now = Date.now()): MessengerUserState 
     lastImageUrl: undefined,
     lastGeneratedUrl: null,
     lastStyle: undefined,
+    lastPrompt: undefined,
     lastGeneratedAt: undefined,
     lastVariantCursor: undefined,
     quota: {
@@ -407,6 +409,25 @@ export function setLastGenerated(psid: string, resultImageUrl: string, now = Dat
       lastGeneratedAt: now,
       stage: "RESULT_READY",
       state: "RESULT_READY",
+    },
+    now,
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
+}
+
+export function setLastGenerationContext(
+  psid: string,
+  context: { style?: Style; prompt?: string },
+  now = Date.now()
+): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      lastStyle: context.style,
+      lastPrompt: context.prompt,
     },
     now,
   );
