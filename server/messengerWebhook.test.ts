@@ -30,6 +30,7 @@ import {
 } from "./_core/messengerWebhook";
 import { anonymizePsid, getState, resetStateStore, setFlowState } from "./_core/messengerState";
 import { getEventDedupeKey } from "./_core/webhookHelpers";
+import { getBotFeatures } from "./_core/bot/features";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
@@ -153,6 +154,10 @@ describe("messenger webhook dedupe", () => {
     safeLogMock.mockClear();
     resetStateStore();
     resetMessengerEventDedupe();
+  });
+
+  it("registers built-in bot features", () => {
+    expect(getBotFeatures().map(feature => feature.name)).toContain("rateLimit");
   });
 
   it("processes a message.mid only once", async () => {
@@ -1446,5 +1451,41 @@ describe("acknowledgement edgecases", () => {
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).not.toHaveBeenCalled();
     expect(safeLogMock).toHaveBeenCalledWith("ack_ignored", { ack: "emoji" });
+  });
+});
+
+describe("bot rate limit feature", () => {
+  beforeEach(() => {
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+    safeLogMock.mockClear();
+    resetStateStore();
+    resetMessengerEventDedupe();
+  });
+
+  it("blocks text spam after the configured in-memory threshold", async () => {
+    const senderId = "rate-limit-user";
+
+    for (let index = 0; index < 11; index += 1) {
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: senderId },
+                message: { mid: `mid-rate-${index}`, text: `random-${index}` },
+              },
+            ],
+          },
+        ],
+      });
+    }
+
+    expect(sendTextMock).toHaveBeenLastCalledWith(
+      senderId,
+      "Slow down a bit before sending more messages.",
+    );
   });
 });

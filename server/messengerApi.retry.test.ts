@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { sendText } from "./_core/messengerApi";
+import { sendImage, sendText } from "./_core/messengerApi";
 import { resetStateStore, setLastUserMessageAt } from "./_core/messengerState";
 
 describe("messengerApi retries", () => {
@@ -90,6 +90,19 @@ describe("messengerApi retries", () => {
       "Messenger API error 429"
     );
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("retries transient network errors and succeeds", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new TypeError("network down"))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    global.fetch = fetchMock;
+
+    await sendImage("psid-1", "https://img.example/out.jpg");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("skips outbound messages when the 24h Messenger response window is closed", async () => {

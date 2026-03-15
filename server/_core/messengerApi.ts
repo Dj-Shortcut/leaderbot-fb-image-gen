@@ -42,6 +42,14 @@ function shouldRetry(status: number): boolean {
   return status === 429 || status >= 500;
 }
 
+function isTransientNetworkError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return error.name === "AbortError" || error instanceof TypeError;
+}
+
 function getRetryAfterMs(response: Response): number | null {
   const header = response.headers.get("retry-after");
   if (!header) {
@@ -74,17 +82,29 @@ async function sendMessage(
   const retryBaseMs = parsePositiveInt("GRAPH_API_RETRY_BASE_MS", 300);
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-    const response = await fetch(getSendApiUrl(), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_type: "RESPONSE",
-        recipient: { id: psid },
-        message,
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(getSendApiUrl(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_type: "RESPONSE",
+          recipient: { id: psid },
+          message,
+        }),
+      });
+    } catch (error) {
+      const canRetry = attempt < maxRetries && isTransientNetworkError(error);
+      if (!canRetry) {
+        throw error;
+      }
+
+      const waitMs = retryBaseMs * 2 ** attempt;
+      await delay(waitMs);
+      continue;
+    }
 
     if (response.ok) {
       return;

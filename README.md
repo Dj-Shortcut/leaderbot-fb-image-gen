@@ -127,7 +127,7 @@ The repository is now organized around an explicit bot-core boundary:
 - `server/_core/bot/index.ts` exposes the Messenger bot runtime entrypoints used by server bootstrap.
 - `server/_core/bot/features.ts` is the dedicated extension point for future bot features.
 
-Today the feature registry is intentionally empty, so behavior is unchanged. Future bot features should prefer registering text/payload/image handlers there via `registerBotFeature(...)` instead of expanding unrelated web or admin codepaths.
+The built-in registry now starts with foundational bot middleware-style features such as rate limiting. Future bot features should prefer registering text/payload/image handlers there via `registerBotFeature(...)` instead of expanding unrelated web or admin codepaths.
 
 ## Quota model
 
