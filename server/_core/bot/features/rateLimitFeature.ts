@@ -5,23 +5,30 @@ const RATE_WINDOW_SECONDS = 60;
 const RATE_LIMIT = 10;
 
 export const rateLimitFeature: BotFeature = {
-  name: "rate_limit",
+  name: "rateLimit",
   async onText(context) {
-    if (!context.text?.trim()) {
-      return false;
+    if (!context.messageText.trim()) {
+      return { handled: false };
     }
 
-    const key = `rate:${context.psid}`;
-    const current = (await Promise.resolve(readScopedState<number>("bot", key))) ?? 0;
+    const key = `rate:${context.senderId}`;
+    const current =
+      (await Promise.resolve(readScopedState<number>("bot", key))) ?? 0;
     const nextCount = current + 1;
 
-    await Promise.resolve(writeScopedState("bot", key, nextCount, RATE_WINDOW_SECONDS));
+    await Promise.resolve(
+      writeScopedState("bot", key, nextCount, RATE_WINDOW_SECONDS)
+    );
 
     if (nextCount <= RATE_LIMIT) {
-      return false;
+      return { handled: false };
     }
 
+    context.logger.warn("bot_feature_rate_limited", {
+      user: context.userId,
+      count: nextCount,
+    });
     await context.sendText("⏳ Slow down a bit.");
-    return true;
+    return { handled: true };
   },
 };

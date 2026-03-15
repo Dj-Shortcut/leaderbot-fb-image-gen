@@ -84,8 +84,10 @@ async function sendMessage(
     return;
   }
 
-  const maxRetries = options?.maxRetries ?? parsePositiveInt("GRAPH_API_MAX_RETRIES", 3);
-  const retryBaseMs = options?.retryBaseMs ?? parsePositiveInt("GRAPH_API_RETRY_BASE_MS", 300);
+  const maxRetries =
+    options?.maxRetries ?? parsePositiveInt("GRAPH_API_MAX_RETRIES", 3);
+  const retryBaseMs =
+    options?.retryBaseMs ?? parsePositiveInt("GRAPH_API_RETRY_BASE_MS", 300);
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     let response: Response;
@@ -111,7 +113,6 @@ async function sendMessage(
 
       const retryError = error instanceof Error ? error : new Error(String(error));
       options?.onRetry?.(attempt + 1, maxRetries + 1, retryError);
-
       const waitMs = retryBaseMs * 2 ** attempt;
       await delay(waitMs);
       continue;
@@ -122,15 +123,14 @@ async function sendMessage(
     }
 
     const body = await response.text();
-    const error = new Error(`Messenger API error ${response.status}: ${body}`);
     const canRetry = attempt < maxRetries && shouldRetry(response.status);
+    const error = new Error(`Messenger API error ${response.status}: ${body}`);
     if (!canRetry) {
       options?.onFinalFailure?.(maxRetries + 1, error);
       throw error;
     }
 
     options?.onRetry?.(attempt + 1, maxRetries + 1, error);
-
     const retryAfterMs = getRetryAfterMs(response);
     const exponentialBackoffMs = retryBaseMs * 2 ** attempt;
     const waitMs = retryAfterMs ?? exponentialBackoffMs;
@@ -211,34 +211,36 @@ export async function sendGenericTemplate(
 export async function sendImage(psid: string, imageUrl: string): Promise<void> {
   safeLog("messenger_image_send", {});
 
-  const message = {
-    attachment: {
-      type: "image" as const,
-      payload: {
-        url: imageUrl,
-        is_reusable: false,
+  await sendMessage(
+    psid,
+    {
+      attachment: {
+        type: "image",
+        payload: {
+          url: imageUrl,
+          is_reusable: false,
+        },
       },
     },
-  };
-
-  await sendMessage(psid, message, {
-    maxRetries: 2,
-    retryBaseMs: 150,
-    onRetry: (attempt, maxAttempts, error) => {
-      safeLog("messenger_image_retry", {
-        attempt,
-        maxAttempts,
-        final: false,
-        errorCode: error.name,
-      });
-    },
-    onFinalFailure: (attempts, error) => {
-      safeLog("messenger_image_send_failed", {
-        attempts,
-        errorCode: error.name,
-      });
-    },
-  });
+    {
+      maxRetries: 2,
+      retryBaseMs: 150,
+      onRetry: (attempt, maxAttempts, error) => {
+        safeLog("messenger_image_retry", {
+          attempt,
+          maxAttempts,
+          final: false,
+          errorCode: error.name,
+        });
+      },
+      onFinalFailure: (attempts, error) => {
+        safeLog("messenger_image_send_failed", {
+          attempts,
+          errorCode: error.name,
+        });
+      },
+    }
+  );
 }
 
 export type { QuickReply, GenericTemplateElement };

@@ -30,6 +30,7 @@ import {
 } from "./_core/messengerWebhook";
 import { anonymizePsid, getState, resetStateStore, setFlowState } from "./_core/messengerState";
 import { getEventDedupeKey } from "./_core/webhookHelpers";
+import { getBotFeatures } from "./_core/bot/features";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
@@ -153,6 +154,10 @@ describe("messenger webhook dedupe", () => {
     safeLogMock.mockClear();
     resetStateStore();
     resetMessengerEventDedupe();
+  });
+
+  it("registers built-in bot features", () => {
+    expect(getBotFeatures().map(feature => feature.name)).toContain("rateLimit");
   });
 
   it("processes a message.mid only once", async () => {
@@ -595,6 +600,7 @@ describe("messenger webhook dedupe", () => {
         "mock-image-user",
         "Klaar ✅",
         [
+          { content_type: "text", title: "Remix", payload: "REMIX_LAST" },
           { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
           { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
         ],
@@ -1320,6 +1326,7 @@ describe("messenger greeting behavior", () => {
         "transition-order-user",
         "Klaar ✅",
         [
+          { content_type: "text", title: "Remix", payload: "REMIX_LAST" },
           { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
           { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
         ],
@@ -1356,6 +1363,7 @@ describe("messenger greeting behavior", () => {
       psid,
       "Klaar ✅",
       [
+        { content_type: "text", title: "Remix", payload: "REMIX_LAST" },
         { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
         { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
       ],
@@ -1446,5 +1454,192 @@ describe("acknowledgement edgecases", () => {
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).not.toHaveBeenCalled();
     expect(safeLogMock).toHaveBeenCalledWith("ack_ignored", { ack: "emoji" });
+  });
+});
+
+describe("bot rate limit feature", () => {
+  beforeEach(() => {
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+    safeLogMock.mockClear();
+    resetStateStore();
+    resetMessengerEventDedupe();
+  });
+
+  it("blocks text spam after the configured in-memory threshold", async () => {
+    const senderId = "rate-limit-user";
+
+    for (let index = 0; index < 11; index += 1) {
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: senderId },
+                message: { mid: `mid-rate-${index}`, text: `random-${index}` },
+              },
+            ],
+          },
+        ],
+      });
+    }
+
+    expect(sendTextMock).toHaveBeenLastCalledWith(
+      senderId,
+      "⏳ Slow down a bit.",
+    );
+  });
+});
+
+describe("bot remix feature", () => {
+  beforeEach(() => {
+    process.env.GENERATOR_MODE = "mock";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    delete process.env.APP_BASE_URL;
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+    safeLogMock.mockClear();
+    resetStateStore();
+    resetMessengerEventDedupe();
+  });
+
+  it("remixes the latest generated style when the user sends remix", async () => {
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "remix-text-user" },
+              message: {
+                mid: "mid-remix-photo",
+                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+              },
+            },
+            {
+              sender: { id: "remix-text-user" },
+              message: { mid: "mid-remix-style", quick_reply: { payload: "disco" } },
+            },
+          ],
+        },
+      ],
+    });
+
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "remix-text-user" },
+              message: { mid: "mid-remix-text-command", text: "remix" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      "remix-text-user",
+      "Ik maak nu je Disco-stijl.",
+    );
+    expect(sendImageMock).toHaveBeenCalledWith(
+      "remix-text-user",
+      "http://localhost:3000/demo/05-paparazzi.png",
+    );
+  });
+
+  it("requires a prior generation before remixing with an explicit style override", async () => {
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "remix-style-user" },
+              message: {
+                mid: "mid-remix-style-photo",
+                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "remix-style-user" },
+              message: { mid: "mid-remix-style-command", text: "remix: gold" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      "remix-style-user",
+      "I can't remix yet—send a photo and generate one first.",
+    );
+    expect(sendImageMock).not.toHaveBeenCalled();
+  });
+
+  it("handles the remix quick reply after a generated image", async () => {
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "remix-payload-user" },
+              message: {
+                mid: "mid-remix-payload-photo",
+                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+              },
+            },
+            {
+              sender: { id: "remix-payload-user" },
+              message: { mid: "mid-remix-payload-style", quick_reply: { payload: "clouds" } },
+            },
+          ],
+        },
+      ],
+    });
+
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "remix-payload-user" },
+              message: { mid: "mid-remix-payload-command", quick_reply: { payload: "REMIX_LAST" } },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      "remix-payload-user",
+      "Ik maak nu je Clouds-stijl.",
+    );
+    expect(sendImageMock).toHaveBeenCalledWith(
+      "remix-payload-user",
+      "http://localhost:3000/demo/06-clouds.png",
+    );
   });
 });

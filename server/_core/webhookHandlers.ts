@@ -44,7 +44,7 @@ import { canGenerate, increment } from "./messengerQuota";
 import { isDebugLogEnabled } from "./logLevel";
 import { getChatRolloutDecision } from "./chatRollout";
 import { generateMessengerReply } from "./messengerResponsesService";
-import { createBotFeatureContext, getBotFeatures } from "./bot/features";
+import { getBotFeatures } from "./bot/features";
 import { ensureDefaultBotFeaturesRegistered } from "./bot/defaultFeatures";
 import {
   getTodayRuntimeStats,
@@ -52,6 +52,12 @@ import {
   recordGenerationError,
   recordGenerationSuccess,
 } from "./botRuntimeStats";
+import type {
+  BotLogger,
+  BotPayloadContext,
+  BotTextContext,
+  BotImageContext,
+} from "./botContext";
 
 type HandlerDeps = {
   defaultLang: Lang;
@@ -212,6 +218,111 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     }
 
     await sendLoggedQuickReplies(psid, text, replies, reqId);
+  }
+
+  function createFeatureLogger(userId: string): BotLogger {
+    return {
+      info(event, details = {}) {
+        safeLog(event, { user: toLogUser(userId), ...details });
+      },
+      warn(event, details = {}) {
+        safeLog(event, { level: "warn", user: toLogUser(userId), ...details });
+      },
+      error(event, details = {}) {
+        safeLog(event, { level: "error", user: toLogUser(userId), ...details });
+      },
+    };
+  }
+
+  function createFeaturePayloadContext(
+    psid: string,
+    userId: string,
+    reqId: string,
+    lang: Lang,
+    state: Awaited<ReturnType<typeof getOrCreateState>>,
+    payload: string
+  ): BotPayloadContext {
+    return {
+      senderId: psid,
+      userId,
+      reqId,
+      lang,
+      state,
+      payload,
+      sendText: text => sendLoggedText(psid, text, reqId),
+      sendImage: imageUrl => sendLoggedImage(psid, imageUrl, reqId),
+      sendQuickReplies: (text, replies) =>
+        sendLoggedQuickReplies(psid, text, replies, reqId),
+      sendStateQuickReplies: (nextState, text) =>
+        sendStateQuickReplies(psid, nextState, text, reqId),
+      chooseStyle: style => handleStyleSelection(psid, userId, style, reqId, lang),
+      runStyleGeneration: (style, sourceImageUrl, promptHint) =>
+        runStyleGeneration(psid, userId, style, reqId, lang, sourceImageUrl, promptHint),
+      getRuntimeStats: () => getTodayRuntimeStats(),
+      logger: createFeatureLogger(userId),
+    };
+  }
+
+  function createFeatureImageContext(
+    psid: string,
+    userId: string,
+    reqId: string,
+    lang: Lang,
+    state: Awaited<ReturnType<typeof getOrCreateState>>,
+    imageUrl: string
+  ): BotImageContext {
+    return {
+      senderId: psid,
+      userId,
+      reqId,
+      lang,
+      state,
+      imageUrl,
+      sendText: text => sendLoggedText(psid, text, reqId),
+      sendImage: nextImageUrl => sendLoggedImage(psid, nextImageUrl, reqId),
+      sendQuickReplies: (text, replies) =>
+        sendLoggedQuickReplies(psid, text, replies, reqId),
+      sendStateQuickReplies: (nextState, text) =>
+        sendStateQuickReplies(psid, nextState, text, reqId),
+      chooseStyle: style => handleStyleSelection(psid, userId, style, reqId, lang),
+      runStyleGeneration: (style, sourceImageUrl, promptHint) =>
+        runStyleGeneration(psid, userId, style, reqId, lang, sourceImageUrl, promptHint),
+      getRuntimeStats: () => getTodayRuntimeStats(),
+      logger: createFeatureLogger(userId),
+    };
+  }
+
+  function createFeatureTextContext(
+    psid: string,
+    userId: string,
+    reqId: string,
+    lang: Lang,
+    state: Awaited<ReturnType<typeof getOrCreateState>>,
+    messageText: string,
+    normalizedText: string,
+    hasPhoto: boolean
+  ): BotTextContext {
+    return {
+      senderId: psid,
+      userId,
+      reqId,
+      lang,
+      state,
+      messageText,
+      normalizedText,
+      hasPhoto,
+      sendText: text => sendLoggedText(psid, text, reqId),
+      sendImage: imageUrl => sendLoggedImage(psid, imageUrl, reqId),
+      sendQuickReplies: (text, replies) =>
+        sendLoggedQuickReplies(psid, text, replies, reqId),
+      sendStateQuickReplies: (nextState, text) =>
+        sendStateQuickReplies(psid, nextState, text, reqId),
+      chooseStyle: style => handleStyleSelection(psid, userId, style, reqId, lang),
+      runStyleGeneration: (style, sourceImageUrl, promptHint) =>
+        runStyleGeneration(psid, userId, style, reqId, lang, sourceImageUrl, promptHint),
+      getRuntimeStats: () => getTodayRuntimeStats(),
+      logger: createFeatureLogger(userId),
+    };
   }
 
   async function sendStylePicker(psid: string, lang: Lang, reqId: string): Promise<void> {
@@ -421,20 +532,10 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
 
     const state = await getOrCreateState(psid);
     for (const feature of getBotFeatures()) {
-      const handled = await feature.onPayload?.(
-        createBotFeatureContext(
-          { psid, userId, reqId, lang, state, payload },
-          {
-            sendText: sendLoggedText,
-            sendImage: sendLoggedImage,
-            sendStateQuickReplies,
-            runStyleGeneration,
-            getRuntimeStats: getTodayRuntimeStats,
-            logger: console,
-          }
-        )
+      const result = await feature.onPayload?.(
+        createFeaturePayloadContext(psid, userId, reqId, lang, state, payload)
       );
-      if (handled) {
+      if (result?.handled) {
         return;
       }
     }
@@ -523,27 +624,17 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
 
       const state = await getOrCreateState(psid);
       for (const feature of getBotFeatures()) {
-        const handled = await feature.onImage?.(
-          createBotFeatureContext(
-            {
-              psid,
-              userId,
-              reqId,
-              lang,
-              state,
-              imageUrl: imageAttachment.payload.url,
-            },
-            {
-              sendText: sendLoggedText,
-              sendImage: sendLoggedImage,
-              sendStateQuickReplies,
-              runStyleGeneration,
-              getRuntimeStats: getTodayRuntimeStats,
-              logger: console,
-            }
+        const result = await feature.onImage?.(
+          createFeatureImageContext(
+            psid,
+            userId,
+            reqId,
+            lang,
+            state,
+            imageAttachment.payload.url
           )
         );
-        if (handled) {
+        if (result?.handled) {
           return;
         }
       }
@@ -606,28 +697,19 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     const state = await getOrCreateState(psid);
     const hasPhoto = Boolean(state.lastPhotoUrl);
     for (const feature of getBotFeatures()) {
-      const handled = await feature.onText?.(
-        createBotFeatureContext(
-          {
-            psid,
-            userId,
-            reqId,
-            lang,
-            state,
-            text: trimmedText,
-            hasPhoto,
-          },
-          {
-            sendText: sendLoggedText,
-            sendImage: sendLoggedImage,
-            sendStateQuickReplies,
-            runStyleGeneration,
-            getRuntimeStats: getTodayRuntimeStats,
-            logger: console,
-          }
+      const result = await feature.onText?.(
+        createFeatureTextContext(
+          psid,
+          userId,
+          reqId,
+          lang,
+          state,
+          trimmedText,
+          normalizedText,
+          hasPhoto
         )
       );
-      if (handled) {
+      if (result?.handled) {
         return;
       }
     }

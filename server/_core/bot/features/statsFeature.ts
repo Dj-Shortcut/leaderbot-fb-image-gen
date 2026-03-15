@@ -17,12 +17,12 @@ function isAdmin(psid: string, userId: string): boolean {
 export const statsFeature: BotFeature = {
   name: "stats",
   async onText(context) {
-    if (context.text?.trim() !== "/stats") {
-      return false;
+    if (context.messageText.trim() !== "/stats") {
+      return { handled: false };
     }
 
-    if (!isAdmin(context.psid, context.userId)) {
-      return false;
+    if (!isAdmin(context.senderId, context.userId)) {
+      return { handled: false };
     }
 
     const stats = context.getRuntimeStats();
@@ -42,6 +42,6 @@ export const statsFeature: BotFeature = {
       ].join("\n")
     );
 
-    return true;
+    return { handled: true };
   },
 };

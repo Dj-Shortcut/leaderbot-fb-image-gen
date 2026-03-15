@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ensureDefaultBotFeaturesRegistered } from "./_core/bot/defaultFeatures";
 import { remixFeature } from "./_core/bot/features/remixFeature";
-import type { BotFeatureContext } from "./_core/bot/features";
+import type { BotTextContext } from "./_core/botContext";
 import type { MessengerUserState } from "./_core/messengerState";
 
 function makeState(overrides: Partial<MessengerUserState> = {}): MessengerUserState {
@@ -22,17 +22,21 @@ function makeState(overrides: Partial<MessengerUserState> = {}): MessengerUserSt
   };
 }
 
-function makeContext(overrides: Partial<BotFeatureContext> = {}): BotFeatureContext {
+function makeContext(overrides: Partial<BotTextContext> = {}): BotTextContext {
   return {
-    psid: "p1",
+    senderId: "p1",
     userId: "u1",
     reqId: "req-1",
     lang: "en",
     state: makeState(),
-    text: "remix: neon rain",
+    messageText: "remix: neon rain",
+    normalizedText: "remix: neon rain",
+    hasPhoto: false,
     sendText: vi.fn(async () => undefined),
     sendImage: vi.fn(async () => undefined),
+    sendQuickReplies: vi.fn(async () => undefined),
     sendStateQuickReplies: vi.fn(async () => undefined),
+    chooseStyle: vi.fn(async () => undefined),
     runStyleGeneration: vi.fn(async () => undefined),
     getRuntimeStats: () => ({
       date: "2026-01-01",
@@ -66,12 +70,14 @@ describe("remixFeature", () => {
         lastPrompt: "more contrast",
       }),
       runStyleGeneration,
-      text: "remix: cyberpunk neon rain",
+      messageText: "remix: cyberpunk neon rain",
+      normalizedText: "remix: cyberpunk neon rain",
+      hasPhoto: true,
     });
 
     const handled = await remixFeature.onText?.(context);
 
-    expect(handled).toBe(true);
+    expect(handled).toEqual({ handled: true });
     expect(runStyleGeneration).toHaveBeenCalledWith(
       "caricature",
       "https://img.example/source.jpg",
