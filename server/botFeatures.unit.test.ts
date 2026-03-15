@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ensureDefaultBotFeaturesRegistered } from "./_core/bot/defaultFeatures";
+import { assistantCommandsFeature } from "./_core/bot/features/assistantCommandsFeature";
 import { remixFeature } from "./_core/bot/features/remixFeature";
 import { rateLimitFeature } from "./_core/bot/features/rateLimitFeature";
 import type { BotTextContext } from "./_core/botContext";
@@ -129,6 +130,53 @@ describe("rateLimitFeature", () => {
       expect(sendText).not.toHaveBeenCalled();
     } finally {
       nowSpy.mockRestore();
+    }
+  });
+});
+
+describe("assistantCommandsFeature", () => {
+  it("shows contextual help when user has not uploaded a photo yet", async () => {
+    const sendText = vi.fn(async () => undefined);
+
+    const result = await assistantCommandsFeature.onText?.(
+      makeContext({
+        normalizedText: "help",
+        messageText: "help",
+        hasPhoto: false,
+        sendText,
+      })
+    );
+
+    expect(result).toEqual({ handled: true });
+    expect(sendText).toHaveBeenCalledOnce();
+    expect(sendText.mock.calls[0]?.[0]).toContain("Feel free to send a photo");
+  });
+
+  it("picks a random style and triggers generation for surprise command", async () => {
+    const runStyleGeneration = vi.fn(async () => undefined);
+    const sendText = vi.fn(async () => undefined);
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+
+    try {
+      const result = await assistantCommandsFeature.onText?.(
+        makeContext({
+          normalizedText: "surprise me",
+          messageText: "surprise me",
+          hasPhoto: true,
+          sendText,
+          runStyleGeneration,
+          state: makeState({ lastPhotoUrl: "https://img.example/original.jpg" }),
+        })
+      );
+
+      expect(result).toEqual({ handled: true });
+      expect(sendText).toHaveBeenCalledWith("🎲 Nice — going with caricature.");
+      expect(runStyleGeneration).toHaveBeenCalledWith(
+        "caricature",
+        "https://img.example/original.jpg"
+      );
+    } finally {
+      randomSpy.mockRestore();
     }
   });
 });
