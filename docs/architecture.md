@@ -262,7 +262,7 @@ To keep `server/_core` from growing into a single flat namespace, domain entrypo
 - `server/_core/messenger/index.ts` for webhook ingress concerns (raw-body capture, signature verification, webhook route registration).
 - `server/_core/image-generation/index.ts` for image-generator startup wiring.
 - `server/_core/bot/index.ts` for the bot-product boundary used by server bootstrap.
-- `server/_core/bot/features.ts` as the canonical extension point for future bot features, with registration centralized through `registerBotFeature(...)` and built-in cross-cutting features such as rate limiting.
+- `server/_core/bot/features.ts` as the canonical extension point for future bot features, with registration centralized through `registerBotFeature(...)` and built-in cross-cutting features such as rate limiting and remix commands.
 
 These entrypoints let server bootstrap code import by domain while remaining backward compatible with existing module files.
 

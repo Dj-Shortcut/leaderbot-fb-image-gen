@@ -4,6 +4,7 @@ import type {
   MessengerUserState,
 } from "./messengerState";
 import type { QuickReply } from "./messengerApi";
+import type { Style } from "./messengerStyles";
 
 export type FeatureResult = { handled: true } | { handled: false };
 
@@ -26,6 +27,7 @@ type BotContextBase = {
     state: ConversationState,
     text: string
   ): Promise<void>;
+  chooseStyle(style: Style): Promise<void>;
   logger: BotLogger;
 };
 

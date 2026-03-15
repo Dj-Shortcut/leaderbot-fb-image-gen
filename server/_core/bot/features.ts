@@ -3,6 +3,7 @@ import {
   writeScopedState,
   type MaybePromise,
 } from "../stateStore";
+import { t } from "../i18n";
 import type {
   BotErrorContext,
   BotImageContext,
@@ -10,6 +11,7 @@ import type {
   BotTextContext,
   FeatureResult,
 } from "../botContext";
+import { normalizeStyle } from "../webhookHelpers";
 
 export type BotFeature = {
   name: string;
@@ -73,7 +75,61 @@ export const rateLimitFeature: BotFeature = {
   },
 };
 
-const botFeatures: BotFeature[] = [rateLimitFeature];
+export const remixFeature: BotFeature = {
+  name: "remix",
+  async onPayload(ctx) {
+    if (ctx.payload !== "REMIX_LAST") {
+      return { handled: false };
+    }
+
+    const selectedStyle = normalizeStyle(ctx.state.selectedStyle ?? "");
+    if (!selectedStyle || !ctx.state.lastPhotoUrl) {
+      await ctx.sendText(t(ctx.lang, "textWithoutPhoto"));
+      return { handled: true };
+    }
+
+    await ctx.chooseStyle(selectedStyle);
+    return { handled: true };
+  },
+  async onText(ctx) {
+    if (!ctx.normalizedText.startsWith("remix")) {
+      return { handled: false };
+    }
+
+    if (!ctx.state.lastPhotoUrl) {
+      await ctx.sendText(t(ctx.lang, "textWithoutPhoto"));
+      return { handled: true };
+    }
+
+    if (ctx.normalizedText === "remix") {
+      const selectedStyle = normalizeStyle(ctx.state.selectedStyle ?? "");
+      if (!selectedStyle) {
+        await ctx.sendStateQuickReplies("AWAITING_STYLE", t(ctx.lang, "stylePicker"));
+        return { handled: true };
+      }
+
+      await ctx.chooseStyle(selectedStyle);
+      return { handled: true };
+    }
+
+    if (!ctx.normalizedText.startsWith("remix:")) {
+      return { handled: false };
+    }
+
+    const requestedStyle = normalizeStyle(
+      ctx.messageText.slice("remix:".length).trim()
+    );
+    if (!requestedStyle) {
+      await ctx.sendStateQuickReplies("AWAITING_STYLE", t(ctx.lang, "stylePicker"));
+      return { handled: true };
+    }
+
+    await ctx.chooseStyle(requestedStyle);
+    return { handled: true };
+  },
+};
+
+const botFeatures: BotFeature[] = [rateLimitFeature, remixFeature];
 
 export function getBotFeatures(): readonly BotFeature[] {
   return botFeatures;

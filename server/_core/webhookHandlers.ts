@@ -245,6 +245,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         sendLoggedQuickReplies(psid, text, replies, reqId),
       sendStateQuickReplies: (nextState, text) =>
         sendStateQuickReplies(psid, nextState, text, reqId),
+      chooseStyle: style => handleStyleSelection(psid, userId, style, reqId, lang),
       logger: createFeatureLogger(userId),
     };
   }
@@ -270,6 +271,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         sendLoggedQuickReplies(psid, text, replies, reqId),
       sendStateQuickReplies: (nextState, text) =>
         sendStateQuickReplies(psid, nextState, text, reqId),
+      chooseStyle: style => handleStyleSelection(psid, userId, style, reqId, lang),
       logger: createFeatureLogger(userId),
     };
   }
@@ -299,6 +301,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         sendLoggedQuickReplies(psid, text, replies, reqId),
       sendStateQuickReplies: (nextState, text) =>
         sendStateQuickReplies(psid, nextState, text, reqId),
+      chooseStyle: style => handleStyleSelection(psid, userId, style, reqId, lang),
       logger: createFeatureLogger(userId),
     };
   }

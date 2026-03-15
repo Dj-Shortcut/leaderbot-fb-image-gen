@@ -69,6 +69,7 @@ describe("messenger state flow", () => {
     ]);
     expect(getQuickRepliesForState("PROCESSING")).toEqual([]);
     expect(getQuickRepliesForState("RESULT_READY")).toEqual([
+      { title: "Remix", payload: "REMIX_LAST" },
       { title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
       { title: "Privacy", payload: "PRIVACY_INFO" },
     ]);

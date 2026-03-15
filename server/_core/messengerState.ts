@@ -69,6 +69,7 @@ const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
   })),
   PROCESSING: [],
   RESULT_READY: [
+    { title: "Remix", payload: "REMIX_LAST" },
     { title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
     { title: "Privacy", payload: "PRIVACY_INFO" },
   ],
