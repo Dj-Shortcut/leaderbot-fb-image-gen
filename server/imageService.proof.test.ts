@@ -110,6 +110,46 @@ describe("OpenAi image-to-image proof", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("uses the cyberpunk preset prompt for OpenAI edits", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+
+    const fixture = Buffer.alloc(7000, 9);
+
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
+        return {
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => fixture,
+        } as Response;
+      }
+
+      const formData = init?.body as FormData;
+      expect(formData.get("prompt")).toContain("cyberpunk aesthetic");
+      expect(formData.get("prompt")).toContain("neon-lit futuristic city");
+      expect(formData.get("prompt")).toContain("cinematic sci-fi atmosphere");
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await generator.generate({
+      style: "cyberpunk",
+      sourceImageUrl: "https://img.example/source.jpg",
+      userKey: "user-1",
+      reqId: "req-cyberpunk-prompt",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("hard-fails before OpenAI call when input image is too small", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";

@@ -42,13 +42,22 @@ export type WebhookSummary = {
   events: WebhookSummaryEvent[];
 };
 
-export const STYLE_OPTIONS: Style[] = ["caricature", "petals", "gold", "cinematic", "disco", "clouds"];
+export const STYLE_OPTIONS: Style[] = [
+  "caricature",
+  "petals",
+  "gold",
+  "cinematic",
+  "cyberpunk",
+  "disco",
+  "clouds",
+];
 
 export const STYLE_LABELS: Record<Style, string> = {
   caricature: "Caricature",
   petals: "Petals",
   gold: "Gold",
   cinematic: "Cinematic",
+  cyberpunk: "Cyberpunk",
   disco: "Disco",
   clouds: "Clouds",
 };
