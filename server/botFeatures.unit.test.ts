@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ensureDefaultBotFeaturesRegistered } from "./_core/bot/defaultFeatures";
 import { remixFeature } from "./_core/bot/features/remixFeature";
 import { rateLimitFeature } from "./_core/bot/features/rateLimitFeature";
+import { styleCommandsFeature } from "./_core/bot/features/styleCommandsFeature";
 import type { BotTextContext } from "./_core/botContext";
 import type { MessengerUserState } from "./_core/messengerState";
 import { resetStateStore } from "./_core/messengerState";
@@ -58,6 +59,52 @@ describe("default feature registration", () => {
       ensureDefaultBotFeaturesRegistered();
       ensureDefaultBotFeaturesRegistered();
     }).not.toThrow();
+  });
+});
+
+describe("styleCommandsFeature", () => {
+  it("accepts /style cyberpunk and delegates style selection", async () => {
+    const chooseStyle = vi.fn(async () => undefined);
+    const context = makeContext({
+      messageText: "/style cyberpunk",
+      normalizedText: "/style cyberpunk",
+      chooseStyle,
+    });
+
+    const handled = await styleCommandsFeature.onText?.(context);
+
+    expect(handled).toEqual({ handled: true });
+    expect(chooseStyle).toHaveBeenCalledWith("cyberpunk");
+  });
+
+  it("confirms style changes when no photo context exists yet", async () => {
+    const sendText = vi.fn(async () => undefined);
+    const chooseStyle = vi.fn(async () => undefined);
+    const context = makeContext({
+      messageText: "style: cyberpunk",
+      normalizedText: "style: cyberpunk",
+      sendText,
+      chooseStyle,
+    });
+
+    await styleCommandsFeature.onText?.(context);
+
+    expect(sendText).toHaveBeenCalledWith("✅ Style set to cyberpunk.");
+    expect(chooseStyle).toHaveBeenCalledWith("cyberpunk");
+  });
+
+  it("falls through on invalid style commands", async () => {
+    const chooseStyle = vi.fn(async () => undefined);
+    const context = makeContext({
+      messageText: "/style vaporwave",
+      normalizedText: "/style vaporwave",
+      chooseStyle,
+    });
+
+    const handled = await styleCommandsFeature.onText?.(context);
+
+    expect(handled).toEqual({ handled: false });
+    expect(chooseStyle).not.toHaveBeenCalled();
   });
 });
 

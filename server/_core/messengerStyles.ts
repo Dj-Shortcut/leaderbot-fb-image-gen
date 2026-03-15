@@ -4,7 +4,8 @@ export type Style =
   | "petals"
   | "clouds"
   | "cinematic"
-  | "disco";
+  | "disco"
+  | "cyberpunk";
 
 export const STYLE_TO_DEMO_FILE: Record<Style, string> = {
   caricature: "01-caricature.png",
@@ -13,6 +14,7 @@ export const STYLE_TO_DEMO_FILE: Record<Style, string> = {
   cinematic: "04-crayon.png",
   disco: "05-paparazzi.png",
   clouds: "06-clouds.png",
+  cyberpunk: "05-paparazzi.png",
 };
 
 export type StyleId =
@@ -22,6 +24,7 @@ export type StyleId =
   | "STYLE_CINEMATIC"
   | "STYLE_DISCO"
   | "STYLE_CLOUDS"
+  | "STYLE_CYBERPUNK"
   | "gold";
 
 export type StyleConfig = {
@@ -69,6 +72,14 @@ export const STYLE_CONFIGS: StyleConfig[] = [
     label: "🎬 Cinematic",
     demoThumbnailUrl: getLocalDemoUrl("cinematic"),
     mockResultUrls: [getLocalDemoUrl("cinematic")],
+  },
+  {
+    id: "STYLE_CYBERPUNK",
+    payload: "STYLE_CYBERPUNK",
+    style: "cyberpunk",
+    label: "🌃 Cyberpunk",
+    demoThumbnailUrl: getLocalDemoUrl("cyberpunk"),
+    mockResultUrls: [getLocalDemoUrl("cyberpunk")],
   },
   {
     id: "STYLE_DISCO",
