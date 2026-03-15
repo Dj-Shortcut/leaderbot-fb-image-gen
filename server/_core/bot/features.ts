@@ -63,3 +63,11 @@ const botFeatures: BotFeature[] = [];
 export function getBotFeatures(): readonly BotFeature[] {
   return botFeatures;
 }
+
+export function registerBotFeature(feature: BotFeature): void {
+  if (botFeatures.some(existing => existing.name === feature.name)) {
+    throw new Error(`Bot feature "${feature.name}" is already registered`);
+  }
+
+  botFeatures.push(feature);
+}

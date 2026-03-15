@@ -7,4 +7,4 @@ export {
   registerMetaWebhookRoutes as registerBotRoutes,
 } from "../messengerWebhook";
 export { getGeneratorStartupConfig as getBotStartupConfig } from "../imageService";
-export { getBotFeatures } from "./features";
+export { getBotFeatures, registerBotFeature } from "./features";
