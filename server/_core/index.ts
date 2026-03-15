@@ -4,17 +4,17 @@ import path from "path";
 import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { assertAuthConfig, registerOAuthRoutes } from "./auth";
+import {
+  captureBotWebhookRawBody,
+  getBotStartupConfig,
+  registerBotRoutes,
+  verifyBotWebhookSignature,
+} from "./bot";
 import { registerChatRoutes } from "./chat";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./vite";
-import {
-  captureMetaWebhookRawBody,
-  registerMetaWebhookRoutes,
-  verifyMetaWebhookSignature,
-} from "./messenger";
 import { assertPrivacyConfig } from "./privacy";
-import { getGeneratorStartupConfig } from "./image-generation";
 import { applySecurityHeaders } from "./securityHeaders";
 import { registerGitHubAdminRoutes } from "./githubAdmin";
 import { getGeneratedImage } from "./generatedImageStore";
@@ -120,7 +120,7 @@ function buildVersionPayload() {
 async function startServer() {
   console.log("BOOT", { pid: process.pid });
   console.log("VERSION", buildVersionPayload());
-  const generatorStartupConfig = getGeneratorStartupConfig();
+  const generatorStartupConfig = getBotStartupConfig();
   console.log("GENERATOR_STARTUP_CONFIG", generatorStartupConfig);
   assertAuthConfig();
   assertPrivacyConfig();
@@ -141,13 +141,13 @@ async function startServer() {
   app.use(
     express.json({
       limit: REQUEST_BODY_LIMIT,
-      verify: captureMetaWebhookRawBody,
+      verify: captureBotWebhookRawBody,
     })
   );
   app.use(express.urlencoded({ limit: REQUEST_BODY_LIMIT, extended: true }));
 
   // Verify webhook signature for Facebook webhook endpoint
-  app.use("/webhook/facebook", verifyMetaWebhookSignature);
+  app.use("/webhook/facebook", verifyBotWebhookSignature);
 
   app.use((req, res, next) => {
     const startTime = process.hrtime.bigint();
@@ -335,7 +335,7 @@ async function startServer() {
   registerGitHubAdminRoutes(app);
 
   // Register webhook routes AFTER signature verification middleware
-  registerMetaWebhookRoutes(app);
+  registerBotRoutes(app);
 
   const oauthServerUrl = process.env.OAUTH_SERVER_URL;
   if (oauthServerUrl) {

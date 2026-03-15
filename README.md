@@ -89,6 +89,7 @@ flowchart TD
 Key server entrypoint: `server/_core/index.ts`.
 Webhook route registration: `server/_core/messengerWebhook.ts`.
 Webhook orchestration: `server/_core/webhookHandlers.ts`.
+Bot core boundary and feature entrypoint: `server/_core/bot/index.ts` and `server/_core/bot/features.ts`.
 
 For a deeper explanation, see [`docs/architecture.md`](docs/architecture.md).
 
@@ -113,10 +114,20 @@ State persistence model:
 
 Relevant files:
 
+- `server/_core/bot/features.ts` (future bot feature hooks)
 - `server/_core/messengerState.ts`
 - `server/_core/stateStore.ts`
 - `server/_core/privacy.ts`
 - `drizzle/schema.ts` (DB table definitions, including `messengerState`)
+
+## Bot-core extension model
+
+The repository is now organized around an explicit bot-core boundary:
+
+- `server/_core/bot/index.ts` exposes the Messenger bot runtime entrypoints used by server bootstrap.
+- `server/_core/bot/features.ts` is the dedicated extension point for future bot features.
+
+Today the feature registry is intentionally empty, so behavior is unchanged. Future bot features should prefer registering text/payload/image handlers there instead of expanding unrelated web or admin codepaths.
 
 ## Quota model
 
