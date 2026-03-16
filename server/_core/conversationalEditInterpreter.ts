@@ -82,6 +82,11 @@ function extractResponseText(raw: unknown): string | null {
       continue;
     }
 
+    const directText = (item as { text?: unknown }).text;
+    if (typeof directText === "string" && directText.trim()) {
+      return directText.trim();
+    }
+
     const content = (item as { content?: unknown }).content;
     if (!Array.isArray(content)) {
       continue;

@@ -59,4 +59,36 @@ describe("conversational edit interpreter", () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("accepts direct output[].text responses from the responses api", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output: [
+            {
+              text: '{"shouldEdit":true,"style":"cyberpunk","promptHint":"more neon rain"}',
+            },
+          ],
+        }),
+        { status: 200 }
+      )
+    );
+
+    global.fetch = fetchMock;
+
+    const result = await interpretConversationalEdit({
+      text: "make it more cyberpunk",
+      lang: "en",
+      lastStyle: "disco",
+    });
+
+    expect(result).toEqual({
+      shouldEdit: true,
+      style: "cyberpunk",
+      promptHint: "more neon rain",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
