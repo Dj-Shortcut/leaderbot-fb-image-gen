@@ -258,6 +258,9 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       setFlowState: async nextState => {
         await setFlowState(psid, nextState);
       },
+      preselectStyle: async style => {
+        await setPreselectedStyle(psid, style);
+      },
       chooseStyle: style => handleStyleSelection(psid, userId, style, reqId, lang),
       runStyleGeneration: (style, sourceImageUrl, promptHint) =>
         runStyleGeneration(psid, userId, style, reqId, lang, sourceImageUrl, promptHint),
@@ -289,6 +292,9 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         sendStateQuickReplies(psid, nextState, text, reqId),
       setFlowState: async nextState => {
         await setFlowState(psid, nextState);
+      },
+      preselectStyle: async style => {
+        await setPreselectedStyle(psid, style);
       },
       chooseStyle: style => handleStyleSelection(psid, userId, style, reqId, lang),
       runStyleGeneration: (style, sourceImageUrl, promptHint) =>
@@ -325,6 +331,9 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         sendStateQuickReplies(psid, nextState, text, reqId),
       setFlowState: async nextState => {
         await setFlowState(psid, nextState);
+      },
+      preselectStyle: async style => {
+        await setPreselectedStyle(psid, style);
       },
       chooseStyle: style => handleStyleSelection(psid, userId, style, reqId, lang),
       runStyleGeneration: (style, sourceImageUrl, promptHint) =>

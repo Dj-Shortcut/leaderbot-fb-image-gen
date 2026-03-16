@@ -29,6 +29,7 @@ type BotContextBase = {
     text: string
   ): Promise<void>;
   setFlowState(state: ConversationState): Promise<void>;
+  preselectStyle(style: Style | null): Promise<void>;
   chooseStyle(style: Style): Promise<void>;
   runStyleGeneration(
     style: Style,

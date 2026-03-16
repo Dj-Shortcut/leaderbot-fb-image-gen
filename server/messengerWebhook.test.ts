@@ -158,6 +158,7 @@ describe("messenger webhook dedupe", () => {
 
   it("registers built-in bot features", () => {
     expect(getBotFeatures().map(feature => feature.name)).toContain("rateLimit");
+    expect(getBotFeatures().map(feature => feature.name)).toContain("styleCommands");
   });
 
   it("processes a message.mid only once", async () => {
@@ -477,6 +478,7 @@ describe("messenger webhook dedupe", () => {
         ["petals", "02-petals.png"],
         ["gold", "03-gold.png"],
         ["cinematic", "04-crayon.png"],
+        ["cyberpunk", "05-paparazzi.png"],
         ["disco", "05-paparazzi.png"],
         ["clouds", "06-clouds.png"],
       ];
@@ -1276,6 +1278,7 @@ describe("messenger greeting behavior", () => {
         { content_type: "text", title: "🌸 Petals", payload: "STYLE_PETALS" },
         { content_type: "text", title: "✨ Gold", payload: "STYLE_GOLD" },
         { content_type: "text", title: "🎬 Cinematic", payload: "STYLE_CINEMATIC" },
+        { content_type: "text", title: "🌃 Cyberpunk", payload: "STYLE_CYBERPUNK" },
         { content_type: "text", title: "🪩 Disco Glow", payload: "STYLE_DISCO" },
         { content_type: "text", title: "☁️ Clouds", payload: "STYLE_CLOUDS" },
       ],
@@ -1641,5 +1644,170 @@ describe("bot remix feature", () => {
       "remix-payload-user",
       "http://localhost:3000/demo/06-clouds.png",
     );
+  });
+
+  it("uses conversational edit text to regenerate the latest image", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+
+    const originalFetch = global.fetch;
+    const interpreterFetch = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output_text:
+            '{"shouldEdit":true,"style":"gold","promptHint":"make it darker with warm glow"}',
+        }),
+        { status: 200 }
+      )
+    );
+    global.fetch = interpreterFetch;
+
+    try {
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "edit-text-user" },
+                message: {
+                  mid: "mid-edit-photo",
+                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                },
+              },
+              {
+                sender: { id: "edit-text-user" },
+                message: { mid: "mid-edit-style", quick_reply: { payload: "disco" } },
+              },
+            ],
+          },
+        ],
+      });
+
+      sendImageMock.mockClear();
+      sendQuickRepliesMock.mockClear();
+      sendTextMock.mockClear();
+
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "edit-text-user" },
+                message: { mid: "mid-edit-command", text: "make it darker and more gold" },
+              },
+            ],
+          },
+        ],
+      });
+
+      expect(sendTextMock).toHaveBeenCalledWith(
+        "edit-text-user",
+        "Ik maak nu je Gold-stijl.",
+      );
+      expect(sendImageMock).toHaveBeenCalledWith(
+        "edit-text-user",
+        "http://localhost:3000/demo/03-gold.png",
+      );
+      expect(interpreterFetch).toHaveBeenCalledTimes(1);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it("handles /style cyberpunk as a first-class style selection", async () => {
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "style-command-user" },
+              message: {
+                mid: "mid-style-command-photo",
+                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "style-command-user" },
+              message: { mid: "mid-style-command-text", text: "/style cyberpunk" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      "style-command-user",
+      "Ik maak nu je Cyberpunk-stijl.",
+    );
+    expect(sendImageMock).toHaveBeenCalledWith(
+      "style-command-user",
+      "http://localhost:3000/demo/05-paparazzi.png",
+    );
+    expect(getState(anonymizePsid("style-command-user"))?.selectedStyle).toBe("cyberpunk");
+    expect(getState(anonymizePsid("style-command-user"))?.lastStyle).toBe("cyberpunk");
+  });
+
+  it("persists /style cyberpunk for the next photo upload", async () => {
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "style-preselect-user" },
+              message: { mid: "mid-style-preselect-text", text: "/style cyberpunk" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      "style-preselect-user",
+      "✅ Stijl ingesteld op cyberpunk.",
+    );
+    expect(sendImageMock).not.toHaveBeenCalled();
+
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "style-preselect-user" },
+              message: {
+                mid: "mid-style-preselect-photo",
+                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      "style-preselect-user",
+      "Ik maak nu je Cyberpunk-stijl.",
+    );
+    expect(sendImageMock).toHaveBeenCalledWith(
+      "style-preselect-user",
+      "http://localhost:3000/demo/05-paparazzi.png",
+    );
+    expect(getState(anonymizePsid("style-preselect-user"))?.preselectedStyle).toBeNull();
+    expect(getState(anonymizePsid("style-preselect-user"))?.selectedStyle).toBe("cyberpunk");
   });
 });
