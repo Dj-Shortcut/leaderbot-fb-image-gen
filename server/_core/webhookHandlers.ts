@@ -255,6 +255,9 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         sendLoggedQuickReplies(psid, text, replies, reqId),
       sendStateQuickReplies: (nextState, text) =>
         sendStateQuickReplies(psid, nextState, text, reqId),
+      setFlowState: async nextState => {
+        await setFlowState(psid, nextState);
+      },
       preselectStyle: async style => {
         await setPreselectedStyle(psid, style);
       },
@@ -287,6 +290,9 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         sendLoggedQuickReplies(psid, text, replies, reqId),
       sendStateQuickReplies: (nextState, text) =>
         sendStateQuickReplies(psid, nextState, text, reqId),
+      setFlowState: async nextState => {
+        await setFlowState(psid, nextState);
+      },
       preselectStyle: async style => {
         await setPreselectedStyle(psid, style);
       },
@@ -323,6 +329,9 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         sendLoggedQuickReplies(psid, text, replies, reqId),
       sendStateQuickReplies: (nextState, text) =>
         sendStateQuickReplies(psid, nextState, text, reqId),
+      setFlowState: async nextState => {
+        await setFlowState(psid, nextState);
+      },
       preselectStyle: async style => {
         await setPreselectedStyle(psid, style);
       },
