@@ -23,7 +23,7 @@ ASCII version:
                     | - /api/trpc                      |
                     | - /auth/github/*                 |
                     | - /healthz, /__version, /metrics|
-                    | - /generated/*, /demo/*         |
+                    | - /generated/*         |
                     +----+---------------+-------------+
                          |               |
           inbound events |               | outbound API / auth / storage
@@ -39,8 +39,7 @@ ASCII version:
                      v
         +--------------------------+
         | Image Service            |
-        | - mock generator         |
-        | - OpenAI generator       |
+        | - OpenAI image generator |
         +------------+-------------+
                      |
           +----------+----------+
@@ -64,9 +63,9 @@ flowchart TD
         WH["/webhook/facebook"]
         TRPC["/api/trpc"]
         AUTH["/auth/github/*"]
-        OPS["/healthz, /__version, /generated/*, /demo/*"]
+        OPS["/healthz, /__version, /generated/*"]
         HANDLERS["Webhook handlers<br/>signature check, dedupe, i18n,<br/>state transitions, quota checks"]
-        IMG["Image service<br/>mock or OpenAI"]
+        IMG["Image service<br/>OpenAI"]
     end
 
     REDIS[("Redis / state store")]
@@ -160,12 +159,11 @@ Related files:
 - `FB_APP_SECRET` (Webhook signature validation)
 - `SOURCE_IMAGE_ALLOWED_HOSTS` (required for inbound source-image fetching; if unset, source-image fetches are blocked; review regularly and keep only trusted domains)
 - `REDIS_URL` (required in production for webhook replay protection)
-- `APP_BASE_URL` (required when `GENERATOR_MODE=openai` for public generated image URLs; must be `https://` in production)
-- `OPENAI_API_KEY` (required when `GENERATOR_MODE=openai`)
+- `APP_BASE_URL` (required for public generated image URLs; must be `https://` in production)
+- `OPENAI_API_KEY` (required for image generation)
 
 ### Common optional
 
-- `GENERATOR_MODE` (`mock|openai`; defaults effectively to `openai`)
 - `WEBHOOK_REPLAY_TTL_SECONDS` (override webhook replay-protection TTL, default `300`)
 - `HTTP_RATE_LIMIT_WINDOW_MS` (global HTTP rate-limit window, default `60000`; Redis-backed when `REDIS_URL` is set)
 - `HTTP_RATE_LIMIT_MAX_REQUESTS` (max requests per IP per window, default `120`)
@@ -256,7 +254,7 @@ Database migration helpers:
 pnpm db:push
 ```
 
-The repository includes focused unit tests for webhook handling, state transitions, signature verification, and image generation behavior under mock/OpenAI configuration.
+The repository includes focused unit tests for webhook handling, state transitions, signature verification, and image generation behavior under OpenAI configuration.
 
 ## Documentation standards
 
