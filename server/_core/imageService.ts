@@ -104,9 +104,11 @@ export function getGeneratorStartupConfig(): { mode: GeneratorMode; resolvedBase
 
 function buildStylePrompt(style: Style, promptHint?: string): string {
   const basePrompt =
-    style === "cyberpunk"
-      ? "Apply cyberpunk aesthetic, neon-lit futuristic city, glowing signs, high contrast, cinematic sci-fi atmosphere, detailed digital art to this photo."
-      : `Apply ${style} style to this photo.`;
+    style === "oil-paint"
+      ? "Apply a classic oil painting portrait style to this photo, with visible brush strokes, textured canvas, painterly lighting, rich color depth, and a fine-art museum feel."
+      : style === "cyberpunk"
+        ? "Apply cyberpunk aesthetic, neon-lit futuristic city, glowing signs, high contrast, cinematic sci-fi atmosphere, detailed digital art to this photo."
+        : `Apply ${style} style to this photo.`;
 
   const trimmedPromptHint = promptHint?.trim();
   if (!trimmedPromptHint) {

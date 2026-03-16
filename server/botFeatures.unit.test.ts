@@ -66,6 +66,24 @@ describe("default feature registration", () => {
 });
 
 describe("styleCommandsFeature", () => {
+  it("accepts style aliases and resolves them to the canonical oil-paint key", async () => {
+    const chooseStyle = vi.fn(async () => undefined);
+    const context = makeContext({
+      state: makeState({
+        lastPhotoUrl: "https://img.example/source.jpg",
+        lastPhoto: "https://img.example/source.jpg",
+      }),
+      messageText: "style: oil painting",
+      normalizedText: "style: oil painting",
+      chooseStyle,
+    });
+
+    const handled = await styleCommandsFeature.onText?.(context);
+
+    expect(handled).toEqual({ handled: true });
+    expect(chooseStyle).toHaveBeenCalledWith("oil-paint");
+  });
+
   it("accepts /style cyberpunk and delegates style selection", async () => {
     const chooseStyle = vi.fn(async () => undefined);
     const context = makeContext({
