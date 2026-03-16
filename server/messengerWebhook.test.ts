@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { sendImageMock, sendQuickRepliesMock, sendTextMock, safeLogMock, generateMessengerReplyMock } = vi.hoisted(() => ({
   sendImageMock: vi.fn(async () => undefined),
@@ -34,9 +34,32 @@ import { getBotFeatures } from "./_core/bot/features";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
+const GENERATED_IMAGE_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=";
 
 function toUrlString(url: string | URL): string {
   return typeof url === "string" ? url : url.toString();
+}
+
+function installOpenAiSuccessFetchMock() {
+  const sourceImage = Buffer.alloc(6000, 7);
+  const fetchMock = vi.fn(async (url: string | URL) => {
+    const normalizedUrl = toUrlString(url);
+    if (normalizedUrl.startsWith("https://img.example/")) {
+      return {
+        ok: true,
+        headers: new Headers({ "content-type": "image/jpeg" }),
+        arrayBuffer: async () => sourceImage,
+      } as Response;
+    }
+
+    return {
+      ok: true,
+      json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+    } as Response;
+  });
+
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
 }
 
 beforeAll(() => {
@@ -50,6 +73,12 @@ afterAll(() => {
   }
 
   process.env.PRIVACY_PEPPER = originalPrivacyPepper;
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.APP_BASE_URL;
 });
 
 beforeEach(() => {
@@ -144,10 +173,11 @@ describe("webhook summary logging", () => {
 
 describe("messenger webhook dedupe", () => {
   beforeEach(() => {
-    process.env.MOCK_MODE = "true";
-    process.env.GENERATOR_MODE = "mock";
+    delete process.env.MOCK_MODE;
+    process.env.GENERATOR_MODE = "openai";
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
-    delete process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
@@ -467,152 +497,118 @@ describe("messenger webhook dedupe", () => {
 
 
 
-  it("returns local demo images for all canonical styles in MOCK_MODE", async () => {
-    vi.useFakeTimers();
-    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+  it("returns generated images for all canonical styles through the OpenAI path", async () => {
+    const styles = ["caricature", "petals", "gold", "cinematic", "disco", "clouds"] as const;
 
-    try {
-      const styles: Array<[string, string]> = [
-        ["caricature", "01-caricature.png"],
-        ["petals", "02-petals.png"],
-        ["gold", "03-gold.png"],
-        ["cinematic", "04-crayon.png"],
-        ["disco", "05-paparazzi.png"],
-        ["clouds", "06-clouds.png"],
-      ];
+    for (const style of styles) {
+      const fetchMock = installOpenAiSuccessFetchMock();
+      sendImageMock.mockClear();
+      sendQuickRepliesMock.mockClear();
+      sendTextMock.mockClear();
+      resetStateStore();
+      resetMessengerEventDedupe();
 
-      for (const [style, filename] of styles) {
-        sendImageMock.mockClear();
-        sendQuickRepliesMock.mockClear();
-        sendTextMock.mockClear();
-        resetStateStore();
-        resetMessengerEventDedupe();
-
-        const processing = processFacebookWebhookPayload({
-          entry: [
-            {
-              messaging: [
-                {
-                  sender: { id: `style-user-${style}` },
-                  message: {
-                    mid: `mid-photo-${style}`,
-                    attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
-                  },
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: `style-user-${style}` },
+                message: {
+                  mid: `mid-photo-${style}`,
+                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
                 },
-                {
-                  sender: { id: `style-user-${style}` },
-                  message: { mid: `mid-style-${style}`, quick_reply: { payload: style } },
-                },
-              ],
-            },
-          ],
-        });
+              },
+              {
+                sender: { id: `style-user-${style}` },
+                message: { mid: `mid-style-${style}`, quick_reply: { payload: style } },
+              },
+            ],
+          },
+        ],
+      });
 
-        await vi.advanceTimersByTimeAsync(2000);
-        await processing;
-
-        const [[, imageUrl]] = sendImageMock.mock.calls as [[string, string]];
-        expect(imageUrl).toBe(`http://localhost:3000/demo/${filename}`);
-      }
-    } finally {
-      randomSpy.mockRestore();
-      vi.useRealTimers();
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(sendImageMock).toHaveBeenCalledWith(
+        `style-user-${style}`,
+        expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/),
+      );
     }
   });
 
 
   it("uses canonical quick-reply payload and APP_BASE_URL for image attachments", async () => {
-    vi.useFakeTimers();
-    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    installOpenAiSuccessFetchMock();
 
-    try {
-      const processing = processFacebookWebhookPayload({
-        entry: [
-          {
-            messaging: [
-              {
-                sender: { id: "canonical-payload-user" },
-                message: {
-                  mid: "mid-photo-canonical",
-                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
-                },
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "canonical-payload-user" },
+              message: {
+                mid: "mid-photo-canonical",
+                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
               },
-              {
-                sender: { id: "canonical-payload-user" },
-                message: {
-                  mid: "mid-style-canonical",
-                  quick_reply: { payload: "disco" },
-                },
+            },
+            {
+              sender: { id: "canonical-payload-user" },
+              message: {
+                mid: "mid-style-canonical",
+                quick_reply: { payload: "disco" },
               },
-            ],
-          },
-        ],
-      });
+            },
+          ],
+        },
+      ],
+    });
 
-      await vi.advanceTimersByTimeAsync(2000);
-      await processing;
-
-      expect(sendImageMock).toHaveBeenCalledWith(
-        "canonical-payload-user",
-        "https://leaderbot-fb-image-gen.fly.dev/demo/05-paparazzi.png",
-      );
-    } finally {
-      delete process.env.APP_BASE_URL;
-      randomSpy.mockRestore();
-      vi.useRealTimers();
-    }
+    expect(sendImageMock).toHaveBeenCalledWith(
+      "canonical-payload-user",
+      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/),
+    );
   });
 
-  it("returns a mock image attachment and follow-up after style selection", async () => {
-    vi.useFakeTimers();
-    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+  it("returns a generated image attachment and follow-up after style selection", async () => {
+    installOpenAiSuccessFetchMock();
 
-    try {
-      const processing = processFacebookWebhookPayload({
-        entry: [
-          {
-            messaging: [
-              {
-                sender: { id: "mock-image-user" },
-                message: {
-                  mid: "mid-photo-1",
-                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
-                },
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "mock-image-user" },
+              message: {
+                mid: "mid-photo-1",
+                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
               },
-              {
-                sender: { id: "mock-image-user" },
-                message: { mid: "mid-style-1", quick_reply: { payload: "disco" } },
-              },
-            ],
-          },
-        ],
-      });
+            },
+            {
+              sender: { id: "mock-image-user" },
+              message: { mid: "mid-style-1", quick_reply: { payload: "disco" } },
+            },
+          ],
+        },
+      ],
+    });
 
-      await vi.advanceTimersByTimeAsync(2000);
-      await processing;
-
-      expect(sendImageMock).toHaveBeenCalledWith(
-        "mock-image-user",
-        "http://localhost:3000/demo/05-paparazzi.png",
-      );
-      expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
-        "mock-image-user",
-        "Klaar ✅",
-        [
-          { content_type: "text", title: "Remix", payload: "REMIX_LAST" },
-          { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
-          { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
-        ],
-      );
-    } finally {
-      randomSpy.mockRestore();
-      vi.useRealTimers();
-    }
+    expect(sendImageMock).toHaveBeenCalledWith(
+      "mock-image-user",
+      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/),
+    );
+    expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
+      "mock-image-user",
+      "Klaar ✅",
+      [
+        { content_type: "text", title: "Remix", payload: "REMIX_LAST" },
+        { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
+        { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
+      ],
+    );
   });
 
-  it("shows friendly message when GENERATOR_MODE=openai and OPENAI_API_KEY is missing", async () => {
-    process.env.GENERATOR_MODE = "openai";
+  it("shows friendly message when OPENAI_API_KEY is missing", async () => {
     delete process.env.OPENAI_API_KEY;
 
     await processFacebookWebhookPayload({
@@ -645,8 +641,7 @@ describe("messenger webhook dedupe", () => {
     expect(sendTextMock).toHaveBeenNthCalledWith(2, "openai-missing-key-user", "Oeps. Probeer nog een stijl.");
   });
 
-  it("reaches OpenAI generator path with GENERATOR_MODE=openai and API key", async () => {
-    process.env.GENERATOR_MODE = "openai";
+  it("reaches OpenAI generator path with API key", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
 
@@ -704,7 +699,6 @@ describe("messenger webhook dedupe", () => {
 
 
   it("keeps failure context and retries selected style with prior photo", async () => {
-    process.env.GENERATOR_MODE = "openai";
     delete process.env.OPENAI_API_KEY;
 
     const psid = "retry-failure-user";
@@ -775,7 +769,6 @@ describe("messenger webhook dedupe", () => {
     );
   });
   it("shows timeout message when OpenAI generation exceeds timeout", async () => {
-    process.env.GENERATOR_MODE = "openai";
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
 
@@ -827,7 +820,6 @@ describe("messenger webhook dedupe", () => {
   });
 
   it("style click during generation does not start a second run", async () => {
-    process.env.GENERATOR_MODE = "openai";
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
 
@@ -916,7 +908,6 @@ describe("messenger webhook dedupe", () => {
   });
 
   it("returns only in-progress status message for style changes while generating", async () => {
-    process.env.GENERATOR_MODE = "openai";
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
 
@@ -1010,8 +1001,10 @@ describe("messenger webhook dedupe", () => {
 
 describe("messenger text brain rollout", () => {
   beforeEach(() => {
-    process.env.GENERATOR_MODE = "mock";
+    process.env.GENERATOR_MODE = "openai";
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
@@ -1184,6 +1177,7 @@ describe("messenger text brain rollout", () => {
   it("does not affect attachment/style/image generation path when responses engine is enabled", async () => {
     process.env.MESSENGER_CHAT_ENGINE = "responses";
     process.env.MESSENGER_CHAT_CANARY_PERCENT = "100";
+    installOpenAiSuccessFetchMock();
 
     await processFacebookWebhookPayload({
       entry: [
@@ -1213,6 +1207,8 @@ describe("messenger text brain rollout", () => {
 describe("messenger greeting behavior", () => {
   beforeEach(() => {
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
@@ -1283,62 +1279,51 @@ describe("messenger greeting behavior", () => {
   });
 
   it("emits one intentional response package per transition in order", async () => {
-    process.env.MOCK_MODE = "true";
-    process.env.GENERATOR_MODE = "mock";
-    vi.useFakeTimers();
-    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+    installOpenAiSuccessFetchMock();
 
-    try {
-      const processing = processFacebookWebhookPayload({
-        entry: [
-          {
-            messaging: [
-              {
-                sender: { id: "transition-order-user" },
-                message: {
-                  mid: "mid-transition-photo",
-                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
-                },
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "transition-order-user" },
+              message: {
+                mid: "mid-transition-photo",
+                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
               },
-              {
-                sender: { id: "transition-order-user" },
-                message: { mid: "mid-transition-style", quick_reply: { payload: "gold" } },
-              },
-            ],
-          },
-        ],
-      });
+            },
+            {
+              sender: { id: "transition-order-user" },
+              message: { mid: "mid-transition-style", quick_reply: { payload: "gold" } },
+            },
+          ],
+        },
+      ],
+    });
 
-      await vi.advanceTimersByTimeAsync(2000);
-      await processing;
+    expect(sendQuickRepliesMock).toHaveBeenNthCalledWith(
+      1,
+      "transition-order-user",
+      "Kies je stijl 👇",
+      expect.any(Array),
+    );
+    expect(sendTextMock).toHaveBeenCalledTimes(1);
+    expect(sendTextMock).toHaveBeenCalledWith("transition-order-user", "Ik maak nu je Gold-stijl.");
+    expect(sendImageMock).toHaveBeenCalledTimes(1);
+    expect(sendQuickRepliesMock).toHaveBeenNthCalledWith(
+      2,
+      "transition-order-user",
+      "Klaar ✅",
+      [
+        { content_type: "text", title: "Remix", payload: "REMIX_LAST" },
+        { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
+        { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
+      ],
+    );
 
-      expect(sendQuickRepliesMock).toHaveBeenNthCalledWith(
-        1,
-        "transition-order-user",
-        "Kies je stijl 👇",
-        expect.any(Array),
-      );
-      expect(sendTextMock).toHaveBeenCalledTimes(1);
-      expect(sendTextMock).toHaveBeenCalledWith("transition-order-user", "Ik maak nu je Gold-stijl.");
-      expect(sendImageMock).toHaveBeenCalledTimes(1);
-      expect(sendQuickRepliesMock).toHaveBeenNthCalledWith(
-        2,
-        "transition-order-user",
-        "Klaar ✅",
-        [
-          { content_type: "text", title: "Remix", payload: "REMIX_LAST" },
-          { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
-          { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
-        ],
-      );
-
-      expect(sendQuickRepliesMock.mock.invocationCallOrder[0]).toBeLessThan(sendTextMock.mock.invocationCallOrder[0]);
-      expect(sendTextMock.mock.invocationCallOrder[0]).toBeLessThan(sendImageMock.mock.invocationCallOrder[0]);
-      expect(sendImageMock.mock.invocationCallOrder[0]).toBeLessThan(sendQuickRepliesMock.mock.invocationCallOrder[1]);
-    } finally {
-      randomSpy.mockRestore();
-      vi.useRealTimers();
-    }
+    expect(sendQuickRepliesMock.mock.invocationCallOrder[0]).toBeLessThan(sendTextMock.mock.invocationCallOrder[0]);
+    expect(sendTextMock.mock.invocationCallOrder[0]).toBeLessThan(sendImageMock.mock.invocationCallOrder[0]);
+    expect(sendImageMock.mock.invocationCallOrder[0]).toBeLessThan(sendQuickRepliesMock.mock.invocationCallOrder[1]);
   });
 
   it("offers follow-up quick actions when state is RESULT_READY", async () => {
@@ -1495,9 +1480,10 @@ describe("bot rate limit feature", () => {
 
 describe("bot remix feature", () => {
   beforeEach(() => {
-    process.env.GENERATOR_MODE = "mock";
+    process.env.GENERATOR_MODE = "openai";
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
-    delete process.env.APP_BASE_URL;
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
@@ -1507,6 +1493,8 @@ describe("bot remix feature", () => {
   });
 
   it("remixes the latest generated style when the user sends remix", async () => {
+    installOpenAiSuccessFetchMock();
+
     await processFacebookWebhookPayload({
       entry: [
         {
@@ -1550,7 +1538,7 @@ describe("bot remix feature", () => {
     );
     expect(sendImageMock).toHaveBeenCalledWith(
       "remix-text-user",
-      "http://localhost:3000/demo/05-paparazzi.png",
+      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/),
     );
   });
 
@@ -1596,6 +1584,8 @@ describe("bot remix feature", () => {
   });
 
   it("handles the remix quick reply after a generated image", async () => {
+    installOpenAiSuccessFetchMock();
+
     await processFacebookWebhookPayload({
       entry: [
         {
@@ -1639,7 +1629,7 @@ describe("bot remix feature", () => {
     );
     expect(sendImageMock).toHaveBeenCalledWith(
       "remix-payload-user",
-      "http://localhost:3000/demo/06-clouds.png",
+      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/),
     );
   });
 });
