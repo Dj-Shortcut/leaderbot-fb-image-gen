@@ -14,6 +14,18 @@ function isAdmin(psid: string, userId: string): boolean {
   return allowed.has(psid) || allowed.has(userId);
 }
 
+function formatUptime(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  return `${minutes}m`;
+}
+
 export const statsFeature: BotFeature = {
   name: "stats",
   async onText(context) {
@@ -26,19 +38,22 @@ export const statsFeature: BotFeature = {
     }
 
     const stats = context.getRuntimeStats();
-    const avgLatency =
-      stats.averageGenerationLatencyMs === null
-        ? "n/a"
-        : `${stats.averageGenerationLatencyMs}ms`;
+    const avgLatency = `${stats.averageGenerationLatencyMs ?? 0}ms`;
+    const uptime = formatUptime(process.uptime());
 
     await context.sendText(
       [
-        `📊 ${stats.date}`,
-        `images generated: ${stats.imagesGeneratedToday}`,
-        `active users: ${stats.activeUsersToday}`,
-        `errors: ${stats.errorCountToday}`,
-        `avg latency: ${avgLatency}`,
-        "note: node-local debug metrics (reset on restart; not cross-instance)",
+        "Leaderbot Stats",
+        "",
+        `Images generated: ${stats.imagesGeneratedToday}`,
+        `Users: ${stats.activeUsersToday}`,
+        `Styles used: ${stats.stylesUsedToday}`,
+        `Errors: ${stats.errorCountToday}`,
+        `Avg latency: ${avgLatency}`,
+        "",
+        `Bot uptime: ${uptime}`,
+        "",
+        `Node-local stats for ${stats.date}`,
       ].join("\n")
     );
 
