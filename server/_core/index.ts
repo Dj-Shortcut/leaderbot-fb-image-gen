@@ -357,10 +357,6 @@ async function startServer() {
   app.use(bodyParserErrorHandler);
 
   const publicDir = path.join(process.cwd(), "public");
-  app.use(
-    "/demo",
-    express.static(path.join(publicDir, "demo"), { fallthrough: false })
-  );
   app.get("/generated/:token.jpg", (req, res) => {
     const generatedImage = getGeneratedImage(req.params.token);
     if (!generatedImage) {

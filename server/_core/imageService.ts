@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
 import net from "node:net";
 import os from "node:os";
-import { STYLE_TO_DEMO_FILE, type Style } from "./messengerStyles";
+import { type Style } from "./messengerStyles";
 import fs from "fs/promises";
 import path from "path";
 import { safeLen, sha256 } from "./imageProof";
 import { buildGeneratedImageUrl, putGeneratedImage } from "./generatedImageStore";
 import { storagePut } from "../storage";
 
-export type GeneratorMode = "mock" | "openai";
+export type GeneratorMode = "openai";
 
 export interface ImageGenerator {
   generate(input: {
@@ -65,43 +65,11 @@ function getConfiguredBaseUrl(): string | undefined {
   return configuredBaseUrl.replace(/\/$/, "");
 }
 
-function getBaseUrl(): string {
-  const configuredBaseUrl = getConfiguredBaseUrl();
-
-  if (configuredBaseUrl) {
-    return configuredBaseUrl;
-  }
-
-  return "http://localhost:3000";
-}
-
-function getMockImageForStyle(style: Style): string {
-  const filename = STYLE_TO_DEMO_FILE[style];
-  return `${getBaseUrl()}/demo/${filename}`;
-}
-
-function buildStylePrompt(style: Style, promptHint?: string): string {
-  const basePrompt =
-    style === "cyberpunk"
-      ? "Apply cyberpunk aesthetic, neon-lit futuristic city, glowing signs, high contrast, cinematic sci-fi atmosphere, detailed digital art to this photo."
-      : `Apply ${style} style to this photo.`;
-
-  const trimmedPromptHint = promptHint?.trim();
-  if (!trimmedPromptHint) {
-    return basePrompt;
-  }
-
-  return `${basePrompt} Additional direction: ${trimmedPromptHint}.`;
-}
-
-function getGeneratorMode(): GeneratorMode {
-  return process.env.GENERATOR_MODE === "mock" ? "mock" : "openai";
-}
 
 function getRequiredPublicBaseUrl(): string {
   const baseUrl = getConfiguredBaseUrl();
   if (!baseUrl) {
-    console.error("APP_BASE_URL is required when GENERATOR_MODE=openai");
+    console.error("APP_BASE_URL is required for image generation");
     throw new MissingAppBaseUrlError("APP_BASE_URL is missing or invalid");
   }
 
@@ -129,9 +97,23 @@ function ensureJpegBuffer(buffer: Buffer): Buffer {
 
 export function getGeneratorStartupConfig(): { mode: GeneratorMode; resolvedBaseUrl: string | undefined } {
   return {
-    mode: getGeneratorMode(),
+    mode: "openai",
     resolvedBaseUrl: getConfiguredBaseUrl(),
   };
+}
+
+function buildStylePrompt(style: Style, promptHint?: string): string {
+  const basePrompt =
+    style === "cyberpunk"
+      ? "Apply cyberpunk aesthetic, neon-lit futuristic city, glowing signs, high contrast, cinematic sci-fi atmosphere, detailed digital art to this photo."
+      : `Apply ${style} style to this photo.`;
+
+  const trimmedPromptHint = promptHint?.trim();
+  if (!trimmedPromptHint) {
+    return basePrompt;
+  }
+
+  return `${basePrompt} Additional direction: ${trimmedPromptHint}.`;
 }
 
 function getOpenAiTimeoutMs(): number {
@@ -319,28 +301,6 @@ async function fetchWithTimeout(input: URL, init: RequestInit | undefined, timeo
     });
   } finally {
     clearTimeout(timeout);
-  }
-}
-
-class MockImageGenerator implements ImageGenerator {
-  generate(input: { style: Style; sourceImageUrl?: string; promptHint?: string; userKey: string; reqId: string }): Promise<{
-    imageUrl: string;
-    proof: { incomingLen: number; incomingSha256: string; openaiInputLen: number; openaiInputSha256: string };
-    metrics: GenerationMetrics;
-  }> {
-    return Promise.resolve({
-      imageUrl: getMockImageForStyle(input.style),
-      proof: {
-        incomingLen: 0,
-        incomingSha256: "",
-        openaiInputLen: 0,
-        openaiInputSha256: "",
-      },
-      metrics: {
-        uploadOrServeMs: 0,
-        totalMs: 0,
-      },
-    });
   }
 }
 
@@ -584,10 +544,6 @@ export class OpenAiImageGenerator implements ImageGenerator {
   }
 }
 
-export function createImageGenerator(mode: GeneratorMode = getGeneratorMode()): { mode: GeneratorMode; generator: ImageGenerator } {
-  if (mode === "openai") {
-    return { mode, generator: new OpenAiImageGenerator() };
-  }
-
-  return { mode: "mock", generator: new MockImageGenerator() };
+export function createImageGenerator(mode: GeneratorMode = "openai"): { mode: GeneratorMode; generator: ImageGenerator } {
+  return { mode, generator: new OpenAiImageGenerator() };
 }

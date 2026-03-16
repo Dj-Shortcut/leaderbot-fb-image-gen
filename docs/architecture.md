@@ -6,7 +6,7 @@ Leaderbot runs as one Node.js process (Express + HTTP server):
 
 - Accepts Messenger webhook traffic.
 - Executes conversation flow + generation orchestration.
-- Serves static assets (`/demo`, `/generated`, web build output).
+- Serves static assets (`/generated`, web build output).
 - Exposes health/version/debug endpoints.
 - Exposes Prometheus-style metrics and request tracing hooks.
 - Optionally mounts OAuth and additional chat routes.
@@ -34,7 +34,7 @@ ASCII version:
                     | - /api/trpc                      |
                     | - /auth/github/*                 |
                     | - /healthz, /__version          |
-                    | - /generated/*, /demo/*         |
+                    | - /generated/*         |
                     +----+---------------+-------------+
                          |               |
           inbound events |               | outbound API / auth / storage
@@ -50,8 +50,7 @@ ASCII version:
                      v
         +--------------------------+
         | Image Service            |
-        | - mock generator         |
-        | - OpenAI generator       |
+        | - OpenAI image generator |
         +------------+-------------+
                      |
           +----------+----------+
@@ -75,9 +74,9 @@ flowchart TD
         WH["/webhook/facebook"]
         TRPC["/api/trpc"]
         AUTH["/auth/github/*"]
-        OPS["/healthz, /__version, /generated/*, /demo/*"]
+        OPS["/healthz, /__version, /generated/*"]
         HANDLERS["Webhook handlers<br/>signature check, dedupe, i18n,<br/>state transitions, quota checks"]
-        IMG["Image service<br/>mock or OpenAI"]
+        IMG["Image service<br/>OpenAI"]
     end
 
     REDIS[("Redis / state store")]
@@ -110,7 +109,7 @@ flowchart TD
 6. State is updated (`setFlowState`, `setPendingImage`, `setChosenStyle`, ...).
 7. If generation is triggered:
    - state -> `PROCESSING`,
-   - image generator selected (`mock` vs `openai`),
+   - OpenAI image generator configuration,
    - result sent via Messenger send API,
    - state -> `RESULT_READY` (or `FAILURE` on error).
 
