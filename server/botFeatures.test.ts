@@ -68,8 +68,8 @@ describe("bot features", () => {
     expect(chatEngineDecisions).toHaveLength(10);
   });
 
-  it("stops further processing when remix has no prior generation", async () => {
-    const psid = "remix-empty-user";
+  it("lets remix text fall back to normal assistant handling", async () => {
+    const psid = "remix-fallback-user";
 
     await processFacebookWebhookPayload({
       entry: [
@@ -86,7 +86,7 @@ describe("bot features", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(
       psid,
-      "I can't remix yet—send a photo and generate one first.",
+      "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
     );
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });

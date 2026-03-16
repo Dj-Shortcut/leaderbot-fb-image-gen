@@ -13,4 +13,3 @@ export {
   hasBotFeature,
 } from "./features";
 export { rateLimitFeature } from "./features/rateLimitFeature";
-export { remixFeature } from "./features/remixFeature";
