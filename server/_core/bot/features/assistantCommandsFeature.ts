@@ -50,6 +50,7 @@ export const assistantCommandsFeature: BotFeature = {
     }
 
     if (!ctx.hasPhoto) {
+      await ctx.setFlowState("AWAITING_PHOTO");
       await ctx.sendText(t(ctx.lang, "textWithoutPhoto"));
       return { handled: true };
     }

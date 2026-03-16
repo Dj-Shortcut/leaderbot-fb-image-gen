@@ -39,6 +39,7 @@ function makeContext(overrides: Partial<BotTextContext> = {}): BotTextContext {
     sendImage: vi.fn(async () => undefined),
     sendQuickReplies: vi.fn(async () => undefined),
     sendStateQuickReplies: vi.fn(async () => undefined),
+    setFlowState: vi.fn(async () => undefined),
     chooseStyle: vi.fn(async () => undefined),
     runStyleGeneration: vi.fn(async () => undefined),
     getRuntimeStats: () => ({
@@ -178,5 +179,24 @@ describe("assistantCommandsFeature", () => {
     } finally {
       randomSpy.mockRestore();
     }
+  });
+
+  it("moves surprise-without-photo users into awaiting photo state", async () => {
+    const sendText = vi.fn(async () => undefined);
+    const setFlowState = vi.fn(async () => undefined);
+
+    const result = await assistantCommandsFeature.onText?.(
+      makeContext({
+        normalizedText: "surprise me",
+        messageText: "surprise me",
+        hasPhoto: false,
+        sendText,
+        setFlowState,
+      })
+    );
+
+    expect(result).toEqual({ handled: true });
+    expect(setFlowState).toHaveBeenCalledWith("AWAITING_PHOTO");
+    expect(sendText).toHaveBeenCalledOnce();
   });
 });

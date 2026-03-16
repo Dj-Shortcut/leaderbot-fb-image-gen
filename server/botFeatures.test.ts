@@ -29,7 +29,7 @@ vi.mock("./_core/messengerResponsesService", () => ({
 }));
 
 import { processFacebookWebhookPayload, resetMessengerEventDedupe } from "./_core/messengerWebhook";
-import { resetStateStore } from "./_core/messengerState";
+import { anonymizePsid, getState, resetStateStore } from "./_core/messengerState";
 
 describe("bot features", () => {
   beforeEach(() => {
@@ -111,6 +111,30 @@ describe("bot features", () => {
       psid,
       expect.stringContaining("Stuur gerust een foto")
     );
+    expect(generateMessengerReplyMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps surprise-without-photo users in awaiting-photo state", async () => {
+    const psid = "surprise-user";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: { mid: "mid-surprise", text: "surprise me" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      psid,
+      expect.stringContaining("Stuur gerust een foto"),
+    );
+    expect(getState(anonymizePsid(psid))?.stage).toBe("AWAITING_PHOTO");
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
 });
