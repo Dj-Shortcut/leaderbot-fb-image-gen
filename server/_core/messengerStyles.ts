@@ -4,7 +4,8 @@ export type Style =
   | "petals"
   | "clouds"
   | "cinematic"
-  | "disco";
+  | "disco"
+  | "cyberpunk";
 
 export type StyleId =
   | "STYLE_CARICATURE"
@@ -13,6 +14,7 @@ export type StyleId =
   | "STYLE_CINEMATIC"
   | "STYLE_DISCO"
   | "STYLE_CLOUDS"
+  | "STYLE_CYBERPUNK"
   | "gold";
 
 export type StyleConfig = {
@@ -46,6 +48,12 @@ export const STYLE_CONFIGS: StyleConfig[] = [
     payload: "STYLE_CINEMATIC",
     style: "cinematic",
     label: "🎬 Cinematic",
+  },
+  {
+    id: "STYLE_CYBERPUNK",
+    payload: "STYLE_CYBERPUNK",
+    style: "cyberpunk",
+    label: "🌃 Cyberpunk",
   },
   {
     id: "STYLE_DISCO",

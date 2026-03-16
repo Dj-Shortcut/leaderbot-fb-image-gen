@@ -102,6 +102,20 @@ export function getGeneratorStartupConfig(): { mode: GeneratorMode; resolvedBase
   };
 }
 
+function buildStylePrompt(style: Style, promptHint?: string): string {
+  const basePrompt =
+    style === "cyberpunk"
+      ? "Apply cyberpunk aesthetic, neon-lit futuristic city, glowing signs, high contrast, cinematic sci-fi atmosphere, detailed digital art to this photo."
+      : `Apply ${style} style to this photo.`;
+
+  const trimmedPromptHint = promptHint?.trim();
+  if (!trimmedPromptHint) {
+    return basePrompt;
+  }
+
+  return `${basePrompt} Additional direction: ${trimmedPromptHint}.`;
+}
+
 function getOpenAiTimeoutMs(): number {
   const raw = Number.parseInt(process.env.OPENAI_IMAGE_TIMEOUT_MS ?? "", 10);
   if (Number.isFinite(raw) && raw > 0) {
@@ -427,9 +441,7 @@ export class OpenAiImageGenerator implements ImageGenerator {
 
       const createOpenAiFormData = (): FormData => {
         const formData = new FormData();
-        const prompt = input.promptHint?.trim()
-          ? `Apply ${input.style} style to this photo. Additional direction: ${input.promptHint.trim()}.`
-          : `Apply ${input.style} style to this photo.`;
+        const prompt = buildStylePrompt(input.style, input.promptHint);
         formData.set("model", "gpt-image-1");
         formData.set("prompt", prompt);
         formData.set("size", "1024x1024");

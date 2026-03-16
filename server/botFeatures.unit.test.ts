@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { ensureDefaultBotFeaturesRegistered } from "./_core/bot/defaultFeatures";
+import { assistantCommandsFeature } from "./_core/bot/features/assistantCommandsFeature";
 import { remixFeature } from "./_core/bot/features/remixFeature";
 import { rateLimitFeature } from "./_core/bot/features/rateLimitFeature";
+import { styleCommandsFeature } from "./_core/bot/features/styleCommandsFeature";
 import type { BotTextContext } from "./_core/botContext";
 import type { MessengerUserState } from "./_core/messengerState";
 import { resetStateStore } from "./_core/messengerState";
@@ -38,6 +40,8 @@ function makeContext(overrides: Partial<BotTextContext> = {}): BotTextContext {
     sendImage: vi.fn(async () => undefined),
     sendQuickReplies: vi.fn(async () => undefined),
     sendStateQuickReplies: vi.fn(async () => undefined),
+    setFlowState: vi.fn(async () => undefined),
+    preselectStyle: vi.fn(async () => undefined),
     chooseStyle: vi.fn(async () => undefined),
     runStyleGeneration: vi.fn(async () => undefined),
     getRuntimeStats: () => ({
@@ -58,6 +62,59 @@ describe("default feature registration", () => {
       ensureDefaultBotFeaturesRegistered();
       ensureDefaultBotFeaturesRegistered();
     }).not.toThrow();
+  });
+});
+
+describe("styleCommandsFeature", () => {
+  it("accepts /style cyberpunk and delegates style selection", async () => {
+    const chooseStyle = vi.fn(async () => undefined);
+    const context = makeContext({
+      state: makeState({
+        lastPhotoUrl: "https://img.example/source.jpg",
+        lastPhoto: "https://img.example/source.jpg",
+      }),
+      messageText: "/style cyberpunk",
+      normalizedText: "/style cyberpunk",
+      chooseStyle,
+    });
+
+    const handled = await styleCommandsFeature.onText?.(context);
+
+    expect(handled).toEqual({ handled: true });
+    expect(chooseStyle).toHaveBeenCalledWith("cyberpunk");
+  });
+
+  it("confirms style changes when no photo context exists yet", async () => {
+    const sendText = vi.fn(async () => undefined);
+    const preselectStyle = vi.fn(async () => undefined);
+    const chooseStyle = vi.fn(async () => undefined);
+    const context = makeContext({
+      messageText: "style: cyberpunk",
+      normalizedText: "style: cyberpunk",
+      sendText,
+      preselectStyle,
+      chooseStyle,
+    });
+
+    await styleCommandsFeature.onText?.(context);
+
+    expect(preselectStyle).toHaveBeenCalledWith("cyberpunk");
+    expect(sendText).toHaveBeenCalledWith("✅ Style set to cyberpunk.");
+    expect(chooseStyle).not.toHaveBeenCalled();
+  });
+
+  it("falls through on invalid style commands", async () => {
+    const chooseStyle = vi.fn(async () => undefined);
+    const context = makeContext({
+      messageText: "/style vaporwave",
+      normalizedText: "/style vaporwave",
+      chooseStyle,
+    });
+
+    const handled = await styleCommandsFeature.onText?.(context);
+
+    expect(handled).toEqual({ handled: false });
+    expect(chooseStyle).not.toHaveBeenCalled();
   });
 });
 
@@ -130,5 +187,71 @@ describe("rateLimitFeature", () => {
     } finally {
       nowSpy.mockRestore();
     }
+  });
+});
+
+describe("assistantCommandsFeature", () => {
+  it("shows contextual help when user has not uploaded a photo yet", async () => {
+    const sendText = vi.fn(async () => undefined);
+
+    const result = await assistantCommandsFeature.onText?.(
+      makeContext({
+        normalizedText: "help",
+        messageText: "help",
+        hasPhoto: false,
+        sendText,
+      })
+    );
+
+    expect(result).toEqual({ handled: true });
+    expect(sendText).toHaveBeenCalledOnce();
+    expect(sendText.mock.calls[0]?.[0]).toContain("Feel free to send a photo");
+  });
+
+  it("picks a random style and triggers generation for surprise command", async () => {
+    const runStyleGeneration = vi.fn(async () => undefined);
+    const sendText = vi.fn(async () => undefined);
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+
+    try {
+      const result = await assistantCommandsFeature.onText?.(
+        makeContext({
+          normalizedText: "surprise me",
+          messageText: "surprise me",
+          hasPhoto: true,
+          sendText,
+          runStyleGeneration,
+          state: makeState({ lastPhotoUrl: "https://img.example/original.jpg" }),
+        })
+      );
+
+      expect(result).toEqual({ handled: true });
+      expect(sendText).toHaveBeenCalledWith("🎲 Nice — going with caricature.");
+      expect(runStyleGeneration).toHaveBeenCalledWith(
+        "caricature",
+        "https://img.example/original.jpg"
+      );
+    } finally {
+      randomSpy.mockRestore();
+    }
+  });
+
+  it("moves surprise-without-photo users into awaiting photo state", async () => {
+    const sendText = vi.fn(async () => undefined);
+    const setFlowState = vi.fn(async () => undefined);
+
+    const result = await assistantCommandsFeature.onText?.(
+      makeContext({
+        normalizedText: "surprise me",
+        messageText: "surprise me",
+        hasPhoto: false,
+        sendText,
+        setFlowState,
+      })
+    );
+
+    expect(result).toEqual({ handled: true });
+    expect(setFlowState).toHaveBeenCalledWith("AWAITING_PHOTO");
+    expect(sendText).toHaveBeenCalledOnce();
   });
 });

@@ -64,6 +64,7 @@ describe("messenger state flow", () => {
       { title: "🌸 Petals", payload: "STYLE_PETALS" },
       { title: "✨ Gold", payload: "STYLE_GOLD" },
       { title: "🎬 Cinematic", payload: "STYLE_CINEMATIC" },
+      { title: "🌃 Cyberpunk", payload: "STYLE_CYBERPUNK" },
       { title: "🪩 Disco Glow", payload: "STYLE_DISCO" },
       { title: "☁️ Clouds", payload: "STYLE_CLOUDS" },
     ]);

@@ -255,6 +255,12 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         sendLoggedQuickReplies(psid, text, replies, reqId),
       sendStateQuickReplies: (nextState, text) =>
         sendStateQuickReplies(psid, nextState, text, reqId),
+      setFlowState: async nextState => {
+        await setFlowState(psid, nextState);
+      },
+      preselectStyle: async style => {
+        await setPreselectedStyle(psid, style);
+      },
       chooseStyle: style => handleStyleSelection(psid, userId, style, reqId, lang),
       runStyleGeneration: (style, sourceImageUrl, promptHint) =>
         runStyleGeneration(psid, userId, style, reqId, lang, sourceImageUrl, promptHint),
@@ -284,6 +290,12 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         sendLoggedQuickReplies(psid, text, replies, reqId),
       sendStateQuickReplies: (nextState, text) =>
         sendStateQuickReplies(psid, nextState, text, reqId),
+      setFlowState: async nextState => {
+        await setFlowState(psid, nextState);
+      },
+      preselectStyle: async style => {
+        await setPreselectedStyle(psid, style);
+      },
       chooseStyle: style => handleStyleSelection(psid, userId, style, reqId, lang),
       runStyleGeneration: (style, sourceImageUrl, promptHint) =>
         runStyleGeneration(psid, userId, style, reqId, lang, sourceImageUrl, promptHint),
@@ -317,6 +329,12 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         sendLoggedQuickReplies(psid, text, replies, reqId),
       sendStateQuickReplies: (nextState, text) =>
         sendStateQuickReplies(psid, nextState, text, reqId),
+      setFlowState: async nextState => {
+        await setFlowState(psid, nextState);
+      },
+      preselectStyle: async style => {
+        await setPreselectedStyle(psid, style);
+      },
       chooseStyle: style => handleStyleSelection(psid, userId, style, reqId, lang),
       runStyleGeneration: (style, sourceImageUrl, promptHint) =>
         runStyleGeneration(psid, userId, style, reqId, lang, sourceImageUrl, promptHint),
