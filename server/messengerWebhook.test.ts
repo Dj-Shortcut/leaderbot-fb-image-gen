@@ -28,6 +28,7 @@ import {
   resetMessengerEventDedupe,
   summarizeWebhook,
 } from "./_core/messengerWebhook";
+import { STYLE_CONFIGS } from "./_core/messengerStyles";
 import { anonymizePsid, getState, resetStateStore, setFlowState } from "./_core/messengerState";
 import { getEventDedupeKey } from "./_core/webhookHelpers";
 import { getBotFeatures } from "./_core/bot/features";
@@ -499,7 +500,7 @@ describe("messenger webhook dedupe", () => {
 
 
   it("returns generated images for all canonical styles through the OpenAI path", async () => {
-    const styles = ["caricature", "petals", "gold", "cinematic", "cyberpunk", "disco", "clouds"] as const;
+    const styles = STYLE_CONFIGS.map(style => style.style);
 
     for (const style of styles) {
       const fetchMock = installOpenAiSuccessFetchMock();
@@ -1268,15 +1269,11 @@ describe("messenger greeting behavior", () => {
     expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
       "style-user",
       "Kies je stijl 👇",
-      [
-        { content_type: "text", title: "🎨 Caricature", payload: "STYLE_CARICATURE" },
-        { content_type: "text", title: "🌸 Petals", payload: "STYLE_PETALS" },
-        { content_type: "text", title: "✨ Gold", payload: "STYLE_GOLD" },
-        { content_type: "text", title: "🎬 Cinematic", payload: "STYLE_CINEMATIC" },
-        { content_type: "text", title: "🌃 Cyberpunk", payload: "STYLE_CYBERPUNK" },
-        { content_type: "text", title: "🪩 Disco Glow", payload: "STYLE_DISCO" },
-        { content_type: "text", title: "☁️ Clouds", payload: "STYLE_CLOUDS" },
-      ],
+      STYLE_CONFIGS.map(style => ({
+        content_type: "text" as const,
+        title: style.label,
+        payload: style.payload,
+      })),
     );
   });
 

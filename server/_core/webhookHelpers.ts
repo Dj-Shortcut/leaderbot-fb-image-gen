@@ -47,6 +47,7 @@ export const STYLE_OPTIONS: Style[] = [
   "petals",
   "gold",
   "cinematic",
+  "oil-paint",
   "cyberpunk",
   "disco",
   "clouds",
@@ -57,10 +58,25 @@ export const STYLE_LABELS: Record<Style, string> = {
   petals: "Petals",
   gold: "Gold",
   cinematic: "Cinematic",
+  "oil-paint": "Oil Paint",
   cyberpunk: "Cyberpunk",
   disco: "Disco",
   clouds: "Clouds",
 };
+
+const STYLE_ALIASES: Record<string, Style> = {
+  "oil paint": "oil-paint",
+  "oil painting": "oil-paint",
+  "oil-paint": "oil-paint",
+};
+
+function normalizeStyleToken(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
 
 export type AckKind = "like" | "ok" | "thanks" | "emoji";
 
@@ -201,8 +217,13 @@ export function getGreetingResponse(state: ConversationState, lang: Lang = norma
 }
 
 export function normalizeStyle(input: string): Style | undefined {
-  const normalized = input.trim().toLowerCase();
-  return STYLE_OPTIONS.find(style => style === normalized);
+  const normalized = normalizeStyleToken(input);
+  const alias = STYLE_ALIASES[normalized];
+  if (alias) {
+    return alias;
+  }
+
+  return STYLE_OPTIONS.find(style => normalizeStyleToken(style) === normalized);
 }
 
 export function stylePayloadToStyle(payload: string): Style | undefined {
@@ -215,7 +236,7 @@ export function stylePayloadToStyle(payload: string): Style | undefined {
     return undefined;
   }
 
-  const styleKey = payload.slice("STYLE_".length).toLowerCase();
+  const styleKey = payload.slice("STYLE_".length).toLowerCase().replace(/_/g, "-");
   return normalizeStyle(styleKey);
 }
 

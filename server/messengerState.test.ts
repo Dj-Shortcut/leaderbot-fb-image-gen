@@ -8,6 +8,7 @@ import {
   setFlowState,
   setPendingImage,
 } from "./_core/messengerState";
+import { STYLE_CONFIGS } from "./_core/messengerStyles";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
@@ -59,15 +60,9 @@ describe("messenger state flow", () => {
       { title: "Privacy", payload: "PRIVACY_INFO" },
     ]);
     expect(getQuickRepliesForState("AWAITING_PHOTO")).toEqual([]);
-    expect(getQuickRepliesForState("AWAITING_STYLE")).toEqual([
-      { title: "🎨 Caricature", payload: "STYLE_CARICATURE" },
-      { title: "🌸 Petals", payload: "STYLE_PETALS" },
-      { title: "✨ Gold", payload: "STYLE_GOLD" },
-      { title: "🎬 Cinematic", payload: "STYLE_CINEMATIC" },
-      { title: "🌃 Cyberpunk", payload: "STYLE_CYBERPUNK" },
-      { title: "🪩 Disco Glow", payload: "STYLE_DISCO" },
-      { title: "☁️ Clouds", payload: "STYLE_CLOUDS" },
-    ]);
+    expect(getQuickRepliesForState("AWAITING_STYLE")).toEqual(
+      STYLE_CONFIGS.map(style => ({ title: style.label, payload: style.payload })),
+    );
     expect(getQuickRepliesForState("PROCESSING")).toEqual([]);
     expect(getQuickRepliesForState("RESULT_READY")).toEqual([
       { title: "Remix", payload: "REMIX_LAST" },

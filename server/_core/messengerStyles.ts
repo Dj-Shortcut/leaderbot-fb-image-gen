@@ -5,13 +5,15 @@ export type Style =
   | "clouds"
   | "cinematic"
   | "disco"
-  | "cyberpunk";
+  | "cyberpunk"
+  | "oil-paint";
 
 export type StyleId =
   | "STYLE_CARICATURE"
   | "STYLE_PETALS"
   | "STYLE_GOLD"
   | "STYLE_CINEMATIC"
+  | "STYLE_OIL_PAINT"
   | "STYLE_DISCO"
   | "STYLE_CLOUDS"
   | "STYLE_CYBERPUNK"
@@ -48,6 +50,12 @@ export const STYLE_CONFIGS: StyleConfig[] = [
     payload: "STYLE_CINEMATIC",
     style: "cinematic",
     label: "🎬 Cinematic",
+  },
+  {
+    id: "STYLE_OIL_PAINT",
+    payload: "STYLE_OIL_PAINT",
+    style: "oil-paint",
+    label: "🖼️ Oil Paint",
   },
   {
     id: "STYLE_CYBERPUNK",

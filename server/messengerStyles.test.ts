@@ -8,6 +8,7 @@ describe("messengerStyles", () => {
       "petals",
       "gold",
       "cinematic",
+      "oil-paint",
       "cyberpunk",
       "disco",
       "clouds",
@@ -16,8 +17,10 @@ describe("messengerStyles", () => {
 
   it("validates and resolves style payloads", () => {
     expect(isStylePayload("STYLE_CINEMATIC")).toBe(true);
+    expect(isStylePayload("STYLE_OIL_PAINT")).toBe(true);
     expect(isStylePayload("STYLE_CYBERPUNK")).toBe(true);
     expect(isStylePayload("UNKNOWN_STYLE")).toBe(false);
+    expect(getStyleById("STYLE_OIL_PAINT").label).toContain("Oil Paint");
     expect(getStyleById("STYLE_CYBERPUNK").label).toContain("Cyberpunk");
     expect(getStyleById("STYLE_DISCO").label).toContain("Disco");
   });
