@@ -14,13 +14,6 @@ function isAdmin(psid: string, userId: string): boolean {
   return allowed.has(psid) || allowed.has(userId);
 }
 
-function getConfiguredAdminIds(): string[] {
-  return (process.env.MESSENGER_ADMIN_IDS ?? "")
-    .split(",")
-    .map(value => value.trim())
-    .filter(Boolean);
-}
-
 function formatUptime(totalSeconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(totalSeconds));
   const hours = Math.floor(safeSeconds / 3600);
@@ -40,18 +33,7 @@ export const statsFeature: BotFeature = {
       return { handled: false };
     }
 
-    const configuredAdminIds = getConfiguredAdminIds();
-    const adminAllowed = isAdmin(context.senderId, context.userId);
-
-    context.logger.info("stats_command_attempt", {
-      senderId: context.senderId,
-      userId: context.userId,
-      adminConfigured: configuredAdminIds.length > 0,
-      adminAllowed,
-      configuredAdminIds,
-    });
-
-    if (!adminAllowed) {
+    if (!isAdmin(context.senderId, context.userId)) {
       return { handled: false };
     }
 
