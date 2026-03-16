@@ -8,6 +8,7 @@ describe("STYLE_TO_DEMO_FILE", () => {
       petals: "02-petals.png",
       gold: "03-gold.png",
       cinematic: "04-crayon.png",
+      cyberpunk: "05-paparazzi.png",
       disco: "05-paparazzi.png",
       clouds: "06-clouds.png",
     };
@@ -17,6 +18,7 @@ describe("STYLE_TO_DEMO_FILE", () => {
 
   it("builds demo thumbnail URLs from mapped files", () => {
     expect(getDemoThumbnailUrl("cinematic")).toBe("/demo/04-crayon.png");
+    expect(getDemoThumbnailUrl("cyberpunk")).toBe("/demo/05-paparazzi.png");
     expect(getDemoThumbnailUrl("disco")).toBe("/demo/05-paparazzi.png");
   });
 });
