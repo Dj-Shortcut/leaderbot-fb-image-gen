@@ -603,7 +603,6 @@ describe("messenger webhook dedupe", () => {
       "mock-image-user",
       "Klaar ✅",
       [
-        { content_type: "text", title: "Remix", payload: "REMIX_LAST" },
         { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
         { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
       ],
@@ -1314,7 +1313,6 @@ describe("messenger greeting behavior", () => {
       "transition-order-user",
       "Klaar ✅",
       [
-        { content_type: "text", title: "Remix", payload: "REMIX_LAST" },
         { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
         { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
       ],
@@ -1347,7 +1345,6 @@ describe("messenger greeting behavior", () => {
       psid,
       "Klaar ✅",
       [
-        { content_type: "text", title: "Remix", payload: "REMIX_LAST" },
         { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
         { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
       ],
@@ -1477,7 +1474,7 @@ describe("bot rate limit feature", () => {
   });
 });
 
-describe("bot remix feature", () => {
+describe("bot conversational editing feature", () => {
   beforeEach(() => {
     process.env.GENERATOR_MODE = "openai";
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
@@ -1489,145 +1486,6 @@ describe("bot remix feature", () => {
     safeLogMock.mockClear();
     resetStateStore();
     resetMessengerEventDedupe();
-  });
-
-  it("remixes the latest generated style when the user sends remix", async () => {
-    installOpenAiSuccessFetchMock();
-    await processFacebookWebhookPayload({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: "remix-text-user" },
-              message: {
-                mid: "mid-remix-photo",
-                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
-              },
-            },
-            {
-              sender: { id: "remix-text-user" },
-              message: { mid: "mid-remix-style", quick_reply: { payload: "disco" } },
-            },
-          ],
-        },
-      ],
-    });
-
-    sendImageMock.mockClear();
-    sendQuickRepliesMock.mockClear();
-    sendTextMock.mockClear();
-
-    await processFacebookWebhookPayload({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: "remix-text-user" },
-              message: { mid: "mid-remix-text-command", text: "remix" },
-            },
-          ],
-        },
-      ],
-    });
-
-    expect(sendTextMock).toHaveBeenCalledWith(
-      "remix-text-user",
-      "Ik maak nu je Disco-stijl.",
-    );
-    expect(sendImageMock).toHaveBeenCalledWith(
-      "remix-text-user",
-      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/),
-    );
-  });
-
-  it("requires a prior generation before remixing with an explicit style override", async () => {
-    await processFacebookWebhookPayload({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: "remix-style-user" },
-              message: {
-                mid: "mid-remix-style-photo",
-                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
-              },
-            },
-          ],
-        },
-      ],
-    });
-
-    sendImageMock.mockClear();
-    sendQuickRepliesMock.mockClear();
-    sendTextMock.mockClear();
-
-    await processFacebookWebhookPayload({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: "remix-style-user" },
-              message: { mid: "mid-remix-style-command", text: "remix: gold" },
-            },
-          ],
-        },
-      ],
-    });
-
-    expect(sendTextMock).toHaveBeenCalledWith(
-      "remix-style-user",
-      "I can't remix yet—send a photo and generate one first.",
-    );
-    expect(sendImageMock).not.toHaveBeenCalled();
-  });
-
-  it("handles the remix quick reply after a generated image", async () => {
-    installOpenAiSuccessFetchMock();
-    await processFacebookWebhookPayload({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: "remix-payload-user" },
-              message: {
-                mid: "mid-remix-payload-photo",
-                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
-              },
-            },
-            {
-              sender: { id: "remix-payload-user" },
-              message: { mid: "mid-remix-payload-style", quick_reply: { payload: "clouds" } },
-            },
-          ],
-        },
-      ],
-    });
-
-    sendImageMock.mockClear();
-    sendQuickRepliesMock.mockClear();
-    sendTextMock.mockClear();
-
-    await processFacebookWebhookPayload({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: "remix-payload-user" },
-              message: { mid: "mid-remix-payload-command", quick_reply: { payload: "REMIX_LAST" } },
-            },
-          ],
-        },
-      ],
-    });
-
-    expect(sendTextMock).toHaveBeenCalledWith(
-      "remix-payload-user",
-      "Ik maak nu je Clouds-stijl.",
-    );
-    expect(sendImageMock).toHaveBeenCalledWith(
-      "remix-payload-user",
-      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/),
-    );
   });
 
   it("uses conversational edit text to regenerate the latest image", async () => {

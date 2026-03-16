@@ -215,7 +215,6 @@ export function looksLikePossibleEditRequest(text: string): boolean {
     "make it",
     "make this",
     "edit",
-    "remix",
     "more ",
     "less ",
     "darker",

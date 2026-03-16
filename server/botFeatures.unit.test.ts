@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ensureDefaultBotFeaturesRegistered } from "./_core/bot/defaultFeatures";
 import { assistantCommandsFeature } from "./_core/bot/features/assistantCommandsFeature";
-import { remixFeature } from "./_core/bot/features/remixFeature";
 import { rateLimitFeature } from "./_core/bot/features/rateLimitFeature";
 import { statsFeature } from "./_core/bot/features/statsFeature";
 import { styleCommandsFeature } from "./_core/bot/features/styleCommandsFeature";
@@ -34,8 +33,8 @@ function makeContext(overrides: Partial<BotTextContext> = {}): BotTextContext {
     reqId: "req-1",
     lang: "en",
     state: makeState(),
-    messageText: "remix: neon rain",
-    normalizedText: "remix: neon rain",
+    messageText: "hello",
+    normalizedText: "hello",
     hasPhoto: false,
     sendText: vi.fn(async () => undefined),
     sendImage: vi.fn(async () => undefined),
@@ -135,33 +134,6 @@ describe("styleCommandsFeature", () => {
 
     expect(handled).toEqual({ handled: false });
     expect(chooseStyle).not.toHaveBeenCalled();
-  });
-});
-
-describe("remixFeature", () => {
-  it("remixes from last source photo and combines prompt context", async () => {
-    const runStyleGeneration = vi.fn(async () => undefined);
-    const context = makeContext({
-      state: makeState({
-        lastGeneratedUrl: "https://app.example/generated.jpg",
-        lastPhotoUrl: "https://img.example/source.jpg",
-        lastStyle: "caricature",
-        lastPrompt: "more contrast",
-      }),
-      runStyleGeneration,
-      messageText: "remix: cyberpunk neon rain",
-      normalizedText: "remix: cyberpunk neon rain",
-      hasPhoto: true,
-    });
-
-    const handled = await remixFeature.onText?.(context);
-
-    expect(handled).toEqual({ handled: true });
-    expect(runStyleGeneration).toHaveBeenCalledWith(
-      "caricature",
-      "https://img.example/source.jpg",
-      "more contrast | cyberpunk neon rain",
-    );
   });
 });
 
