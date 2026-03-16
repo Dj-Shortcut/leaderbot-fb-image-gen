@@ -3,6 +3,7 @@ import { ensureDefaultBotFeaturesRegistered } from "./_core/bot/defaultFeatures"
 import { assistantCommandsFeature } from "./_core/bot/features/assistantCommandsFeature";
 import { remixFeature } from "./_core/bot/features/remixFeature";
 import { rateLimitFeature } from "./_core/bot/features/rateLimitFeature";
+import { statsFeature } from "./_core/bot/features/statsFeature";
 import { styleCommandsFeature } from "./_core/bot/features/styleCommandsFeature";
 import type { BotTextContext } from "./_core/botContext";
 import type { MessengerUserState } from "./_core/messengerState";
@@ -48,6 +49,7 @@ function makeContext(overrides: Partial<BotTextContext> = {}): BotTextContext {
       date: "2026-01-01",
       imagesGeneratedToday: 0,
       activeUsersToday: 0,
+      stylesUsedToday: 0,
       errorCountToday: 0,
       averageGenerationLatencyMs: null,
     }),
@@ -271,5 +273,71 @@ describe("assistantCommandsFeature", () => {
     expect(result).toEqual({ handled: true });
     expect(setFlowState).toHaveBeenCalledWith("AWAITING_PHOTO");
     expect(sendText).toHaveBeenCalledOnce();
+  });
+});
+
+describe("statsFeature", () => {
+  it("returns a readable admin-only stats block", async () => {
+    process.env.MESSENGER_ADMIN_IDS = "p1";
+    const sendText = vi.fn(async () => undefined);
+    const uptimeSpy = vi.spyOn(process, "uptime").mockReturnValue(3 * 3600 + 12 * 60);
+
+    try {
+      const result = await statsFeature.onText?.(
+        makeContext({
+          messageText: "/stats",
+          normalizedText: "/stats",
+          sendText,
+          getRuntimeStats: () => ({
+            date: "2026-03-16",
+            imagesGeneratedToday: 0,
+            activeUsersToday: 0,
+            stylesUsedToday: 0,
+            errorCountToday: 0,
+            averageGenerationLatencyMs: null,
+          }),
+        }),
+      );
+
+      expect(result).toEqual({ handled: true });
+      expect(sendText).toHaveBeenCalledWith(
+        [
+          "Leaderbot Stats",
+          "",
+          "Images generated: 0",
+          "Users: 0",
+          "Styles used: 0",
+          "Errors: 0",
+          "Avg latency: 0ms",
+          "",
+          "Bot uptime: 3h 12m",
+          "",
+          "Node-local stats for 2026-03-16",
+        ].join("\n"),
+      );
+    } finally {
+      uptimeSpy.mockRestore();
+      delete process.env.MESSENGER_ADMIN_IDS;
+    }
+  });
+
+  it("falls through for non-admin users", async () => {
+    process.env.MESSENGER_ADMIN_IDS = "someone-else";
+    const sendText = vi.fn(async () => undefined);
+
+    try {
+      const result = await statsFeature.onText?.(
+        makeContext({
+          messageText: "/stats",
+          normalizedText: "/stats",
+          sendText,
+        }),
+      );
+
+      expect(result).toEqual({ handled: false });
+      expect(sendText).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.MESSENGER_ADMIN_IDS;
+    }
   });
 });

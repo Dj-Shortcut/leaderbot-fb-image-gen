@@ -1,7 +1,10 @@
+import type { Style } from "./messengerStyles";
+
 export type GenerationStatsSnapshot = {
   date: string;
   imagesGeneratedToday: number;
   activeUsersToday: number;
+  stylesUsedToday: number;
   errorCountToday: number;
   averageGenerationLatencyMs: number | null;
 };
@@ -12,6 +15,7 @@ type DayStats = {
   latencyTotalMs: number;
   latencyCount: number;
   activeUsers: Set<string>;
+  stylesUsed: Set<Style>;
 };
 
 const statsByDay = new Map<string, DayStats>();
@@ -33,6 +37,7 @@ function getDayStats(now = Date.now()): DayStats {
     latencyTotalMs: 0,
     latencyCount: 0,
     activeUsers: new Set<string>(),
+    stylesUsed: new Set<Style>(),
   };
   statsByDay.set(day, created);
   return created;
@@ -42,9 +47,10 @@ export function recordActiveUserToday(userId: string, now = Date.now()): void {
   getDayStats(now).activeUsers.add(userId);
 }
 
-export function recordGenerationSuccess(latencyMs: number, now = Date.now()): void {
+export function recordGenerationSuccess(style: Style, latencyMs: number, now = Date.now()): void {
   const stats = getDayStats(now);
   stats.imagesGenerated += 1;
+  stats.stylesUsed.add(style);
 
   if (Number.isFinite(latencyMs) && latencyMs >= 0) {
     stats.latencyTotalMs += latencyMs;
@@ -64,6 +70,7 @@ export function getTodayRuntimeStats(now = Date.now()): GenerationStatsSnapshot 
     date: day,
     imagesGeneratedToday: stats.imagesGenerated,
     activeUsersToday: stats.activeUsers.size,
+    stylesUsedToday: stats.stylesUsed.size,
     errorCountToday: stats.errors,
     averageGenerationLatencyMs:
       stats.latencyCount > 0 ? Math.round(stats.latencyTotalMs / stats.latencyCount) : null,

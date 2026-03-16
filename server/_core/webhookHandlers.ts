@@ -450,7 +450,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         await increment(psid);
         await setLastGenerated(psid, imageUrl);
         await setLastGenerationContext(psid, { style, prompt: promptHint });
-        recordGenerationSuccess(metrics.totalMs);
+        recordGenerationSuccess(style, metrics.totalMs);
         await sendStateQuickReplies(psid, "RESULT_READY", t(lang, "success"), reqId);
         await setFlowState(psid, "IDLE");
       } catch (error) {
