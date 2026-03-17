@@ -17,10 +17,10 @@ importers:
     dependencies:
       '@ai-sdk/openai':
         specifier: ^3.0.41
-        version: 3.0.41(zod@4.3.5)
+        version: 3.0.41(zod@4.3.6)
       '@ai-sdk/react':
         specifier: ^3.0.118
-        version: 3.0.118(react@19.2.4)(zod@4.3.5)
+        version: 3.0.118(react@19.2.4)(zod@4.3.6)
       '@aws-sdk/client-s3':
         specifier: ^3.1005.0
         version: 3.1005.0
@@ -128,7 +128,7 @@ importers:
         version: 11.12.0(typescript@5.9.3)
       ai:
         specifier: ^6.0.38
-        version: 6.0.38(zod@4.3.5)
+        version: 6.0.38(zod@4.3.6)
       axios:
         specifier: ^1.13.5
         version: 1.13.6
@@ -226,8 +226,8 @@ importers:
         specifier: 3.7.1
         version: 3.7.1(react@19.2.4)
       zod:
-        specifier: ^4.1.12
-        version: 4.3.5
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@builder.io/vite-plugin-jsx-loc':
         specifier: ^0.1.1
@@ -5283,47 +5283,47 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
-  zod@4.3.5:
-    resolution: {integrity: sha512-k7Nwx6vuWx1IJ9Bjuf4Zt1PEllcwe7cls3VNzm4CQ1/hgtFUK2bRNG3rvnpPUhFjmqJKAKtjV576KnUkHocg/g==}
+  zod@4.3.6:
+    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
 
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
 snapshots:
 
-  '@ai-sdk/gateway@3.0.16(zod@4.3.5)':
+  '@ai-sdk/gateway@3.0.16(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.4
-      '@ai-sdk/provider-utils': 4.0.8(zod@4.3.5)
+      '@ai-sdk/provider-utils': 4.0.8(zod@4.3.6)
       '@vercel/oidc': 3.1.0
-      zod: 4.3.5
+      zod: 4.3.6
 
-  '@ai-sdk/gateway@3.0.66(zod@4.3.5)':
+  '@ai-sdk/gateway@3.0.66(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.19(zod@4.3.5)
+      '@ai-sdk/provider-utils': 4.0.19(zod@4.3.6)
       '@vercel/oidc': 3.1.0
-      zod: 4.3.5
+      zod: 4.3.6
 
-  '@ai-sdk/openai@3.0.41(zod@4.3.5)':
+  '@ai-sdk/openai@3.0.41(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.19(zod@4.3.5)
-      zod: 4.3.5
+      '@ai-sdk/provider-utils': 4.0.19(zod@4.3.6)
+      zod: 4.3.6
 
-  '@ai-sdk/provider-utils@4.0.19(zod@4.3.5)':
+  '@ai-sdk/provider-utils@4.0.19(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.0.6
-      zod: 4.3.5
+      zod: 4.3.6
 
-  '@ai-sdk/provider-utils@4.0.8(zod@4.3.5)':
+  '@ai-sdk/provider-utils@4.0.8(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.4
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.0.6
-      zod: 4.3.5
+      zod: 4.3.6
 
   '@ai-sdk/provider@3.0.4':
     dependencies:
@@ -5333,10 +5333,10 @@ snapshots:
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/react@3.0.118(react@19.2.4)(zod@4.3.5)':
+  '@ai-sdk/react@3.0.118(react@19.2.4)(zod@4.3.6)':
     dependencies:
-      '@ai-sdk/provider-utils': 4.0.19(zod@4.3.5)
-      ai: 6.0.116(zod@4.3.5)
+      '@ai-sdk/provider-utils': 4.0.19(zod@4.3.6)
+      ai: 6.0.116(zod@4.3.6)
       react: 19.2.4
       swr: 2.4.1(react@19.2.4)
       throttleit: 2.1.0
@@ -7962,21 +7962,21 @@ snapshots:
 
   add@2.0.6: {}
 
-  ai@6.0.116(zod@4.3.5):
+  ai@6.0.116(zod@4.3.6):
     dependencies:
-      '@ai-sdk/gateway': 3.0.66(zod@4.3.5)
+      '@ai-sdk/gateway': 3.0.66(zod@4.3.6)
       '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.19(zod@4.3.5)
+      '@ai-sdk/provider-utils': 4.0.19(zod@4.3.6)
       '@opentelemetry/api': 1.9.0
-      zod: 4.3.5
+      zod: 4.3.6
 
-  ai@6.0.38(zod@4.3.5):
+  ai@6.0.38(zod@4.3.6):
     dependencies:
-      '@ai-sdk/gateway': 3.0.16(zod@4.3.5)
+      '@ai-sdk/gateway': 3.0.16(zod@4.3.6)
       '@ai-sdk/provider': 3.0.4
-      '@ai-sdk/provider-utils': 4.0.8(zod@4.3.5)
+      '@ai-sdk/provider-utils': 4.0.8(zod@4.3.6)
       '@opentelemetry/api': 1.9.0
-      zod: 4.3.5
+      zod: 4.3.6
 
   ajv@6.14.0:
     dependencies:
@@ -11134,6 +11134,6 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod@4.3.5: {}
+  zod@4.3.6: {}
 
   zwitch@2.0.4: {}
