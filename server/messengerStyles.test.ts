@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { STYLE_CONFIGS, getStyleById, isStylePayload } from "./_core/messengerStyles";
+import {
+  STYLE_CONFIGS,
+  getStyleById,
+  isStylePayload,
+} from "./_core/messengerStyles";
 
 describe("messengerStyles", () => {
   it("exposes canonical style configs", () => {
@@ -10,6 +14,7 @@ describe("messengerStyles", () => {
       "cinematic",
       "oil-paint",
       "cyberpunk",
+      "norman-blackwell",
       "disco",
       "clouds",
     ]);
@@ -19,9 +24,13 @@ describe("messengerStyles", () => {
     expect(isStylePayload("STYLE_CINEMATIC")).toBe(true);
     expect(isStylePayload("STYLE_OIL_PAINT")).toBe(true);
     expect(isStylePayload("STYLE_CYBERPUNK")).toBe(true);
+    expect(isStylePayload("STYLE_NORMAN_BLACKWELL")).toBe(true);
     expect(isStylePayload("UNKNOWN_STYLE")).toBe(false);
     expect(getStyleById("STYLE_OIL_PAINT").label).toContain("Oil Paint");
     expect(getStyleById("STYLE_CYBERPUNK").label).toContain("Cyberpunk");
+    expect(getStyleById("STYLE_NORMAN_BLACKWELL").label).toContain(
+      "Norman Blackwell"
+    );
     expect(getStyleById("STYLE_DISCO").label).toContain("Disco");
   });
 });
