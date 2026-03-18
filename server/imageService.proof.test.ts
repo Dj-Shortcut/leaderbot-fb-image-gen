@@ -271,13 +271,15 @@ describe("OpenAi image-to-image proof", () => {
       const formData = init?.body as FormData;
       const prompt = String(formData.get("prompt"));
       expect(prompt).toContain(
-        "Reimagine this photo as a nostalgic mid-century editorial illustration"
+        "Reimagine this photo as a nostalgic mid-century American editorial illustration"
       );
       expect(prompt).toContain("warm storybook lighting");
       expect(prompt).toContain(
-        "Americana palette of cream, brick red, muted teal, and honey gold"
+        "all-American palette of cream, brick red, muted teal, and honey gold"
       );
-      expect(prompt).toContain("polished finish of a vintage magazine cover");
+      expect(prompt).toContain(
+        "polished finish of a vintage family magazine cover from the 1940s or 1950s"
+      );
 
       return {
         ok: true,

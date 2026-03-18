@@ -144,7 +144,7 @@ const STYLE_PROMPTS = {
   "oil-paint":
     "Render this portrait as a classical oil painting with visible brush strokes, textured canvas grain, sculpted painterly lighting, a rich museum-grade palette of umber, ochre, crimson, and deep blue, dignified fine-art mood, and layered artisanal detail throughout the composition.",
   "norman-blackwell":
-    "Reimagine this photo as a nostalgic mid-century editorial illustration with warm storybook lighting, an Americana palette of cream, brick red, muted teal, and honey gold, heartfelt wholesome mood, painterly realism, expressive character detail, and the polished finish of a vintage magazine cover.",
+    "Reimagine this photo as a nostalgic mid-century American editorial illustration with warm storybook lighting, an all-American palette of cream, brick red, muted teal, and honey gold, heartfelt small-town mood, painterly realism, expressive character detail, and the polished finish of a vintage family magazine cover from the 1940s or 1950s.",
 } satisfies Record<Style, string>;
 
 function buildStylePrompt(style: Style, promptHint?: string): string {
@@ -672,6 +672,13 @@ export class OpenAiImageGenerator implements ImageGenerator {
       }
 
       if (!response.ok) {
+        const errorBody = await response.text();
+        console.error("OPENAI_ERROR_RESPONSE", {
+          reqId: input.reqId,
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody.slice(0, 1000),
+        });
         throw attachGenerationMetrics(
           new OpenAiGenerationError(
             `OpenAI request failed (${response.status} ${response.statusText})`
