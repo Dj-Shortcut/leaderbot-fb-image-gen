@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { normalizeLang, t, type Lang } from "./i18n";
-import { getQuickRepliesForState, type ConversationState } from "./messengerState";
+import {
+  getQuickRepliesForState,
+  type ConversationState,
+} from "./messengerState";
 import { type Style } from "./messengerStyles";
 
 export type FacebookWebhookEvent = {
@@ -49,6 +52,7 @@ export const STYLE_OPTIONS: Style[] = [
   "cinematic",
   "oil-paint",
   "cyberpunk",
+  "norman-blackwell",
   "disco",
   "clouds",
 ];
@@ -60,6 +64,7 @@ export const STYLE_LABELS: Record<Style, string> = {
   cinematic: "Cinematic",
   "oil-paint": "Oil Paint",
   cyberpunk: "Cyberpunk",
+  "norman-blackwell": "Norman Blackwell",
   disco: "Disco",
   clouds: "Clouds",
 };
@@ -68,14 +73,12 @@ const STYLE_ALIASES: Record<string, Style> = {
   "oil paint": "oil-paint",
   "oil painting": "oil-paint",
   "oil-paint": "oil-paint",
+  "norman blackwell": "norman-blackwell",
+  blackwell: "norman-blackwell",
 };
 
 function normalizeStyleToken(input: string): string {
-  return input
-    .trim()
-    .toLowerCase()
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ");
+  return input.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
 }
 
 export type AckKind = "like" | "ok" | "thanks" | "emoji";
@@ -87,7 +90,7 @@ type GreetingResponse =
 export function getEventDedupeKey(
   event: FacebookWebhookEvent,
   userKey: string,
-  entryId?: string,
+  entryId?: string
 ): string | undefined {
   const messageId = event.message?.mid?.trim();
   if (messageId) {
@@ -100,10 +103,17 @@ export function getEventDedupeKey(
       return "none";
     }
 
-    return createHash("sha256").update(normalizedValue).digest("hex").slice(0, 12);
+    return createHash("sha256")
+      .update(normalizedValue)
+      .digest("hex")
+      .slice(0, 12);
   };
 
-  const eventType = event.message ? "message" : event.postback ? "postback" : "other";
+  const eventType = event.message
+    ? "message"
+    : event.postback
+      ? "postback"
+      : "other";
   const postbackPayloadHash = hashToken(event.postback?.payload);
   const quickReplyPayloadHash = hashToken(event.message?.quick_reply?.payload);
   const hasText = event.message?.text?.trim() ? "1" : "0";
@@ -114,10 +124,12 @@ export function getEventDedupeKey(
       counts.set(type, (counts.get(type) ?? 0) + 1);
     }
 
-    return Array.from(counts.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([type, count]) => `${type}:${count}`)
-      .join(",") || "none";
+    return (
+      Array.from(counts.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([type, count]) => `${type}:${count}`)
+        .join(",") || "none"
+    );
   })();
   const fallbackEventFingerprint = [
     eventType,
@@ -141,8 +153,11 @@ export function getEventDedupeKey(
 }
 
 export function summarizeWebhook(payload: unknown): WebhookSummary {
-  const entries = Array.isArray((payload as { entry?: unknown[] } | null | undefined)?.entry)
-    ? (payload as { entry: Array<{ messaging?: FacebookWebhookEvent[] }> }).entry
+  const entries = Array.isArray(
+    (payload as { entry?: unknown[] } | null | undefined)?.entry
+  )
+    ? (payload as { entry: Array<{ messaging?: FacebookWebhookEvent[] }> })
+        .entry
     : [];
 
   const events = entries.flatMap(entry => {
@@ -153,8 +168,8 @@ export function summarizeWebhook(payload: unknown): WebhookSummary {
         new Set(
           (event.message?.attachments ?? [])
             .map(attachment => attachment.type?.trim())
-            .filter((type): type is string => Boolean(type)),
-        ),
+            .filter((type): type is string => Boolean(type))
+        )
       );
 
       let type: WebhookSummaryEvent["type"] = "unknown";
@@ -182,20 +197,28 @@ export function summarizeWebhook(payload: unknown): WebhookSummary {
 
   return {
     object:
-      typeof (payload as { object?: unknown } | null | undefined)?.object === "string"
-        ? ((payload as { object: string }).object)
+      typeof (payload as { object?: unknown } | null | undefined)?.object ===
+      "string"
+        ? (payload as { object: string }).object
         : undefined,
     entryCount: entries.length,
     events,
   };
 }
 
-export function getGreetingResponse(state: ConversationState, lang: Lang = normalizeLang(process.env.DEFAULT_MESSENGER_LANG)): GreetingResponse {
+export function getGreetingResponse(
+  state: ConversationState,
+  lang: Lang = normalizeLang(process.env.DEFAULT_MESSENGER_LANG)
+): GreetingResponse {
   switch (state) {
     case "PROCESSING":
       return { mode: "text", text: t(lang, "processingBlocked") };
     case "AWAITING_STYLE":
-      return { mode: "quick_replies", state: "AWAITING_STYLE", text: t(lang, "stylePicker") };
+      return {
+        mode: "quick_replies",
+        state: "AWAITING_STYLE",
+        text: t(lang, "stylePicker"),
+      };
     case "RESULT_READY":
       return {
         mode: "quick_replies",
@@ -212,7 +235,11 @@ export function getGreetingResponse(state: ConversationState, lang: Lang = norma
       return { mode: "text", text: t(lang, "textWithoutPhoto") };
     case "IDLE":
     default:
-      return { mode: "quick_replies", state: "IDLE", text: t(lang, "flowExplanation") };
+      return {
+        mode: "quick_replies",
+        state: "IDLE",
+        text: t(lang, "flowExplanation"),
+      };
   }
 }
 
@@ -236,7 +263,10 @@ export function stylePayloadToStyle(payload: string): Style | undefined {
     return undefined;
   }
 
-  const styleKey = payload.slice("STYLE_".length).toLowerCase().replace(/_/g, "-");
+  const styleKey = payload
+    .slice("STYLE_".length)
+    .toLowerCase()
+    .replace(/_/g, "-");
   return normalizeStyle(styleKey);
 }
 
@@ -276,7 +306,10 @@ export function detectAck(raw: string | undefined | null): AckKind | null {
     return "thanks";
   }
 
-  if (text.length > 0 && Array.from(text).every(char => /[\p{Extended_Pictographic}\s]/u.test(char))) {
+  if (
+    text.length > 0 &&
+    Array.from(text).every(char => /[\p{Extended_Pictographic}\s]/u.test(char))
+  ) {
     return "emoji";
   }
 

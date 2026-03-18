@@ -28,6 +28,7 @@ describe("conversational edit interpreter", () => {
   it("detects likely edit requests before calling the model", () => {
     expect(looksLikePossibleEditRequest("make it darker")).toBe(true);
     expect(looksLikePossibleEditRequest("meer cinematic")).toBe(true);
+    expect(looksLikePossibleEditRequest("make it norman blackwell")).toBe(true);
     expect(looksLikePossibleEditRequest("what can you do?")).toBe(false);
   });
 

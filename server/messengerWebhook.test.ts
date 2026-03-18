@@ -1,6 +1,21 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
-const { sendImageMock, sendQuickRepliesMock, sendTextMock, safeLogMock, generateMessengerReplyMock } = vi.hoisted(() => ({
+const {
+  sendImageMock,
+  sendQuickRepliesMock,
+  sendTextMock,
+  safeLogMock,
+  generateMessengerReplyMock,
+} = vi.hoisted(() => ({
   sendImageMock: vi.fn(async () => undefined),
   sendQuickRepliesMock: vi.fn(async () => undefined),
   sendTextMock: vi.fn(async () => undefined),
@@ -29,7 +44,12 @@ import {
   summarizeWebhook,
 } from "./_core/messengerWebhook";
 import { STYLE_CONFIGS } from "./_core/messengerStyles";
-import { anonymizePsid, getState, resetStateStore, setFlowState } from "./_core/messengerState";
+import {
+  anonymizePsid,
+  getState,
+  resetStateStore,
+  setFlowState,
+} from "./_core/messengerState";
 import { getEventDedupeKey } from "./_core/webhookHelpers";
 import { getBotFeatures } from "./_core/bot/features";
 
@@ -106,7 +126,11 @@ describe("webhook summary logging", () => {
               message: {
                 text: "super secret text",
                 is_echo: true,
-                attachments: [{ type: "image" }, { type: "audio" }, { payload: { url: "https://a" } }],
+                attachments: [
+                  { type: "image" },
+                  { type: "audio" },
+                  { payload: { url: "https://a" } },
+                ],
               },
             },
             {
@@ -188,8 +212,12 @@ describe("messenger webhook dedupe", () => {
   });
 
   it("registers built-in bot features", () => {
-    expect(getBotFeatures().map(feature => feature.name)).toContain("rateLimit");
-    expect(getBotFeatures().map(feature => feature.name)).toContain("styleCommands");
+    expect(getBotFeatures().map(feature => feature.name)).toContain(
+      "rateLimit"
+    );
+    expect(getBotFeatures().map(feature => feature.name)).toContain(
+      "styleCommands"
+    );
   });
 
   it("processes a message.mid only once", async () => {
@@ -201,7 +229,12 @@ describe("messenger webhook dedupe", () => {
               sender: { id: "psid-123" },
               message: {
                 mid: "m_abc123",
-                attachments: [{ type: "image", payload: { url: "https://img.example/a.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/a.jpg" },
+                  },
+                ],
               },
             },
           ],
@@ -226,7 +259,12 @@ describe("messenger webhook dedupe", () => {
               message: {
                 mid: "mid-shared",
                 is_echo: true,
-                attachments: [{ type: "image", payload: { url: "https://img.example/echo.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/echo.jpg" },
+                  },
+                ],
               },
             },
           ],
@@ -242,7 +280,12 @@ describe("messenger webhook dedupe", () => {
               sender: { id: "echo-user" },
               message: {
                 mid: "mid-shared",
-                attachments: [{ type: "image", payload: { url: "https://img.example/real.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/real.jpg" },
+                  },
+                ],
               },
             },
           ],
@@ -263,7 +306,12 @@ describe("messenger webhook dedupe", () => {
               sender: { id: "psid-456" },
               timestamp: 1730000000000,
               message: {
-                attachments: [{ type: "image", payload: { url: "https://img.example/b.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/b.jpg" },
+                  },
+                ],
               },
             },
           ],
@@ -285,10 +333,12 @@ describe("messenger webhook dedupe", () => {
         sender: { id: "psid-same-ts" },
         timestamp,
         message: {
-          attachments: [{ type: "image", payload: { url: "https://img.example/a.jpg" } }],
+          attachments: [
+            { type: "image", payload: { url: "https://img.example/a.jpg" } },
+          ],
         },
       },
-      "psid-same-ts",
+      "psid-same-ts"
     );
 
     const textEventKey = getEventDedupeKey(
@@ -299,7 +349,7 @@ describe("messenger webhook dedupe", () => {
           text: "hello",
         },
       },
-      "psid-same-ts",
+      "psid-same-ts"
     );
 
     expect(imageEventKey).toBeDefined();
@@ -315,7 +365,11 @@ describe("messenger webhook dedupe", () => {
     };
 
     const first = getEventDedupeKey(duplicateEvent, "psid-dup-ts", "entry-dup");
-    const second = getEventDedupeKey(duplicateEvent, "psid-dup-ts", "entry-dup");
+    const second = getEventDedupeKey(
+      duplicateEvent,
+      "psid-dup-ts",
+      "entry-dup"
+    );
 
     expect(first).toBe(second);
     expect(first).toContain("entry:entry-dup");
@@ -333,7 +387,7 @@ describe("messenger webhook dedupe", () => {
         },
       },
       "anonymized-user-key",
-      "entry-sensitive",
+      "entry-sensitive"
     );
 
     expect(key).toBeDefined();
@@ -355,7 +409,12 @@ describe("messenger webhook dedupe", () => {
               sender: { id: "psid-replay" },
               timestamp: 1730000000004,
               message: {
-                attachments: [{ type: "image", payload: { url: "https://img.example/replay.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/replay.jpg" },
+                  },
+                ],
               },
             },
           ],
@@ -379,7 +438,12 @@ describe("messenger webhook dedupe", () => {
               sender: { id: "psid-entry-fallback" },
               timestamp: 1730000000001,
               message: {
-                attachments: [{ type: "image", payload: { url: "https://img.example/c.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/c.jpg" },
+                  },
+                ],
               },
             },
           ],
@@ -398,7 +462,9 @@ describe("messenger webhook dedupe", () => {
   });
 
   it("does not emit photo debug logs when debug logging is disabled", async () => {
-    const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const consoleLogSpy = vi
+      .spyOn(console, "log")
+      .mockImplementation(() => undefined);
 
     try {
       const expectedPsidHash = anonymizePsid("psid-host-log").slice(0, 12);
@@ -429,7 +495,7 @@ describe("messenger webhook dedupe", () => {
         .find(
           value =>
             typeof value === "string" &&
-            value.includes("\"msg\":\"photo_received\"")
+            value.includes('"msg":"photo_received"')
         );
 
       expect(photoReceivedCall).toBeUndefined();
@@ -497,8 +563,6 @@ describe("messenger webhook dedupe", () => {
     expect(getState(userId)?.lastUserMessageAt).toBe(1730000000123);
   });
 
-
-
   it("returns generated images for all canonical styles through the OpenAI path", async () => {
     const styles = STYLE_CONFIGS.map(style => style.style);
 
@@ -518,12 +582,20 @@ describe("messenger webhook dedupe", () => {
                 sender: { id: `style-user-${style}` },
                 message: {
                   mid: `mid-photo-${style}`,
-                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                  attachments: [
+                    {
+                      type: "image",
+                      payload: { url: "https://img.example/source.jpg" },
+                    },
+                  ],
                 },
               },
               {
                 sender: { id: `style-user-${style}` },
-                message: { mid: `mid-style-${style}`, quick_reply: { payload: style } },
+                message: {
+                  mid: `mid-style-${style}`,
+                  quick_reply: { payload: style },
+                },
               },
             ],
           },
@@ -533,11 +605,12 @@ describe("messenger webhook dedupe", () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(sendImageMock).toHaveBeenCalledWith(
         `style-user-${style}`,
-        expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/),
+        expect.stringMatching(
+          /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+        )
       );
     }
   });
-
 
   it("uses canonical quick-reply payload and APP_BASE_URL for image attachments", async () => {
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
@@ -551,7 +624,12 @@ describe("messenger webhook dedupe", () => {
               sender: { id: "canonical-payload-user" },
               message: {
                 mid: "mid-photo-canonical",
-                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/source.jpg" },
+                  },
+                ],
               },
             },
             {
@@ -568,7 +646,75 @@ describe("messenger webhook dedupe", () => {
 
     expect(sendImageMock).toHaveBeenCalledWith(
       "canonical-payload-user",
-      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/),
+      expect.stringMatching(
+        /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+      )
+    );
+  });
+
+  it("routes STYLE_NORMAN_BLACKWELL quick replies through the same payload flow", async () => {
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+
+    const sourceImage = Buffer.alloc(6000, 7);
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      if (toUrlString(url).startsWith("https://img.example/")) {
+        return {
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => sourceImage,
+        } as Response;
+      }
+
+      const formData = init?.body as FormData;
+      expect(String(formData.get("prompt"))).toContain(
+        "Norman Blackwell portrait style"
+      );
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "norman-payload-user" },
+              message: {
+                mid: "mid-photo-norman-payload",
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/source.jpg" },
+                  },
+                ],
+              },
+            },
+            {
+              sender: { id: "norman-payload-user" },
+              message: {
+                mid: "mid-style-norman-payload",
+                quick_reply: { payload: "STYLE_NORMAN_BLACKWELL" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sendImageMock).toHaveBeenCalledWith(
+      "norman-payload-user",
+      expect.stringMatching(
+        /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+      )
+    );
+    expect(getState(anonymizePsid("norman-payload-user"))?.selectedStyle).toBe(
+      "norman-blackwell"
     );
   });
 
@@ -583,12 +729,20 @@ describe("messenger webhook dedupe", () => {
               sender: { id: "mock-image-user" },
               message: {
                 mid: "mid-photo-1",
-                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/source.jpg" },
+                  },
+                ],
               },
             },
             {
               sender: { id: "mock-image-user" },
-              message: { mid: "mid-style-1", quick_reply: { payload: "disco" } },
+              message: {
+                mid: "mid-style-1",
+                quick_reply: { payload: "disco" },
+              },
             },
           ],
         },
@@ -597,15 +751,21 @@ describe("messenger webhook dedupe", () => {
 
     expect(sendImageMock).toHaveBeenCalledWith(
       "mock-image-user",
-      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/),
+      expect.stringMatching(
+        /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+      )
     );
     expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
       "mock-image-user",
       "Klaar ✅",
       [
-        { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
+        {
+          content_type: "text",
+          title: "Nieuwe stijl",
+          payload: "CHOOSE_STYLE",
+        },
         { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
-      ],
+      ]
     );
   });
 
@@ -620,26 +780,50 @@ describe("messenger webhook dedupe", () => {
               sender: { id: "openai-missing-key-user" },
               message: {
                 mid: "mid-photo-openai-missing",
-                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/source.jpg" },
+                  },
+                ],
               },
             },
             {
               sender: { id: "openai-missing-key-user" },
-              message: { mid: "mid-style-openai-missing", quick_reply: { payload: "disco" } },
+              message: {
+                mid: "mid-style-openai-missing",
+                quick_reply: { payload: "disco" },
+              },
             },
           ],
         },
       ],
     });
 
-    expect(sendQuickRepliesMock).toHaveBeenLastCalledWith("openai-missing-key-user", "AI generation isn’t enabled yet.", [
-      { content_type: "text", title: "Opnieuw", payload: "RETRY_STYLE_disco" },
-      { content_type: "text", title: "Andere", payload: "CHOOSE_STYLE" },
-    ]);
+    expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
+      "openai-missing-key-user",
+      "AI generation isn’t enabled yet.",
+      [
+        {
+          content_type: "text",
+          title: "Opnieuw",
+          payload: "RETRY_STYLE_disco",
+        },
+        { content_type: "text", title: "Andere", payload: "CHOOSE_STYLE" },
+      ]
+    );
     expect(sendImageMock).not.toHaveBeenCalled();
     expect(sendTextMock).toHaveBeenCalledTimes(2);
-    expect(sendTextMock).toHaveBeenNthCalledWith(1, "openai-missing-key-user", "Ik maak nu je Disco-stijl.");
-    expect(sendTextMock).toHaveBeenNthCalledWith(2, "openai-missing-key-user", "Oeps. Probeer nog een stijl.");
+    expect(sendTextMock).toHaveBeenNthCalledWith(
+      1,
+      "openai-missing-key-user",
+      "Ik maak nu je Disco-stijl."
+    );
+    expect(sendTextMock).toHaveBeenNthCalledWith(
+      2,
+      "openai-missing-key-user",
+      "Oeps. Probeer nog een stijl."
+    );
   });
 
   it("reaches OpenAI generator path with API key", async () => {
@@ -674,12 +858,20 @@ describe("messenger webhook dedupe", () => {
                 sender: { id: "openai-success-user" },
                 message: {
                   mid: "mid-photo-openai-success",
-                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                  attachments: [
+                    {
+                      type: "image",
+                      payload: { url: "https://img.example/source.jpg" },
+                    },
+                  ],
                 },
               },
               {
                 sender: { id: "openai-success-user" },
-                message: { mid: "mid-style-openai-success", quick_reply: { payload: "gold" } },
+                message: {
+                  mid: "mid-style-openai-success",
+                  quick_reply: { payload: "gold" },
+                },
               },
             ],
           },
@@ -692,12 +884,11 @@ describe("messenger webhook dedupe", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(sendImageMock).toHaveBeenCalledWith(
       "openai-success-user",
-      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/),
+      expect.stringMatching(
+        /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+      )
     );
   });
-
-
-
 
   it("keeps failure context and retries selected style with prior photo", async () => {
     delete process.env.OPENAI_API_KEY;
@@ -713,12 +904,20 @@ describe("messenger webhook dedupe", () => {
               sender: { id: psid },
               message: {
                 mid: "mid-photo-retry-failure",
-                attachments: [{ type: "image", payload: { url: "https://img.example/retry.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/retry.jpg" },
+                  },
+                ],
               },
             },
             {
               sender: { id: psid },
-              message: { mid: "mid-style-retry-failure", quick_reply: { payload: "gold" } },
+              message: {
+                mid: "mid-style-retry-failure",
+                quick_reply: { payload: "gold" },
+              },
             },
           ],
         },
@@ -753,12 +952,12 @@ describe("messenger webhook dedupe", () => {
     expect(sendQuickRepliesMock).not.toHaveBeenCalledWith(
       psid,
       "What style should I use?",
-      expect.anything(),
+      expect.anything()
     );
     expect(sendQuickRepliesMock).not.toHaveBeenCalledWith(
       psid,
       "Pick a style using the buttons below 🙂",
-      expect.anything(),
+      expect.anything()
     );
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
@@ -766,7 +965,7 @@ describe("messenger webhook dedupe", () => {
       [
         { content_type: "text", title: "Opnieuw", payload: "RETRY_STYLE_gold" },
         { content_type: "text", title: "Andere", payload: "CHOOSE_STYLE" },
-      ],
+      ]
     );
   });
   it("shows timeout message when OpenAI generation exceeds timeout", async () => {
@@ -799,12 +998,20 @@ describe("messenger webhook dedupe", () => {
                 sender: { id: "openai-timeout-user" },
                 message: {
                   mid: "mid-photo-openai-timeout",
-                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                  attachments: [
+                    {
+                      type: "image",
+                      payload: { url: "https://img.example/source.jpg" },
+                    },
+                  ],
                 },
               },
               {
                 sender: { id: "openai-timeout-user" },
-                message: { mid: "mid-style-openai-timeout", quick_reply: { payload: "clouds" } },
+                message: {
+                  mid: "mid-style-openai-timeout",
+                  quick_reply: { payload: "clouds" },
+                },
               },
             ],
           },
@@ -814,17 +1021,30 @@ describe("messenger webhook dedupe", () => {
       vi.unstubAllGlobals();
     }
 
-    expect(sendQuickRepliesMock).toHaveBeenLastCalledWith("openai-timeout-user", "This took too long.", [
-      { content_type: "text", title: "Opnieuw", payload: "RETRY_STYLE_clouds" },
-      { content_type: "text", title: "Andere", payload: "CHOOSE_STYLE" },
-    ]);
+    expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
+      "openai-timeout-user",
+      "This took too long.",
+      [
+        {
+          content_type: "text",
+          title: "Opnieuw",
+          payload: "RETRY_STYLE_clouds",
+        },
+        { content_type: "text", title: "Andere", payload: "CHOOSE_STYLE" },
+      ]
+    );
   });
 
   it("style click during generation does not start a second run", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
 
-    let resolveFetch: ((value: { ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }) => void) | undefined;
+    let resolveFetch:
+      | ((value: {
+          ok: boolean;
+          json: () => Promise<{ data: Array<{ b64_json: string }> }>;
+        }) => void)
+      | undefined;
     const sourceImage = Buffer.alloc(6000, 7);
     const fetchMock = vi.fn((url: string | URL) => {
       if (toUrlString(url) === "https://img.example/source.jpg") {
@@ -835,7 +1055,10 @@ describe("messenger webhook dedupe", () => {
         } as Response);
       }
 
-      return new Promise<{ ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }>(resolve => {
+      return new Promise<{
+        ok: boolean;
+        json: () => Promise<{ data: Array<{ b64_json: string }> }>;
+      }>(resolve => {
         resolveFetch = resolve;
       });
     });
@@ -850,7 +1073,12 @@ describe("messenger webhook dedupe", () => {
                 sender: { id: "busy-user" },
                 message: {
                   mid: "mid-photo-busy",
-                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                  attachments: [
+                    {
+                      type: "image",
+                      payload: { url: "https://img.example/source.jpg" },
+                    },
+                  ],
                 },
               },
             ],
@@ -864,7 +1092,10 @@ describe("messenger webhook dedupe", () => {
             messaging: [
               {
                 sender: { id: "busy-user" },
-                message: { mid: "mid-style-busy-1", quick_reply: { payload: "disco" } },
+                message: {
+                  mid: "mid-style-busy-1",
+                  quick_reply: { payload: "disco" },
+                },
               },
             ],
           },
@@ -887,7 +1118,10 @@ describe("messenger webhook dedupe", () => {
             messaging: [
               {
                 sender: { id: "busy-user" },
-                message: { mid: "mid-style-busy-2", quick_reply: { payload: "gold" } },
+                message: {
+                  mid: "mid-style-busy-2",
+                  quick_reply: { payload: "gold" },
+                },
               },
             ],
           },
@@ -895,7 +1129,10 @@ describe("messenger webhook dedupe", () => {
       });
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect(sendTextMock).toHaveBeenCalledWith("busy-user", "⏳ even geduld, ik ben nog bezig met jouw restyle");
+      expect(sendTextMock).toHaveBeenCalledWith(
+        "busy-user",
+        "⏳ even geduld, ik ben nog bezig met jouw restyle"
+      );
 
       const generatedImageBytes = Buffer.from("fake-png").toString("base64");
       resolveFetch?.({
@@ -912,7 +1149,12 @@ describe("messenger webhook dedupe", () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
 
-    let resolveFetch: ((value: { ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }) => void) | undefined;
+    let resolveFetch:
+      | ((value: {
+          ok: boolean;
+          json: () => Promise<{ data: Array<{ b64_json: string }> }>;
+        }) => void)
+      | undefined;
     const sourceImage = Buffer.alloc(6000, 7);
     const fetchMock = vi.fn((url: string | URL) => {
       if (toUrlString(url) === "https://img.example/source.jpg") {
@@ -923,7 +1165,10 @@ describe("messenger webhook dedupe", () => {
         } as Response);
       }
 
-      return new Promise<{ ok: boolean; json: () => Promise<{ data: Array<{ b64_json: string }> }> }>(resolve => {
+      return new Promise<{
+        ok: boolean;
+        json: () => Promise<{ data: Array<{ b64_json: string }> }>;
+      }>(resolve => {
         resolveFetch = resolve;
       });
     });
@@ -938,7 +1183,12 @@ describe("messenger webhook dedupe", () => {
                 sender: { id: "busy-user-text" },
                 message: {
                   mid: "mid-photo-busy-text",
-                  attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                  attachments: [
+                    {
+                      type: "image",
+                      payload: { url: "https://img.example/source.jpg" },
+                    },
+                  ],
                 },
               },
             ],
@@ -952,7 +1202,10 @@ describe("messenger webhook dedupe", () => {
             messaging: [
               {
                 sender: { id: "busy-user-text" },
-                message: { mid: "mid-style-busy-text-1", quick_reply: { payload: "disco" } },
+                message: {
+                  mid: "mid-style-busy-text-1",
+                  quick_reply: { payload: "disco" },
+                },
               },
             ],
           },
@@ -974,7 +1227,10 @@ describe("messenger webhook dedupe", () => {
             messaging: [
               {
                 sender: { id: "busy-user-text" },
-                message: { mid: "mid-style-busy-text-2", quick_reply: { payload: "gold" } },
+                message: {
+                  mid: "mid-style-busy-text-2",
+                  quick_reply: { payload: "gold" },
+                },
               },
             ],
           },
@@ -997,7 +1253,6 @@ describe("messenger webhook dedupe", () => {
       vi.unstubAllGlobals();
     }
   });
-
 });
 
 describe("messenger text brain rollout", () => {
@@ -1026,7 +1281,12 @@ describe("messenger text brain rollout", () => {
               sender: { id: "legacy-user" },
               message: {
                 mid: "mid-legacy-photo",
-                attachments: [{ type: "image", payload: { url: "https://img.example/legacy.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/legacy.jpg" },
+                  },
+                ],
               },
             },
             {
@@ -1041,7 +1301,7 @@ describe("messenger text brain rollout", () => {
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
     expect(sendTextMock).toHaveBeenLastCalledWith(
       "legacy-user",
-      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis.",
+      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis."
     );
   });
 
@@ -1061,12 +1321,20 @@ describe("messenger text brain rollout", () => {
               sender: { id: "responses-user" },
               message: {
                 mid: "mid-responses-photo",
-                attachments: [{ type: "image", payload: { url: "https://img.example/responses.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/responses.jpg" },
+                  },
+                ],
               },
             },
             {
               sender: { id: "responses-user" },
-              message: { mid: "mid-responses-text", text: "Wat kan ik nu doen?" },
+              message: {
+                mid: "mid-responses-text",
+                text: "Wat kan ik nu doen?",
+              },
             },
           ],
         },
@@ -1081,12 +1349,14 @@ describe("messenger text brain rollout", () => {
         hasPhoto: true,
         stage: "AWAITING_STYLE",
         text: "Wat kan ik nu doen?",
-      }),
+      })
     );
-    expect(generateMessengerReplyMock.mock.calls[0]?.[0]?.userKey).not.toBe("responses-user");
+    expect(generateMessengerReplyMock.mock.calls[0]?.[0]?.userKey).not.toBe(
+      "responses-user"
+    );
     expect(sendTextMock).toHaveBeenLastCalledWith(
       "responses-user",
-      "Kies een stijl via de knoppen hieronder.",
+      "Kies een stijl via de knoppen hieronder."
     );
   });
 
@@ -1102,7 +1372,12 @@ describe("messenger text brain rollout", () => {
               sender: { id: "canary-miss-user" },
               message: {
                 mid: "mid-canary-photo",
-                attachments: [{ type: "image", payload: { url: "https://img.example/canary.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/canary.jpg" },
+                  },
+                ],
               },
             },
             {
@@ -1117,7 +1392,7 @@ describe("messenger text brain rollout", () => {
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
     expect(sendTextMock).toHaveBeenLastCalledWith(
       "canary-miss-user",
-      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis.",
+      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis."
     );
   });
 
@@ -1145,9 +1420,11 @@ describe("messenger text brain rollout", () => {
     expect(generateMessengerReplyMock).toHaveBeenCalledTimes(1);
     expect(sendTextMock).toHaveBeenLastCalledWith(
       "responses-fallback-user",
-      "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
+      "Stuur gerust een foto, dan kan ik een stijl voor je maken."
     );
-    expect(getState(anonymizePsid("responses-fallback-user"))?.stage).toBe("AWAITING_PHOTO");
+    expect(getState(anonymizePsid("responses-fallback-user"))?.stage).toBe(
+      "AWAITING_PHOTO"
+    );
   });
 
   it("falls back to deterministic text when responses service throws", async () => {
@@ -1170,9 +1447,11 @@ describe("messenger text brain rollout", () => {
 
     expect(sendTextMock).toHaveBeenLastCalledWith(
       "responses-error-user",
-      "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
+      "Stuur gerust een foto, dan kan ik een stijl voor je maken."
     );
-    expect(getState(anonymizePsid("responses-error-user"))?.stage).toBe("AWAITING_PHOTO");
+    expect(getState(anonymizePsid("responses-error-user"))?.stage).toBe(
+      "AWAITING_PHOTO"
+    );
   });
 
   it("does not affect attachment/style/image generation path when responses engine is enabled", async () => {
@@ -1188,12 +1467,20 @@ describe("messenger text brain rollout", () => {
               sender: { id: "responses-image-user" },
               message: {
                 mid: "mid-responses-image-photo",
-                attachments: [{ type: "image", payload: { url: "https://img.example/image-path.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/image-path.jpg" },
+                  },
+                ],
               },
             },
             {
               sender: { id: "responses-image-user" },
-              message: { mid: "mid-responses-image-style", quick_reply: { payload: "disco" } },
+              message: {
+                mid: "mid-responses-image-style",
+                quick_reply: { payload: "disco" },
+              },
             },
           ],
         },
@@ -1239,7 +1526,7 @@ describe("messenger greeting behavior", () => {
       expect.arrayContaining([
         { content_type: "text", title: "Wat doe ik?", payload: "WHAT_IS_THIS" },
         { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
-      ]),
+      ])
     );
   });
 
@@ -1252,7 +1539,12 @@ describe("messenger greeting behavior", () => {
               sender: { id: "style-user" },
               message: {
                 mid: "mid-style-1",
-                attachments: [{ type: "image", payload: { url: "https://img.example/style.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/style.jpg" },
+                  },
+                ],
               },
             },
             {
@@ -1272,7 +1564,7 @@ describe("messenger greeting behavior", () => {
         content_type: "text" as const,
         title: style.label,
         payload: style.payload,
-      })),
+      }))
     );
   });
 
@@ -1287,12 +1579,20 @@ describe("messenger greeting behavior", () => {
               sender: { id: "transition-order-user" },
               message: {
                 mid: "mid-transition-photo",
-                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/source.jpg" },
+                  },
+                ],
               },
             },
             {
               sender: { id: "transition-order-user" },
-              message: { mid: "mid-transition-style", quick_reply: { payload: "gold" } },
+              message: {
+                mid: "mid-transition-style",
+                quick_reply: { payload: "gold" },
+              },
             },
           ],
         },
@@ -1303,24 +1603,37 @@ describe("messenger greeting behavior", () => {
       1,
       "transition-order-user",
       "Kies je stijl 👇",
-      expect.any(Array),
+      expect.any(Array)
     );
     expect(sendTextMock).toHaveBeenCalledTimes(1);
-    expect(sendTextMock).toHaveBeenCalledWith("transition-order-user", "Ik maak nu je Gold-stijl.");
+    expect(sendTextMock).toHaveBeenCalledWith(
+      "transition-order-user",
+      "Ik maak nu je Gold-stijl."
+    );
     expect(sendImageMock).toHaveBeenCalledTimes(1);
     expect(sendQuickRepliesMock).toHaveBeenNthCalledWith(
       2,
       "transition-order-user",
       "Klaar ✅",
       [
-        { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
+        {
+          content_type: "text",
+          title: "Nieuwe stijl",
+          payload: "CHOOSE_STYLE",
+        },
         { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
-      ],
+      ]
     );
 
-    expect(sendQuickRepliesMock.mock.invocationCallOrder[0]).toBeLessThan(sendTextMock.mock.invocationCallOrder[0]);
-    expect(sendTextMock.mock.invocationCallOrder[0]).toBeLessThan(sendImageMock.mock.invocationCallOrder[0]);
-    expect(sendImageMock.mock.invocationCallOrder[0]).toBeLessThan(sendQuickRepliesMock.mock.invocationCallOrder[1]);
+    expect(sendQuickRepliesMock.mock.invocationCallOrder[0]).toBeLessThan(
+      sendTextMock.mock.invocationCallOrder[0]
+    );
+    expect(sendTextMock.mock.invocationCallOrder[0]).toBeLessThan(
+      sendImageMock.mock.invocationCallOrder[0]
+    );
+    expect(sendImageMock.mock.invocationCallOrder[0]).toBeLessThan(
+      sendQuickRepliesMock.mock.invocationCallOrder[1]
+    );
   });
 
   it("offers follow-up quick actions when state is RESULT_READY", async () => {
@@ -1341,14 +1654,10 @@ describe("messenger greeting behavior", () => {
       ],
     });
 
-    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
-      psid,
-      "Klaar ✅",
-      [
-        { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
-        { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
-      ],
-    );
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(psid, "Klaar ✅", [
+      { content_type: "text", title: "Nieuwe stijl", payload: "CHOOSE_STYLE" },
+      { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
+    ]);
   });
 
   it("offers retry actions when state is FAILURE", async () => {
@@ -1373,9 +1682,17 @@ describe("messenger greeting behavior", () => {
       psid,
       "Oeps. Probeer nog een stijl.",
       [
-        { content_type: "text", title: "Probeer opnieuw", payload: "RETRY_STYLE" },
-        { content_type: "text", title: "Andere stijl", payload: "CHOOSE_STYLE" },
-      ],
+        {
+          content_type: "text",
+          title: "Probeer opnieuw",
+          payload: "RETRY_STYLE",
+        },
+        {
+          content_type: "text",
+          title: "Andere stijl",
+          payload: "CHOOSE_STYLE",
+        },
+      ]
     );
   });
 });
@@ -1469,7 +1786,7 @@ describe("bot rate limit feature", () => {
 
     expect(sendTextMock).toHaveBeenLastCalledWith(
       senderId,
-      "⏳ Slow down a bit.",
+      "⏳ Slow down a bit."
     );
   });
 });
@@ -1507,7 +1824,7 @@ describe("bot conversational editing feature", () => {
             output_text:
               '{"shouldEdit":true,"style":"gold","promptHint":"make it darker with warm glow"}',
           }),
-          { status: 200 },
+          { status: 200 }
         );
       }
 
@@ -1527,12 +1844,20 @@ describe("bot conversational editing feature", () => {
               sender: { id: "edit-text-user" },
               message: {
                 mid: "mid-edit-photo",
-                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/source.jpg" },
+                  },
+                ],
               },
             },
             {
               sender: { id: "edit-text-user" },
-              message: { mid: "mid-edit-style", quick_reply: { payload: "disco" } },
+              message: {
+                mid: "mid-edit-style",
+                quick_reply: { payload: "disco" },
+              },
             },
           ],
         },
@@ -1549,7 +1874,10 @@ describe("bot conversational editing feature", () => {
           messaging: [
             {
               sender: { id: "edit-text-user" },
-              message: { mid: "mid-edit-command", text: "make it darker and more gold" },
+              message: {
+                mid: "mid-edit-command",
+                text: "make it darker and more gold",
+              },
             },
           ],
         },
@@ -1558,14 +1886,18 @@ describe("bot conversational editing feature", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(
       "edit-text-user",
-      "Ik maak nu je Gold-stijl.",
+      "Ik maak nu je Gold-stijl."
     );
     expect(sendImageMock).toHaveBeenCalledWith(
       "edit-text-user",
-      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/),
+      expect.stringMatching(
+        /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+      )
     );
     expect(
-      combinedFetch.mock.calls.some(([url]) => toUrlString(url as string | URL).includes("/v1/responses")),
+      combinedFetch.mock.calls.some(([url]) =>
+        toUrlString(url as string | URL).includes("/v1/responses")
+      )
     ).toBe(true);
   });
 
@@ -1579,7 +1911,12 @@ describe("bot conversational editing feature", () => {
               sender: { id: "style-command-user" },
               message: {
                 mid: "mid-style-command-photo",
-                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/source.jpg" },
+                  },
+                ],
               },
             },
           ],
@@ -1597,7 +1934,10 @@ describe("bot conversational editing feature", () => {
           messaging: [
             {
               sender: { id: "style-command-user" },
-              message: { mid: "mid-style-command-text", text: "/style cyberpunk" },
+              message: {
+                mid: "mid-style-command-text",
+                text: "/style cyberpunk",
+              },
             },
           ],
         },
@@ -1606,14 +1946,20 @@ describe("bot conversational editing feature", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(
       "style-command-user",
-      "Ik maak nu je Cyberpunk-stijl.",
+      "Ik maak nu je Cyberpunk-stijl."
     );
     expect(sendImageMock).toHaveBeenCalledWith(
       "style-command-user",
-      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/),
+      expect.stringMatching(
+        /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+      )
     );
-    expect(getState(anonymizePsid("style-command-user"))?.selectedStyle).toBe("cyberpunk");
-    expect(getState(anonymizePsid("style-command-user"))?.lastStyle).toBe("cyberpunk");
+    expect(getState(anonymizePsid("style-command-user"))?.selectedStyle).toBe(
+      "cyberpunk"
+    );
+    expect(getState(anonymizePsid("style-command-user"))?.lastStyle).toBe(
+      "cyberpunk"
+    );
   });
 
   it("persists /style cyberpunk for the next photo upload", async () => {
@@ -1623,7 +1969,10 @@ describe("bot conversational editing feature", () => {
           messaging: [
             {
               sender: { id: "style-preselect-user" },
-              message: { mid: "mid-style-preselect-text", text: "/style cyberpunk" },
+              message: {
+                mid: "mid-style-preselect-text",
+                text: "/style cyberpunk",
+              },
             },
           ],
         },
@@ -1632,7 +1981,7 @@ describe("bot conversational editing feature", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(
       "style-preselect-user",
-      "✅ Stijl ingesteld op cyberpunk.",
+      "✅ Stijl ingesteld op cyberpunk."
     );
     expect(sendImageMock).not.toHaveBeenCalled();
 
@@ -1649,7 +1998,12 @@ describe("bot conversational editing feature", () => {
               sender: { id: "style-preselect-user" },
               message: {
                 mid: "mid-style-preselect-photo",
-                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/source.jpg" },
+                  },
+                ],
               },
             },
           ],
@@ -1659,13 +2013,19 @@ describe("bot conversational editing feature", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(
       "style-preselect-user",
-      "Ik maak nu je Cyberpunk-stijl.",
+      "Ik maak nu je Cyberpunk-stijl."
     );
     expect(sendImageMock).toHaveBeenCalledWith(
       "style-preselect-user",
-      expect.stringMatching(/^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/),
+      expect.stringMatching(
+        /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+      )
     );
-    expect(getState(anonymizePsid("style-preselect-user"))?.preselectedStyle).toBeNull();
-    expect(getState(anonymizePsid("style-preselect-user"))?.selectedStyle).toBe("cyberpunk");
+    expect(
+      getState(anonymizePsid("style-preselect-user"))?.preselectedStyle
+    ).toBeNull();
+    expect(getState(anonymizePsid("style-preselect-user"))?.selectedStyle).toBe(
+      "cyberpunk"
+    );
   });
 });
