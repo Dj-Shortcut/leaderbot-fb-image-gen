@@ -5,7 +5,10 @@ import { type Style } from "./messengerStyles";
 import fs from "fs/promises";
 import path from "path";
 import { safeLen, sha256 } from "./imageProof";
-import { buildGeneratedImageUrl, putGeneratedImage } from "./generatedImageStore";
+import {
+  buildGeneratedImageUrl,
+  putGeneratedImage,
+} from "./generatedImageStore";
 import { storagePut } from "../storage";
 
 export type GeneratorMode = "openai";
@@ -19,7 +22,12 @@ export interface ImageGenerator {
     reqId: string;
   }): Promise<{
     imageUrl: string;
-    proof: { incomingLen: number; incomingSha256: string; openaiInputLen: number; openaiInputSha256: string };
+    proof: {
+      incomingLen: number;
+      incomingSha256: string;
+      openaiInputLen: number;
+      openaiInputSha256: string;
+    };
     metrics: GenerationMetrics;
   }>;
 }
@@ -39,7 +47,9 @@ export type GenerationMetrics = {
   totalMs: number;
 };
 
-type ErrorWithGenerationMetrics = Error & { generationMetrics?: GenerationMetrics };
+type ErrorWithGenerationMetrics = Error & {
+  generationMetrics?: GenerationMetrics;
+};
 
 const MIN_INPUT_IMAGE_BYTES = 5 * 1024;
 const FB_IMAGE_FETCH_RETRY_LIMIT = 1;
@@ -48,13 +58,17 @@ const OPENAI_RETRY_BASE_MS_DEFAULT = 500;
 const OPENAI_TIMEOUT_MS_DEFAULT = 30_000;
 
 function getConfiguredBaseUrl(): string | undefined {
-  const configuredBaseUrl = process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
+  const configuredBaseUrl =
+    process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
 
   if (!configuredBaseUrl || !/^https?:\/\//.test(configuredBaseUrl)) {
     return undefined;
   }
 
-  if (process.env.NODE_ENV === "production" && !configuredBaseUrl.startsWith("https://")) {
+  if (
+    process.env.NODE_ENV === "production" &&
+    !configuredBaseUrl.startsWith("https://")
+  ) {
     console.error("APP_BASE_URL must use https:// in production", {
       hasConfiguredBaseUrl: true,
       protocol: configuredBaseUrl.split(":")[0],
@@ -64,7 +78,6 @@ function getConfiguredBaseUrl(): string | undefined {
 
   return configuredBaseUrl.replace(/\/$/, "");
 }
-
 
 function getRequiredPublicBaseUrl(): string {
   const baseUrl = getConfiguredBaseUrl();
@@ -77,10 +90,16 @@ function getRequiredPublicBaseUrl(): string {
 }
 
 function hasObjectStorageConfig(): boolean {
-  return Boolean(process.env.BUILT_IN_FORGE_API_URL?.trim() && process.env.BUILT_IN_FORGE_API_KEY?.trim());
+  return Boolean(
+    process.env.BUILT_IN_FORGE_API_URL?.trim() &&
+    process.env.BUILT_IN_FORGE_API_KEY?.trim()
+  );
 }
 
-async function publishGeneratedImage(jpegBuffer: Buffer, style: Style): Promise<string> {
+async function publishGeneratedImage(
+  jpegBuffer: Buffer,
+  style: Style
+): Promise<string> {
   if (hasObjectStorageConfig()) {
     const key = `generated/${style}/${Date.now()}-${randomUUID()}.jpg`;
     const { url } = await storagePut(key, jpegBuffer, "image/jpeg");
@@ -95,7 +114,10 @@ function ensureJpegBuffer(buffer: Buffer): Buffer {
   return buffer;
 }
 
-export function getGeneratorStartupConfig(): { mode: GeneratorMode; resolvedBaseUrl: string | undefined } {
+export function getGeneratorStartupConfig(): {
+  mode: GeneratorMode;
+  resolvedBaseUrl: string | undefined;
+} {
   return {
     mode: "openai",
     resolvedBaseUrl: getConfiguredBaseUrl(),
@@ -108,7 +130,9 @@ function buildStylePrompt(style: Style, promptHint?: string): string {
       ? "Apply a classic oil painting portrait style to this photo, with visible brush strokes, textured canvas, painterly lighting, rich color depth, and a fine-art museum feel."
       : style === "cyberpunk"
         ? "Apply cyberpunk aesthetic, neon-lit futuristic city, glowing signs, high contrast, cinematic sci-fi atmosphere, detailed digital art to this photo."
-        : `Apply ${style} style to this photo.`;
+        : style === "norman-blackwell"
+          ? "Apply a Norman Blackwell portrait style to this photo, with nostalgic mid-century editorial illustration, warm Americana storytelling, painterly realism, expressive faces, soft brushwork, and a vintage magazine cover feel."
+          : `Apply ${style} style to this photo.`;
 
   const trimmedPromptHint = promptHint?.trim();
   if (!trimmedPromptHint) {
@@ -160,14 +184,20 @@ function wait(ms: number): Promise<void> {
   });
 }
 
-function finalizeMetrics(startedAt: number, partial: Omit<GenerationMetrics, "totalMs"> = {}): GenerationMetrics {
+function finalizeMetrics(
+  startedAt: number,
+  partial: Omit<GenerationMetrics, "totalMs"> = {}
+): GenerationMetrics {
   return {
     ...partial,
     totalMs: Date.now() - startedAt,
   };
 }
 
-function attachGenerationMetrics(error: unknown, metrics: GenerationMetrics): unknown {
+function attachGenerationMetrics(
+  error: unknown,
+  metrics: GenerationMetrics
+): unknown {
   if (error instanceof Error) {
     (error as ErrorWithGenerationMetrics).generationMetrics = metrics;
   }
@@ -175,7 +205,9 @@ function attachGenerationMetrics(error: unknown, metrics: GenerationMetrics): un
   return error;
 }
 
-export function getGenerationMetrics(error: unknown): GenerationMetrics | undefined {
+export function getGenerationMetrics(
+  error: unknown
+): GenerationMetrics | undefined {
   if (error instanceof Error) {
     return (error as ErrorWithGenerationMetrics).generationMetrics;
   }
@@ -204,7 +236,10 @@ function parseAllowedHostsFromEnv(): string[] {
 
 function isPrivateIPv4(ip: string): boolean {
   const parts = ip.split(".").map(x => Number(x));
-  if (parts.length !== 4 || parts.some(n => !Number.isInteger(n) || n < 0 || n > 255)) {
+  if (
+    parts.length !== 4 ||
+    parts.some(n => !Number.isInteger(n) || n < 0 || n > 255)
+  ) {
     return true;
   }
 
@@ -219,7 +254,10 @@ function isPrivateIPv4(ip: string): boolean {
   return false;
 }
 
-function hostnameMatchesAllowedHost(hostname: string, allowedHost: string): boolean {
+function hostnameMatchesAllowedHost(
+  hostname: string,
+  allowedHost: string
+): boolean {
   return hostname === allowedHost || hostname.endsWith(`.${allowedHost}`);
 }
 
@@ -237,14 +275,23 @@ function isBlockedHostname(hostname: string): boolean {
   if (ipType === 6) {
     if (h === "::1") return true;
     if (h.startsWith("fc") || h.startsWith("fd")) return true;
-    if (h.startsWith("fe8") || h.startsWith("fe9") || h.startsWith("fea") || h.startsWith("feb")) return true;
+    if (
+      h.startsWith("fe8") ||
+      h.startsWith("fe9") ||
+      h.startsWith("fea") ||
+      h.startsWith("feb")
+    )
+      return true;
     return true;
   }
 
   return false;
 }
 
-export function validateSourceImageUrlOrThrow(sourceImageUrl: string, reqId?: string): URL {
+export function validateSourceImageUrlOrThrow(
+  sourceImageUrl: string,
+  reqId?: string
+): URL {
   let parsedUrl: URL;
 
   try {
@@ -256,40 +303,70 @@ export function validateSourceImageUrlOrThrow(sourceImageUrl: string, reqId?: st
 
   const hostname = parsedUrl.hostname.toLowerCase();
   if (parsedUrl.protocol !== "https:") {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "non_https", protocol: parsedUrl.protocol });
+    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
+      reqId,
+      reason: "non_https",
+      protocol: parsedUrl.protocol,
+    });
     throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
   if (parsedUrl.username || parsedUrl.password) {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "credentials_in_url" });
+    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
+      reqId,
+      reason: "credentials_in_url",
+    });
     throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
   if (parsedUrl.port && parsedUrl.port !== "443") {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "non_standard_port", port: parsedUrl.port });
+    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
+      reqId,
+      reason: "non_standard_port",
+      port: parsedUrl.port,
+    });
     throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
   if (isBlockedHostname(hostname)) {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "blocked_hostname", hostname });
+    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
+      reqId,
+      reason: "blocked_hostname",
+      hostname,
+    });
     throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
   const allowedHosts = parseAllowedHostsFromEnv();
   if (allowedHosts.length === 0) {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "allowlist_not_configured" });
+    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
+      reqId,
+      reason: "allowlist_not_configured",
+    });
     throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
-  if (!allowedHosts.some(allowedHost => hostnameMatchesAllowedHost(hostname, allowedHost))) {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "host_not_allowed", hostname });
+  if (
+    !allowedHosts.some(allowedHost =>
+      hostnameMatchesAllowedHost(hostname, allowedHost)
+    )
+  ) {
+    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
+      reqId,
+      reason: "host_not_allowed",
+      hostname,
+    });
     throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
   return parsedUrl;
 }
 
-async function fetchWithTimeout(input: URL, init: RequestInit | undefined, timeoutMs: number): Promise<Response> {
+async function fetchWithTimeout(
+  input: URL,
+  init: RequestInit | undefined,
+  timeoutMs: number
+): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => {
     controller.abort();
@@ -306,14 +383,20 @@ async function fetchWithTimeout(input: URL, init: RequestInit | undefined, timeo
   }
 }
 
-async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string): Promise<{
+async function downloadSourceImageOrThrow(
+  sourceImageUrl: string,
+  reqId: string
+): Promise<{
   imageBuffer: Buffer;
   contentType: string;
   incomingLen: number;
   incomingSha256: string;
   fbImageFetchMs: number;
 }> {
-  const validatedSourceImageUrl = validateSourceImageUrlOrThrow(sourceImageUrl, reqId);
+  const validatedSourceImageUrl = validateSourceImageUrlOrThrow(
+    sourceImageUrl,
+    reqId
+  );
   const timeoutMs = getInboundImageTimeoutMs();
   let totalFetchMs = 0;
 
@@ -321,8 +404,13 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
     const attemptStartedAt = Date.now();
 
     try {
-      const response = await fetchWithTimeout(validatedSourceImageUrl, { redirect: "manual" }, timeoutMs);
-      const contentType = response.headers.get("content-type") ?? "application/octet-stream";
+      const response = await fetchWithTimeout(
+        validatedSourceImageUrl,
+        { redirect: "manual" },
+        timeoutMs
+      );
+      const contentType =
+        response.headers.get("content-type") ?? "application/octet-stream";
 
       if (isRedirectStatus(response.status)) {
         console.warn("SOURCE_IMAGE_URL_BLOCKED", {
@@ -337,13 +425,26 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
       if (!response.ok) {
         totalFetchMs += Date.now() - attemptStartedAt;
 
-        if (attempt < FB_IMAGE_FETCH_RETRY_LIMIT && isRetryableResponseStatus(response.status)) {
-          console.debug("FB_IMAGE_FETCH_RETRY", { reqId, attempt: attempt + 1, status: response.status });
+        if (
+          attempt < FB_IMAGE_FETCH_RETRY_LIMIT &&
+          isRetryableResponseStatus(response.status)
+        ) {
+          console.debug("FB_IMAGE_FETCH_RETRY", {
+            reqId,
+            attempt: attempt + 1,
+            status: response.status,
+          });
           continue;
         }
 
-        console.error("MISSING_INPUT_IMAGE", { reqId, reason: "download_failed", status: response.status });
-        throw new MissingInputImageError(`Failed to download source image (${response.status})`);
+        console.error("MISSING_INPUT_IMAGE", {
+          reqId,
+          reason: "download_failed",
+          status: response.status,
+        });
+        throw new MissingInputImageError(
+          `Failed to download source image (${response.status})`
+        );
       }
 
       const imageBuffer = Buffer.from(await response.arrayBuffer());
@@ -368,8 +469,14 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
       }
 
       if (incomingByteLen < MIN_INPUT_IMAGE_BYTES) {
-        console.error("MISSING_INPUT_IMAGE", { reqId, reason: "too_small", byte_len: incomingByteLen });
-        throw new MissingInputImageError(`Source image too small (${incomingByteLen} bytes)`);
+        console.error("MISSING_INPUT_IMAGE", {
+          reqId,
+          reason: "too_small",
+          byte_len: incomingByteLen,
+        });
+        throw new MissingInputImageError(
+          `Source image too small (${incomingByteLen} bytes)`
+        );
       }
 
       return {
@@ -380,13 +487,19 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
         fbImageFetchMs: totalFetchMs,
       };
     } catch (error) {
-      if (error instanceof MissingInputImageError || error instanceof InvalidSourceImageUrlError) {
+      if (
+        error instanceof MissingInputImageError ||
+        error instanceof InvalidSourceImageUrlError
+      ) {
         throw error;
       }
 
       totalFetchMs += Date.now() - attemptStartedAt;
 
-      if (attempt < FB_IMAGE_FETCH_RETRY_LIMIT && isTransientNetworkError(error)) {
+      if (
+        attempt < FB_IMAGE_FETCH_RETRY_LIMIT &&
+        isTransientNetworkError(error)
+      ) {
         console.debug("FB_IMAGE_FETCH_RETRY", {
           reqId,
           attempt: attempt + 1,
@@ -398,7 +511,10 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
       if (isTransientNetworkError(error)) {
         console.error("MISSING_INPUT_IMAGE", {
           reqId,
-          reason: error instanceof Error && error.name === "AbortError" ? "download_timeout" : "download_network_error",
+          reason:
+            error instanceof Error && error.name === "AbortError"
+              ? "download_timeout"
+              : "download_network_error",
         });
         throw new MissingInputImageError("Failed to download source image");
       }
@@ -411,9 +527,20 @@ async function downloadSourceImageOrThrow(sourceImageUrl: string, reqId: string)
 }
 
 export class OpenAiImageGenerator implements ImageGenerator {
-  async generate(input: { style: Style; sourceImageUrl?: string; promptHint?: string; userKey: string; reqId: string }): Promise<{
+  async generate(input: {
+    style: Style;
+    sourceImageUrl?: string;
+    promptHint?: string;
+    userKey: string;
+    reqId: string;
+  }): Promise<{
     imageUrl: string;
-    proof: { incomingLen: number; incomingSha256: string; openaiInputLen: number; openaiInputSha256: string };
+    proof: {
+      incomingLen: number;
+      incomingSha256: string;
+      openaiInputLen: number;
+      openaiInputSha256: string;
+    };
     metrics: GenerationMetrics;
   }> {
     const startedAt = Date.now();
@@ -423,7 +550,10 @@ export class OpenAiImageGenerator implements ImageGenerator {
     }
 
     if (!input.sourceImageUrl) {
-      console.error("MISSING_INPUT_IMAGE", { reqId: input.reqId, reason: "missing_source_url" });
+      console.error("MISSING_INPUT_IMAGE", {
+        reqId: input.reqId,
+        reason: "missing_source_url",
+      });
       throw new MissingInputImageError("sourceImageUrl is required");
     }
 
@@ -432,7 +562,13 @@ export class OpenAiImageGenerator implements ImageGenerator {
     }
 
     try {
-      const { imageBuffer, contentType, incomingLen, incomingSha256, fbImageFetchMs } = await downloadSourceImageOrThrow(input.sourceImageUrl, input.reqId);
+      const {
+        imageBuffer,
+        contentType,
+        incomingLen,
+        incomingSha256,
+        fbImageFetchMs,
+      } = await downloadSourceImageOrThrow(input.sourceImageUrl, input.reqId);
       partialMetrics.fbImageFetchMs = fbImageFetchMs;
       const openAiInputHash = sha256(imageBuffer);
       const openAiInputByteLen = safeLen(imageBuffer);
@@ -448,7 +584,11 @@ export class OpenAiImageGenerator implements ImageGenerator {
         formData.set("prompt", prompt);
         formData.set("size", "1024x1024");
         formData.set("output_format", "jpeg");
-        formData.set("image", new Blob([new Uint8Array(imageBuffer)], { type: contentType }), "source-image");
+        formData.set(
+          "image",
+          new Blob([new Uint8Array(imageBuffer)], { type: contentType }),
+          "source-image"
+        );
         return formData;
       };
 
@@ -465,13 +605,19 @@ export class OpenAiImageGenerator implements ImageGenerator {
               },
               body: createOpenAiFormData(),
             },
-            openAiTimeoutMs,
+            openAiTimeoutMs
           );
         } catch (error) {
-          partialMetrics.openAiMs = (partialMetrics.openAiMs ?? 0) + (Date.now() - openAiStartedAt);
+          partialMetrics.openAiMs =
+            (partialMetrics.openAiMs ?? 0) + (Date.now() - openAiStartedAt);
           if (attempt < openAiRetryLimit && isTransientNetworkError(error)) {
             const waitMs = openAiRetryBaseMs * 2 ** attempt;
-            console.warn("OPENAI_GENERATION_RETRY", { reqId: input.reqId, attempt: attempt + 1, waitMs, reason: (error as Error).name });
+            console.warn("OPENAI_GENERATION_RETRY", {
+              reqId: input.reqId,
+              attempt: attempt + 1,
+              waitMs,
+              reason: (error as Error).name,
+            });
             await wait(waitMs);
             continue;
           }
@@ -479,14 +625,23 @@ export class OpenAiImageGenerator implements ImageGenerator {
           throw error;
         }
 
-        partialMetrics.openAiMs = (partialMetrics.openAiMs ?? 0) + (Date.now() - openAiStartedAt);
+        partialMetrics.openAiMs =
+          (partialMetrics.openAiMs ?? 0) + (Date.now() - openAiStartedAt);
         if (response.ok) {
           break;
         }
 
-        if (attempt < openAiRetryLimit && isRetryableResponseStatus(response.status)) {
+        if (
+          attempt < openAiRetryLimit &&
+          isRetryableResponseStatus(response.status)
+        ) {
           const waitMs = openAiRetryBaseMs * 2 ** attempt;
-          console.warn("OPENAI_GENERATION_RETRY", { reqId: input.reqId, attempt: attempt + 1, waitMs, status: response.status });
+          console.warn("OPENAI_GENERATION_RETRY", {
+            reqId: input.reqId,
+            attempt: attempt + 1,
+            waitMs,
+            status: response.status,
+          });
           await wait(waitMs);
           continue;
         }
@@ -495,26 +650,36 @@ export class OpenAiImageGenerator implements ImageGenerator {
       }
 
       if (!response) {
-        throw new OpenAiGenerationError("OpenAI request failed before receiving a response");
+        throw new OpenAiGenerationError(
+          "OpenAI request failed before receiving a response"
+        );
       }
 
       if (!response.ok) {
         throw attachGenerationMetrics(
-          new OpenAiGenerationError(`OpenAI request failed (${response.status} ${response.statusText})`),
-          finalizeMetrics(startedAt, partialMetrics),
+          new OpenAiGenerationError(
+            `OpenAI request failed (${response.status} ${response.statusText})`
+          ),
+          finalizeMetrics(startedAt, partialMetrics)
         );
       }
 
-      const result = (await response.json()) as { data?: Array<{ b64_json?: string }> };
+      const result = (await response.json()) as {
+        data?: Array<{ b64_json?: string }>;
+      };
       const base64Image = result.data?.[0]?.b64_json;
 
       if (!base64Image) {
-        throw new OpenAiGenerationError("OpenAI response did not include base64 image data");
+        throw new OpenAiGenerationError(
+          "OpenAI response did not include base64 image data"
+        );
       }
 
       const imageBufferResult = Buffer.from(base64Image, "base64");
       if (imageBufferResult.length <= 0) {
-        throw new OpenAiGenerationError("OpenAI response image data was empty after base64 decode");
+        throw new OpenAiGenerationError(
+          "OpenAI response image data was empty after base64 decode"
+        );
       }
 
       const jpegBuffer = ensureJpegBuffer(imageBufferResult);
@@ -537,15 +702,24 @@ export class OpenAiImageGenerator implements ImageGenerator {
       if ((error as { name?: string })?.name === "AbortError") {
         throw attachGenerationMetrics(
           new GenerationTimeoutError("OpenAI generation timed out"),
-          finalizeMetrics(startedAt, partialMetrics),
+          finalizeMetrics(startedAt, partialMetrics)
         );
       }
 
-      throw attachGenerationMetrics(error, finalizeMetrics(startedAt, getGenerationMetrics(error) ?? partialMetrics));
+      throw attachGenerationMetrics(
+        error,
+        finalizeMetrics(
+          startedAt,
+          getGenerationMetrics(error) ?? partialMetrics
+        )
+      );
     }
   }
 }
 
-export function createImageGenerator(mode: GeneratorMode = "openai"): { mode: GeneratorMode; generator: ImageGenerator } {
+export function createImageGenerator(mode: GeneratorMode = "openai"): {
+  mode: GeneratorMode;
+  generator: ImageGenerator;
+} {
   return { mode, generator: new OpenAiImageGenerator() };
 }

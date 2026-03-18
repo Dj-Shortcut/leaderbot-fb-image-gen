@@ -147,10 +147,7 @@ async function callResponsesApi(
   throw new Error("edit_interpreter_retry_exhausted");
 }
 
-function buildSystemPrompt(input: {
-  lang: Lang;
-  lastStyle?: Style;
-}): string {
+function buildSystemPrompt(input: { lang: Lang; lastStyle?: Style }): string {
   const language = input.lang === "en" ? "English" : "Dutch";
   const lastStyle = input.lastStyle ?? "unknown";
 
@@ -159,7 +156,7 @@ function buildSystemPrompt(input: {
     `The user language is ${language}.`,
     `The last known style is ${lastStyle}.`,
     "Only return JSON with no markdown.",
-    'Schema: {"shouldEdit":boolean,"style":"caricature"|"gold"|"petals"|"clouds"|"cinematic"|"disco"|"cyberpunk"|null,"promptHint":string|null}.',
+    'Schema: {"shouldEdit":boolean,"style":"caricature"|"gold"|"petals"|"clouds"|"cinematic"|"disco"|"cyberpunk"|"norman-blackwell"|null,"promptHint":string|null}.',
     "Set shouldEdit=true only when the user is asking to change the previous image.",
     "Use style only when the user explicitly asks for a known style or it is clearly implied.",
     "Put the visual change request into promptHint in concise plain text.",
@@ -186,7 +183,8 @@ function parseDecision(rawText: string): ConversationalEditDecision | null {
       parsed.style === "clouds" ||
       parsed.style === "cinematic" ||
       parsed.style === "disco" ||
-      parsed.style === "cyberpunk"
+      parsed.style === "cyberpunk" ||
+      parsed.style === "norman-blackwell"
         ? parsed.style
         : undefined;
 
@@ -227,6 +225,9 @@ export function looksLikePossibleEditRequest(text: string): boolean {
     "clouds",
     "disco",
     "cyberpunk",
+    "norman",
+    "blackwell",
+    "norman blackwell",
     "caricature",
     "background",
     "remove",

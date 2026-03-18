@@ -6,7 +6,8 @@ export type Style =
   | "cinematic"
   | "disco"
   | "cyberpunk"
-  | "oil-paint";
+  | "oil-paint"
+  | "norman-blackwell";
 
 export type StyleId =
   | "STYLE_CARICATURE"
@@ -17,6 +18,7 @@ export type StyleId =
   | "STYLE_DISCO"
   | "STYLE_CLOUDS"
   | "STYLE_CYBERPUNK"
+  | "STYLE_NORMAN_BLACKWELL"
   | "gold";
 
 export type StyleConfig = {
@@ -62,6 +64,12 @@ export const STYLE_CONFIGS: StyleConfig[] = [
     payload: "STYLE_CYBERPUNK",
     style: "cyberpunk",
     label: "🌃 Cyberpunk",
+  },
+  {
+    id: "STYLE_NORMAN_BLACKWELL",
+    payload: "STYLE_NORMAN_BLACKWELL",
+    style: "norman-blackwell",
+    label: "📰 Norman Blackwell",
   },
   {
     id: "STYLE_DISCO",

@@ -8,7 +8,9 @@ import type { BotTextContext } from "./_core/botContext";
 import type { MessengerUserState } from "./_core/messengerState";
 import { resetStateStore } from "./_core/messengerState";
 
-function makeState(overrides: Partial<MessengerUserState> = {}): MessengerUserState {
+function makeState(
+  overrides: Partial<MessengerUserState> = {}
+): MessengerUserState {
   return {
     psid: "p1",
     userKey: "u1",
@@ -83,6 +85,24 @@ describe("styleCommandsFeature", () => {
 
     expect(handled).toEqual({ handled: true });
     expect(chooseStyle).toHaveBeenCalledWith("oil-paint");
+  });
+
+  it("accepts /style Norman Blackwell aliases and delegates style selection", async () => {
+    const chooseStyle = vi.fn(async () => undefined);
+    const context = makeContext({
+      state: makeState({
+        lastPhotoUrl: "https://img.example/source.jpg",
+        lastPhoto: "https://img.example/source.jpg",
+      }),
+      messageText: "/style norman blackwell",
+      normalizedText: "/style norman blackwell",
+      chooseStyle,
+    });
+
+    const handled = await styleCommandsFeature.onText?.(context);
+
+    expect(handled).toEqual({ handled: true });
+    expect(chooseStyle).toHaveBeenCalledWith("norman-blackwell");
   });
 
   it("accepts /style cyberpunk and delegates style selection", async () => {
@@ -213,7 +233,9 @@ describe("assistantCommandsFeature", () => {
           hasPhoto: true,
           sendText,
           runStyleGeneration,
-          state: makeState({ lastPhotoUrl: "https://img.example/original.jpg" }),
+          state: makeState({
+            lastPhotoUrl: "https://img.example/original.jpg",
+          }),
         })
       );
 
@@ -252,7 +274,9 @@ describe("statsFeature", () => {
   it("returns a readable admin-only stats block", async () => {
     process.env.MESSENGER_ADMIN_IDS = "p1";
     const sendText = vi.fn(async () => undefined);
-    const uptimeSpy = vi.spyOn(process, "uptime").mockReturnValue(3 * 3600 + 12 * 60);
+    const uptimeSpy = vi
+      .spyOn(process, "uptime")
+      .mockReturnValue(3 * 3600 + 12 * 60);
 
     try {
       const result = await statsFeature.onText?.(
@@ -268,7 +292,7 @@ describe("statsFeature", () => {
             errorCountToday: 0,
             averageGenerationLatencyMs: null,
           }),
-        }),
+        })
       );
 
       expect(result).toEqual({ handled: true });
@@ -285,7 +309,7 @@ describe("statsFeature", () => {
           "Bot uptime: 3h 12m",
           "",
           "Node-local stats for 2026-03-16",
-        ].join("\n"),
+        ].join("\n")
       );
     } finally {
       uptimeSpy.mockRestore();
@@ -303,7 +327,7 @@ describe("statsFeature", () => {
           messageText: "/stats",
           normalizedText: "/stats",
           sendText,
-        }),
+        })
       );
 
       expect(result).toEqual({ handled: false });
