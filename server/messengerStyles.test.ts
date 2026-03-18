@@ -9,6 +9,7 @@ describe("messengerStyles", () => {
   it("exposes canonical style configs", () => {
     expect(STYLE_CONFIGS.map(style => style.style)).toEqual([
       "caricature",
+      "storybook-anime",
       "petals",
       "gold",
       "cinematic",
@@ -25,7 +26,11 @@ describe("messengerStyles", () => {
     expect(isStylePayload("STYLE_OIL_PAINT")).toBe(true);
     expect(isStylePayload("STYLE_CYBERPUNK")).toBe(true);
     expect(isStylePayload("STYLE_NORMAN_BLACKWELL")).toBe(true);
+    expect(isStylePayload("STYLE_STORYBOOK_ANIME")).toBe(true);
     expect(isStylePayload("UNKNOWN_STYLE")).toBe(false);
+    expect(getStyleById("STYLE_STORYBOOK_ANIME").label).toContain(
+      "Storybook Anime"
+    );
     expect(getStyleById("STYLE_OIL_PAINT").label).toContain("Oil Paint");
     expect(getStyleById("STYLE_CYBERPUNK").label).toContain("Cyberpunk");
     expect(getStyleById("STYLE_NORMAN_BLACKWELL").label).toContain(

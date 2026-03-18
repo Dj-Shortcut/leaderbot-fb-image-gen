@@ -29,6 +29,8 @@ describe("conversational edit interpreter", () => {
     expect(looksLikePossibleEditRequest("make it darker")).toBe(true);
     expect(looksLikePossibleEditRequest("meer cinematic")).toBe(true);
     expect(looksLikePossibleEditRequest("make it norman blackwell")).toBe(true);
+    expect(looksLikePossibleEditRequest("make it ghibli")).toBe(true);
+    expect(looksLikePossibleEditRequest("make it whimsical")).toBe(true);
     expect(looksLikePossibleEditRequest("what can you do?")).toBe(false);
   });
 
@@ -91,5 +93,40 @@ describe("conversational edit interpreter", () => {
       promptHint: "more neon rain",
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("supports storybook anime style decisions and sends alias guidance to the model", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output_text:
+            '{"shouldEdit":true,"style":"storybook-anime","promptHint":"add cozy magical forest details"}',
+        }),
+        { status: 200 }
+      )
+    );
+
+    global.fetch = fetchMock;
+
+    const result = await interpretConversationalEdit({
+      text: "make it ghibli",
+      lang: "en",
+      lastStyle: "disco",
+    });
+
+    expect(result).toEqual({
+      shouldEdit: true,
+      style: "storybook-anime",
+      promptHint: "add cozy magical forest details",
+    });
+
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(request.body)) as {
+      input: Array<{ role: string; content: string }>;
+    };
+    expect(body.input[0]?.content).toContain('"storybook-anime"');
+    expect(body.input[0]?.content).toContain('Treat "ghibli"');
   });
 });

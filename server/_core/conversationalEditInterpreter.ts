@@ -156,9 +156,10 @@ function buildSystemPrompt(input: { lang: Lang; lastStyle?: Style }): string {
     `The user language is ${language}.`,
     `The last known style is ${lastStyle}.`,
     "Only return JSON with no markdown.",
-    'Schema: {"shouldEdit":boolean,"style":"caricature"|"gold"|"petals"|"clouds"|"cinematic"|"disco"|"cyberpunk"|"norman-blackwell"|null,"promptHint":string|null}.',
+    'Schema: {"shouldEdit":boolean,"style":"caricature"|"storybook-anime"|"gold"|"petals"|"clouds"|"cinematic"|"disco"|"cyberpunk"|"norman-blackwell"|null,"promptHint":string|null}.',
     "Set shouldEdit=true only when the user is asking to change the previous image.",
     "Use style only when the user explicitly asks for a known style or it is clearly implied.",
+    'Treat "ghibli", "ghibli style", "studio ghibli", "storybook anime", and "whimsical anime" as requests for "storybook-anime".',
     "Put the visual change request into promptHint in concise plain text.",
     "If it is normal chat, a question, or unclear, return shouldEdit=false.",
   ].join(" ");
@@ -178,6 +179,7 @@ function parseDecision(rawText: string): ConversationalEditDecision | null {
 
     const style =
       parsed.style === "caricature" ||
+      parsed.style === "storybook-anime" ||
       parsed.style === "gold" ||
       parsed.style === "petals" ||
       parsed.style === "clouds" ||
@@ -215,10 +217,13 @@ export function looksLikePossibleEditRequest(text: string): boolean {
     "edit",
     "more ",
     "less ",
+    "whimsical",
     "darker",
     "lighter",
     "softer",
     "stronger",
+    "ghibli",
+    "storybook anime",
     "cinematic",
     "gold",
     "petals",

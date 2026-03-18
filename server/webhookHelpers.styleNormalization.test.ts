@@ -7,6 +7,21 @@ import {
 } from "./_core/webhookHelpers";
 
 describe("style normalization", () => {
+  it("normalizes storybook anime aliases to the canonical key", () => {
+    expect(normalizeStyle("ghibli")).toBe("storybook-anime");
+    expect(normalizeStyle("ghibli style")).toBe("storybook-anime");
+    expect(normalizeStyle("studio ghibli")).toBe("storybook-anime");
+    expect(normalizeStyle("storybook anime")).toBe("storybook-anime");
+    expect(normalizeStyle("whimsical anime")).toBe("storybook-anime");
+    expect(parseStyle("storybook anime")).toBe("storybook-anime");
+    expect(stylePayloadToStyle("STYLE_STORYBOOK_ANIME")).toBe(
+      "storybook-anime"
+    );
+    expect(parseReferralStyle("style_storybook-anime")).toBe(
+      "storybook-anime"
+    );
+  });
+
   it("normalizes oil paint aliases to the canonical oil-paint key", () => {
     expect(normalizeStyle("oil paint")).toBe("oil-paint");
     expect(normalizeStyle("oil painting")).toBe("oil-paint");

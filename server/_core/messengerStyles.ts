@@ -1,5 +1,6 @@
 export type Style =
   | "caricature"
+  | "storybook-anime"
   | "gold"
   | "petals"
   | "clouds"
@@ -11,6 +12,7 @@ export type Style =
 
 export type StyleId =
   | "STYLE_CARICATURE"
+  | "STYLE_STORYBOOK_ANIME"
   | "STYLE_PETALS"
   | "STYLE_GOLD"
   | "STYLE_CINEMATIC"
@@ -34,6 +36,12 @@ export const STYLE_CONFIGS: StyleConfig[] = [
     payload: "STYLE_CARICATURE",
     style: "caricature",
     label: "🎨 Caricature",
+  },
+  {
+    id: "STYLE_STORYBOOK_ANIME",
+    payload: "STYLE_STORYBOOK_ANIME",
+    style: "storybook-anime",
+    label: "🌿 Storybook Anime",
   },
   {
     id: "STYLE_PETALS",

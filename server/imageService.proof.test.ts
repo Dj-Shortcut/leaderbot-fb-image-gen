@@ -15,6 +15,7 @@ function toUrlString(url: string | URL): string {
 type StylePromptCase = {
   style:
     | "caricature"
+    | "storybook-anime"
     | "petals"
     | "gold"
     | "cinematic"
@@ -33,6 +34,18 @@ const STYLE_PROMPT_CASES = [
       "playfully exaggerated facial proportions",
       "crisp inked contours",
       "dimensional cel-shaded rendering",
+    ],
+    minFeatureMatches: 3,
+  },
+  {
+    style: "storybook-anime",
+    baseLead:
+      "Transform this photo into a whimsical hand-drawn fantasy illustration with a warm storybook atmosphere.",
+    features: [
+      "soft, painterly animated scene",
+      "hand-painted background sensibility",
+      "soft daylight or golden-hour lighting",
+      "nostalgic magical mood",
     ],
     minFeatureMatches: 3,
   },
@@ -112,7 +125,9 @@ function expectDistinctivePrompt(
   const matchedFeatures = styleCase.features.filter(feature =>
     prompt.includes(feature)
   );
-  expect(matchedFeatures).toHaveLength(styleCase.minFeatureMatches);
+  expect(matchedFeatures.length).toBeGreaterThanOrEqual(
+    styleCase.minFeatureMatches
+  );
 
   const additionalDirection = `Additional direction: ${promptHint}.`;
   expect(prompt).toContain(additionalDirection);

@@ -127,6 +127,8 @@ export function getGeneratorStartupConfig(): {
 const STYLE_PROMPTS = {
   caricature:
     "Transform this photo into a high-end caricature portrait with playfully exaggerated facial proportions, crisp inked contours, dimensional cel-shaded rendering, punchy studio key lighting, a saturated carnival palette of cherry red, cobalt, tangerine, and teal, and an energetic mischievous mood with polished illustration detail.",
+  "storybook-anime":
+    "Transform this photo into a whimsical hand-drawn fantasy illustration with a warm storybook atmosphere. Preserve the subject identity while rendering the image as a soft, painterly animated scene with delicate linework, hand-painted background sensibility, lush natural greens and sun-washed earth tones, gentle expressive eyes, subtly simplified anatomy, cozy fantasy details, soft daylight or golden-hour lighting, and a nostalgic magical mood. The result should feel like a lovingly crafted illustrated animation frame with a warm human touch, clearly non-photorealistic and never like a generic photo filter.",
   gold:
     "Reimagine this portrait as a luxe gilded editorial artwork with molten gold highlights, champagne and amber color grading, sculpted rim lighting, glossy reflective surfaces, regal opulent mood, and ultra-detailed rendered textures that feel like a premium fashion campaign dipped in liquid metal.",
   petals:
