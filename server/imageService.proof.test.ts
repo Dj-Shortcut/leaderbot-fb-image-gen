@@ -22,6 +22,7 @@ type StylePromptCase = {
     | "clouds";
   baseLead: string;
   features: string[];
+  minFeatureMatches: number;
 };
 
 const STYLE_PROMPT_CASES = [
@@ -33,6 +34,7 @@ const STYLE_PROMPT_CASES = [
       "crisp inked contours",
       "dimensional cel-shaded rendering",
     ],
+    minFeatureMatches: 3,
   },
   {
     style: "petals",
@@ -42,6 +44,7 @@ const STYLE_PROMPT_CASES = [
       "luminous backlighting",
       "soft pastel palette of rose, blush, ivory, and fresh green",
     ],
+    minFeatureMatches: 3,
   },
   {
     style: "gold",
@@ -51,6 +54,7 @@ const STYLE_PROMPT_CASES = [
       "champagne and amber color grading",
       "sculpted rim lighting",
     ],
+    minFeatureMatches: 3,
   },
   {
     style: "cinematic",
@@ -60,6 +64,7 @@ const STYLE_PROMPT_CASES = [
       "deep shadows",
       "refined teal-and-amber palette",
     ],
+    minFeatureMatches: 3,
   },
   {
     style: "disco",
@@ -69,6 +74,7 @@ const STYLE_PROMPT_CASES = [
       "magenta and electric blue spotlights",
       "glittering highlights",
     ],
+    minFeatureMatches: 3,
   },
   {
     style: "clouds",
@@ -78,21 +84,35 @@ const STYLE_PROMPT_CASES = [
       "diffused sunrise lighting",
       "airy gradients of pearl white, pale blue, silver, and warm peach",
     ],
+    minFeatureMatches: 3,
   },
 ] satisfies StylePromptCase[];
+
+const GENERIC_FALLBACK_PATTERNS = [
+  "Apply disco style to this photo",
+  /Apply .* style to this photo/i,
+] as const;
 
 function expectDistinctivePrompt(
   prompt: string,
   styleCase: StylePromptCase,
   promptHint: string
 ): void {
-  expect(prompt).not.toContain("Apply disco style to this photo");
-  expect(prompt).not.toMatch(/Apply .* style to this photo/i);
+  for (const pattern of GENERIC_FALLBACK_PATTERNS) {
+    if (typeof pattern === "string") {
+      expect(prompt).not.toContain(pattern);
+      continue;
+    }
+
+    expect(prompt).not.toMatch(pattern);
+  }
+
   expect(prompt).toContain(styleCase.baseLead);
 
-  for (const feature of styleCase.features) {
-    expect(prompt).toContain(feature);
-  }
+  const matchedFeatures = styleCase.features.filter(feature =>
+    prompt.includes(feature)
+  );
+  expect(matchedFeatures).toHaveLength(styleCase.minFeatureMatches);
 
   const additionalDirection = `Additional direction: ${promptHint}.`;
   expect(prompt).toContain(additionalDirection);
