@@ -124,15 +124,29 @@ export function getGeneratorStartupConfig(): {
   };
 }
 
+const STYLE_PROMPTS = {
+  caricature:
+    "Transform this photo into a high-end caricature portrait with playfully exaggerated facial proportions, crisp inked contours, dimensional cel-shaded rendering, punchy studio key lighting, a saturated carnival palette of cherry red, cobalt, tangerine, and teal, and an energetic mischievous mood with polished illustration detail.",
+  gold:
+    "Reimagine this portrait as a luxe gilded editorial artwork with molten gold highlights, champagne and amber color grading, sculpted rim lighting, glossy reflective surfaces, regal opulent mood, and ultra-detailed rendered textures that feel like a premium fashion campaign dipped in liquid metal.",
+  petals:
+    "Turn this image into a romantic floral fantasy portrait surrounded by drifting blossom petals, luminous backlighting, a soft pastel palette of rose, blush, ivory, and fresh green, dreamy springtime mood, velvety skin rendering, and richly detailed painterly depth with graceful motion in every petal.",
+  clouds:
+    "Render this portrait as an ethereal skyborne scene wrapped in layered clouds, diffused sunrise lighting, airy gradients of pearl white, pale blue, silver, and warm peach, serene uplifting mood, soft atmospheric depth, and finely rendered cinematic detail that blends realism with dreamlike softness.",
+  cinematic:
+    "Reframe this photo as a prestige-film still with dramatic directional lighting, deep shadows, subtle lens bloom, a refined teal-and-amber palette, moody emotionally charged atmosphere, shallow depth of field, and richly detailed photoreal rendering with premium color-graded cinema texture.",
+  disco:
+    "Convert this portrait into a glamorous disco-era hero shot with mirror-ball reflections, magenta and electric blue spotlights, glittering highlights, a bold nightlife palette of fuchsia, violet, cyan, and chrome, euphoric dance-floor mood, and glossy high-detail rendering full of sparkle and motion.",
+  cyberpunk:
+    "Transform this photo into a cyberpunk portrait with neon signage glow, rain-slick reflections, intense high-contrast lighting, a vivid palette of electric pink, cyan, ultraviolet, and toxic blue, rebellious futuristic mood, and dense digital-art rendering packed with atmospheric sci-fi detail.",
+  "oil-paint":
+    "Render this portrait as a classical oil painting with visible brush strokes, textured canvas grain, sculpted painterly lighting, a rich museum-grade palette of umber, ochre, crimson, and deep blue, dignified fine-art mood, and layered artisanal detail throughout the composition.",
+  "norman-blackwell":
+    "Reimagine this photo as a nostalgic mid-century editorial illustration with warm storybook lighting, an Americana palette of cream, brick red, muted teal, and honey gold, heartfelt wholesome mood, painterly realism, expressive character detail, and the polished finish of a vintage magazine cover.",
+} satisfies Record<Style, string>;
+
 function buildStylePrompt(style: Style, promptHint?: string): string {
-  const basePrompt =
-    style === "oil-paint"
-      ? "Apply a classic oil painting portrait style to this photo, with visible brush strokes, textured canvas, painterly lighting, rich color depth, and a fine-art museum feel."
-      : style === "cyberpunk"
-        ? "Apply cyberpunk aesthetic, neon-lit futuristic city, glowing signs, high contrast, cinematic sci-fi atmosphere, detailed digital art to this photo."
-        : style === "norman-blackwell"
-          ? "Apply a Norman Blackwell portrait style to this photo, with nostalgic mid-century editorial illustration, warm Americana storytelling, painterly realism, expressive faces, soft brushwork, and a vintage magazine cover feel."
-          : `Apply ${style} style to this photo.`;
+  const basePrompt = STYLE_PROMPTS[style];
 
   const trimmedPromptHint = promptHint?.trim();
   if (!trimmedPromptHint) {

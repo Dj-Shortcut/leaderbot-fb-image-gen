@@ -12,6 +12,95 @@ function toUrlString(url: string | URL): string {
   return typeof url === "string" ? url : url.toString();
 }
 
+type StylePromptCase = {
+  style:
+    | "caricature"
+    | "petals"
+    | "gold"
+    | "cinematic"
+    | "disco"
+    | "clouds";
+  baseLead: string;
+  features: string[];
+};
+
+const STYLE_PROMPT_CASES = [
+  {
+    style: "caricature",
+    baseLead: "Transform this photo into a high-end caricature portrait",
+    features: [
+      "playfully exaggerated facial proportions",
+      "crisp inked contours",
+      "dimensional cel-shaded rendering",
+    ],
+  },
+  {
+    style: "petals",
+    baseLead: "Turn this image into a romantic floral fantasy portrait",
+    features: [
+      "drifting blossom petals",
+      "luminous backlighting",
+      "soft pastel palette of rose, blush, ivory, and fresh green",
+    ],
+  },
+  {
+    style: "gold",
+    baseLead: "Reimagine this portrait as a luxe gilded editorial artwork",
+    features: [
+      "molten gold highlights",
+      "champagne and amber color grading",
+      "sculpted rim lighting",
+    ],
+  },
+  {
+    style: "cinematic",
+    baseLead: "Reframe this photo as a prestige-film still",
+    features: [
+      "dramatic directional lighting",
+      "deep shadows",
+      "refined teal-and-amber palette",
+    ],
+  },
+  {
+    style: "disco",
+    baseLead: "Convert this portrait into a glamorous disco-era hero shot",
+    features: [
+      "mirror-ball reflections",
+      "magenta and electric blue spotlights",
+      "glittering highlights",
+    ],
+  },
+  {
+    style: "clouds",
+    baseLead: "Render this portrait as an ethereal skyborne scene",
+    features: [
+      "layered clouds",
+      "diffused sunrise lighting",
+      "airy gradients of pearl white, pale blue, silver, and warm peach",
+    ],
+  },
+] satisfies StylePromptCase[];
+
+function expectDistinctivePrompt(
+  prompt: string,
+  styleCase: StylePromptCase,
+  promptHint: string
+): void {
+  expect(prompt).not.toContain("Apply disco style to this photo");
+  expect(prompt).not.toMatch(/Apply .* style to this photo/i);
+  expect(prompt).toContain(styleCase.baseLead);
+
+  for (const feature of styleCase.features) {
+    expect(prompt).toContain(feature);
+  }
+
+  const additionalDirection = `Additional direction: ${promptHint}.`;
+  expect(prompt).toContain(additionalDirection);
+  expect(prompt.indexOf(styleCase.baseLead)).toBeLessThan(
+    prompt.indexOf(additionalDirection)
+  );
+}
+
 describe("OpenAi image-to-image proof", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -23,104 +112,65 @@ describe("OpenAi image-to-image proof", () => {
     delete process.env.SOURCE_IMAGE_ALLOWED_HOSTS;
   });
 
-  it("sends the original image bytes in OpenAI edits request", async () => {
-    process.env.OPENAI_API_KEY = "dummy-key";
-    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+  it.each(STYLE_PROMPT_CASES)(
+    "$style builds a distinctive OpenAI edits prompt and preserves prompt hints",
+    async styleCase => {
+      process.env.OPENAI_API_KEY = "dummy-key";
+      process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+      process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
 
-    const fixture = Buffer.alloc(7000, 9);
-    const fixtureHash = sha256(fixture);
+      const fixture = Buffer.alloc(7000, 9);
+      const fixtureHash = sha256(fixture);
+      const promptHint = "neon rain";
 
-    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
-        expect(init?.redirect).toBe("manual");
+      const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+        if (toUrlString(url) === "https://img.example/source.jpg") {
+          expect(init?.redirect).toBe("manual");
+          return {
+            ok: true,
+            headers: new Headers({ "content-type": "image/jpeg" }),
+            arrayBuffer: async () => fixture,
+          } as Response;
+        }
+
+        expect(toUrlString(url)).toBe("https://api.openai.com/v1/images/edits");
+        const formData = init?.body as FormData;
+        expect(formData).toBeInstanceOf(FormData);
+        const imageBlob = formData.get("image");
+        expect(imageBlob).toBeInstanceOf(Blob);
+        const imageBuffer = Buffer.from(await (imageBlob as Blob).arrayBuffer());
+        expect(sha256(imageBuffer)).toBe(fixtureHash);
+        expect(formData.get("output_format")).toBe("jpeg");
+
+        const prompt = String(formData.get("prompt"));
+        expectDistinctivePrompt(prompt, styleCase, promptHint);
+
         return {
           ok: true,
-          headers: new Headers({ "content-type": "image/jpeg" }),
-          arrayBuffer: async () => fixture,
+          json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
         } as Response;
-      }
+      });
 
-      expect(toUrlString(url)).toBe("https://api.openai.com/v1/images/edits");
-      const formData = init?.body as FormData;
-      expect(formData).toBeInstanceOf(FormData);
-      const imageBlob = formData.get("image");
-      expect(imageBlob).toBeInstanceOf(Blob);
-      const imageBuffer = Buffer.from(await (imageBlob as Blob).arrayBuffer());
-      expect(sha256(imageBuffer)).toBe(fixtureHash);
-      expect(formData.get("prompt")).toContain(
-        "Apply disco style to this photo"
+      vi.stubGlobal("fetch", fetchMock);
+
+      const generator = new OpenAiImageGenerator();
+      const result = await generator.generate({
+        style: styleCase.style,
+        sourceImageUrl: "https://img.example/source.jpg",
+        promptHint,
+        userKey: "user-1",
+        reqId: `req-${styleCase.style}-prompt`,
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(result.imageUrl).toMatch(
+        /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
       );
-      expect(formData.get("output_format")).toBe("jpeg");
-
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
-    });
-
-    vi.stubGlobal("fetch", fetchMock);
-
-    const generator = new OpenAiImageGenerator();
-    const result = await generator.generate({
-      style: "disco",
-      sourceImageUrl: "https://img.example/source.jpg",
-      userKey: "user-1",
-      reqId: "req-1",
-    });
-
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(result.imageUrl).toMatch(
-      /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
-    );
-    expect(result.metrics.totalMs).toBeGreaterThanOrEqual(0);
-    expect(result.metrics.fbImageFetchMs).toBeGreaterThanOrEqual(0);
-    expect(result.metrics.openAiMs).toBeGreaterThanOrEqual(0);
-  });
-
-  it("forwards remix prompt hints to the OpenAI edits prompt", async () => {
-    process.env.OPENAI_API_KEY = "dummy-key";
-    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
-
-    const fixture = Buffer.alloc(7000, 9);
-
-    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
-        return {
-          ok: true,
-          headers: new Headers({ "content-type": "image/jpeg" }),
-          arrayBuffer: async () => fixture,
-        } as Response;
-      }
-
-      const formData = init?.body as FormData;
-      expect(formData.get("prompt")).toContain(
-        "Apply disco style to this photo."
-      );
-      expect(formData.get("prompt")).toContain(
-        "Additional direction: neon rain."
-      );
-
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
-    });
-
-    vi.stubGlobal("fetch", fetchMock);
-
-    const generator = new OpenAiImageGenerator();
-    await generator.generate({
-      style: "disco",
-      sourceImageUrl: "https://img.example/source.jpg",
-      promptHint: "neon rain",
-      userKey: "user-1",
-      reqId: "req-remix-prompt",
-    });
-
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-  });
+      expect(result.metrics.totalMs).toBeGreaterThanOrEqual(0);
+      expect(result.metrics.fbImageFetchMs).toBeGreaterThanOrEqual(0);
+      expect(result.metrics.openAiMs).toBeGreaterThanOrEqual(0);
+    }
+  );
 
   it("uses the cyberpunk preset prompt for OpenAI edits", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
@@ -139,9 +189,14 @@ describe("OpenAi image-to-image proof", () => {
       }
 
       const formData = init?.body as FormData;
-      expect(formData.get("prompt")).toContain("cyberpunk aesthetic");
-      expect(formData.get("prompt")).toContain("neon-lit futuristic city");
-      expect(formData.get("prompt")).toContain("cinematic sci-fi atmosphere");
+      expect(formData.get("prompt")).toContain(
+        "Transform this photo into a cyberpunk portrait"
+      );
+      expect(formData.get("prompt")).toContain("neon signage glow");
+      expect(formData.get("prompt")).toContain("rain-slick reflections");
+      expect(formData.get("prompt")).toContain(
+        "vivid palette of electric pink, cyan, ultraviolet, and toxic blue"
+      );
 
       return {
         ok: true,
@@ -180,10 +235,14 @@ describe("OpenAi image-to-image proof", () => {
 
       const formData = init?.body as FormData;
       const prompt = String(formData.get("prompt"));
-      expect(prompt).toContain("Norman Blackwell portrait style");
-      expect(prompt).toContain("nostalgic mid-century editorial illustration");
-      expect(prompt).toContain("warm Americana storytelling");
-      expect(prompt).toContain("vintage magazine cover feel");
+      expect(prompt).toContain(
+        "Reimagine this photo as a nostalgic mid-century editorial illustration"
+      );
+      expect(prompt).toContain("warm storybook lighting");
+      expect(prompt).toContain(
+        "Americana palette of cream, brick red, muted teal, and honey gold"
+      );
+      expect(prompt).toContain("polished finish of a vintage magazine cover");
 
       return {
         ok: true,
@@ -222,11 +281,15 @@ describe("OpenAi image-to-image proof", () => {
 
       const formData = init?.body as FormData;
       const prompt = String(formData.get("prompt"));
-      expect(prompt).toContain("classic oil painting portrait");
+      expect(prompt).toContain(
+        "Render this portrait as a classical oil painting"
+      );
       expect(prompt).toContain("visible brush strokes");
-      expect(prompt).toContain("textured canvas");
-      expect(prompt).toContain("painterly lighting");
-      expect(prompt).toContain("fine-art museum feel");
+      expect(prompt).toContain("textured canvas grain");
+      expect(prompt).toContain("sculpted painterly lighting");
+      expect(prompt).toContain(
+        "rich museum-grade palette of umber, ochre, crimson, and deep blue"
+      );
 
       return {
         ok: true,
