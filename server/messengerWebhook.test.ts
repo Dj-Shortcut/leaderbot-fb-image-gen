@@ -666,8 +666,13 @@ describe("messenger webhook dedupe", () => {
       }
 
       const formData = init?.body as FormData;
-      expect(String(formData.get("prompt"))).toContain(
-        "Norman Blackwell portrait style"
+      const prompt = String(formData.get("prompt"));
+      expect(prompt).toContain(
+        "Reimagine this photo as a nostalgic mid-century editorial illustration"
+      );
+      expect(prompt).toContain("warm storybook lighting");
+      expect(prompt).toContain(
+        "Americana palette of cream, brick red, muted teal, and honey gold"
       );
 
       return {
