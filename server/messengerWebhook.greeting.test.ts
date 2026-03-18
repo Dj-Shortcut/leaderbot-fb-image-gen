@@ -20,7 +20,7 @@ describe("greeting handling by conversation state", () => {
     expect(getGreetingResponse("AWAITING_STYLE")).toEqual({
       mode: "quick_replies",
       state: "AWAITING_STYLE",
-      text: "Kies je stijl 👇",
+      text: "Kies eerst een stijlgroep 👇",
     });
   });
 

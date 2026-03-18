@@ -23,10 +23,28 @@ export type StyleId =
   | "STYLE_NORMAN_BLACKWELL"
   | "gold";
 
+export type StyleCategory =
+  | "illustrated"
+  | "atmosphere"
+  | "bold";
+
+export type StyleCategoryId =
+  | "STYLE_CATEGORY_ILLUSTRATED"
+  | "STYLE_CATEGORY_ATMOSPHERE"
+  | "STYLE_CATEGORY_BOLD";
+
 export type StyleConfig = {
   id: StyleId;
   payload: StyleId;
   style: Style;
+  label: string;
+  category: StyleCategory;
+};
+
+export type StyleCategoryConfig = {
+  id: StyleCategoryId;
+  payload: StyleCategoryId;
+  category: StyleCategory;
   label: string;
 };
 
@@ -36,67 +54,106 @@ export const STYLE_CONFIGS: StyleConfig[] = [
     payload: "STYLE_CARICATURE",
     style: "caricature",
     label: "🎨 Caricature",
+    category: "illustrated",
   },
   {
     id: "STYLE_STORYBOOK_ANIME",
     payload: "STYLE_STORYBOOK_ANIME",
     style: "storybook-anime",
     label: "🌿 Storybook Anime",
+    category: "illustrated",
   },
   {
     id: "STYLE_PETALS",
     payload: "STYLE_PETALS",
     style: "petals",
     label: "🌸 Petals",
+    category: "atmosphere",
   },
   {
     id: "STYLE_GOLD",
     payload: "STYLE_GOLD",
     style: "gold",
     label: "✨ Gold",
+    category: "bold",
   },
   {
     id: "STYLE_CINEMATIC",
     payload: "STYLE_CINEMATIC",
     style: "cinematic",
     label: "🎬 Cinematic",
+    category: "atmosphere",
   },
   {
     id: "STYLE_OIL_PAINT",
     payload: "STYLE_OIL_PAINT",
     style: "oil-paint",
     label: "🖼️ Oil Paint",
+    category: "illustrated",
   },
   {
     id: "STYLE_CYBERPUNK",
     payload: "STYLE_CYBERPUNK",
     style: "cyberpunk",
     label: "🌃 Cyberpunk",
+    category: "bold",
   },
   {
     id: "STYLE_NORMAN_BLACKWELL",
     payload: "STYLE_NORMAN_BLACKWELL",
     style: "norman-blackwell",
     label: "📰 Norman Blackwell",
+    category: "illustrated",
   },
   {
     id: "STYLE_DISCO",
     payload: "STYLE_DISCO",
     style: "disco",
     label: "🪩 Disco Glow",
+    category: "bold",
   },
   {
     id: "STYLE_CLOUDS",
     payload: "STYLE_CLOUDS",
     style: "clouds",
     label: "☁️ Clouds",
+    category: "atmosphere",
   },
 ];
 
 export const STYLE_IDS = new Set<StyleId>(STYLE_CONFIGS.map(style => style.id));
 
+export const STYLE_CATEGORY_CONFIGS: StyleCategoryConfig[] = [
+  {
+    id: "STYLE_CATEGORY_ILLUSTRATED",
+    payload: "STYLE_CATEGORY_ILLUSTRATED",
+    category: "illustrated",
+    label: "🎨 Illustrated",
+  },
+  {
+    id: "STYLE_CATEGORY_ATMOSPHERE",
+    payload: "STYLE_CATEGORY_ATMOSPHERE",
+    category: "atmosphere",
+    label: "🌤️ Atmosphere",
+  },
+  {
+    id: "STYLE_CATEGORY_BOLD",
+    payload: "STYLE_CATEGORY_BOLD",
+    category: "bold",
+    label: "⚡ Bold",
+  },
+];
+
+const STYLE_CATEGORY_IDS = new Set<StyleCategoryId>(
+  STYLE_CATEGORY_CONFIGS.map(category => category.id)
+);
+
 export function isStylePayload(value: string): value is StyleId {
   return STYLE_IDS.has(value as StyleId);
+}
+
+export function isStyleCategoryPayload(value: string): value is StyleCategoryId {
+  return STYLE_CATEGORY_IDS.has(value as StyleCategoryId);
 }
 
 export function getStyleById(styleId: StyleId): StyleConfig {
@@ -107,4 +164,20 @@ export function getStyleById(styleId: StyleId): StyleConfig {
   }
 
   return style;
+}
+
+export function getStyleCategoryById(
+  styleCategoryId: StyleCategoryId
+): StyleCategoryConfig {
+  const category = STYLE_CATEGORY_CONFIGS.find(item => item.id === styleCategoryId);
+
+  if (!category) {
+    throw new Error(`Unknown style category: ${styleCategoryId}`);
+  }
+
+  return category;
+}
+
+export function getStylesForCategory(category: StyleCategory): StyleConfig[] {
+  return STYLE_CONFIGS.filter(style => style.category === category);
 }

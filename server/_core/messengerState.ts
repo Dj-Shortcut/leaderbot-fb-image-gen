@@ -1,5 +1,8 @@
-import type { Style } from "./messengerStyles";
-import { STYLE_CONFIGS } from "./messengerStyles";
+import type { Style, StyleCategory } from "./messengerStyles";
+import {
+  STYLE_CATEGORY_CONFIGS,
+  getStylesForCategory,
+} from "./messengerStyles";
 import type { Lang } from "./i18n";
 import { toUserKey } from "./privacy";
 import {
@@ -43,6 +46,7 @@ export type MessengerUserState = {
   lastPhoto: string | null;
   selectedStyle: string | null;
   chosenStyle: string | null;
+  selectedStyleCategory?: StyleCategory | null;
   preselectedStyle?: string | null;
   preferredLang?: Lang;
   hasSeenIntro: boolean;
@@ -64,9 +68,9 @@ const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
     { title: "Privacy", payload: "PRIVACY_INFO" },
   ],
   AWAITING_PHOTO: [],
-  AWAITING_STYLE: STYLE_CONFIGS.map(style => ({
-    title: style.label,
-    payload: style.payload,
+  AWAITING_STYLE: STYLE_CATEGORY_CONFIGS.map(category => ({
+    title: category.label,
+    payload: category.payload,
   })),
   PROCESSING: [],
   RESULT_READY: [
@@ -100,6 +104,7 @@ function createDefaultState(psid: string, now = Date.now()): MessengerUserState 
     lastPhoto: null,
     selectedStyle: null,
     chosenStyle: null,
+    selectedStyleCategory: null,
     preselectedStyle: null,
     preferredLang: "nl",
     hasSeenIntro: false,
@@ -140,6 +145,8 @@ function normalizeState(psid: string, value: PartialState | null | undefined): M
     lastPhoto,
     selectedStyle,
     chosenStyle: selectedStyle,
+    selectedStyleCategory:
+      value?.selectedStyleCategory ?? fallback.selectedStyleCategory,
     lastImageUrl: value?.lastImageUrl ?? lastGeneratedUrl ?? fallback.lastImageUrl,
     lastGeneratedUrl,
     quota: {
@@ -326,6 +333,7 @@ export function clearPendingImageState(psid: string, now = Date.now()): MaybePro
       pendingImageAt: undefined,
       selectedStyle: null,
       chosenStyle: null,
+      selectedStyleCategory: null,
     },
     now,
   );
@@ -347,6 +355,7 @@ export function setChosenStyle(psid: string, style: string, now = Date.now()): M
     {
       selectedStyle: style,
       chosenStyle: style,
+      selectedStyleCategory: null,
     },
     now,
   );
@@ -354,6 +363,37 @@ export function setChosenStyle(psid: string, style: string, now = Date.now()): M
   if (isPromiseLike(result)) {
     return result.then(() => undefined);
   }
+}
+
+export function setSelectedStyleCategory(
+  psid: string,
+  category: StyleCategory | null,
+  now = Date.now()
+): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      selectedStyleCategory: category,
+    },
+    now
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
+}
+
+export function getStyleRepliesForCategory(category: StyleCategory): StateQuickReply[] {
+  return [
+    ...getStylesForCategory(category).map(style => ({
+      title: style.label,
+      payload: style.payload,
+    })),
+    {
+      title: "↩️ Categorieen",
+      payload: "CHOOSE_STYLE",
+    },
+  ];
 }
 
 export function setPreferredLang(psid: string, lang: Lang, now = Date.now()): MaybePromise<void> {

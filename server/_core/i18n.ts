@@ -8,6 +8,8 @@ type TranslationParams = {
 type TranslationKey =
   | "flowExplanation"
   | "stylePicker"
+  | "styleCategoryPicker"
+  | "styleCategoryCarouselIntro"
   | "success"
   | "processingBlocked"
   | "styleWithoutPhoto"
@@ -19,6 +21,7 @@ type TranslationKey =
   | "generatingPrompt"
   | "retryThisStyle"
   | "otherStyle"
+  | "backToCategories"
   | "hdUnavailable"
   | "generationUnavailable"
   | "generationTimeout"
@@ -30,6 +33,9 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
   nl: {
     flowExplanation: "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis.",
     stylePicker: "Kies je stijl 👇",
+    styleCategoryPicker: "Kies eerst een stijlgroep 👇",
+    styleCategoryCarouselIntro: ({ styleLabel }) =>
+      `Hier zijn je ${styleLabel ?? ""}-stijlen. Kies er eentje hieronder.`,
     success: "Klaar ✅",
     processingBlocked: "Even geduld — je vorige afbeelding is bijna klaar.",
     styleWithoutPhoto: "Stuur eerst een foto, dan maak ik die stijl voor je.",
@@ -45,6 +51,7 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
     generatingPrompt: ({ styleLabel }) => `Ik maak nu je ${styleLabel ?? ""}-stijl.`,
     retryThisStyle: "Opnieuw",
     otherStyle: "Andere",
+    backToCategories: "Categorieen",
     hdUnavailable: "I can share HD downloads after I generate an image.",
     generationUnavailable: "AI generation isn’t enabled yet.",
     generationTimeout: "This took too long.",
@@ -53,6 +60,9 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
   en: {
     flowExplanation: "Send a photo and I will make a special version of it in another style for free.",
     stylePicker: "Pick a style 👇",
+    styleCategoryPicker: "Pick a style group first 👇",
+    styleCategoryCarouselIntro: ({ styleLabel }) =>
+      `Here are your ${styleLabel ?? ""} styles. Pick one below.`,
     success: "Done ✅",
     processingBlocked: "One sec — your previous image is almost done.",
     styleWithoutPhoto: "Send a photo first, then I can make that style for you.",
@@ -68,6 +78,7 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
     generatingPrompt: ({ styleLabel }) => `I am now making your ${styleLabel ?? ""} style.`,
     retryThisStyle: "Retry",
     otherStyle: "Another",
+    backToCategories: "Categories",
     hdUnavailable: "I can share HD downloads after I generate an image.",
     generationUnavailable: "AI generation isn’t enabled yet.",
     generationTimeout: "This took too long.",

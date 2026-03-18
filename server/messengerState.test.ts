@@ -3,12 +3,13 @@ import {
   anonymizePsid,
   getOrCreateState,
   getQuickRepliesForState,
+  getStyleRepliesForCategory,
   resetStateStore,
   setChosenStyle,
   setFlowState,
   setPendingImage,
 } from "./_core/messengerState";
-import { STYLE_CONFIGS } from "./_core/messengerStyles";
+import { STYLE_CATEGORY_CONFIGS } from "./_core/messengerStyles";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
@@ -61,7 +62,10 @@ describe("messenger state flow", () => {
     ]);
     expect(getQuickRepliesForState("AWAITING_PHOTO")).toEqual([]);
     expect(getQuickRepliesForState("AWAITING_STYLE")).toEqual(
-      STYLE_CONFIGS.map(style => ({ title: style.label, payload: style.payload })),
+      STYLE_CATEGORY_CONFIGS.map(category => ({
+        title: category.label,
+        payload: category.payload,
+      })),
     );
     expect(getQuickRepliesForState("PROCESSING")).toEqual([]);
     expect(getQuickRepliesForState("RESULT_READY")).toEqual([
@@ -71,6 +75,15 @@ describe("messenger state flow", () => {
     expect(getQuickRepliesForState("FAILURE")).toEqual([
       { title: "Probeer opnieuw", payload: "RETRY_STYLE" },
       { title: "Andere stijl", payload: "CHOOSE_STYLE" },
+    ]);
+  });
+
+  it("maps per-category style replies with a back action", () => {
+    expect(getStyleRepliesForCategory("bold")).toEqual([
+      { title: "✨ Gold", payload: "STYLE_GOLD" },
+      { title: "🌃 Cyberpunk", payload: "STYLE_CYBERPUNK" },
+      { title: "🪩 Disco Glow", payload: "STYLE_DISCO" },
+      { title: "↩️ Categorieen", payload: "CHOOSE_STYLE" },
     ]);
   });
 

@@ -10,12 +10,14 @@ import {
 } from "vitest";
 
 const {
+  sendGenericTemplateMock,
   sendImageMock,
   sendQuickRepliesMock,
   sendTextMock,
   safeLogMock,
   generateMessengerReplyMock,
 } = vi.hoisted(() => ({
+  sendGenericTemplateMock: vi.fn(async () => undefined),
   sendImageMock: vi.fn(async () => undefined),
   sendQuickRepliesMock: vi.fn(async () => undefined),
   sendTextMock: vi.fn(async () => undefined),
@@ -27,6 +29,7 @@ const {
 }));
 
 vi.mock("./_core/messengerApi", () => ({
+  sendGenericTemplate: sendGenericTemplateMock,
   sendImage: sendImageMock,
   sendQuickReplies: sendQuickRepliesMock,
   sendText: sendTextMock,
@@ -204,6 +207,7 @@ describe("messenger webhook dedupe", () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     sendImageMock.mockClear();
+    sendGenericTemplateMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
     safeLogMock.mockClear();
@@ -1564,12 +1568,24 @@ describe("messenger greeting behavior", () => {
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
       "style-user",
-      "Kies je stijl 👇",
-      STYLE_CONFIGS.map(style => ({
-        content_type: "text" as const,
-        title: style.label,
-        payload: style.payload,
-      }))
+      "Kies eerst een stijlgroep 👇",
+      [
+        {
+          content_type: "text",
+          title: "🎨 Illustrated",
+          payload: "STYLE_CATEGORY_ILLUSTRATED",
+        },
+        {
+          content_type: "text",
+          title: "🌤️ Atmosphere",
+          payload: "STYLE_CATEGORY_ATMOSPHERE",
+        },
+        {
+          content_type: "text",
+          title: "⚡ Bold",
+          payload: "STYLE_CATEGORY_BOLD",
+        },
+      ]
     );
   });
 
@@ -1607,7 +1623,7 @@ describe("messenger greeting behavior", () => {
     expect(sendQuickRepliesMock).toHaveBeenNthCalledWith(
       1,
       "transition-order-user",
-      "Kies je stijl 👇",
+      "Kies eerst een stijlgroep 👇",
       expect.any(Array)
     );
     expect(sendTextMock).toHaveBeenCalledTimes(1);
@@ -1639,6 +1655,150 @@ describe("messenger greeting behavior", () => {
     expect(sendImageMock.mock.invocationCallOrder[0]).toBeLessThan(
       sendQuickRepliesMock.mock.invocationCallOrder[1]
     );
+  });
+
+  it("opens a category carousel and matching style pills after category selection", async () => {
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "category-user" },
+              message: {
+                mid: "mid-category-photo",
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/source.jpg" },
+                  },
+                ],
+              },
+            },
+            {
+              sender: { id: "category-user" },
+              postback: { payload: "STYLE_CATEGORY_ILLUSTRATED" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendGenericTemplateMock).toHaveBeenCalledWith("category-user", [
+      expect.objectContaining({
+        title: "Caricature",
+        buttons: [
+          {
+            type: "postback",
+            title: "Kies",
+            payload: "STYLE_CARICATURE",
+          },
+        ],
+      }),
+      expect.objectContaining({
+        title: "Storybook Anime",
+        buttons: [
+          {
+            type: "postback",
+            title: "Kies",
+            payload: "STYLE_STORYBOOK_ANIME",
+          },
+        ],
+      }),
+      expect.objectContaining({
+        title: "Oil Paint",
+      }),
+      expect.objectContaining({
+        title: "Norman Blackwell",
+      }),
+    ]);
+    expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
+      "category-user",
+      "Hier zijn je illustrated-stijlen. Kies er eentje hieronder.",
+      [
+        {
+          content_type: "text",
+          title: "🎨 Caricature",
+          payload: "STYLE_CARICATURE",
+        },
+        {
+          content_type: "text",
+          title: "🌿 Storybook Anime",
+          payload: "STYLE_STORYBOOK_ANIME",
+        },
+        {
+          content_type: "text",
+          title: "🖼️ Oil Paint",
+          payload: "STYLE_OIL_PAINT",
+        },
+        {
+          content_type: "text",
+          title: "📰 Norman Blackwell",
+          payload: "STYLE_NORMAN_BLACKWELL",
+        },
+        {
+          content_type: "text",
+          title: "Categorieen",
+          payload: "CHOOSE_STYLE",
+        },
+      ]
+    );
+  });
+
+  it("falls back to category style pills when the carousel send fails", async () => {
+    sendGenericTemplateMock.mockRejectedValueOnce(new Error("template-failed"));
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "category-fallback-user" },
+              message: {
+                mid: "mid-category-fallback-photo",
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/source.jpg" },
+                  },
+                ],
+              },
+            },
+            {
+              sender: { id: "category-fallback-user" },
+              postback: { payload: "STYLE_CATEGORY_BOLD" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
+      "category-fallback-user",
+      "Hier zijn je bold-stijlen. Kies er eentje hieronder.",
+      [
+        { content_type: "text", title: "✨ Gold", payload: "STYLE_GOLD" },
+        {
+          content_type: "text",
+          title: "🌃 Cyberpunk",
+          payload: "STYLE_CYBERPUNK",
+        },
+        {
+          content_type: "text",
+          title: "🪩 Disco Glow",
+          payload: "STYLE_DISCO",
+        },
+        {
+          content_type: "text",
+          title: "Categorieen",
+          payload: "CHOOSE_STYLE",
+        },
+      ]
+    );
+    expect(safeLogMock).toHaveBeenCalledWith("style_category_carousel_failed", {
+      user: expect.any(String),
+      category: "bold",
+      errorCode: "Error",
+    });
   });
 
   it("offers follow-up quick actions when state is RESULT_READY", async () => {

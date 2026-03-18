@@ -1,6 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { sendImageMock, sendQuickRepliesMock, sendTextMock, safeLogMock } = vi.hoisted(() => ({
+const {
+  sendGenericTemplateMock,
+  sendImageMock,
+  sendQuickRepliesMock,
+  sendTextMock,
+  safeLogMock,
+} = vi.hoisted(() => ({
+  sendGenericTemplateMock: vi.fn(async () => undefined),
   sendImageMock: vi.fn(async () => undefined),
   sendQuickRepliesMock: vi.fn(async () => undefined),
   sendTextMock: vi.fn(async () => undefined),
@@ -8,6 +15,7 @@ const { sendImageMock, sendQuickRepliesMock, sendTextMock, safeLogMock } = vi.ho
 }));
 
 vi.mock("./_core/messengerApi", () => ({
+  sendGenericTemplate: sendGenericTemplateMock,
   sendImage: sendImageMock,
   sendQuickReplies: sendQuickRepliesMock,
   sendText: sendTextMock,
@@ -27,6 +35,7 @@ describe("photo-first onboarding", () => {
 
   beforeEach(() => {
     sendImageMock.mockClear();
+    sendGenericTemplateMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
     safeLogMock.mockClear();
@@ -67,11 +76,12 @@ describe("photo-first onboarding", () => {
     expect(userState?.stage).toBe("AWAITING_STYLE");
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
-      "Kies je stijl 👇",
+      "Kies eerst een stijlgroep 👇",
       expect.arrayContaining([
-        expect.objectContaining({ payload: "STYLE_CARICATURE" }),
+        expect.objectContaining({ payload: "STYLE_CATEGORY_ILLUSTRATED" }),
       ]),
     );
+    expect(sendGenericTemplateMock).not.toHaveBeenCalled();
     expect(sendTextMock).not.toHaveBeenCalled();
   });
 

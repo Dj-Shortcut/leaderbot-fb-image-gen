@@ -1,10 +1,15 @@
 import { createHash } from "node:crypto";
 import { normalizeLang, t, type Lang } from "./i18n";
 import {
+  getStyleRepliesForCategory,
   getQuickRepliesForState,
   type ConversationState,
 } from "./messengerState";
-import { type Style } from "./messengerStyles";
+import {
+  type Style,
+  type StyleCategory,
+  STYLE_CATEGORY_CONFIGS,
+} from "./messengerStyles";
 
 export type FacebookWebhookEvent = {
   sender?: { id?: string; locale?: string };
@@ -69,6 +74,12 @@ export const STYLE_LABELS: Record<Style, string> = {
   "norman-blackwell": "Norman Blackwell",
   disco: "Disco",
   clouds: "Clouds",
+};
+
+export const STYLE_CATEGORY_LABELS: Record<StyleCategory, string> = {
+  illustrated: "Illustrated",
+  atmosphere: "Atmosphere",
+  bold: "Bold",
 };
 
 const STYLE_ALIASES: Record<string, Style> = {
@@ -225,7 +236,7 @@ export function getGreetingResponse(
       return {
         mode: "quick_replies",
         state: "AWAITING_STYLE",
-        text: t(lang, "stylePicker"),
+        text: t(lang, "styleCategoryPicker"),
       };
     case "RESULT_READY":
       return {
@@ -282,6 +293,13 @@ export function parseStyle(text: string): Style | undefined {
   return normalizeStyle(text);
 }
 
+export function styleCategoryPayloadToCategory(
+  payload: string
+): StyleCategory | undefined {
+  const category = STYLE_CATEGORY_CONFIGS.find(item => item.payload === payload);
+  return category?.category;
+}
+
 export function parseReferralStyle(ref: string | undefined): Style | undefined {
   if (!ref?.startsWith("style_")) {
     return undefined;
@@ -328,6 +346,15 @@ export function toMessengerReplies(state: ConversationState) {
   return getQuickRepliesForState(state).map(reply => ({
     content_type: "text" as const,
     title: reply.title,
+    payload: reply.payload,
+  }));
+}
+
+export function toMessengerStyleReplies(category: StyleCategory, lang: Lang) {
+  return getStyleRepliesForCategory(category).map(reply => ({
+    content_type: "text" as const,
+    title:
+      reply.payload === "CHOOSE_STYLE" ? t(lang, "backToCategories") : reply.title,
     payload: reply.payload,
   }));
 }

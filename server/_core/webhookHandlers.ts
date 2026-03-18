@@ -1,4 +1,10 @@
-import { sendImage, sendQuickReplies, sendText, safeLog } from "./messengerApi";
+import {
+  sendGenericTemplate,
+  sendImage,
+  sendQuickReplies,
+  sendText,
+  safeLog,
+} from "./messengerApi";
 import {
   createImageGenerator,
   getGenerationMetrics,
@@ -18,13 +24,18 @@ import {
   setPendingImage,
   setPreselectedStyle,
   setPreferredLang,
+  setSelectedStyleCategory,
   markIntroSeen,
   anonymizePsid,
   type ConversationState,
 } from "./messengerState";
 import { normalizeLang, t, type Lang } from "./i18n";
 import { toLogUser, toUserKey } from "./privacy";
-import type { Style } from "./messengerStyles";
+import {
+  getStylesForCategory,
+  type Style,
+  type StyleCategory,
+} from "./messengerStyles";
 import { claimWebhookReplayKey } from "./webhookReplayProtection";
 import {
   detectAck,
@@ -35,9 +46,12 @@ import {
   normalizeStyle,
   parseReferralStyle,
   parseStyle,
+  STYLE_CATEGORY_LABELS,
   STYLE_LABELS,
+  styleCategoryPayloadToCategory,
   stylePayloadToStyle,
   toMessengerReplies,
+  toMessengerStyleReplies,
 } from "./webhookHelpers";
 import { hasInFlightGeneration, runGuardedGeneration } from "./generationGuard";
 import { canGenerate, increment } from "./messengerQuota";
@@ -220,6 +234,29 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     await sendLoggedQuickReplies(psid, text, replies, reqId);
   }
 
+  async function sendLoggedGenericTemplate(
+    psid: string,
+    elements: Parameters<typeof sendGenericTemplate>[1],
+    reqId: string
+  ): Promise<void> {
+    debugWebhookLog({
+      level: "debug",
+      msg: "outgoing_message",
+      kind: "generic_template",
+      reqId,
+      psidHash: anonymizePsid(psid).slice(0, 12),
+      elements: elements.map(element => ({
+        title: element.title,
+        subtitle: element.subtitle,
+        buttons: element.buttons?.map(button => ({
+          title: button.title,
+          payload: button.payload,
+        })),
+      })),
+    });
+    await sendGenericTemplate(psid, elements);
+  }
+
   function createFeatureLogger(userId: string): BotLogger {
     return {
       info(event, details = {}) {
@@ -344,7 +381,58 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
   }
 
   async function sendStylePicker(psid: string, lang: Lang, reqId: string): Promise<void> {
-    await sendStateQuickReplies(psid, "AWAITING_STYLE", t(lang, "stylePicker"), reqId);
+    await sendStateQuickReplies(
+      psid,
+      "AWAITING_STYLE",
+      t(lang, "styleCategoryPicker"),
+      reqId
+    );
+  }
+
+  async function sendStyleOptionsForCategory(
+    psid: string,
+    category: StyleCategory,
+    lang: Lang,
+    reqId: string
+  ): Promise<void> {
+    const styles = getStylesForCategory(category);
+    const categoryLabel = STYLE_CATEGORY_LABELS[category];
+
+    try {
+      await sendLoggedGenericTemplate(
+        psid,
+        styles.map(style => ({
+          title: STYLE_LABELS[style.style],
+          subtitle:
+            lang === "en"
+              ? `${categoryLabel} style`
+              : `${categoryLabel}-stijl`,
+          buttons: [
+            {
+              type: "postback",
+              title: lang === "en" ? "Choose" : "Kies",
+              payload: style.payload,
+            },
+          ],
+        })),
+        reqId
+      );
+    } catch (error) {
+      safeLog("style_category_carousel_failed", {
+        user: toLogUser(psid),
+        category,
+        errorCode: error instanceof Error ? error.name : "unknown_error",
+      });
+    }
+
+    await sendLoggedQuickReplies(
+      psid,
+      t(lang, "styleCategoryCarouselIntro", {
+        styleLabel: categoryLabel.toLowerCase(),
+      }),
+      toMessengerStyleReplies(category, lang),
+      reqId
+    );
   }
 
   async function sendPhotoReceivedPrompt(
@@ -528,8 +616,8 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       return;
     }
 
-    await setChosenStyle(psid, selectedStyle);
-    if (!state.lastPhotoUrl) {
+      await setChosenStyle(psid, selectedStyle);
+      if (!state.lastPhotoUrl) {
       await setFlowState(psid, "AWAITING_PHOTO");
       await sendLoggedText(psid, t(lang, "styleWithoutPhoto"), reqId);
       return;
@@ -573,8 +661,17 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       return;
     }
 
+    const selectedCategory = styleCategoryPayloadToCategory(payload);
+    if (selectedCategory) {
+      await setSelectedStyleCategory(psid, selectedCategory);
+      await setFlowState(psid, "AWAITING_STYLE");
+      await sendStyleOptionsForCategory(psid, selectedCategory, lang, reqId);
+      return;
+    }
+
     if (payload === "CHOOSE_STYLE") {
       await setPreselectedStyle(psid, null);
+      await setSelectedStyleCategory(psid, null);
       await setFlowState(psid, "AWAITING_STYLE");
       await sendStylePicker(psid, lang, reqId);
       return;

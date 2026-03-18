@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   STYLE_CONFIGS,
+  STYLE_CATEGORY_CONFIGS,
+  getStyleCategoryById,
   getStyleById,
+  getStylesForCategory,
+  isStyleCategoryPayload,
   isStylePayload,
 } from "./_core/messengerStyles";
 
@@ -37,5 +41,25 @@ describe("messengerStyles", () => {
       "Norman Blackwell"
     );
     expect(getStyleById("STYLE_DISCO").label).toContain("Disco");
+  });
+
+  it("exposes style categories and maps styles into them", () => {
+    expect(STYLE_CATEGORY_CONFIGS.map(category => category.category)).toEqual([
+      "illustrated",
+      "atmosphere",
+      "bold",
+    ]);
+    expect(isStyleCategoryPayload("STYLE_CATEGORY_ILLUSTRATED")).toBe(true);
+    expect(isStyleCategoryPayload("STYLE_CATEGORY_BOLD")).toBe(true);
+    expect(isStyleCategoryPayload("STYLE_CATEGORY_UNKNOWN")).toBe(false);
+    expect(getStyleCategoryById("STYLE_CATEGORY_ATMOSPHERE").label).toContain(
+      "Atmosphere"
+    );
+    expect(getStylesForCategory("illustrated").map(style => style.style)).toEqual([
+      "caricature",
+      "storybook-anime",
+      "oil-paint",
+      "norman-blackwell",
+    ]);
   });
 });
