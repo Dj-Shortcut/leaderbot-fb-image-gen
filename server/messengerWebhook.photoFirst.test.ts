@@ -1,12 +1,14 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
+  sendButtonTemplateMock,
   sendGenericTemplateMock,
   sendImageMock,
   sendQuickRepliesMock,
   sendTextMock,
   safeLogMock,
 } = vi.hoisted(() => ({
+  sendButtonTemplateMock: vi.fn(async () => undefined),
   sendGenericTemplateMock: vi.fn(async () => undefined),
   sendImageMock: vi.fn(async () => undefined),
   sendQuickRepliesMock: vi.fn(async () => undefined),
@@ -15,6 +17,7 @@ const {
 }));
 
 vi.mock("./_core/messengerApi", () => ({
+  sendButtonTemplate: sendButtonTemplateMock,
   sendGenericTemplate: sendGenericTemplateMock,
   sendImage: sendImageMock,
   sendQuickReplies: sendQuickRepliesMock,
@@ -35,6 +38,7 @@ describe("photo-first onboarding", () => {
 
   beforeEach(() => {
     sendImageMock.mockClear();
+    sendButtonTemplateMock.mockClear();
     sendGenericTemplateMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
@@ -197,6 +201,7 @@ describe("photo-first onboarding", () => {
 
   it("returns privacy explanation on PRIVACY_INFO postback", async () => {
     const psid = "privacy-user";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
 
     await processFacebookWebhookPayload({
       entry: [
@@ -211,14 +216,22 @@ describe("photo-first onboarding", () => {
       ],
     });
 
-    expect(sendTextMock).toHaveBeenCalledWith(
+    expect(sendButtonTemplateMock).toHaveBeenCalledWith(
       psid,
       [
         "Je foto wordt enkel gebruikt om de afbeelding te maken.",
         "Ze wordt daarna niet bewaard.",
-        "Hier kan je het volledige privacybeleid lezen: <link>",
+        "Privacybeleid: https://leaderbot-fb-image-gen.fly.dev/privacy",
       ].join("\n"),
+      [
+        {
+          type: "web_url",
+          title: "Privacybeleid",
+          url: "https://leaderbot-fb-image-gen.fly.dev/privacy",
+        },
+      ],
     );
+    expect(sendTextMock).not.toHaveBeenCalled();
   });
 
   it("routes free-form user text without photo into the photo prompt", async () => {
@@ -266,6 +279,7 @@ describe("photo-first onboarding", () => {
     );
 
     sendQuickRepliesMock.mockClear();
+    sendButtonTemplateMock.mockClear();
 
     await processFacebookWebhookPayload({
       entry: [
@@ -280,13 +294,20 @@ describe("photo-first onboarding", () => {
       ],
     });
 
-    expect(sendTextMock).toHaveBeenLastCalledWith(
+    expect(sendButtonTemplateMock).toHaveBeenLastCalledWith(
       psid,
       [
         "Your photo is only used to make the image.",
         "It is not stored afterwards.",
-        "You can read the full privacy policy here: <link>",
+        "Privacy policy: https://leaderbot-fb-image-gen.fly.dev/privacy",
       ].join("\n"),
+      [
+        {
+          type: "web_url",
+          title: "Privacy Policy",
+          url: "https://leaderbot-fb-image-gen.fly.dev/privacy",
+        },
+      ],
     );
   });
 

@@ -15,6 +15,7 @@ type TranslationKey =
   | "styleWithoutPhoto"
   | "textWithoutPhoto"
   | "privacy"
+  | "privacyButtonLabel"
   | "aboutLeaderbot"
   | "failure"
   | "missingInputImage"
@@ -43,8 +44,9 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
     privacy: ({ link }) => [
       "Je foto wordt enkel gebruikt om de afbeelding te maken.",
       "Ze wordt daarna niet bewaard.",
-      `Hier kan je het volledige privacybeleid lezen: ${link ?? "<link>"}`,
+      ...(link ? [`Privacybeleid: ${link}`] : []),
     ].join("\n"),
+    privacyButtonLabel: "Privacybeleid",
     aboutLeaderbot: "Leaderbot is gemaakt door Andy. Je mag hem gerust contacteren via Facebook.\nVolledige naam op vraag: Andy Arijs.",
     failure: "Oeps. Probeer nog een stijl.",
     missingInputImage: "Ik kon je foto niet goed lezen. Stuur ze nog eens door aub.",
@@ -70,8 +72,9 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
     privacy: ({ link }) => [
       "Your photo is only used to make the image.",
       "It is not stored afterwards.",
-      `You can read the full privacy policy here: ${link ?? "<link>"}`,
+      ...(link ? [`Privacy policy: ${link}`] : []),
     ].join("\n"),
+    privacyButtonLabel: "Privacy Policy",
     aboutLeaderbot: "Leaderbot was made by Andy. Feel free to contact him via Facebook.\nFull name on request: Andy Arijs.",
     failure: "Oops. Try another style.",
     missingInputImage: "I could not read your photo properly. Please send it again.",

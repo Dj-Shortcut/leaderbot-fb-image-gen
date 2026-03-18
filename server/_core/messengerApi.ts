@@ -8,15 +8,23 @@ type QuickReply = {
   payload: string;
 };
 
+type TemplateButton =
+  | {
+      type: "postback";
+      title: string;
+      payload: string;
+    }
+  | {
+      type: "web_url";
+      title: string;
+      url: string;
+    };
+
 type GenericTemplateElement = {
   title: string;
   subtitle?: string;
   image_url?: string;
-  buttons?: Array<{
-    type: "postback";
-    title: string;
-    payload: string;
-  }>;
+  buttons?: TemplateButton[];
 };
 
 function getPageToken(): string {
@@ -208,6 +216,23 @@ export async function sendGenericTemplate(
   });
 }
 
+export async function sendButtonTemplate(
+  psid: string,
+  text: string,
+  buttons: TemplateButton[]
+): Promise<void> {
+  await sendMessage(psid, {
+    attachment: {
+      type: "template",
+      payload: {
+        template_type: "button",
+        text,
+        buttons,
+      },
+    },
+  });
+}
+
 export async function sendImage(psid: string, imageUrl: string): Promise<void> {
   safeLog("messenger_image_send", {});
 
@@ -243,4 +268,4 @@ export async function sendImage(psid: string, imageUrl: string): Promise<void> {
   );
 }
 
-export type { QuickReply, GenericTemplateElement };
+export type { QuickReply, GenericTemplateElement, TemplateButton };

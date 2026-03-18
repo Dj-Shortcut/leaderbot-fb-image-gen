@@ -1,4 +1,5 @@
 import {
+  sendButtonTemplate,
   sendGenericTemplate,
   sendImage,
   sendQuickReplies,
@@ -234,6 +235,21 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     await sendLoggedQuickReplies(psid, text, replies, reqId);
   }
 
+  function resolvePrivacyPolicyUrl(): string | undefined {
+    const trimmed = privacyPolicyUrl.trim();
+    if (/^https?:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+
+    const appBaseUrl =
+      process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
+    if (appBaseUrl && /^https?:\/\//i.test(appBaseUrl)) {
+      return `${appBaseUrl.replace(/\/$/, "")}/privacy`;
+    }
+
+    return undefined;
+  }
+
   async function sendLoggedGenericTemplate(
     psid: string,
     elements: Parameters<typeof sendGenericTemplate>[1],
@@ -248,13 +264,51 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       elements: elements.map(element => ({
         title: element.title,
         subtitle: element.subtitle,
-        buttons: element.buttons?.map(button => ({
-          title: button.title,
-          payload: button.payload,
-        })),
+        buttons: element.buttons?.map(button => {
+          if (button.type === "web_url") {
+            return {
+              type: button.type,
+              title: button.title,
+            };
+          }
+
+          return {
+            type: button.type,
+            title: button.title,
+            payload: button.payload,
+          };
+        }),
       })),
     });
     await sendGenericTemplate(psid, elements);
+  }
+
+  async function sendLoggedButtonTemplate(
+    psid: string,
+    text: string,
+    buttons: Parameters<typeof sendButtonTemplate>[2],
+    reqId: string
+  ): Promise<void> {
+    debugWebhookLog({
+      level: "debug",
+      msg: "outgoing_message",
+      kind: "button_template",
+      reqId,
+      psidHash: anonymizePsid(psid).slice(0, 12),
+      text,
+      buttons: buttons.map(button => {
+        if (button.type === "web_url") {
+          return { type: button.type, title: button.title };
+        }
+
+        return {
+          type: button.type,
+          title: button.title,
+          payload: button.payload,
+        };
+      }),
+    });
+    await sendButtonTemplate(psid, text, buttons);
   }
 
   function createFeatureLogger(userId: string): BotLogger {
@@ -697,7 +751,26 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     }
 
     if (payload === "PRIVACY_INFO") {
-      await sendLoggedText(psid, t(lang, "privacy", { link: privacyPolicyUrl }), reqId);
+      const resolvedPrivacyUrl = resolvePrivacyPolicyUrl();
+      const privacyText = t(lang, "privacy", { link: resolvedPrivacyUrl });
+
+      if (resolvedPrivacyUrl) {
+        await sendLoggedButtonTemplate(
+          psid,
+          privacyText,
+          [
+            {
+              type: "web_url",
+              title: t(lang, "privacyButtonLabel"),
+              url: resolvedPrivacyUrl,
+            },
+          ],
+          reqId
+        );
+        return;
+      }
+
+      await sendLoggedText(psid, privacyText, reqId);
       return;
     }
 
