@@ -55,7 +55,7 @@ const MIN_INPUT_IMAGE_BYTES = 5 * 1024;
 const FB_IMAGE_FETCH_RETRY_LIMIT = 1;
 const OPENAI_RETRY_LIMIT_DEFAULT = 1;
 const OPENAI_RETRY_BASE_MS_DEFAULT = 500;
-const OPENAI_TIMEOUT_MS_DEFAULT = 30_000;
+const OPENAI_TIMEOUT_MS_DEFAULT = 45_000;
 
 function getConfiguredBaseUrl(): string | undefined {
   const configuredBaseUrl =
