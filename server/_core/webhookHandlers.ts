@@ -472,6 +472,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         })),
         reqId
       );
+      return;
     } catch (error) {
       safeLog("style_category_carousel_failed", {
         user: toLogUser(psid),

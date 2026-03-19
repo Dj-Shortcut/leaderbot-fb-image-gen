@@ -1790,36 +1790,15 @@ describe("messenger greeting behavior", () => {
         title: "Norman Blackwell",
       }),
     ]);
-    expect(sendQuickRepliesMock).toHaveBeenLastCalledWith(
+    expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       "category-user",
-      "Hier zijn je illustrated-stijlen. Kies er eentje hieronder.",
-      [
-        {
-          content_type: "text",
-          title: "🎨 Caricature",
-          payload: "STYLE_CARICATURE",
-        },
-        {
-          content_type: "text",
-          title: "🌿 Storybook Anime",
-          payload: "STYLE_STORYBOOK_ANIME",
-        },
-        {
-          content_type: "text",
-          title: "🖼️ Oil Paint",
-          payload: "STYLE_OIL_PAINT",
-        },
-        {
-          content_type: "text",
-          title: "📰 Norman Blackwell",
-          payload: "STYLE_NORMAN_BLACKWELL",
-        },
-        {
-          content_type: "text",
-          title: "Categorieen",
-          payload: "CHOOSE_STYLE",
-        },
-      ]
+      "Kies eerst een stijlgroep 👇",
+      expect.arrayContaining([
+        expect.objectContaining({ payload: "STYLE_CATEGORY_ILLUSTRATED" }),
+        expect.objectContaining({ payload: "STYLE_CATEGORY_ATMOSPHERE" }),
+        expect.objectContaining({ payload: "STYLE_CATEGORY_BOLD" }),
+      ])
     );
   });
 
