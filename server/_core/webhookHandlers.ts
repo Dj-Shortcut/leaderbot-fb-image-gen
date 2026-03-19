@@ -242,13 +242,31 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       return trimmed;
     }
 
-    const appBaseUrl =
-      process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
-    if (appBaseUrl && /^https?:\/\//i.test(appBaseUrl)) {
-      return `${appBaseUrl.replace(/\/$/, "")}/privacy`;
+    const appBaseUrl = resolveAppBaseUrl();
+    if (appBaseUrl) {
+      return `${appBaseUrl}/privacy`;
     }
 
     return undefined;
+  }
+
+  function resolveAppBaseUrl(): string | undefined {
+    const appBaseUrl =
+      process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
+    if (appBaseUrl && /^https?:\/\//i.test(appBaseUrl)) {
+      return appBaseUrl.replace(/\/$/, "");
+    }
+
+    return undefined;
+  }
+
+  function resolveStylePreviewUrl(style: Style): string | undefined {
+    const appBaseUrl = resolveAppBaseUrl();
+    if (!appBaseUrl) {
+      return undefined;
+    }
+
+    return `${appBaseUrl}/style-previews/${style}.png`;
   }
 
   async function sendLoggedGenericTemplate(
@@ -265,6 +283,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       elements: elements.map(element => ({
         title: element.title,
         subtitle: element.subtitle,
+        imageUrl: element.image_url,
         buttons: element.buttons?.map(button => {
           if (button.type === "web_url") {
             return {
@@ -452,8 +471,12 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
   ): Promise<void> {
     const styles = getStylesForCategory(category);
     const categoryLabel = STYLE_CATEGORY_LABELS[category];
+    const introText = t(lang, "styleCategoryCarouselIntro", {
+      styleLabel: categoryLabel.toLowerCase(),
+    });
 
     try {
+      await sendLoggedText(psid, introText, reqId);
       await sendLoggedGenericTemplate(
         psid,
         styles.map(style => ({
@@ -462,6 +485,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
             lang === "en"
               ? `${categoryLabel} style`
               : `${categoryLabel}-stijl`,
+          image_url: resolveStylePreviewUrl(style.style),
           buttons: [
             {
               type: "postback",
@@ -483,9 +507,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
 
     await sendLoggedQuickReplies(
       psid,
-      t(lang, "styleCategoryCarouselIntro", {
-        styleLabel: categoryLabel.toLowerCase(),
-      }),
+      introText,
       toMessengerStyleReplies(category, lang),
       reqId
     );

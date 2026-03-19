@@ -36,6 +36,7 @@ const STYLE_PROMPT_CASES = [
       "dimensional cel-shaded rendering",
     ],
     minFeatureMatches: 3,
+<<<<<<< ours
   },
   {
     style: "storybook-anime",
@@ -48,6 +49,8 @@ const STYLE_PROMPT_CASES = [
       "nostalgic magical mood",
     ],
     minFeatureMatches: 3,
+=======
+>>>>>>> theirs
   },
   {
     style: "petals",
@@ -125,9 +128,13 @@ function expectDistinctivePrompt(
   const matchedFeatures = styleCase.features.filter(feature =>
     prompt.includes(feature)
   );
+<<<<<<< ours
   expect(matchedFeatures.length).toBeGreaterThanOrEqual(
     styleCase.minFeatureMatches
   );
+=======
+  expect(matchedFeatures).toHaveLength(styleCase.minFeatureMatches);
+>>>>>>> theirs
 
   const additionalDirection = `Additional direction: ${promptHint}.`;
   expect(prompt).toContain(additionalDirection);

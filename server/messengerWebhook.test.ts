@@ -1736,7 +1736,7 @@ describe("messenger greeting behavior", () => {
     );
   });
 
-  it("opens a category carousel and matching style pills after category selection", async () => {
+  it("shows category intro text before the carousel without duplicate substyle pills", async () => {
     await processFacebookWebhookPayload({
       entry: [
         {
@@ -1762,9 +1762,15 @@ describe("messenger greeting behavior", () => {
       ],
     });
 
+    expect(sendTextMock).toHaveBeenCalledWith(
+      "category-user",
+      "Hier zijn je illustrated-stijlen. Kies er eentje hieronder."
+    );
     expect(sendGenericTemplateMock).toHaveBeenCalledWith("category-user", [
       expect.objectContaining({
         title: "Caricature",
+        image_url:
+          "https://leaderbot-fb-image-gen.fly.dev/style-previews/caricature.png",
         buttons: [
           {
             type: "postback",
@@ -1775,6 +1781,8 @@ describe("messenger greeting behavior", () => {
       }),
       expect.objectContaining({
         title: "Storybook Anime",
+        image_url:
+          "https://leaderbot-fb-image-gen.fly.dev/style-previews/storybook-anime.png",
         buttons: [
           {
             type: "postback",
@@ -1785,9 +1793,13 @@ describe("messenger greeting behavior", () => {
       }),
       expect.objectContaining({
         title: "Oil Paint",
+        image_url:
+          "https://leaderbot-fb-image-gen.fly.dev/style-previews/oil-paint.png",
       }),
       expect.objectContaining({
         title: "Norman Blackwell",
+        image_url:
+          "https://leaderbot-fb-image-gen.fly.dev/style-previews/norman-blackwell.png",
       }),
     ]);
     expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
@@ -1800,6 +1812,50 @@ describe("messenger greeting behavior", () => {
         expect.objectContaining({ payload: "STYLE_CATEGORY_BOLD" }),
       ])
     );
+    expect(sendTextMock.mock.invocationCallOrder[0]).toBeLessThan(
+      sendGenericTemplateMock.mock.invocationCallOrder[0]
+    );
+  });
+
+  it("keeps category selection in no-photo flow on a single text-plus-carousel path", async () => {
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "category-no-photo-user" },
+              postback: { payload: "STYLE_CATEGORY_ATMOSPHERE" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      "category-no-photo-user",
+      "Hier zijn je atmosphere-stijlen. Kies er eentje hieronder."
+    );
+    expect(sendGenericTemplateMock).toHaveBeenCalledWith(
+      "category-no-photo-user",
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Petals",
+          image_url:
+            "https://leaderbot-fb-image-gen.fly.dev/style-previews/petals.png",
+        }),
+        expect.objectContaining({
+          title: "Cinematic",
+          image_url:
+            "https://leaderbot-fb-image-gen.fly.dev/style-previews/cinematic.png",
+        }),
+        expect.objectContaining({
+          title: "Clouds",
+          image_url:
+            "https://leaderbot-fb-image-gen.fly.dev/style-previews/clouds.png",
+        }),
+      ])
+    );
+    expect(sendQuickRepliesMock).not.toHaveBeenCalled();
   });
 
   it("falls back to category style pills when the carousel send fails", async () => {
