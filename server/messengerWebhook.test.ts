@@ -1589,6 +1589,85 @@ describe("messenger greeting behavior", () => {
     );
   });
 
+  it("shows monthly budget fallback when OpenAI quota is exhausted", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+
+    const sourceImage = Buffer.alloc(6000, 7);
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
+        return {
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => sourceImage,
+        } as Response;
+      }
+
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: "insufficient_quota",
+            message: "Budget reached for this month",
+          },
+        }),
+        {
+          status: 429,
+          statusText: "Too Many Requests",
+          headers: new Headers({ "content-type": "application/json" }),
+        }
+      );
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "openai-budget-user" },
+                message: {
+                  mid: "mid-photo-openai-budget",
+                  attachments: [
+                    {
+                      type: "image",
+                      payload: { url: "https://img.example/source.jpg" },
+                    },
+                  ],
+                },
+              },
+              {
+                sender: { id: "openai-budget-user" },
+                message: {
+                  mid: "mid-style-openai-budget",
+                  quick_reply: { payload: "clouds" },
+                },
+              },
+            ],
+          },
+        ],
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(sendTextMock).toHaveBeenLastCalledWith(
+      "openai-budget-user",
+      "⚠️ Even pauze — ons maandbudget is bereikt. Probeer later opnieuw."
+    );
+    expect(sendQuickRepliesMock).not.toHaveBeenLastCalledWith(
+      "openai-budget-user",
+      expect.any(String),
+      expect.arrayContaining([
+        expect.objectContaining({ payload: "RETRY_STYLE_clouds" }),
+      ])
+    );
+    expect(getState(anonymizePsid("openai-budget-user"))?.stage).toBe(
+      "AWAITING_STYLE"
+    );
+  });
+
   it("emits one intentional response package per transition in order", async () => {
     installOpenAiSuccessFetchMock();
 

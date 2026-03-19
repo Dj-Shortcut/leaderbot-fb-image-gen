@@ -8,6 +8,7 @@ import {
 } from "./messengerApi";
 import {
   createImageGenerator,
+  OpenAiBudgetExceededError,
   getGenerationMetrics,
   GenerationTimeoutError,
   MissingInputImageError,
@@ -630,6 +631,10 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
           failureText = t(lang, "generationUnavailable");
         } else if (error instanceof GenerationTimeoutError) {
           failureText = t(lang, "generationTimeout");
+        } else if (error instanceof OpenAiBudgetExceededError) {
+          await sendLoggedText(psid, t(lang, "generationBudgetReached"), reqId);
+          await setFlowState(psid, "AWAITING_STYLE");
+          return;
         }
 
         await sendLoggedText(psid, t(lang, "failure"), reqId);

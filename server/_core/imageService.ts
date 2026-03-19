@@ -36,6 +36,7 @@ export class InvalidGenerationInputError extends Error {}
 export class MissingOpenAiApiKeyError extends Error {}
 export class GenerationTimeoutError extends Error {}
 export class OpenAiGenerationError extends Error {}
+export class OpenAiBudgetExceededError extends Error {}
 export class MissingAppBaseUrlError extends Error {}
 export class MissingInputImageError extends Error {}
 export class InvalidSourceImageUrlError extends Error {}
@@ -233,6 +234,39 @@ export function getGenerationMetrics(
 
 function isRetryableResponseStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
+}
+
+function isBudgetExceededErrorResponse(
+  status: number,
+  errorBody: string
+): boolean {
+  if (status !== 429 && status !== 400 && status !== 403) {
+    return false;
+  }
+
+  const normalized = errorBody.toLowerCase();
+  return (
+    normalized.includes("insufficient_quota") ||
+    normalized.includes("billing_hard_limit_reached") ||
+    normalized.includes("budget") ||
+    normalized.includes("quota")
+  );
+}
+
+async function readErrorBody(response: Response): Promise<string> {
+  if (typeof response.text === "function") {
+    return response.text();
+  }
+
+  try {
+    if (typeof response.json === "function") {
+      return JSON.stringify(await response.json());
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
 }
 
 function isTransientNetworkError(error: unknown): boolean {
@@ -647,6 +681,52 @@ export class OpenAiImageGenerator implements ImageGenerator {
           break;
         }
 
+        if (!response.ok) {
+          const errorBody = await readErrorBody(response);
+          if (isBudgetExceededErrorResponse(response.status, errorBody)) {
+            console.error("OPENAI_BUDGET_EXCEEDED", {
+              reqId: input.reqId,
+              status: response.status,
+              statusText: response.statusText,
+              body: errorBody.slice(0, 1000),
+            });
+            throw attachGenerationMetrics(
+              new OpenAiBudgetExceededError(
+                `OpenAI budget exceeded (${response.status} ${response.statusText})`
+              ),
+              finalizeMetrics(startedAt, partialMetrics)
+            );
+          }
+
+          if (
+            attempt < openAiRetryLimit &&
+            isRetryableResponseStatus(response.status)
+          ) {
+            const waitMs = openAiRetryBaseMs * 2 ** attempt;
+            console.warn("OPENAI_GENERATION_RETRY", {
+              reqId: input.reqId,
+              attempt: attempt + 1,
+              waitMs,
+              status: response.status,
+            });
+            await wait(waitMs);
+            continue;
+          }
+
+          console.error("OPENAI_ERROR_RESPONSE", {
+            reqId: input.reqId,
+            status: response.status,
+            statusText: response.statusText,
+            body: errorBody.slice(0, 1000),
+          });
+          throw attachGenerationMetrics(
+            new OpenAiGenerationError(
+              `OpenAI request failed (${response.status} ${response.statusText})`
+            ),
+            finalizeMetrics(startedAt, partialMetrics)
+          );
+        }
+
         if (
           attempt < openAiRetryLimit &&
           isRetryableResponseStatus(response.status)
@@ -668,22 +748,6 @@ export class OpenAiImageGenerator implements ImageGenerator {
       if (!response) {
         throw new OpenAiGenerationError(
           "OpenAI request failed before receiving a response"
-        );
-      }
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        console.error("OPENAI_ERROR_RESPONSE", {
-          reqId: input.reqId,
-          status: response.status,
-          statusText: response.statusText,
-          body: errorBody.slice(0, 1000),
-        });
-        throw attachGenerationMetrics(
-          new OpenAiGenerationError(
-            `OpenAI request failed (${response.status} ${response.statusText})`
-          ),
-          finalizeMetrics(startedAt, partialMetrics)
         );
       }
 

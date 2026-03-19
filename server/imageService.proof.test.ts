@@ -637,6 +637,53 @@ describe("OpenAi image-to-image proof", () => {
     expect(result.metrics.openAiMs).toBeGreaterThanOrEqual(0);
   });
 
+  it("does not retry when OpenAI reports insufficient quota", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.OPENAI_IMAGE_MAX_RETRIES = "2";
+    process.env.OPENAI_IMAGE_RETRY_BASE_MS = "1";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+
+    const fixture = Buffer.alloc(7000, 9);
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      if (toUrlString(url) === "https://img.example/source.jpg") {
+        return {
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => fixture,
+        } as Response;
+      }
+
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: "insufficient_quota",
+            message: "Budget reached for this month",
+          },
+        }),
+        {
+          status: 429,
+          statusText: "Too Many Requests",
+          headers: new Headers({ "content-type": "application/json" }),
+        }
+      );
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await expect(
+      generator.generate({
+        style: "disco",
+        sourceImageUrl: "https://img.example/source.jpg",
+        userKey: "user-1",
+        reqId: "req-openai-budget-exceeded",
+      })
+    ).rejects.toThrow("OpenAI budget exceeded");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("fails closed when SOURCE_IMAGE_ALLOWED_HOSTS is not set", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";

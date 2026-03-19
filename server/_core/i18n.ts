@@ -26,6 +26,7 @@ type TranslationKey =
   | "hdUnavailable"
   | "generationUnavailable"
   | "generationTimeout"
+  | "generationBudgetReached"
   | "generationGenericFailure";
 
 type TranslationValue = string | ((params: TranslationParams) => string);
@@ -57,6 +58,8 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
     hdUnavailable: "I can share HD downloads after I generate an image.",
     generationUnavailable: "AI generation isn’t enabled yet.",
     generationTimeout: "This took too long.",
+    generationBudgetReached:
+      "⚠️ Even pauze — ons maandbudget is bereikt. Probeer later opnieuw.",
     generationGenericFailure: "I couldn’t generate that image right now.",
   },
   en: {
@@ -85,6 +88,8 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
     hdUnavailable: "I can share HD downloads after I generate an image.",
     generationUnavailable: "AI generation isn’t enabled yet.",
     generationTimeout: "This took too long.",
+    generationBudgetReached:
+      "⚠️ Quick pause — our monthly budget has been reached. Please try again later.",
     generationGenericFailure: "I couldn’t generate that image right now.",
   },
 };
