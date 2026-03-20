@@ -62,6 +62,8 @@ import { getChatRolloutDecision } from "./chatRollout";
 import { generateMessengerReply } from "./messengerResponsesService";
 import { getBotFeatures } from "./bot/features";
 import { ensureDefaultBotFeaturesRegistered } from "./bot/defaultFeatures";
+import { handleSharedTextMessage } from "./sharedTextHandler";
+import type { NormalizedInboundMessage } from "./normalizedInboundMessage";
 import {
   getTodayRuntimeStats,
   recordActiveUserToday,
@@ -79,17 +81,6 @@ type HandlerDeps = {
   defaultLang: Lang;
   privacyPolicyUrl: string;
 };
-
-const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
-const SMALLTALK = new Set([
-  "how are you",
-  "how are you?",
-  "sup",
-  "what's up",
-  "whats up",
-  "thanks",
-  "thank you",
-]);
 
 const IN_FLIGHT_MESSAGE = "\u23F3 even geduld, ik ben nog bezig met jouw restyle";
 const inFlightNoticeSent = new Set();
@@ -872,114 +863,80 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     }
 
     const text = message.text;
-    const ack = detectAck(text);
-    if (ack) {
-      safeLog("ack_ignored", { ack });
-      return;
-    }
-
     const trimmedText = text?.trim();
-    const normalizedText = trimmedText?.toLowerCase();
-    if (!normalizedText || !trimmedText) {
+    if (!trimmedText) {
       return;
     }
 
-    if (GREETINGS.has(normalizedText) || SMALLTALK.has(normalizedText)) {
-      const state = await getOrCreateState(psid);
-      logUserState(psid, userId, state, reqId, "greeting");
-      if (!state.hasSeenIntro && state.stage === "IDLE") {
-        await sendIntro(psid, lang, reqId);
-        await markIntroSeen(psid);
-        return;
-      }
-
-      const response = getGreetingResponse(state.stage, lang);
-      if (response.mode === "text") {
-        await sendLoggedText(psid, response.text, reqId);
-      } else {
-        await sendStateQuickReplies(psid, response.state, response.text, reqId);
-      }
-      return;
-    }
-
-    if (normalizedText === "nieuwe stijl" || normalizedText === "new style") {
-      const quickState = await getOrCreateState(psid);
-      if (quickState.lastPhotoUrl) {
-        await setFlowState(psid, "AWAITING_STYLE");
-        await sendStylePicker(psid, lang, reqId);
-        return;
-      }
-    }
-
-    const state = await getOrCreateState(psid);
-    const hasPhoto = Boolean(state.lastPhotoUrl);
-    for (const feature of getBotFeatures()) {
-      const result = await feature.onText?.(
-        createFeatureTextContext(
-          psid,
-          userId,
-          reqId,
-          lang,
-          state,
-          trimmedText,
-          normalizedText,
-          hasPhoto
-        )
-      );
-      if (result?.handled) {
-        return;
-      }
-    }
-    logUserState(psid, userId, state, reqId, "text_message");
-    if (!hasPhoto) {
-      await setFlowState(psid, "AWAITING_PHOTO");
-    }
-
-    const rolloutDecision = getChatRolloutDecision(userId);
-    safeLog("messenger_chat_engine_decision", {
+    const normalizedMessage: NormalizedInboundMessage = {
+      channel: "messenger",
+      senderId: psid,
+      userId,
+      messageType: "text",
+      textBody: trimmedText,
+      timestamp: event.timestamp ?? Date.now(),
+    };
+    console.log("[messenger webhook] normalized event handoff", {
+      channel: normalizedMessage.channel,
+      reqId,
       user: toLogUser(userId),
-      engine: rolloutDecision.engine,
-      canaryPercent: rolloutDecision.canaryPercent,
-      bucket: rolloutDecision.bucket,
-      selected: rolloutDecision.useResponses ? "responses" : "legacy",
+      messageType: normalizedMessage.messageType,
     });
 
-    if (rolloutDecision.useResponses) {
-      try {
-        const reply = await generateMessengerReply({
-          psid,
-          userKey: userId,
-          lang,
-          stage: state.stage,
-          text: trimmedText,
-          hasPhoto,
-        });
+    await handleSharedTextMessage({
+      message: normalizedMessage,
+      reqId,
+      lang,
+      getState: () => Promise.resolve(getOrCreateState(psid)),
+      setFlowState: nextState => Promise.resolve(setFlowState(psid, nextState)),
+      markIntroSeen: () => Promise.resolve(markIntroSeen(psid)),
+      sendText: text => sendLoggedText(psid, text, reqId),
+      sendStateText: (stateName, text) =>
+        sendStateQuickReplies(psid, stateName, text, reqId),
+      runTextFeatures: async ({ state, messageText, normalizedText, hasPhoto }) => {
+        for (const feature of getBotFeatures()) {
+          const result = await feature.onText?.(
+            createFeatureTextContext(
+              psid,
+              userId,
+              reqId,
+              lang,
+              state,
+              messageText,
+              normalizedText,
+              hasPhoto
+            )
+          );
+          if (result?.handled) {
+            return true;
+          }
+        }
 
+        return false;
+      },
+      logState: (state, context) => {
+        logUserState(psid, userId, state, reqId, context);
+      },
+      logAckIgnored: ack => {
+        safeLog("ack_ignored", { ack });
+      },
+      logRolloutDecision: rolloutDecision => {
+        safeLog("messenger_chat_engine_decision", {
+          user: toLogUser(userId),
+          engine: rolloutDecision.engine,
+          canaryPercent: rolloutDecision.canaryPercent,
+          bucket: rolloutDecision.bucket,
+          selected: rolloutDecision.useResponses ? "responses" : "legacy",
+        });
+      },
+      logEngineResult: ({ source, errorCode }) => {
         safeLog("messenger_chat_engine_result", {
           user: toLogUser(userId),
-          source: reply.source,
+          source,
+          ...(errorCode ? { errorCode } : {}),
         });
-        await sendLoggedText(psid, reply.text, reqId);
-      } catch (error) {
-        safeLog("messenger_chat_engine_result", {
-          user: toLogUser(userId),
-          source: "fallback",
-          errorCode: error instanceof Error ? error.name : "unknown_error",
-        });
-        await sendLoggedText(
-          psid,
-          hasPhoto ? t(lang, "flowExplanation") : t(lang, "textWithoutPhoto"),
-          reqId
-        );
-      }
-      return;
-    }
-
-    await sendLoggedText(
-      psid,
-      hasPhoto ? t(lang, "flowExplanation") : t(lang, "textWithoutPhoto"),
-      reqId
-    );
+      },
+    });
   }
 
   async function handleEvent(event: FacebookWebhookEvent, entryId?: string): Promise<void> {

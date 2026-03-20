@@ -11,6 +11,10 @@ import {
 } from "./webhookHelpers";
 import { facebookWebhookPayloadSchema } from "./webhookSchemas";
 import { sendWhatsAppText } from "./whatsappApi";
+import { toUserKey, toLogUser } from "./privacy";
+import { handleSharedTextMessage } from "./sharedTextHandler";
+import { getOrCreateState, markIntroSeen, setFlowState, type ConversationState } from "./messengerState";
+import type { NormalizedInboundMessage } from "./normalizedInboundMessage";
 
 const PRIVACY_POLICY_URL = process.env.PRIVACY_POLICY_URL?.trim() || "<link>";
 const DEFAULT_LANG = normalizeLang(process.env.DEFAULT_MESSENGER_LANG);
@@ -63,15 +67,9 @@ function logWhatsAppWebhookPayload(payload: unknown): void {
   console.log(serializedBody);
 }
 
-type NormalizedWhatsAppTextEvent = {
-  from: string;
-  messageType: string;
-  textBody: string | null;
-};
-
 function extractWhatsAppTextEvents(
   payload: unknown
-): NormalizedWhatsAppTextEvent[] {
+): NormalizedInboundMessage[] {
   if (typeof payload !== "object" || payload === null) {
     return [];
   }
@@ -114,7 +112,14 @@ function extractWhatsAppTextEvents(
           return [];
         }
 
-        return [{ from, messageType, textBody }];
+        return [{
+          channel: "whatsapp",
+          senderId: from,
+          userId: toUserKey(from),
+          messageType:
+            messageType === "text" ? "text" : messageType === "image" ? "image" : "unknown",
+          textBody: textBody ?? undefined,
+        }];
       });
     });
   });
@@ -130,25 +135,60 @@ async function handleWhatsAppWebhookPayload(payload: unknown): Promise<void> {
   }
 
   for (const event of events) {
-    console.log("[whatsapp webhook] normalized inbound event", event);
+    console.log("[whatsapp webhook] normalized inbound event", {
+      channel: event.channel,
+      user: toLogUser(event.userId),
+      messageType: event.messageType,
+    });
 
     if (event.messageType !== "text") {
       continue;
     }
 
-    console.log("[whatsapp webhook] reply attempt", {
-      to: event.from,
+    console.log("[whatsapp webhook] normalized event handoff", {
+      channel: event.channel,
+      user: toLogUser(event.userId),
       messageType: event.messageType,
     });
 
     try {
-      await sendWhatsAppText(event.from, "Leaderbot WhatsApp test OK");
-      console.log("[whatsapp webhook] reply sent", {
-        to: event.from,
+      const reqId = `${event.senderId}-${Date.now()}`;
+      await handleSharedTextMessage({
+        message: event,
+        reqId,
+        lang: DEFAULT_LANG,
+        getState: () => Promise.resolve(getOrCreateState(event.senderId)),
+        setFlowState: (nextState: ConversationState) =>
+          Promise.resolve(setFlowState(event.senderId, nextState)),
+        markIntroSeen: () => Promise.resolve(markIntroSeen(event.senderId)),
+        sendText: async (text: string) => {
+          console.log("[whatsapp webhook] reply attempt", {
+            to: event.senderId,
+            messageType: event.messageType,
+          });
+          await sendWhatsAppText(event.senderId, text);
+          console.log("[whatsapp webhook] reply sent", {
+            to: event.senderId,
+          });
+        },
+        sendStateText: async (_state: ConversationState, text: string) => {
+          console.log("[whatsapp webhook] state text send", {
+            to: event.senderId,
+          });
+          await sendWhatsAppText(event.senderId, text);
+        },
+        logState: (state, context) => {
+          console.log("[whatsapp webhook] shared state", {
+            context,
+            user: toLogUser(event.userId),
+            stage: state.stage,
+            hasPhoto: Boolean(state.lastPhotoUrl),
+          });
+        },
       });
     } catch (error) {
       console.error("[whatsapp webhook] reply failed", {
-        to: event.from,
+        to: event.senderId,
         error: error instanceof Error ? error.message : String(error),
       });
     }
