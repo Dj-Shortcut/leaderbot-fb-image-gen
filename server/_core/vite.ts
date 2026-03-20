@@ -3,10 +3,19 @@ import fs from "fs";
 import { type Server } from "http";
 import { nanoid } from "nanoid";
 import path from "path";
+import { fileURLToPath } from "url";
 import { createGlobalHttpRateLimiter, DEFAULT_MAX_REQUESTS, DEFAULT_WINDOW_MS } from "./httpRateLimit";
 import rateLimit from "express-rate-limit";
 
 type ViteCreateServer = (typeof import("vite"))["createServer"];
+
+function getCurrentDir(): string {
+  if (typeof __dirname === "string") {
+    return __dirname;
+  }
+
+  return path.dirname(fileURLToPath(import.meta.url));
+}
 
 export async function setupVite(app: Express, server: Server, createViteServer: ViteCreateServer) {
   app.use(createGlobalHttpRateLimiter());
@@ -18,9 +27,10 @@ export async function setupVite(app: Express, server: Server, createViteServer: 
     hmr: { server },
     allowedHosts: true as const,
   };
+  const currentDir = getCurrentDir();
 
   const vite = await createViteServer({
-    configFile: path.resolve(import.meta.dirname, "../..", "vite.config.ts"),
+    configFile: path.resolve(currentDir, "../..", "vite.config.ts"),
     server: serverOptions,
     appType: "custom",
   });
@@ -32,7 +42,7 @@ export async function setupVite(app: Express, server: Server, createViteServer: 
     void (async () => {
       try {
         const clientTemplate = path.resolve(
-          import.meta.dirname,
+          currentDir,
           "../..",
           "client",
           "index.html"
@@ -58,11 +68,12 @@ export function serveStatic(app: Express, staticRoot?: string) {
   app.use(createGlobalHttpRateLimiter());
 
   app.use(rateLimit({windowMs:DEFAULT_WINDOW_MS,limit:DEFAULT_MAX_REQUESTS,standardHeaders:true,legacyHeaders:false}));
+  const currentDir = getCurrentDir();
   const distPathCandidates = staticRoot
     ? [path.resolve(staticRoot)]
     : [
-        path.resolve(import.meta.dirname, "public"),
-        path.resolve(import.meta.dirname, "..", "public"),
+        path.resolve(currentDir, "public"),
+        path.resolve(currentDir, "..", "public"),
       ];
   const distPath = distPathCandidates.find((candidate) => fs.existsSync(candidate));
 
