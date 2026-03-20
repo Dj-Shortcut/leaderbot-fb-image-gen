@@ -4,7 +4,7 @@ A zero-friction Meta messaging bot that transforms user photos into AI-styled im
 
 ## Architecture
 
-The runtime is a single Node/Express process that handles Messenger webhook traffic, outbound Meta messaging API calls, AI image generation orchestration, static asset serving, admin auth, and operational endpoints.
+The runtime is a single Node/Express process that handles Meta webhook traffic, channel-specific outbound messaging API calls, shared bot/conversation logic, AI image generation orchestration, static asset serving, admin auth, and operational endpoints.
 
 ASCII version:
 
@@ -87,7 +87,10 @@ flowchart TD
 
 Key server entrypoint: `server/_core/index.ts`.
 Webhook route registration: `server/_core/messengerWebhook.ts`.
-Webhook orchestration: `server/_core/webhookHandlers.ts`.
+Messenger webhook orchestration: `server/_core/webhookHandlers.ts`.
+Normalized inbound message contract: `server/_core/normalizedInboundMessage.ts`.
+Shared text/domain handler: `server/_core/sharedTextHandler.ts`.
+Outbound response intent types and adapter mapping: `server/_core/botResponse.ts` and `server/_core/botResponseAdapters.ts`.
 Bot core boundary and feature entrypoint: `server/_core/bot/index.ts` and `server/_core/bot/features.ts`.
 
 For a deeper explanation, see [`docs/architecture.md`](docs/architecture.md).
@@ -127,6 +130,16 @@ The repository is now organized around an explicit bot-core boundary:
 - `server/_core/bot/features.ts` is the dedicated extension point for future bot features.
 
 The built-in registry now starts with foundational bot middleware-style features such as rate limiting, style handling, conversational editing, and admin stats. Future bot features should prefer registering text/payload/image handlers there via `registerBotFeature(...)` instead of expanding unrelated web or admin codepaths.
+
+## Multi-channel text flow
+
+Text handling is now split into three layers:
+
+- Channel adapters at the edge parse Messenger and WhatsApp webhook payloads into a normalized inbound shape.
+- Shared domain logic in `server/_core/sharedTextHandler.ts` operates on that normalized shape and returns channel-agnostic bot intents.
+- Channel adapters map outbound `BotResponse` intents into Messenger or WhatsApp send calls.
+
+Current scope is intentionally limited to text messages. Media/image handling is still channel-specific and will be moved later once the shared contracts are expanded.
 
 ## Quota model
 
@@ -258,6 +271,8 @@ pnpm db:push
 ```
 
 The repository includes focused unit tests for webhook handling, state transitions, signature verification, and image generation behavior under OpenAI configuration.
+
+Multi-channel text routing now also has a small adapter-level test in `server/botResponseAdapters.test.ts` to verify `BotResponse` mapping independently from webhook payload parsing.
 
 ## Documentation standards
 

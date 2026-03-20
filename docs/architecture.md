@@ -5,7 +5,9 @@
 Leaderbot runs as one Node.js process (Express + HTTP server):
 
 - Accepts Messenger webhook traffic.
+- Accepts WhatsApp webhook traffic on the same Meta callback route.
 - Supports outbound WhatsApp Cloud API sends.
+- Shares normalized text/domain handling across Messenger and WhatsApp.
 - Executes conversation flow + generation orchestration.
 - Serves static assets (`/generated`, web build output).
 - Exposes health/version/debug endpoints.
@@ -97,18 +99,19 @@ flowchart TD
     AUTH --> GITHUB
 ```
 
-## 2) Request flow (Messenger)
+## 2) Request flow (Meta messaging)
 
 1. Meta sends webhook event to `POST /webhook/facebook`.
 2. Signature middleware validates payload when `FB_APP_SECRET` is present.
-3. `processFacebookWebhookPayload` fans in to webhook handlers.
-4. Handler dedupes inbound events (`TtlDedupeSet`) and resolves language.
-5. Handler inspects event kind:
-   - quick reply / postback payload,
-   - photo attachment,
-   - text message.
-6. State is updated (`setFlowState`, `setPendingImage`, `setChosenStyle`, ...).
-7. If generation is triggered:
+3. Channel adapter parses provider payloads:
+   - Messenger payloads fan in to `processFacebookWebhookPayload`
+   - WhatsApp payloads are normalized from `entry[].changes[].value.messages[]`
+4. Text messages are converted into a shared normalized inbound message shape.
+5. Shared text/domain logic runs in `server/_core/sharedTextHandler.ts`.
+6. Shared logic returns channel-agnostic outbound intents (`BotResponse`).
+7. Channel adapters translate those intents into Messenger or WhatsApp sends.
+8. For Messenger image/style flows, state is still updated directly (`setFlowState`, `setPendingImage`, `setChosenStyle`, ...).
+9. If generation is triggered:
    - state -> `PROCESSING`,
    - OpenAI image generator configuration,
    - result sent via Messenger send API,
@@ -118,6 +121,10 @@ Core files:
 
 - `server/_core/messengerWebhook.ts`
 - `server/_core/webhookHandlers.ts`
+- `server/_core/normalizedInboundMessage.ts`
+- `server/_core/sharedTextHandler.ts`
+- `server/_core/botResponse.ts`
+- `server/_core/botResponseAdapters.ts`
 - `server/_core/imageService.ts`
 - `server/_core/messengerApi.ts`
 
@@ -143,6 +150,7 @@ Design intent:
 - Keep state minimal and directly tied to Messenger flow.
 - Normalize legacy/alias fields during reads.
 - Avoid storing raw PSID in logs; derive `userKey` for correlation.
+- Keep `senderId` channel-specific and `userId` as the internal stabilized identity used by shared logic.
 
 ## 4) Quota model details
 
@@ -173,6 +181,16 @@ Configuration is environment-variable driven.
 - Meta webhook verification accepts `META_VERIFY_TOKEN` when set and falls back to `FB_VERIFY_TOKEN` for existing Messenger deployments.
 
 See README env section for operationally relevant variables.
+
+## 5b) Multi-channel bot boundary
+
+The current bot boundary is intentionally incremental:
+
+- Inbound normalization happens at the channel edge.
+- Shared text handling lives in the middle and does not consume raw provider payloads.
+- Outbound behavior is represented first as a small `BotResponse` intent layer (`text`, `ack`, `typing`), then translated by channel adapters.
+
+This keeps Messenger and WhatsApp aligned for text without forcing media/image abstractions before the contracts are ready.
 
 ## 6) Deployment model
 
