@@ -170,6 +170,7 @@ Configuration is environment-variable driven.
 - Critical startup checks: privacy, generator, and WhatsApp API config.
 - Route behavior toggled by env presence (e.g. OAuth routes).
 - Debug/observability endpoints guarded via `ADMIN_TOKEN`.
+- Meta webhook verification accepts `META_VERIFY_TOKEN` when set and falls back to `FB_VERIFY_TOKEN` for existing Messenger deployments.
 
 See README env section for operationally relevant variables.
 

@@ -155,6 +155,7 @@ Related files:
 - `JWT_SECRET` (required at startup; must be at least 32 chars)
 - `PRIVACY_PEPPER` (required at startup, used for user-key hashing)
 - `FB_VERIFY_TOKEN` (Webhook verification)
+- `META_VERIFY_TOKEN` (preferred generic Meta webhook verification token; falls back to `FB_VERIFY_TOKEN` when unset)
 - `FB_PAGE_ACCESS_TOKEN` (Messenger send API)
 - `FB_APP_SECRET` (Webhook signature validation)
 - `WHATSAPP_ACCESS_TOKEN` (WhatsApp Cloud API send API)

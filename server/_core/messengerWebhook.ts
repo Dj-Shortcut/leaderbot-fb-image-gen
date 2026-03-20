@@ -38,6 +38,30 @@ export function resetMessengerEventDedupe(): void {
   resetWebhookReplayProtection();
 }
 
+function getMetaVerifyToken(): string {
+  return (
+    process.env.META_VERIFY_TOKEN?.trim() ||
+    process.env.FB_VERIFY_TOKEN?.trim() ||
+    ""
+  );
+}
+
+function isWhatsAppWebhookPayload(
+  payload: unknown
+): payload is { object: "whatsapp_business_account" } {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    (payload as { object?: unknown }).object === "whatsapp_business_account"
+  );
+}
+
+function logWhatsAppWebhookPayload(payload: unknown): void {
+  const serializedBody = JSON.stringify(payload, null, 2);
+  console.log("[whatsapp webhook] inbound payload");
+  console.log(serializedBody);
+}
+
 export async function processFacebookWebhookPayload(
   payload: unknown
 ): Promise<void> {
@@ -46,7 +70,7 @@ export async function processFacebookWebhookPayload(
 
 export function registerMetaWebhookRoutes(app: express.Express): void {
   const handleVerification: express.RequestHandler = (req, res) => {
-    const configuredToken = process.env.FB_VERIFY_TOKEN?.trim();
+    const configuredToken = getMetaVerifyToken();
     const parsedQuery = webhookVerificationQuerySchema.safeParse(req.query);
 
     if (
@@ -68,6 +92,14 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
   app.get("/webhook/facebook", handleVerification);
 
   app.post("/webhook/facebook", (req, res) => {
+    if (isWhatsAppWebhookPayload(req.body)) {
+      res.sendStatus(200);
+      setImmediate(() => {
+        logWhatsAppWebhookPayload(req.body);
+      });
+      return;
+    }
+
     try {
       facebookWebhookPayloadSchema.parse(req.body);
     } catch (error) {
