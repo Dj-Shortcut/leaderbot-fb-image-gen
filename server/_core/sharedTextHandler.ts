@@ -1,8 +1,5 @@
 import { t, type Lang } from "./i18n";
-import type {
-  ConversationState,
-  MessengerUserState,
-} from "./messengerState";
+import type { ConversationState, MessengerUserState } from "./messengerState";
 import { getChatRolloutDecision } from "./chatRollout";
 import { generateMessengerReply } from "./messengerResponsesService";
 import { safeLog } from "./messengerApi";
@@ -36,13 +33,17 @@ type SharedTextHandlerInput = {
   }) => Promise<boolean>;
   logState?: (state: MessengerUserState, context: string) => void;
   logAckIgnored?: (ack: string) => void;
-  logRolloutDecision?: (decision: ReturnType<typeof getChatRolloutDecision>) => void;
-  logEngineResult?: (details: {
-    source: string;
-    errorCode?: string;
-  }) => void;
+  logRolloutDecision?: (
+    decision: ReturnType<typeof getChatRolloutDecision>
+  ) => void;
+  logEngineResult?: (details: { source: string; errorCode?: string }) => void;
 };
 
+/**
+ * Shared text handling currently only covers normalized text messages.
+ * Channel adapters remain responsible for media-specific flows and any
+ * post-send side effects returned via this result contract.
+ */
 export type SharedTextHandlerResult = {
   response: BotResponse | null;
   replyState?: ConversationState;
@@ -192,7 +193,9 @@ export async function handleSharedTextMessage(
   return {
     response: {
       kind: "text",
-      text: hasPhoto ? t(input.lang, "flowExplanation") : t(input.lang, "textWithoutPhoto"),
+      text: hasPhoto
+        ? t(input.lang, "flowExplanation")
+        : t(input.lang, "textWithoutPhoto"),
     },
   };
 }

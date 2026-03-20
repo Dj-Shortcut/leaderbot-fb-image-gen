@@ -1,6 +1,8 @@
 import type { ConversationState } from "./messengerState";
 import type { BotResponse } from "./botResponse";
 
+function assertNever(_value: never): void {}
+
 export async function sendMessengerBotResponse(
   response: BotResponse | null,
   options: {
@@ -13,13 +15,24 @@ export async function sendMessengerBotResponse(
     return;
   }
 
-  if (response.kind === "text" && response.text) {
-    if (options.replyState) {
-      await options.sendStateText(options.replyState, response.text);
-      return;
-    }
+  switch (response.kind) {
+    case "text":
+      if (!response.text) {
+        return;
+      }
 
-    await options.sendText(response.text);
+      if (options.replyState) {
+        await options.sendStateText(options.replyState, response.text);
+        return;
+      }
+
+      await options.sendText(response.text);
+      return;
+    case "ack":
+    case "typing":
+      return;
+    default:
+      assertNever(response.kind);
   }
 }
 
@@ -33,7 +46,18 @@ export async function sendWhatsAppBotResponse(
     return;
   }
 
-  if (response.kind === "text" && response.text) {
-    await options.sendText(response.text);
+  switch (response.kind) {
+    case "text":
+      if (!response.text) {
+        return;
+      }
+
+      await options.sendText(response.text);
+      return;
+    case "ack":
+    case "typing":
+      return;
+    default:
+      assertNever(response.kind);
   }
 }

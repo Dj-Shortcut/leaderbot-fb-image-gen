@@ -22,6 +22,23 @@ describe("botResponseAdapters", () => {
     expect(sendText).not.toHaveBeenCalled();
   });
 
+  it("ignores non-text Messenger intents until channel support is added", async () => {
+    const sendText = vi.fn(async () => {});
+    const sendStateText = vi.fn(async () => {});
+
+    await sendMessengerBotResponse(
+      { kind: "typing" },
+      {
+        replyState: "IDLE",
+        sendText,
+        sendStateText,
+      }
+    );
+
+    expect(sendStateText).not.toHaveBeenCalled();
+    expect(sendText).not.toHaveBeenCalled();
+  });
+
   it("maps a WhatsApp text response to plain text sending", async () => {
     const sendText = vi.fn(async () => {});
 
@@ -33,5 +50,18 @@ describe("botResponseAdapters", () => {
     );
 
     expect(sendText).toHaveBeenCalledWith("hello");
+  });
+
+  it("ignores non-text WhatsApp intents until channel support is added", async () => {
+    const sendText = vi.fn(async () => {});
+
+    await sendWhatsAppBotResponse(
+      { kind: "ack" },
+      {
+        sendText,
+      }
+    );
+
+    expect(sendText).not.toHaveBeenCalled();
   });
 });
