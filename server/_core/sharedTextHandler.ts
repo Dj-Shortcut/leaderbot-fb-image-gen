@@ -9,6 +9,7 @@ import { safeLog } from "./messengerApi";
 import { detectAck, getGreetingResponse } from "./webhookHelpers";
 import { toLogUser } from "./privacy";
 import type { NormalizedInboundMessage } from "./normalizedInboundMessage";
+import type { BotResponse } from "./botResponse";
 
 const GREETINGS = new Set(["hi", "hello", "hey", "yo", "hola"]);
 const SMALLTALK = new Set([
@@ -27,9 +28,6 @@ type SharedTextHandlerInput = {
   lang: Lang;
   getState: () => Promise<MessengerUserState>;
   setFlowState: (state: ConversationState) => Promise<void>;
-  markIntroSeen: () => Promise<void>;
-  sendText: (text: string) => Promise<void>;
-  sendStateText: (state: ConversationState, text: string) => Promise<void>;
   runTextFeatures?: (args: {
     state: MessengerUserState;
     messageText: string;
@@ -45,17 +43,23 @@ type SharedTextHandlerInput = {
   }) => void;
 };
 
+export type SharedTextHandlerResult = {
+  response: BotResponse | null;
+  replyState?: ConversationState;
+  afterSend?: "markIntroSeen";
+};
+
 export async function handleSharedTextMessage(
   input: SharedTextHandlerInput
-): Promise<void> {
+): Promise<SharedTextHandlerResult> {
   if (input.message.messageType !== "text") {
-    return;
+    return { response: null };
   }
 
   const trimmedText = input.message.textBody?.trim();
   const normalizedText = trimmedText?.toLowerCase();
   if (!trimmedText || !normalizedText) {
-    return;
+    return { response: null };
   }
 
   console.log("[shared text] executing", {
@@ -72,33 +76,39 @@ export async function handleSharedTextMessage(
     } else {
       safeLog("ack_ignored", { ack, channel: input.message.channel });
     }
-    return;
+    return { response: null };
   }
 
   if (GREETINGS.has(normalizedText) || SMALLTALK.has(normalizedText)) {
     const state = await input.getState();
     input.logState?.(state, "greeting");
     if (!state.hasSeenIntro && state.stage === "IDLE") {
-      await input.sendStateText("IDLE", t(input.lang, "flowExplanation"));
-      await input.markIntroSeen();
-      return;
+      return {
+        response: { kind: "text", text: t(input.lang, "flowExplanation") },
+        replyState: "IDLE",
+        afterSend: "markIntroSeen",
+      };
     }
 
     const response = getGreetingResponse(state.stage, input.lang);
     if (response.mode === "text") {
-      await input.sendText(response.text);
-    } else {
-      await input.sendStateText(response.state, response.text);
+      return { response: { kind: "text", text: response.text } };
     }
-    return;
+
+    return {
+      response: { kind: "text", text: response.text },
+      replyState: response.state,
+    };
   }
 
   if (normalizedText === "nieuwe stijl" || normalizedText === "new style") {
     const state = await input.getState();
     if (state.lastPhotoUrl) {
       await input.setFlowState("AWAITING_STYLE");
-      await input.sendStateText("AWAITING_STYLE", t(input.lang, "styleCategoryPicker"));
-      return;
+      return {
+        response: { kind: "text", text: t(input.lang, "styleCategoryPicker") },
+        replyState: "AWAITING_STYLE",
+      };
     }
   }
 
@@ -113,7 +123,7 @@ export async function handleSharedTextMessage(
       hasPhoto,
     }))
   ) {
-    return;
+    return { response: null };
   }
 
   input.logState?.(state, "text_message");
@@ -153,7 +163,7 @@ export async function handleSharedTextMessage(
           source: reply.source,
         });
       }
-      await input.sendText(reply.text);
+      return { response: { kind: "text", text: reply.text } };
     } catch (error) {
       if (input.logEngineResult) {
         input.logEngineResult({
@@ -168,14 +178,21 @@ export async function handleSharedTextMessage(
           errorCode: error instanceof Error ? error.name : "unknown_error",
         });
       }
-      await input.sendText(
-        hasPhoto ? t(input.lang, "flowExplanation") : t(input.lang, "textWithoutPhoto")
-      );
+      return {
+        response: {
+          kind: "text",
+          text: hasPhoto
+            ? t(input.lang, "flowExplanation")
+            : t(input.lang, "textWithoutPhoto"),
+        },
+      };
     }
-    return;
   }
 
-  await input.sendText(
-    hasPhoto ? t(input.lang, "flowExplanation") : t(input.lang, "textWithoutPhoto")
-  );
+  return {
+    response: {
+      kind: "text",
+      text: hasPhoto ? t(input.lang, "flowExplanation") : t(input.lang, "textWithoutPhoto"),
+    },
+  };
 }

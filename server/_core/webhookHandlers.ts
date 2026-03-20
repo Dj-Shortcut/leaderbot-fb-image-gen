@@ -64,6 +64,8 @@ import { getBotFeatures } from "./bot/features";
 import { ensureDefaultBotFeaturesRegistered } from "./bot/defaultFeatures";
 import { handleSharedTextMessage } from "./sharedTextHandler";
 import type { NormalizedInboundMessage } from "./normalizedInboundMessage";
+import type { BotResponse } from "./botResponse";
+import { sendMessengerBotResponse } from "./botResponseAdapters";
 import {
   getTodayRuntimeStats,
   recordActiveUserToday,
@@ -883,16 +885,12 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       messageType: normalizedMessage.messageType,
     });
 
-    await handleSharedTextMessage({
+    const result = await handleSharedTextMessage({
       message: normalizedMessage,
       reqId,
       lang,
       getState: () => Promise.resolve(getOrCreateState(psid)),
       setFlowState: nextState => Promise.resolve(setFlowState(psid, nextState)),
-      markIntroSeen: () => Promise.resolve(markIntroSeen(psid)),
-      sendText: text => sendLoggedText(psid, text, reqId),
-      sendStateText: (stateName, text) =>
-        sendStateQuickReplies(psid, stateName, text, reqId),
       runTextFeatures: async ({ state, messageText, normalizedText, hasPhoto }) => {
         for (const feature of getBotFeatures()) {
           const result = await feature.onText?.(
@@ -937,6 +935,15 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         });
       },
     });
+    await sendMessengerBotResponse(result.response, {
+      replyState: result.replyState,
+      sendText: text => sendLoggedText(psid, text, reqId),
+      sendStateText: (stateName, text) =>
+        sendStateQuickReplies(psid, stateName, text, reqId),
+    });
+    if (result.afterSend === "markIntroSeen") {
+      await Promise.resolve(markIntroSeen(psid));
+    }
   }
 
   async function handleEvent(event: FacebookWebhookEvent, entryId?: string): Promise<void> {

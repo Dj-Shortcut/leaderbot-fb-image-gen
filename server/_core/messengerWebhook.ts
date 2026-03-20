@@ -15,6 +15,8 @@ import { toUserKey, toLogUser } from "./privacy";
 import { handleSharedTextMessage } from "./sharedTextHandler";
 import { getOrCreateState, markIntroSeen, setFlowState, type ConversationState } from "./messengerState";
 import type { NormalizedInboundMessage } from "./normalizedInboundMessage";
+import type { BotResponse } from "./botResponse";
+import { sendWhatsAppBotResponse } from "./botResponseAdapters";
 
 const PRIVACY_POLICY_URL = process.env.PRIVACY_POLICY_URL?.trim() || "<link>";
 const DEFAULT_LANG = normalizeLang(process.env.DEFAULT_MESSENGER_LANG);
@@ -153,30 +155,13 @@ async function handleWhatsAppWebhookPayload(payload: unknown): Promise<void> {
 
     try {
       const reqId = `${event.senderId}-${Date.now()}`;
-      await handleSharedTextMessage({
+      const result = await handleSharedTextMessage({
         message: event,
         reqId,
         lang: DEFAULT_LANG,
         getState: () => Promise.resolve(getOrCreateState(event.senderId)),
         setFlowState: (nextState: ConversationState) =>
           Promise.resolve(setFlowState(event.senderId, nextState)),
-        markIntroSeen: () => Promise.resolve(markIntroSeen(event.senderId)),
-        sendText: async (text: string) => {
-          console.log("[whatsapp webhook] reply attempt", {
-            to: event.senderId,
-            messageType: event.messageType,
-          });
-          await sendWhatsAppText(event.senderId, text);
-          console.log("[whatsapp webhook] reply sent", {
-            to: event.senderId,
-          });
-        },
-        sendStateText: async (_state: ConversationState, text: string) => {
-          console.log("[whatsapp webhook] state text send", {
-            to: event.senderId,
-          });
-          await sendWhatsAppText(event.senderId, text);
-        },
         logState: (state, context) => {
           console.log("[whatsapp webhook] shared state", {
             context,
@@ -186,6 +171,21 @@ async function handleWhatsAppWebhookPayload(payload: unknown): Promise<void> {
           });
         },
       });
+      await sendWhatsAppBotResponse(result.response, {
+        sendText: async text => {
+          console.log("[whatsapp webhook] reply attempt", {
+            to: event.senderId,
+            messageType: event.messageType,
+          });
+          await sendWhatsAppText(event.senderId, text);
+          console.log("[whatsapp webhook] reply sent", {
+            to: event.senderId,
+          });
+        },
+      });
+      if (result.afterSend === "markIntroSeen") {
+        await Promise.resolve(markIntroSeen(event.senderId));
+      }
     } catch (error) {
       console.error("[whatsapp webhook] reply failed", {
         to: event.senderId,
