@@ -13,9 +13,13 @@ import { facebookWebhookPayloadSchema } from "./webhookSchemas";
 import { sendWhatsAppText } from "./whatsappApi";
 import { toUserKey, toLogUser } from "./privacy";
 import { handleSharedTextMessage } from "./sharedTextHandler";
-import { getOrCreateState, markIntroSeen, setFlowState, type ConversationState } from "./messengerState";
+import {
+  getOrCreateState,
+  markIntroSeen,
+  setFlowState,
+  type ConversationState,
+} from "./messengerState";
 import type { NormalizedInboundMessage } from "./normalizedInboundMessage";
-import type { BotResponse } from "./botResponse";
 import { sendWhatsAppBotResponse } from "./botResponseAdapters";
 
 const PRIVACY_POLICY_URL = process.env.PRIVACY_POLICY_URL?.trim() || "<link>";
@@ -81,7 +85,9 @@ function extractWhatsAppTextEvents(
     : [];
 
   return entries.flatMap(entry => {
-    const changes = Array.isArray((entry as { changes?: unknown[] } | null)?.changes)
+    const changes = Array.isArray(
+      (entry as { changes?: unknown[] } | null)?.changes
+    )
       ? ((entry as { changes: unknown[] }).changes ?? [])
       : [];
 
@@ -90,7 +96,9 @@ function extractWhatsAppTextEvents(
         typeof change === "object" && change !== null
           ? ((change as { value?: unknown }).value ?? null)
           : null;
-      const messages = Array.isArray((value as { messages?: unknown[] } | null)?.messages)
+      const messages = Array.isArray(
+        (value as { messages?: unknown[] } | null)?.messages
+      )
         ? ((value as { messages: unknown[] }).messages ?? [])
         : [];
 
@@ -99,14 +107,17 @@ function extractWhatsAppTextEvents(
           return [];
         }
 
-        const from = typeof (message as { from?: unknown }).from === "string"
-          ? (message as { from: string }).from
-          : "";
-        const messageType = typeof (message as { type?: unknown }).type === "string"
-          ? (message as { type: string }).type
-          : "unknown";
+        const from =
+          typeof (message as { from?: unknown }).from === "string"
+            ? (message as { from: string }).from
+            : "";
+        const messageType =
+          typeof (message as { type?: unknown }).type === "string"
+            ? (message as { type: string }).type
+            : "unknown";
         const textBody =
-          typeof (message as { text?: { body?: unknown } }).text?.body === "string"
+          typeof (message as { text?: { body?: unknown } }).text?.body ===
+          "string"
             ? (message as { text: { body: string } }).text.body
             : null;
 
@@ -114,14 +125,20 @@ function extractWhatsAppTextEvents(
           return [];
         }
 
-        return [{
-          channel: "whatsapp",
-          senderId: from,
-          userId: toUserKey(from),
-          messageType:
-            messageType === "text" ? "text" : messageType === "image" ? "image" : "unknown",
-          textBody: textBody ?? undefined,
-        }];
+        return [
+          {
+            channel: "whatsapp",
+            senderId: from,
+            userId: toUserKey(from),
+            messageType:
+              messageType === "text"
+                ? "text"
+                : messageType === "image"
+                  ? "image"
+                  : "unknown",
+            textBody: textBody ?? undefined,
+          },
+        ];
       });
     });
   });
@@ -248,7 +265,9 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
       facebookWebhookPayloadSchema.parse(req.body);
     } catch (error) {
       if (error instanceof ZodError) {
-        console.warn("[messenger webhook] POST rejected: invalid payload shape");
+        console.warn(
+          "[messenger webhook] POST rejected: invalid payload shape"
+        );
         res.status(400).json({ error: "Invalid webhook payload" });
         return;
       }

@@ -64,7 +64,6 @@ import { getBotFeatures } from "./bot/features";
 import { ensureDefaultBotFeaturesRegistered } from "./bot/defaultFeatures";
 import { handleSharedTextMessage } from "./sharedTextHandler";
 import type { NormalizedInboundMessage } from "./normalizedInboundMessage";
-import type { BotResponse } from "./botResponse";
 import { sendMessengerBotResponse } from "./botResponseAdapters";
 import {
   getTodayRuntimeStats,
@@ -84,10 +83,14 @@ type HandlerDeps = {
   privacyPolicyUrl: string;
 };
 
-const IN_FLIGHT_MESSAGE = "\u23F3 even geduld, ik ben nog bezig met jouw restyle";
+const IN_FLIGHT_MESSAGE =
+  "\u23F3 even geduld, ik ben nog bezig met jouw restyle";
 const inFlightNoticeSent = new Set();
 
-export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: HandlerDeps) {
+export function createWebhookHandlers({
+  defaultLang,
+  privacyPolicyUrl,
+}: HandlerDeps) {
   ensureDefaultBotFeaturesRegistered();
 
   function debugWebhookLog(message: Record<string, unknown>): void {
@@ -128,22 +131,22 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     reqId: string
   ): void {
     debugWebhookLog({
-        level: "debug",
-        msg: "incoming_message",
-        reqId,
-        user: toLogUser(userId),
-        psidHash: anonymizePsid(psid).slice(0, 12),
-        isEcho: Boolean(event.message?.is_echo),
-        text: event.message?.text ?? null,
-        quickReplyPayload: event.message?.quick_reply?.payload ?? null,
-        attachments:
-          event.message?.attachments?.map(attachment => ({
-            type: attachment.type,
-            hasUrl: Boolean(attachment.payload?.url),
+      level: "debug",
+      msg: "incoming_message",
+      reqId,
+      user: toLogUser(userId),
+      psidHash: anonymizePsid(psid).slice(0, 12),
+      isEcho: Boolean(event.message?.is_echo),
+      text: event.message?.text ?? null,
+      quickReplyPayload: event.message?.quick_reply?.payload ?? null,
+      attachments:
+        event.message?.attachments?.map(attachment => ({
+          type: attachment.type,
+          hasUrl: Boolean(attachment.payload?.url),
         })) ?? [],
-        postbackPayload: event.postback?.payload ?? null,
-        referralRef: event.postback?.referral?.ref ?? event.referral?.ref ?? null,
-      });
+      postbackPayload: event.postback?.payload ?? null,
+      referralRef: event.postback?.referral?.ref ?? event.referral?.ref ?? null,
+    });
   }
 
   function logUserState(
@@ -154,30 +157,34 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     context: string
   ): void {
     debugWebhookLog({
-        level: "debug",
-        msg: "user_state",
-        context,
-        reqId,
-        user: toLogUser(userId),
-        psidHash: anonymizePsid(psid).slice(0, 12),
-        stage: state.stage,
-        hasSeenIntro: state.hasSeenIntro,
-        hasLastPhoto: Boolean(state.lastPhotoUrl),
-        selectedStyle: state.selectedStyle ?? null,
-        preselectedStyle: state.preselectedStyle ?? null,
-        preferredLang: state.preferredLang ?? null,
-      });
+      level: "debug",
+      msg: "user_state",
+      context,
+      reqId,
+      user: toLogUser(userId),
+      psidHash: anonymizePsid(psid).slice(0, 12),
+      stage: state.stage,
+      hasSeenIntro: state.hasSeenIntro,
+      hasLastPhoto: Boolean(state.lastPhotoUrl),
+      selectedStyle: state.selectedStyle ?? null,
+      preselectedStyle: state.preselectedStyle ?? null,
+      preferredLang: state.preferredLang ?? null,
+    });
   }
 
-  async function sendLoggedText(psid: string, text: string, reqId: string): Promise<void> {
+  async function sendLoggedText(
+    psid: string,
+    text: string,
+    reqId: string
+  ): Promise<void> {
     debugWebhookLog({
-        level: "debug",
-        msg: "outgoing_message",
-        kind: "text",
-        reqId,
-        psidHash: anonymizePsid(psid).slice(0, 12),
-        text,
-      });
+      level: "debug",
+      msg: "outgoing_message",
+      kind: "text",
+      reqId,
+      psidHash: anonymizePsid(psid).slice(0, 12),
+      text,
+    });
     await sendText(psid, text);
   }
 
@@ -188,29 +195,33 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     reqId: string
   ): Promise<void> {
     debugWebhookLog({
-        level: "debug",
-        msg: "outgoing_message",
-        kind: "quick_replies",
-        reqId,
-        psidHash: anonymizePsid(psid).slice(0, 12),
-        text,
-        quickReplies: replies.map(reply => ({
-          title: reply.title,
-          payload: reply.payload,
-        })),
-      });
+      level: "debug",
+      msg: "outgoing_message",
+      kind: "quick_replies",
+      reqId,
+      psidHash: anonymizePsid(psid).slice(0, 12),
+      text,
+      quickReplies: replies.map(reply => ({
+        title: reply.title,
+        payload: reply.payload,
+      })),
+    });
     await sendQuickReplies(psid, text, replies);
   }
 
-  async function sendLoggedImage(psid: string, imageUrl: string, reqId: string): Promise<void> {
+  async function sendLoggedImage(
+    psid: string,
+    imageUrl: string,
+    reqId: string
+  ): Promise<void> {
     debugWebhookLog({
-        level: "debug",
-        msg: "outgoing_message",
-        kind: "image",
-        reqId,
-        psidHash: anonymizePsid(psid).slice(0, 12),
-        imageUrl,
-      });
+      level: "debug",
+      msg: "outgoing_message",
+      kind: "image",
+      reqId,
+      psidHash: anonymizePsid(psid).slice(0, 12),
+      imageUrl,
+    });
     await sendImage(psid, imageUrl);
   }
 
@@ -365,9 +376,18 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       preselectStyle: async style => {
         await setPreselectedStyle(psid, style);
       },
-      chooseStyle: style => handleStyleSelection(psid, userId, style, reqId, lang),
+      chooseStyle: style =>
+        handleStyleSelection(psid, userId, style, reqId, lang),
       runStyleGeneration: (style, sourceImageUrl, promptHint) =>
-        runStyleGeneration(psid, userId, style, reqId, lang, sourceImageUrl, promptHint),
+        runStyleGeneration(
+          psid,
+          userId,
+          style,
+          reqId,
+          lang,
+          sourceImageUrl,
+          promptHint
+        ),
       getRuntimeStats: () => getTodayRuntimeStats(),
       logger: createFeatureLogger(userId),
     };
@@ -400,9 +420,18 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       preselectStyle: async style => {
         await setPreselectedStyle(psid, style);
       },
-      chooseStyle: style => handleStyleSelection(psid, userId, style, reqId, lang),
+      chooseStyle: style =>
+        handleStyleSelection(psid, userId, style, reqId, lang),
       runStyleGeneration: (style, sourceImageUrl, promptHint) =>
-        runStyleGeneration(psid, userId, style, reqId, lang, sourceImageUrl, promptHint),
+        runStyleGeneration(
+          psid,
+          userId,
+          style,
+          reqId,
+          lang,
+          sourceImageUrl,
+          promptHint
+        ),
       getRuntimeStats: () => getTodayRuntimeStats(),
       logger: createFeatureLogger(userId),
     };
@@ -439,15 +468,28 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       preselectStyle: async style => {
         await setPreselectedStyle(psid, style);
       },
-      chooseStyle: style => handleStyleSelection(psid, userId, style, reqId, lang),
+      chooseStyle: style =>
+        handleStyleSelection(psid, userId, style, reqId, lang),
       runStyleGeneration: (style, sourceImageUrl, promptHint) =>
-        runStyleGeneration(psid, userId, style, reqId, lang, sourceImageUrl, promptHint),
+        runStyleGeneration(
+          psid,
+          userId,
+          style,
+          reqId,
+          lang,
+          sourceImageUrl,
+          promptHint
+        ),
       getRuntimeStats: () => getTodayRuntimeStats(),
       logger: createFeatureLogger(userId),
     };
   }
 
-  async function sendStylePicker(psid: string, lang: Lang, reqId: string): Promise<void> {
+  async function sendStylePicker(
+    psid: string,
+    lang: Lang,
+    reqId: string
+  ): Promise<void> {
     await sendStateQuickReplies(
       psid,
       "AWAITING_STYLE",
@@ -475,9 +517,7 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         styles.map(style => ({
           title: STYLE_LABELS[style.style],
           subtitle:
-            lang === "en"
-              ? `${categoryLabel} style`
-              : `${categoryLabel}-stijl`,
+            lang === "en" ? `${categoryLabel} style` : `${categoryLabel}-stijl`,
           image_url: resolveStylePreviewUrl(style.style),
           buttons: [
             {
@@ -514,8 +554,17 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     await sendStylePicker(psid, lang, reqId);
   }
 
-  async function sendIntro(psid: string, lang: Lang, reqId: string): Promise<void> {
-    await sendStateQuickReplies(psid, "IDLE", t(lang, "flowExplanation"), reqId);
+  async function sendIntro(
+    psid: string,
+    lang: Lang,
+    reqId: string
+  ): Promise<void> {
+    await sendStateQuickReplies(
+      psid,
+      "IDLE",
+      t(lang, "flowExplanation"),
+      reqId
+    );
   }
 
   async function sendReferralPhotoPrompt(
@@ -546,10 +595,28 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       const allowed = await canGenerate(psid);
       const quotaState = await getOrCreateState(psid);
       const bypassRaw = process.env.MESSENGER_QUOTA_BYPASS_IDS ?? "";
-      const bypassApplied = bypassRaw.includes(psid) || bypassRaw.includes(quotaState.userKey);
-      console.log(JSON.stringify({ level: "info", msg: "quota_decision", action: "check", psidHash: anonymizePsid(psid).slice(0, 12), count: quotaState.quota.count, limit: 2, bypassApplied, allowed }));
+      const bypassApplied =
+        bypassRaw.includes(psid) || bypassRaw.includes(quotaState.userKey);
+      console.log(
+        JSON.stringify({
+          level: "info",
+          msg: "quota_decision",
+          action: "check",
+          psidHash: anonymizePsid(psid).slice(0, 12),
+          count: quotaState.quota.count,
+          limit: 2,
+          bypassApplied,
+          allowed,
+        })
+      );
       if (!allowed) {
-        await sendLoggedText(psid, lang === "en" ? "You used your free credits for today. Come back tomorrow." : "Je hebt je gratis credits voor vandaag opgebruikt. Kom morgen terug.", reqId);
+        await sendLoggedText(
+          psid,
+          lang === "en"
+            ? "You used your free credits for today. Come back tomorrow."
+            : "Je hebt je gratis credits voor vandaag opgebruikt. Kom morgen terug.",
+          reqId
+        );
         await setFlowState(psid, "AWAITING_STYLE");
         return;
       }
@@ -610,7 +677,12 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         await setLastGenerated(psid, imageUrl);
         await setLastGenerationContext(psid, { style, prompt: promptHint });
         recordGenerationSuccess(style, metrics.totalMs);
-        await sendStateQuickReplies(psid, "RESULT_READY", t(lang, "success"), reqId);
+        await sendStateQuickReplies(
+          psid,
+          "RESULT_READY",
+          t(lang, "success"),
+          reqId
+        );
         await setFlowState(psid, "IDLE");
       } catch (error) {
         console.error("OPENAI_CALL_ERROR", {
@@ -656,18 +728,23 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
         await sendLoggedText(psid, t(lang, "failure"), reqId);
         await setFlowState(psid, "FAILURE");
 
-        await sendLoggedQuickReplies(psid, failureText, [
-          {
-            content_type: "text",
-            title: t(lang, "retryThisStyle"),
-            payload: `RETRY_STYLE_${style}`,
-          },
-          {
-            content_type: "text",
-            title: t(lang, "otherStyle"),
-            payload: "CHOOSE_STYLE",
-          },
-        ], reqId);
+        await sendLoggedQuickReplies(
+          psid,
+          failureText,
+          [
+            {
+              content_type: "text",
+              title: t(lang, "retryThisStyle"),
+              payload: `RETRY_STYLE_${style}`,
+            },
+            {
+              content_type: "text",
+              title: t(lang, "otherStyle"),
+              payload: "CHOOSE_STYLE",
+            },
+          ],
+          reqId
+        );
       }
     });
 
@@ -691,8 +768,8 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       return;
     }
 
-      await setChosenStyle(psid, selectedStyle);
-      if (!state.lastPhotoUrl) {
+    await setChosenStyle(psid, selectedStyle);
+    if (!state.lastPhotoUrl) {
       await setFlowState(psid, "AWAITING_PHOTO");
       await sendLoggedText(psid, t(lang, "styleWithoutPhoto"), reqId);
       return;
@@ -824,13 +901,13 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     );
     if (imageAttachment?.payload?.url) {
       debugWebhookLog({
-          level: "debug",
-          msg: "photo_received",
-          reqId,
-          psidHash: anonymizePsid(psid).slice(0, 12),
-          hasAttachments: !!message.attachments,
-          attachmentHostname: getAttachmentHostname(imageAttachment.payload.url),
-        });
+        level: "debug",
+        msg: "photo_received",
+        reqId,
+        psidHash: anonymizePsid(psid).slice(0, 12),
+        hasAttachments: !!message.attachments,
+        attachmentHostname: getAttachmentHostname(imageAttachment.payload.url),
+      });
 
       const state = await getOrCreateState(psid);
       for (const feature of getBotFeatures()) {
@@ -891,7 +968,12 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
       lang,
       getState: () => Promise.resolve(getOrCreateState(psid)),
       setFlowState: nextState => Promise.resolve(setFlowState(psid, nextState)),
-      runTextFeatures: async ({ state, messageText, normalizedText, hasPhoto }) => {
+      runTextFeatures: async ({
+        state,
+        messageText,
+        normalizedText,
+        hasPhoto,
+      }) => {
         for (const feature of getBotFeatures()) {
           const result = await feature.onText?.(
             createFeatureTextContext(
@@ -946,7 +1028,10 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
     }
   }
 
-  async function handleEvent(event: FacebookWebhookEvent, entryId?: string): Promise<void> {
+  async function handleEvent(
+    event: FacebookWebhookEvent,
+    entryId?: string
+  ): Promise<void> {
     const psid = event.sender?.id;
     if (!psid) return;
 
@@ -996,7 +1081,9 @@ export function createWebhookHandlers({ defaultLang, privacyPolicyUrl }: Handler
   async function processFacebookWebhookPayload(
     payload: unknown
   ): Promise<void> {
-    const entries = Array.isArray((payload as { entry?: unknown[] } | null | undefined)?.entry)
+    const entries = Array.isArray(
+      (payload as { entry?: unknown[] } | null | undefined)?.entry
+    )
       ? ((payload as { entry: FacebookWebhookEntry[] }).entry ?? [])
       : [];
 
