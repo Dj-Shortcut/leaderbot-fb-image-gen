@@ -72,15 +72,25 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
   const handleVerification: express.RequestHandler = (req, res) => {
     const configuredToken = getMetaVerifyToken();
     const parsedQuery = webhookVerificationQuerySchema.safeParse(req.query);
+    const path = req.path;
+
+    console.log("[meta webhook] GET verification request", { path });
 
     if (
       !configuredToken ||
       !parsedQuery.success ||
       parsedQuery.data["hub.verify_token"] !== configuredToken
     ) {
+      console.warn("[meta webhook] GET verification rejected", {
+        path,
+        hasConfiguredToken: Boolean(configuredToken),
+        hasMode: typeof req.query["hub.mode"] === "string",
+        hasChallenge: typeof req.query["hub.challenge"] === "string",
+      });
       return res.sendStatus(403);
     }
 
+    console.log("[meta webhook] GET verification accepted", { path });
     return res
       .status(200)
       .type("text/plain")
@@ -93,6 +103,7 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
 
   app.post("/webhook/facebook", (req, res) => {
     if (isWhatsAppWebhookPayload(req.body)) {
+      console.log("[whatsapp webhook] POST delivery received");
       res.sendStatus(200);
       setImmediate(() => {
         logWhatsAppWebhookPayload(req.body);
@@ -104,6 +115,7 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
       facebookWebhookPayloadSchema.parse(req.body);
     } catch (error) {
       if (error instanceof ZodError) {
+        console.warn("[messenger webhook] POST rejected: invalid payload shape");
         res.status(400).json({ error: "Invalid webhook payload" });
         return;
       }
@@ -111,6 +123,7 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
       throw error;
     }
 
+    console.log("[messenger webhook] POST delivery received");
     res.sendStatus(200);
     setImmediate(() => {
       void processFacebookWebhookPayload(req.body).catch(console.error);
