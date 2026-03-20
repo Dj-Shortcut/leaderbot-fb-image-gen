@@ -4,6 +4,7 @@ import path from "path";
 import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { assertAuthConfig, registerOAuthRoutes } from "./auth";
+import { assertWhatsAppConfig } from "./env";
 import {
   captureBotWebhookRawBody,
   getBotStartupConfig,
@@ -123,6 +124,7 @@ async function startServer() {
   const generatorStartupConfig = getBotStartupConfig();
   console.log("GENERATOR_STARTUP_CONFIG", generatorStartupConfig);
   assertAuthConfig();
+  assertWhatsAppConfig();
   assertPrivacyConfig();
   assertProductionWebhookReplayProtectionConfig();
   await ensureStateStoreReady();

@@ -15,6 +15,16 @@ export function getConfiguredJwtSecret(): string {
   return process.env.JWT_SECRET?.trim() ?? "";
 }
 
+export function getEnv(name: string): string {
+  const value = process.env[name]?.trim() ?? "";
+
+  if (!value) {
+    throw new Error(`${name} is missing`);
+  }
+
+  return value;
+}
+
 export function assertAuthConfig(): void {
   const secret = getConfiguredJwtSecret();
 
@@ -23,6 +33,11 @@ export function assertAuthConfig(): void {
       `JWT_SECRET must be set and at least ${MIN_SESSION_SECRET_LENGTH} characters long`
     );
   }
+}
+
+export function assertWhatsAppConfig(): void {
+  getEnv("WHATSAPP_ACCESS_TOKEN");
+  getEnv("WHATSAPP_PHONE_NUMBER_ID");
 }
 
 

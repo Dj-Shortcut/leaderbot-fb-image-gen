@@ -1,10 +1,10 @@
 # Leaderbot AI Image Generator
 
-A zero-friction Facebook Messenger bot that transforms user photos into AI-styled images.
+A zero-friction Meta messaging bot that transforms user photos into AI-styled images.
 
 ## Architecture
 
-The runtime is a single Node/Express process that handles Messenger webhook traffic, AI image generation orchestration, static asset serving, admin auth, and operational endpoints.
+The runtime is a single Node/Express process that handles Messenger webhook traffic, outbound Meta messaging API calls, AI image generation orchestration, static asset serving, admin auth, and operational endpoints.
 
 ASCII version:
 
@@ -157,6 +157,8 @@ Related files:
 - `FB_VERIFY_TOKEN` (Webhook verification)
 - `FB_PAGE_ACCESS_TOKEN` (Messenger send API)
 - `FB_APP_SECRET` (Webhook signature validation)
+- `WHATSAPP_ACCESS_TOKEN` (WhatsApp Cloud API send API)
+- `WHATSAPP_PHONE_NUMBER_ID` (WhatsApp Cloud API sender identity)
 - `SOURCE_IMAGE_ALLOWED_HOSTS` (required for inbound source-image fetching; if unset, source-image fetches are blocked; review regularly and keep only trusted domains)
 - `REDIS_URL` (required in production for webhook replay protection)
 - `APP_BASE_URL` (required for public generated image URLs; must be `https://` in production)
@@ -329,10 +331,12 @@ Operational notes:
 
 - `NODE_ENV=production` and `PORT=8080` are expected in runtime.
 - `REDIS_URL` must be set in Fly secrets before deploy; production startup now fails without it.
+- `WHATSAPP_ACCESS_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID` must be set in Fly secrets before deploy; startup now fails when either is missing.
 - Health check endpoint is `/healthz`.
 - `/metrics` exposes Prometheus-style request counters and latency histograms.
 - Each request carries an `X-Request-Id` header for simple request tracing across logs and downstream calls.
 - The server accepts and returns `traceparent` so it can plug into OpenTelemetry-compatible tracing later without changing route behavior.
 - `APP_BASE_URL` must be publicly reachable in OpenAI mode so Messenger can fetch generated images from `/generated/<id>.png`.
 - Keep `FB_APP_SECRET` configured to enforce webhook signature verification middleware.
+- Outbound WhatsApp sends use `server/_core/whatsappApi.ts` and the WhatsApp Cloud API `phone_number_id` configured through env, not hardcoded values.
 - Set `SOURCE_IMAGE_ALLOWED_HOSTS` in production. Source-image fetches fail closed when it is unset. `fbcdn.net,fbsbx.com` is a conservative Meta-focused starting point, but the preferred setup is to narrow this to the exact attachment hostnames you observe in your Messenger webhook traffic.

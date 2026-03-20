@@ -5,6 +5,7 @@
 Leaderbot runs as one Node.js process (Express + HTTP server):
 
 - Accepts Messenger webhook traffic.
+- Supports outbound WhatsApp Cloud API sends.
 - Executes conversation flow + generation orchestration.
 - Serves static assets (`/generated`, web build output).
 - Exposes health/version/debug endpoints.
@@ -166,7 +167,7 @@ This duality supports both direct Messenger state-based throttling and account/u
 
 Configuration is environment-variable driven.
 
-- Critical startup checks: privacy and generator config.
+- Critical startup checks: privacy, generator, and WhatsApp API config.
 - Route behavior toggled by env presence (e.g. OAuth routes).
 - Debug/observability endpoints guarded via `ADMIN_TOKEN`.
 
@@ -187,14 +188,14 @@ The canonical runtime contract across all platforms is:
 - Repository includes a production `Dockerfile`; `.dockerignore` excludes local/dev artifacts (`node_modules`, `.env*`, `.git`, etc.) to keep image builds clean and deterministic.
 - Typical flow:
   1. Build image: `docker build -t leaderbot:latest .`
-  2. Run container with required env vars (`REDIS_URL`, Messenger secrets, generator settings).
+  2. Run container with required env vars (`REDIS_URL`, Messenger secrets, WhatsApp secrets, generator settings).
   3. Expose `PORT` (default runtime expectation is `8080` in production deployments).
 
 ### B. Fly.io
 
 - `fly.toml` defines app runtime, HTTP service, and `/healthz` checks.
 - Deploy using `fly deploy` after setting secrets (`fly secrets set ...`).
-- Keep `REDIS_URL` and other credentials in Fly secrets (not in image or Git).
+- Keep `REDIS_URL`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, and other credentials in Fly secrets (not in image or Git).
 
 ### C. Kubernetes
 
