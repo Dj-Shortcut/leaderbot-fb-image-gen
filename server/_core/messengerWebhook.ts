@@ -10,6 +10,7 @@ import {
   summarizeWebhook,
 } from "./webhookHelpers";
 import { facebookWebhookPayloadSchema } from "./webhookSchemas";
+import { sendWhatsAppText } from "./whatsappApi";
 
 const PRIVACY_POLICY_URL = process.env.PRIVACY_POLICY_URL?.trim() || "<link>";
 const DEFAULT_LANG = normalizeLang(process.env.DEFAULT_MESSENGER_LANG);
@@ -62,6 +63,98 @@ function logWhatsAppWebhookPayload(payload: unknown): void {
   console.log(serializedBody);
 }
 
+type NormalizedWhatsAppTextEvent = {
+  from: string;
+  messageType: string;
+  textBody: string | null;
+};
+
+function extractWhatsAppTextEvents(
+  payload: unknown
+): NormalizedWhatsAppTextEvent[] {
+  if (typeof payload !== "object" || payload === null) {
+    return [];
+  }
+
+  const entries = Array.isArray((payload as { entry?: unknown[] }).entry)
+    ? (payload as { entry: unknown[] }).entry
+    : [];
+
+  return entries.flatMap(entry => {
+    const changes = Array.isArray((entry as { changes?: unknown[] } | null)?.changes)
+      ? ((entry as { changes: unknown[] }).changes ?? [])
+      : [];
+
+    return changes.flatMap(change => {
+      const value =
+        typeof change === "object" && change !== null
+          ? ((change as { value?: unknown }).value ?? null)
+          : null;
+      const messages = Array.isArray((value as { messages?: unknown[] } | null)?.messages)
+        ? ((value as { messages: unknown[] }).messages ?? [])
+        : [];
+
+      return messages.flatMap(message => {
+        if (typeof message !== "object" || message === null) {
+          return [];
+        }
+
+        const from = typeof (message as { from?: unknown }).from === "string"
+          ? (message as { from: string }).from
+          : "";
+        const messageType = typeof (message as { type?: unknown }).type === "string"
+          ? (message as { type: string }).type
+          : "unknown";
+        const textBody =
+          typeof (message as { text?: { body?: unknown } }).text?.body === "string"
+            ? (message as { text: { body: string } }).text.body
+            : null;
+
+        if (!from) {
+          return [];
+        }
+
+        return [{ from, messageType, textBody }];
+      });
+    });
+  });
+}
+
+async function handleWhatsAppWebhookPayload(payload: unknown): Promise<void> {
+  logWhatsAppWebhookPayload(payload);
+
+  const events = extractWhatsAppTextEvents(payload);
+  if (events.length === 0) {
+    console.log("[whatsapp webhook] no inbound messages found");
+    return;
+  }
+
+  for (const event of events) {
+    console.log("[whatsapp webhook] normalized inbound event", event);
+
+    if (event.messageType !== "text") {
+      continue;
+    }
+
+    console.log("[whatsapp webhook] reply attempt", {
+      to: event.from,
+      messageType: event.messageType,
+    });
+
+    try {
+      await sendWhatsAppText(event.from, "Leaderbot WhatsApp test OK");
+      console.log("[whatsapp webhook] reply sent", {
+        to: event.from,
+      });
+    } catch (error) {
+      console.error("[whatsapp webhook] reply failed", {
+        to: event.from,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+}
+
 export async function processFacebookWebhookPayload(
   payload: unknown
 ): Promise<void> {
@@ -106,7 +199,7 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
       console.log("[whatsapp webhook] POST delivery received");
       res.sendStatus(200);
       setImmediate(() => {
-        logWhatsAppWebhookPayload(req.body);
+        void handleWhatsAppWebhookPayload(req.body);
       });
       return;
     }
