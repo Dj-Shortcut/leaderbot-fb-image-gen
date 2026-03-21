@@ -1,6 +1,5 @@
-import dotenv from "dotenv";
 import express from "express";
-import { pathToFileURL } from "node:url";
+import { existsSync, readFileSync } from "node:fs";
 import {
   HeadObjectCommand,
   PutObjectCommand,
@@ -17,7 +16,42 @@ type ProxyEnv = {
   port: number;
 };
 
-dotenv.config({ override: false });
+function loadDotEnvFromDisk(): void {
+  const envPath = ".env";
+  if (!existsSync(envPath)) {
+    return;
+  }
+
+  const source = readFileSync(envPath, "utf8");
+  for (const line of source.split(/\r?\n/u)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+
+    const separatorIndex = trimmed.indexOf("=");
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = trimmed.slice(0, separatorIndex).trim();
+    if (!key || Object.prototype.hasOwnProperty.call(process.env, key)) {
+      continue;
+    }
+
+    let value = trimmed.slice(separatorIndex + 1).trim();
+    if (
+      (value.startsWith("\"") && value.endsWith("\"")) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    process.env[key] = value;
+  }
+}
+
+loadDotEnvFromDisk();
 
 const REQUIRED_ENV_KEYS = [
   "FORGE_API_KEY",
@@ -287,10 +321,7 @@ export function startStorageProxy(): void {
   });
 }
 
-const entryHref = process.argv[1]
-  ? pathToFileURL(process.argv[1]).href
-  : undefined;
-
-if (entryHref && import.meta.url === entryHref) {
+const entryScript = process.argv[1]?.replace(/\\/g, "/") ?? "";
+if (/\/index\.(?:ts|js|cjs)$/u.test(entryScript)) {
   startStorageProxy();
 }
