@@ -16,7 +16,9 @@
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "test": "vitest run",
     "lint:server": "eslint server",
-    "lint:server:fix": "eslint server --fix"
+    "lint:server:fix": "eslint server --fix",
+    "storage-proxy:dev": "tsx watch storage-proxy/index.ts",
+    "storage-proxy:start": "cross-env NODE_ENV=production tsx storage-proxy/index.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.41",
