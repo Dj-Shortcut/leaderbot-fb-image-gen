@@ -80,6 +80,7 @@ describe("messenger state flow", () => {
 
   it("maps per-category style replies with a back action", () => {
     expect(getStyleRepliesForCategory("bold")).toEqual([
+      { title: "Afroman", payload: "STYLE_AFROMAN_AMERICANA" },
       { title: "✨ Gold", payload: "STYLE_GOLD" },
       { title: "🌃 Cyberpunk", payload: "STYLE_CYBERPUNK" },
       { title: "🪩 Disco Glow", payload: "STYLE_DISCO" },
