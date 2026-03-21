@@ -154,8 +154,13 @@ function getBearerToken(authorization: string | undefined): string | null {
     return null;
   }
 
-  const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
-  return match?.[1]?.trim() ?? null;
+  const trimmed = authorization.trim();
+  if (trimmed.length < 8 || trimmed.slice(0, 7).toLowerCase() !== "bearer ") {
+    return null;
+  }
+
+  const token = trimmed.slice(7).trim();
+  return token || null;
 }
 
 function readRawBody(req: express.Request): Promise<Buffer> {
