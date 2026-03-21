@@ -38,6 +38,7 @@ export class GenerationTimeoutError extends Error {}
 export class OpenAiGenerationError extends Error {}
 export class OpenAiBudgetExceededError extends Error {}
 export class MissingAppBaseUrlError extends Error {}
+export class MissingObjectStorageConfigError extends Error {}
 export class MissingInputImageError extends Error {}
 export class InvalidSourceImageUrlError extends Error {}
 
@@ -97,19 +98,69 @@ function hasObjectStorageConfig(): boolean {
   );
 }
 
+function isProductionRuntime(): boolean {
+  return process.env.NODE_ENV === "production";
+}
+
+export function assertProductionImageStorageConfig(): void {
+  if (!isProductionRuntime()) {
+    return;
+  }
+
+  if (!hasObjectStorageConfig()) {
+    throw new MissingObjectStorageConfigError(
+      "BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY are required in production for durable generated image storage"
+    );
+  }
+}
+
 async function publishGeneratedImage(
   jpegBuffer: Buffer,
-  style: Style
+  style: Style,
+  reqId?: string
 ): Promise<string> {
   if (hasObjectStorageConfig()) {
     const key = `generated/${style}/${Date.now()}-${randomUUID()}.jpg`;
-    const { url } = await storagePut(key, jpegBuffer, "image/jpeg");
-    return url;
+    try {
+      const { url } = await storagePut(key, jpegBuffer, "image/jpeg");
+      console.info(
+        JSON.stringify({
+          level: "info",
+          msg: "generated_image_upload_success",
+          reqId,
+          style,
+          storageKey: key,
+          publicUrl: url,
+        })
+      );
+      return url;
+    } catch (error) {
+      console.error("GENERATED_IMAGE_UPLOAD_FAILED", {
+        reqId,
+        style,
+        storageKey: key,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  if (isProductionRuntime()) {
+    throw new MissingObjectStorageConfigError(
+      "BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY are required in production for durable generated image storage"
+    );
   }
 
   const token = putGeneratedImage(jpegBuffer, "image/jpeg");
   const publicBaseUrl = getRequiredPublicBaseUrl();
-  return buildGeneratedImageUrl(publicBaseUrl, token);
+  const localUrl = buildGeneratedImageUrl(publicBaseUrl, token);
+  console.warn("GENERATED_IMAGE_LOCAL_FALLBACK", {
+    reqId,
+    style,
+    token,
+    publicUrl: localUrl,
+  });
+  return localUrl;
 }
 function ensureJpegBuffer(buffer: Buffer): Buffer {
   return buffer;
@@ -118,10 +169,14 @@ function ensureJpegBuffer(buffer: Buffer): Buffer {
 export function getGeneratorStartupConfig(): {
   mode: GeneratorMode;
   resolvedBaseUrl: string | undefined;
+  objectStorageEnabled: boolean;
+  requiresDurableStorageInProduction: boolean;
 } {
   return {
     mode: "openai",
     resolvedBaseUrl: getConfiguredBaseUrl(),
+    objectStorageEnabled: hasObjectStorageConfig(),
+    requiresDurableStorageInProduction: true,
   };
 }
 
@@ -773,7 +828,11 @@ export class OpenAiImageGenerator implements ImageGenerator {
 
       const jpegBuffer = ensureJpegBuffer(imageBufferResult);
       const uploadStartedAt = Date.now();
-      const imageUrl = await publishGeneratedImage(jpegBuffer, input.style);
+      const imageUrl = await publishGeneratedImage(
+        jpegBuffer,
+        input.style,
+        input.reqId
+      );
       const uploadOrServeMs = Date.now() - uploadStartedAt;
       partialMetrics.uploadOrServeMs = uploadOrServeMs;
 

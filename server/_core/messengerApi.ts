@@ -234,7 +234,13 @@ export async function sendButtonTemplate(
 }
 
 export async function sendImage(psid: string, imageUrl: string): Promise<void> {
-  safeLog("messenger_image_send", {});
+  console.info(
+    JSON.stringify({
+      level: "info",
+      msg: "messenger_image_send",
+      imageUrl,
+    })
+  );
 
   await sendMessage(
     psid,
@@ -251,18 +257,27 @@ export async function sendImage(psid: string, imageUrl: string): Promise<void> {
       maxRetries: 2,
       retryBaseMs: 150,
       onRetry: (attempt, maxAttempts, error) => {
-        safeLog("messenger_image_retry", {
-          attempt,
-          maxAttempts,
-          final: false,
-          errorCode: error.name,
-        });
+        console.warn(
+          JSON.stringify({
+            level: "warn",
+            msg: "messenger_image_retry",
+            attempt,
+            maxAttempts,
+            imageUrl,
+            errorCode: error.name,
+          })
+        );
       },
       onFinalFailure: (attempts, error) => {
-        safeLog("messenger_image_send_failed", {
-          attempts,
-          errorCode: error.name,
-        });
+        console.error(
+          JSON.stringify({
+            level: "error",
+            msg: "messenger_image_send_failed",
+            attempts,
+            imageUrl,
+            errorCode: error.name,
+          })
+        );
       },
     }
   );

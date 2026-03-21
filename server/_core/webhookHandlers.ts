@@ -13,6 +13,7 @@ import {
   GenerationTimeoutError,
   MissingInputImageError,
   MissingAppBaseUrlError,
+  MissingObjectStorageConfigError,
   MissingOpenAiApiKeyError,
 } from "./imageService";
 import {
@@ -643,6 +644,17 @@ export function createWebhookHandlers({
         console.info(
           JSON.stringify({
             level: "info",
+            msg: "messenger_send_image_url",
+            reqId,
+            psidHash: anonymizePsid(psid).slice(0, 12),
+            style,
+            imageUrl,
+          })
+        );
+
+        console.info(
+          JSON.stringify({
+            level: "info",
             msg: "generation_summary",
             reqId,
             psidHash: anonymizePsid(psid).slice(0, 12),
@@ -714,7 +726,8 @@ export function createWebhookHandlers({
           return;
         } else if (
           error instanceof MissingOpenAiApiKeyError ||
-          error instanceof MissingAppBaseUrlError
+          error instanceof MissingAppBaseUrlError ||
+          error instanceof MissingObjectStorageConfigError
         ) {
           failureText = t(lang, "generationUnavailable");
         } else if (error instanceof GenerationTimeoutError) {

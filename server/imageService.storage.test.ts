@@ -10,6 +10,7 @@ describe("OpenAi image delivery via object storage", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.resetModules();
+    delete process.env.NODE_ENV;
     delete process.env.OPENAI_API_KEY;
     delete process.env.SOURCE_IMAGE_ALLOWED_HOSTS;
     delete process.env.BUILT_IN_FORGE_API_URL;
@@ -68,5 +69,21 @@ describe("OpenAi image delivery via object storage", () => {
 
     expect(result.imageUrl).toBe("https://cdn.example/generated/disco.jpg?signature=abc");
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("fails clearly in production when durable storage config is missing", async () => {
+    process.env.NODE_ENV = "production";
+
+    const {
+      assertProductionImageStorageConfig,
+      MissingObjectStorageConfigError,
+    } = await import("./_core/imageService");
+
+    expect(() => assertProductionImageStorageConfig()).toThrow(
+      MissingObjectStorageConfigError
+    );
+    expect(() => assertProductionImageStorageConfig()).toThrow(
+      "BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY are required in production"
+    );
   });
 });

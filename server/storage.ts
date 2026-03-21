@@ -1,7 +1,7 @@
 // Preconfigured storage helpers for Manus WebDev templates
 // Uses the Biz-provided storage proxy (Authorization: Bearer <token>)
 
-import { ENV } from './_core/env';
+import { getForgeApiBaseUrlOrThrow } from "./_core/env";
 
 type StorageConfig = { baseUrl: string; apiKey: string };
 
@@ -17,8 +17,8 @@ function extractUrl(value: unknown): string {
 }
 
 function getStorageConfig(): StorageConfig {
-  const baseUrl = ENV.forgeApiUrl;
-  const apiKey = ENV.forgeApiKey;
+  const baseUrl = process.env.BUILT_IN_FORGE_API_URL?.trim() ?? "";
+  const apiKey = process.env.BUILT_IN_FORGE_API_KEY?.trim() ?? "";
 
   if (!baseUrl || !apiKey) {
     throw new Error(
@@ -26,7 +26,7 @@ function getStorageConfig(): StorageConfig {
     );
   }
 
-  return { baseUrl: baseUrl.replace(/\/+$/, ""), apiKey };
+  return { baseUrl: getForgeApiBaseUrlOrThrow().replace(/\/+$/, ""), apiKey };
 }
 
 function buildUploadUrl(baseUrl: string, relKey: string): URL {

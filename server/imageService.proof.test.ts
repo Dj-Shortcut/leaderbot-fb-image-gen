@@ -150,12 +150,15 @@ function expectDistinctivePrompt(
 describe("OpenAi image-to-image proof", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    delete process.env.NODE_ENV;
     delete process.env.OPENAI_API_KEY;
     delete process.env.APP_BASE_URL;
     delete process.env.OPENAI_IMAGE_MAX_RETRIES;
     delete process.env.OPENAI_IMAGE_RETRY_BASE_MS;
     delete process.env.OPENAI_IMAGE_TIMEOUT_MS;
     delete process.env.SOURCE_IMAGE_ALLOWED_HOSTS;
+    delete process.env.BUILT_IN_FORGE_API_URL;
+    delete process.env.BUILT_IN_FORGE_API_KEY;
   });
 
   it.each(STYLE_PROMPT_CASES)(
@@ -560,11 +563,13 @@ describe("OpenAi image-to-image proof", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("requires https APP_BASE_URL in production for openai mode", async () => {
+  it("does not require APP_BASE_URL when production uses durable object storage", async () => {
     process.env.NODE_ENV = "production";
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "http://leaderbot.example";
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example";
+    process.env.BUILT_IN_FORGE_API_URL = "https://forge.example";
+    process.env.BUILT_IN_FORGE_API_KEY = "forge-secret";
 
     const fixture = Buffer.alloc(7000, 9);
     const fetchMock = vi.fn(async (url: string | URL) => {
@@ -573,6 +578,19 @@ describe("OpenAi image-to-image proof", () => {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
           arrayBuffer: async () => fixture,
+        } as Response;
+      }
+
+      if (
+        toUrlString(url).startsWith(
+          "https://forge.example/v1/storage/upload?path=generated%2Fdisco%2F"
+        )
+      ) {
+        return {
+          ok: true,
+          json: async () => ({
+            url: "https://cdn.example/generated/disco.jpg?signature=prod",
+          }),
         } as Response;
       }
 
@@ -585,17 +603,17 @@ describe("OpenAi image-to-image proof", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const generator = new OpenAiImageGenerator();
-    await expect(
-      generator.generate({
-        style: "disco",
-        sourceImageUrl: "https://img.example/source.jpg",
-        userKey: "user-1",
-        reqId: "req-insecure-app-base-url",
-      })
-    ).rejects.toThrow("APP_BASE_URL is missing or invalid");
+    const result = await generator.generate({
+      style: "disco",
+      sourceImageUrl: "https://img.example/source.jpg",
+      userKey: "user-1",
+      reqId: "req-insecure-app-base-url",
+    });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    delete process.env.NODE_ENV;
+    expect(result.imageUrl).toBe(
+      "https://cdn.example/generated/disco.jpg?signature=prod"
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("retries OpenAI edits request on retryable status codes", async () => {

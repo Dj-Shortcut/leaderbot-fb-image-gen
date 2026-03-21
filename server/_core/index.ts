@@ -11,6 +11,7 @@ import {
   registerBotRoutes,
   verifyBotWebhookSignature,
 } from "./bot";
+import { assertProductionImageStorageConfig } from "./imageService";
 import { registerChatRoutes } from "./chat";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -123,6 +124,7 @@ async function startServer() {
   console.log("VERSION", buildVersionPayload());
   const generatorStartupConfig = getBotStartupConfig();
   console.log("GENERATOR_STARTUP_CONFIG", generatorStartupConfig);
+  assertProductionImageStorageConfig();
   assertAuthConfig();
   assertWhatsAppConfig();
   assertPrivacyConfig();
@@ -362,6 +364,12 @@ async function startServer() {
   app.get("/generated/:token.jpg", (req, res) => {
     const generatedImage = getGeneratedImage(req.params.token);
     if (!generatedImage) {
+      console.warn("GENERATED_IMAGE_FETCH_MISS", {
+        reqId: getRequestId(req),
+        token: req.params.token,
+        path: req.path,
+        nodeEnv: process.env.NODE_ENV ?? "unknown",
+      });
       res.status(404).send("Not found");
       return;
     }
