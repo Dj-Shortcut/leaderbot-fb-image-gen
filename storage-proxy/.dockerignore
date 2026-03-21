@@ -4,3 +4,16 @@ dist
 *.log
 tmp
 temp
+.DS_Store
+.env
+.env.*
+coverage
+*.tmp
+*.temp
+*.swp
+*.swo
+Thumbs.db
+screenshots
+test-results
+playwright-report
+*.tsbuildinfo
