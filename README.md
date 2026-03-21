@@ -206,7 +206,7 @@ Related files:
 - `LOG_LEVEL`, `DEBUG_STATE_DUMP`, `DEBUG_IMAGE_PROOF` (diagnostics)
 - `MESSENGER_QUOTA_BYPASS_IDS` (comma-separated PSIDs or hashed user keys that skip Messenger daily quota; intended for internal testing/admin)
 - `PORT` (default `8080`)
-- `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY` (opt-in for `/api/chat`; when either is missing/blank, chat stays disabled and returns HTTP 503)
+- `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY` (used by the storage proxy contract; in production image generation these should point to the R2-backed proxy so generated Messenger attachment URLs are durable across Fly machines; they also gate `/api/chat`, which stays disabled and returns HTTP 503 when either is missing/blank)
 - `VITE_APP_ID`, `DATABASE_URL`, `OWNER_OPEN_ID`, `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY` (app/data integrations exposed via `server/_core/env.ts`)
 
 Legacy/app-specific environment variables also exist for SDK and data API integrations in `server/_core/env.ts`.
@@ -333,6 +333,28 @@ Oversized payloads return `413` with a friendly JSON response:
 ## Deployment notes
 
 This app is configured for Fly.io using `Dockerfile` + `fly.toml`.
+
+### Durable image storage
+
+Production Messenger image delivery should use the R2-backed storage proxy described in [`docs/storage-proxy-r2.md`](docs/storage-proxy-r2.md).
+
+Main app settings:
+
+- `BUILT_IN_FORGE_API_URL=https://leaderbot-storage-proxy.fly.dev`
+- `BUILT_IN_FORGE_API_KEY=<same bearer token configured as FORGE_API_KEY on the proxy>`
+
+Proxy app notes:
+
+- The deployed Fly app is `leaderbot-storage-proxy`
+- The separate empty Fly app `storage-proxy` is not used
+- Preferred proxy commands are:
+
+```bash
+fly status -a leaderbot-storage-proxy
+fly logs -a leaderbot-storage-proxy --no-tail
+fly deploy --depot=false -a leaderbot-storage-proxy
+fly secrets list -a leaderbot-storage-proxy
+```
 
 Typical deployment flow:
 
