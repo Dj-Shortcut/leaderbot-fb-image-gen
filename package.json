@@ -10,6 +10,8 @@
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "debug:image-url": "tsx server/_core/debugImageUrl.ts",
     "dev": "cross-env NODE_ENV=development tsx watch server/_core/index.ts",
+    "deploy:check-docker": "node scripts/check-docker-host.mjs",
+    "fix:docker": "scripts\\fix-docker.cmd",
     "format": "prettier --write .",
     "lint": "eslint client/src shared",
     "lint:fix": "eslint client/src shared --fix",
