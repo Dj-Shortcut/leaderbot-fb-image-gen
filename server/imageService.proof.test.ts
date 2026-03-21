@@ -16,6 +16,7 @@ type StylePromptCase = {
   style:
     | "caricature"
     | "storybook-anime"
+    | "afroman-americana"
     | "petals"
     | "gold"
     | "cinematic"
@@ -46,6 +47,16 @@ const STYLE_PROMPT_CASES = [
       "hand-painted background sensibility",
       "soft daylight or golden-hour lighting",
       "nostalgic magical mood",
+    ],
+    minFeatureMatches: 3,
+  },
+  {
+    style: "afroman-americana",
+    baseLead: "A premium stylized portrait thumbnail of Afroman",
+    features: [
+      "tailored American flag suit",
+      "bold retro Americana energy",
+      "rich red white and blue color balance",
     ],
     minFeatureMatches: 3,
   },

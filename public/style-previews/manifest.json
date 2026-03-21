@@ -19,6 +19,10 @@
     ],
     "output": "public/style-previews/storybook-anime.png"
   },
+  "afroman-americana": {
+    "output": "public/style-previews/afroman-americana.png",
+    "thumbnailPrompt": "Afroman wearing an American flag suit, centered portrait, strong silhouette, high contrast red white and blue, clean background, bold lighting, expressive confident face, simplified composition, optimized for small mobile preview"
+  },
   "petals": {
     "tileIndex": 2,
     "cropBox": [

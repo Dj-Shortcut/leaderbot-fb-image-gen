@@ -34,6 +34,18 @@ describe("style normalization", () => {
     expect(stylePayloadToStyle("STYLE_OIL_PAINT")).toBe("oil-paint");
     expect(parseReferralStyle("style_oil-paint")).toBe("oil-paint");
   });
+
+  it("normalizes Afroman aliases to the canonical key", () => {
+    expect(normalizeStyle("Afroman")).toBe("afroman-americana");
+    expect(normalizeStyle("afroman americana")).toBe("afroman-americana");
+    expect(parseStyle("afroman")).toBe("afroman-americana");
+    expect(stylePayloadToStyle("STYLE_AFROMAN_AMERICANA")).toBe(
+      "afroman-americana"
+    );
+    expect(parseReferralStyle("style_afroman-americana")).toBe(
+      "afroman-americana"
+    );
+  });
 });
 
 it("normalizes Norman Blackwell aliases to the canonical key", () => {

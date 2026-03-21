@@ -1,6 +1,7 @@
 export type Style =
   | "caricature"
   | "storybook-anime"
+  | "afroman-americana"
   | "gold"
   | "petals"
   | "clouds"
@@ -13,6 +14,7 @@ export type Style =
 export type StyleId =
   | "STYLE_CARICATURE"
   | "STYLE_STORYBOOK_ANIME"
+  | "STYLE_AFROMAN_AMERICANA"
   | "STYLE_PETALS"
   | "STYLE_GOLD"
   | "STYLE_CINEMATIC"
@@ -39,6 +41,7 @@ export type StyleConfig = {
   style: Style;
   label: string;
   category: StyleCategory;
+  thumbnailPrompt?: string;
 };
 
 export type StyleCategoryConfig = {
@@ -62,6 +65,15 @@ export const STYLE_CONFIGS: StyleConfig[] = [
     style: "storybook-anime",
     label: "🌿 Storybook Anime",
     category: "illustrated",
+  },
+  {
+    id: "STYLE_AFROMAN_AMERICANA",
+    payload: "STYLE_AFROMAN_AMERICANA",
+    style: "afroman-americana",
+    label: "Afroman",
+    category: "bold",
+    thumbnailPrompt:
+      "Afroman wearing an American flag suit, centered portrait, strong silhouette, high contrast red white and blue, clean background, bold lighting, expressive confident face, simplified composition, optimized for small mobile preview",
   },
   {
     id: "STYLE_PETALS",

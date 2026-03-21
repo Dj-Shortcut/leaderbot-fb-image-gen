@@ -53,6 +53,7 @@ export type WebhookSummary = {
 export const STYLE_OPTIONS: Style[] = [
   "caricature",
   "storybook-anime",
+  "afroman-americana",
   "petals",
   "gold",
   "cinematic",
@@ -66,6 +67,7 @@ export const STYLE_OPTIONS: Style[] = [
 export const STYLE_LABELS: Record<Style, string> = {
   caricature: "Caricature",
   "storybook-anime": "Storybook Anime",
+  "afroman-americana": "Afroman",
   petals: "Petals",
   gold: "Gold",
   cinematic: "Cinematic",
@@ -83,6 +85,9 @@ export const STYLE_CATEGORY_LABELS: Record<StyleCategory, string> = {
 };
 
 const STYLE_ALIASES: Record<string, Style> = {
+  afroman: "afroman-americana",
+  "afroman americana": "afroman-americana",
+  "afroman-americana": "afroman-americana",
   ghibli: "storybook-anime",
   "ghibli style": "storybook-anime",
   "studio ghibli": "storybook-anime",

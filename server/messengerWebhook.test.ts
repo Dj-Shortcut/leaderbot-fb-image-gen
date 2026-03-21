@@ -1890,6 +1890,11 @@ describe("messenger greeting behavior", () => {
       "category-fallback-user",
       "Hier zijn je bold-stijlen. Kies er eentje hieronder.",
       [
+        {
+          content_type: "text",
+          title: "Afroman",
+          payload: "STYLE_AFROMAN_AMERICANA",
+        },
         { content_type: "text", title: "✨ Gold", payload: "STYLE_GOLD" },
         {
           content_type: "text",
@@ -2305,6 +2310,92 @@ describe("bot conversational editing feature", () => {
     ).toBeNull();
     expect(getState(anonymizePsid("style-preselect-user"))?.selectedStyle).toBe(
       "cyberpunk"
+    );
+  });
+
+  it("handles /style Afroman and routes the next generation through afroman-americana", async () => {
+    const sourceImage = Buffer.alloc(6000, 7);
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      if (toUrlString(url).startsWith("https://img.example/")) {
+        return {
+          ok: true,
+          headers: new Headers({ "content-type": "image/jpeg" }),
+          arrayBuffer: async () => sourceImage,
+        } as Response;
+      }
+
+      const formData = init?.body as FormData;
+      const prompt = String(formData.get("prompt"));
+      expect(prompt).toContain(
+        "A premium stylized portrait thumbnail of Afroman"
+      );
+      expect(prompt).toContain("tailored American flag suit");
+      expect(prompt).toContain("bold retro Americana energy");
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "afroman-style-user" },
+              message: {
+                mid: "mid-afroman-photo",
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/source.jpg" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "afroman-style-user" },
+              message: {
+                mid: "mid-afroman-style-command",
+                text: "/style Afroman",
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      "afroman-style-user",
+      "Ik maak nu je Afroman-stijl."
+    );
+    expect(sendImageMock).toHaveBeenCalledWith(
+      "afroman-style-user",
+      expect.stringMatching(
+        /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+      )
+    );
+    expect(getState(anonymizePsid("afroman-style-user"))?.selectedStyle).toBe(
+      "afroman-americana"
+    );
+    expect(getState(anonymizePsid("afroman-style-user"))?.lastStyle).toBe(
+      "afroman-americana"
     );
   });
 });

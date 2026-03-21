@@ -14,6 +14,7 @@ describe("messengerStyles", () => {
     expect(STYLE_CONFIGS.map(style => style.style)).toEqual([
       "caricature",
       "storybook-anime",
+      "afroman-americana",
       "petals",
       "gold",
       "cinematic",
@@ -29,9 +30,11 @@ describe("messengerStyles", () => {
     expect(isStylePayload("STYLE_CINEMATIC")).toBe(true);
     expect(isStylePayload("STYLE_OIL_PAINT")).toBe(true);
     expect(isStylePayload("STYLE_CYBERPUNK")).toBe(true);
+    expect(isStylePayload("STYLE_AFROMAN_AMERICANA")).toBe(true);
     expect(isStylePayload("STYLE_NORMAN_BLACKWELL")).toBe(true);
     expect(isStylePayload("STYLE_STORYBOOK_ANIME")).toBe(true);
     expect(isStylePayload("UNKNOWN_STYLE")).toBe(false);
+    expect(getStyleById("STYLE_AFROMAN_AMERICANA").label).toContain("Afroman");
     expect(getStyleById("STYLE_STORYBOOK_ANIME").label).toContain(
       "Storybook Anime"
     );
@@ -60,6 +63,12 @@ describe("messengerStyles", () => {
       "storybook-anime",
       "oil-paint",
       "norman-blackwell",
+    ]);
+    expect(getStylesForCategory("bold").map(style => style.style)).toEqual([
+      "afroman-americana",
+      "gold",
+      "cyberpunk",
+      "disco",
     ]);
   });
 });

@@ -156,7 +156,7 @@ function buildSystemPrompt(input: { lang: Lang; lastStyle?: Style }): string {
     `The user language is ${language}.`,
     `The last known style is ${lastStyle}.`,
     "Only return JSON with no markdown.",
-    'Schema: {"shouldEdit":boolean,"style":"caricature"|"storybook-anime"|"gold"|"petals"|"clouds"|"cinematic"|"disco"|"cyberpunk"|"norman-blackwell"|null,"promptHint":string|null}.',
+    'Schema: {"shouldEdit":boolean,"style":"caricature"|"storybook-anime"|"afroman-americana"|"gold"|"petals"|"clouds"|"cinematic"|"disco"|"cyberpunk"|"norman-blackwell"|null,"promptHint":string|null}.',
     "Set shouldEdit=true only when the user is asking to change the previous image.",
     "Use style only when the user explicitly asks for a known style or it is clearly implied.",
     'Treat "ghibli", "ghibli style", "studio ghibli", "storybook anime", and "whimsical anime" as requests for "storybook-anime".',
@@ -180,6 +180,7 @@ function parseDecision(rawText: string): ConversationalEditDecision | null {
     const style =
       parsed.style === "caricature" ||
       parsed.style === "storybook-anime" ||
+      parsed.style === "afroman-americana" ||
       parsed.style === "gold" ||
       parsed.style === "petals" ||
       parsed.style === "clouds" ||
@@ -218,6 +219,7 @@ export function looksLikePossibleEditRequest(text: string): boolean {
     "more ",
     "less ",
     "whimsical",
+    "afroman",
     "darker",
     "lighter",
     "softer",
