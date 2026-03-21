@@ -272,11 +272,14 @@ export function createStorageProxyApp(config: ProxyEnv): express.Express {
 export function startStorageProxy(): void {
   const config = loadConfig();
   const app = createStorageProxyApp(config);
+  const host = "0.0.0.0";
 
-  app.listen(config.port, "0.0.0.0", () => {
+  app.listen(config.port, host, () => {
     logJson("info", {
       msg: "storage_proxy_started",
+      host,
       port: config.port,
+      bind: `${host}:${config.port}`,
       publicBaseUrl: config.publicBaseUrl,
       r2Bucket: config.r2Bucket,
       r2Endpoint: config.r2Endpoint,
