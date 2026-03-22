@@ -281,6 +281,10 @@ Multi-channel text routing now also has a small adapter-level test in `server/bo
 - Keep documentation comments synchronized with implementation changes; when behavior, inputs, or outputs change, update the docblock in the same PR.
 - Remove stale comments rather than leaving outdated guidance in place.
 
+## Style additions
+
+When adding or updating image styles, use [`docs/style-guide.md`](docs/style-guide.md) as the quality and consistency checklist for prompts, previews, naming, and review.
+
 ## Admin login (GitHub OAuth)
 
 The same server can protect `/admin` using GitHub OAuth and a simple allowlist.
