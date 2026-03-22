@@ -186,7 +186,7 @@ const STYLE_PROMPTS = {
   "storybook-anime":
     "Transform this photo into a whimsical hand-drawn fantasy illustration with a warm storybook atmosphere. Preserve the subject identity while rendering the image as a soft, painterly animated scene with delicate linework, hand-painted background sensibility, lush natural greens and sun-washed earth tones, gentle expressive eyes, subtly simplified anatomy, cozy fantasy details, soft daylight or golden-hour lighting, and a nostalgic magical mood. The result should feel like a lovingly crafted illustrated animation frame with a warm human touch, clearly non-photorealistic and never like a generic photo filter.",
   "afroman-americana":
-    "A premium stylized portrait thumbnail of Afroman wearing a tailored American flag suit, bold retro Americana energy, relaxed victorious expression, crisp silhouette, polished illustrative rendering, rich red white and blue color balance, iconic stage charisma, clean composition for a mobile carousel card",
+    "Transform this photo into a premium stylized portrait in an Afroman-inspired Americana look. Preserve the subject identity and facial features while dressing them in a tailored American flag suit with bold retro Americana energy, a relaxed victorious expression, crisp silhouette, polished illustrative rendering, rich red white and blue color balance, iconic stage charisma, and a clean composition.",
   gold:
     "Reimagine this portrait as a luxe gilded editorial artwork with molten gold highlights, champagne and amber color grading, sculpted rim lighting, glossy reflective surfaces, regal opulent mood, and ultra-detailed rendered textures that feel like a premium fashion campaign dipped in liquid metal.",
   petals:

@@ -52,8 +52,10 @@ const STYLE_PROMPT_CASES = [
   },
   {
     style: "afroman-americana",
-    baseLead: "A premium stylized portrait thumbnail of Afroman",
+    baseLead:
+      "Transform this photo into a premium stylized portrait in an Afroman-inspired Americana look.",
     features: [
+      "Preserve the subject identity and facial features",
       "tailored American flag suit",
       "bold retro Americana energy",
       "rich red white and blue color balance",
