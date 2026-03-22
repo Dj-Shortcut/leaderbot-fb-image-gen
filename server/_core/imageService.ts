@@ -17,6 +17,10 @@ export interface ImageGenerator {
   generate(input: {
     style: Style;
     sourceImageUrl?: string;
+    sourceImageData?: {
+      buffer: Buffer;
+      contentType: string;
+    };
     promptHint?: string;
     userKey: string;
     reqId: string;
@@ -51,6 +55,17 @@ export type GenerationMetrics = {
 
 type ErrorWithGenerationMetrics = Error & {
   generationMetrics?: GenerationMetrics;
+};
+
+type SourceImageData = {
+  buffer: Buffer;
+  contentType: string;
+};
+
+type DownloadedSourceImage = SourceImageData & {
+  incomingLen: number;
+  incomingSha256: string;
+  fbImageFetchMs: number;
 };
 
 const MIN_INPUT_IMAGE_BYTES = 5 * 1024;
@@ -493,13 +508,7 @@ async function fetchWithTimeout(
 async function downloadSourceImageOrThrow(
   sourceImageUrl: string,
   reqId: string
-): Promise<{
-  imageBuffer: Buffer;
-  contentType: string;
-  incomingLen: number;
-  incomingSha256: string;
-  fbImageFetchMs: number;
-}> {
+): Promise<DownloadedSourceImage> {
   const validatedSourceImageUrl = validateSourceImageUrlOrThrow(
     sourceImageUrl,
     reqId
@@ -587,7 +596,7 @@ async function downloadSourceImageOrThrow(
       }
 
       return {
-        imageBuffer,
+        buffer: imageBuffer,
         contentType,
         incomingLen: incomingByteLen,
         incomingSha256: incomingHash,
@@ -633,10 +642,26 @@ async function downloadSourceImageOrThrow(
   throw new MissingInputImageError("Failed to download source image");
 }
 
+function normalizeProvidedSourceImage(
+  sourceImageData: SourceImageData
+): DownloadedSourceImage {
+  return {
+    buffer: sourceImageData.buffer,
+    contentType: sourceImageData.contentType,
+    incomingLen: safeLen(sourceImageData.buffer),
+    incomingSha256: sha256(sourceImageData.buffer),
+    fbImageFetchMs: 0,
+  };
+}
+
 export class OpenAiImageGenerator implements ImageGenerator {
   async generate(input: {
     style: Style;
     sourceImageUrl?: string;
+    sourceImageData?: {
+      buffer: Buffer;
+      contentType: string;
+    };
     promptHint?: string;
     userKey: string;
     reqId: string;
@@ -656,12 +681,12 @@ export class OpenAiImageGenerator implements ImageGenerator {
       throw new InvalidGenerationInputError("Style is required");
     }
 
-    if (!input.sourceImageUrl) {
+    if (!input.sourceImageUrl && !input.sourceImageData) {
       console.error("MISSING_INPUT_IMAGE", {
         reqId: input.reqId,
         reason: "missing_source_url",
       });
-      throw new MissingInputImageError("sourceImageUrl is required");
+      throw new MissingInputImageError("source image is required");
     }
 
     if (!process.env.OPENAI_API_KEY) {
@@ -669,14 +694,14 @@ export class OpenAiImageGenerator implements ImageGenerator {
     }
 
     try {
-      const {
-        imageBuffer,
-        contentType,
-        incomingLen,
-        incomingSha256,
-        fbImageFetchMs,
-      } = await downloadSourceImageOrThrow(input.sourceImageUrl, input.reqId);
-      partialMetrics.fbImageFetchMs = fbImageFetchMs;
+      const sourceImage = input.sourceImageData
+        ? normalizeProvidedSourceImage(input.sourceImageData)
+        : await downloadSourceImageOrThrow(input.sourceImageUrl!, input.reqId);
+      const imageBuffer = sourceImage.buffer;
+      const contentType = sourceImage.contentType;
+      const incomingLen = sourceImage.incomingLen;
+      const incomingSha256 = sourceImage.incomingSha256;
+      partialMetrics.fbImageFetchMs = sourceImage.fbImageFetchMs;
       const openAiInputHash = sha256(imageBuffer);
       const openAiInputByteLen = safeLen(imageBuffer);
 

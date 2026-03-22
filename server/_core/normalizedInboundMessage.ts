@@ -7,5 +7,6 @@ export type NormalizedInboundMessage = {
   messageType: "text" | "image" | "unknown";
   textBody?: string;
   imageUrl?: string;
+  imageId?: string;
   timestamp?: number;
 };
