@@ -2327,7 +2327,10 @@ describe("bot conversational editing feature", () => {
       const formData = init?.body as FormData;
       const prompt = String(formData.get("prompt"));
       expect(prompt).toContain(
-        "A premium stylized portrait thumbnail of Afroman"
+        "Transform this photo into a premium stylized portrait in an Afroman-inspired Americana look."
+      );
+      expect(prompt).toContain(
+        "Preserve the subject identity and facial features"
       );
       expect(prompt).toContain("tailored American flag suit");
       expect(prompt).toContain("bold retro Americana energy");
