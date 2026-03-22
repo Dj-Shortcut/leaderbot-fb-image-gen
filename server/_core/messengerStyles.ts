@@ -22,8 +22,7 @@ export type StyleId =
   | "STYLE_DISCO"
   | "STYLE_CLOUDS"
   | "STYLE_CYBERPUNK"
-  | "STYLE_NORMAN_BLACKWELL"
-  | "gold";
+  | "STYLE_NORMAN_BLACKWELL";
 
 export type StyleCategory =
   | "illustrated"
