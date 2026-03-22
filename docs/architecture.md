@@ -80,25 +80,26 @@ flowchart TD
     MM["Meta Messenger<br/>Webhook + Send API"]
     UA["Admin / Browser / Monitoring"]
 
-    subgraph LB["Leaderbot Server (Node/Express)"]
+    subgraph LB["Leaderbot Server"]
         WH["/webhook/facebook"]
         TRPC["/api/trpc"]
         AUTH["/auth/github/*"]
         OPS["/healthz, /__version, /generated/*"]
         HANDLERS["Webhook handlers<br/>signature check, dedupe, i18n,<br/>state transitions, quota checks"]
-        IMG["Image service<br/>OpenAI"]
+        IMG["Image service"]
     end
 
-    REDIS[("Redis / state store")]
+    REDIS["Redis / state store"]
     OPENAI["OpenAI Images API"]
     GITHUB["GitHub OAuth"]
-    PROXY["Storage proxy (Fly)<br/>Forge-style upload/download contract"]
-    R2["Cloudflare R2 / public asset URL"]
+    PROXY["Storage proxy<br/>Fly app"]
+    R2["Cloudflare R2<br/>Public asset URL"]
 
     MM --> WH
     WH --> HANDLERS
     HANDLERS --> IMG
-    HANDLERS <--> REDIS
+    HANDLERS --> REDIS
+    REDIS --> HANDLERS
     IMG --> OPENAI
     IMG --> PROXY
     PROXY --> R2
