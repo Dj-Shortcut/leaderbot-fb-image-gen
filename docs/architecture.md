@@ -56,14 +56,21 @@ ASCII version:
         | - OpenAI image generator |
         +------------+-------------+
                      |
-          +----------+----------+
-          |                     |
-          v                     v
-        +-------------------+   +----------------------+
-        | Redis / State     |   | OpenAI Images API    |
-        | - state store     |   | - generation backend |
-        | - rate limit base |   +----------------------+
-        +-------------------+
+          +----------+----------+-------------------------+
+          |                     |                         |
+          v                     v                         v
+        +-------------------+   +----------------------+  +---------------------------+
+        | Redis / State     |   | OpenAI Images API    |  | Storage Proxy (Fly app)   |
+        | - state store     |   | - generation backend |  | - Forge-style upload API  |
+        | - rate limit base |   +----------------------+  | - returns durable URLs     |
+        +-------------------+                             +-------------+-------------+
+                                                                      |
+                                                                      v
+                                                        +-----------------------------+
+                                                        | Cloudflare R2 + Public URL  |
+                                                        | - object storage            |
+                                                        | - public asset delivery     |
+                                                        +-----------------------------+
 ```
 
 Mermaid version:
@@ -85,12 +92,16 @@ flowchart TD
     REDIS[("Redis / state store")]
     OPENAI["OpenAI Images API"]
     GITHUB["GitHub OAuth"]
+    PROXY["Storage proxy (Fly)<br/>Forge-style upload/download contract"]
+    R2["Cloudflare R2 / public asset URL"]
 
     MM --> WH
     WH --> HANDLERS
     HANDLERS --> IMG
     HANDLERS <--> REDIS
     IMG --> OPENAI
+    IMG --> PROXY
+    PROXY --> R2
     IMG --> MM
 
     UA --> TRPC
@@ -202,6 +213,18 @@ The canonical runtime contract across all platforms is:
 - Health endpoint is `/healthz`.
 - `APP_BASE_URL` must be publicly reachable so Messenger can fetch `/generated/<id>.png` assets.
 
+### Edge and asset delivery
+
+Cloudflare is part of the production asset-delivery path, not the main app runtime path.
+
+- The main Leaderbot app runs on Fly.io.
+- The storage proxy also runs on Fly.io and exposes the Forge-style upload/download contract expected by the app.
+- The storage proxy writes generated assets to Cloudflare R2.
+- The storage proxy returns durable public URLs built from `PUBLIC_BASE_URL`.
+- `PUBLIC_BASE_URL` can be an R2 public URL such as `*.r2.dev` or a Cloudflare-backed custom domain.
+
+This means Cloudflare currently sits behind the storage proxy for durable asset storage and delivery, rather than acting as the primary reverse proxy in front of the main Leaderbot app.
+
 ### A. Docker
 
 - Repository includes a production `Dockerfile`; `.dockerignore` excludes local/dev artifacts (`node_modules`, `.env*`, `.git`, etc.) to keep image builds clean and deterministic.
@@ -215,6 +238,8 @@ The canonical runtime contract across all platforms is:
 - `fly.toml` defines app runtime, HTTP service, and `/healthz` checks.
 - Deploy using `fly deploy` after setting secrets (`fly secrets set ...`).
 - Keep `REDIS_URL`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, and other credentials in Fly secrets (not in image or Git).
+- The main app should talk to the storage proxy via `BUILT_IN_FORGE_API_URL`, not directly to Cloudflare R2.
+- The storage proxy is a separate Fly app that bridges Leaderbot and Cloudflare R2/public asset URLs.
 
 ### C. Kubernetes
 
