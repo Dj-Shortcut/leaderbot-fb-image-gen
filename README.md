@@ -141,6 +141,18 @@ Text handling is now split into three layers:
 
 Current scope is intentionally limited to text messages. Media/image handling is still channel-specific and will be moved later once the shared contracts are expanded.
 
+## WhatsApp image flow
+
+WhatsApp now supports the same core customer journey as Messenger:
+
+- inbound image webhooks are accepted on the shared Meta callback route
+- WhatsApp media is downloaded through the Cloud API using the inbound media id
+- the source image is persisted to a reusable public URL for follow-up style picks
+- users can pick style groups and styles over plain text replies
+- generated images are returned through the WhatsApp Cloud API image send endpoint
+
+Because the persisted source image is fetched again during generation, `SOURCE_IMAGE_ALLOWED_HOSTS` must include the hostname used for those stored source images. In local/dev setups this is usually the `APP_BASE_URL` host. In production it should include the public asset host returned by the storage layer.
+
 ## Quota model
 
 There are two quota layers in the codebase, each with a 2-image/day free limit:
@@ -382,3 +394,4 @@ Operational notes:
 - Keep `FB_APP_SECRET` configured to enforce webhook signature verification middleware.
 - Outbound WhatsApp sends use `server/_core/whatsappApi.ts` and the WhatsApp Cloud API `phone_number_id` configured through env, not hardcoded values.
 - Set `SOURCE_IMAGE_ALLOWED_HOSTS` in production. Source-image fetches fail closed when it is unset. `fbcdn.net,fbsbx.com` is a conservative Meta-focused starting point, but the preferred setup is to narrow this to the exact attachment hostnames you observe in your Messenger webhook traffic.
+- For WhatsApp source-image reuse, also include the host that serves persisted inbound source images, such as your app host in local/dev or your storage public domain in production.

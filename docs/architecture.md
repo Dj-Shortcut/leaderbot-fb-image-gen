@@ -119,14 +119,15 @@ flowchart TD
    - Messenger payloads fan in to `processFacebookWebhookPayload`
    - WhatsApp payloads are normalized from `entry[].changes[].value.messages[]`
 4. Text messages are converted into a shared normalized inbound message shape.
-5. Shared text/domain logic runs in `server/_core/sharedTextHandler.ts`.
-6. Shared logic returns channel-agnostic outbound intents (`BotResponse`).
-7. Channel adapters translate those intents into Messenger or WhatsApp sends.
-8. For Messenger image/style flows, state is still updated directly (`setFlowState`, `setPendingImage`, `setChosenStyle`, ...).
-9. If generation is triggered:
+5. WhatsApp image messages are downloaded via the WhatsApp Cloud API media endpoint and persisted to a reusable source-image URL.
+6. Shared text/domain logic runs in `server/_core/sharedTextHandler.ts`.
+7. Shared logic returns channel-agnostic outbound intents (`BotResponse`).
+8. Channel adapters translate those intents into Messenger or WhatsApp sends.
+9. Image/style flow state is still updated directly in channel orchestration (`setFlowState`, `setPendingImage`, `setChosenStyle`, ...), with WhatsApp using plain-text prompts where Messenger uses richer UI affordances.
+10. If generation is triggered:
    - state -> `PROCESSING`,
    - OpenAI image generator configuration,
-   - result sent via Messenger send API,
+   - result sent via Messenger Send API or WhatsApp Cloud API,
    - state -> `RESULT_READY` (or `FAILURE` on error).
 
 Core files:
