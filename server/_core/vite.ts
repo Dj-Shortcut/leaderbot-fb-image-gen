@@ -9,12 +9,16 @@ import rateLimit from "express-rate-limit";
 
 type ViteCreateServer = (typeof import("vite"))["createServer"];
 
+function getImportMetaUrl(): string {
+  return Function("return import.meta.url;")() as string;
+}
+
 function getCurrentDir(): string {
   if (typeof __dirname === "string") {
     return __dirname;
   }
 
-  return path.dirname(fileURLToPath(import.meta.url));
+  return path.dirname(fileURLToPath(getImportMetaUrl()));
 }
 
 export async function setupVite(app: Express, server: Server, createViteServer: ViteCreateServer) {
