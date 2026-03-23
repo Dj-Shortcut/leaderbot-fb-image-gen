@@ -790,7 +790,7 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
   app.get("/webhook", handleVerification);
   app.get("/webhook/facebook", handleVerification);
 
-  app.post("/webhook/facebook", (req, res) => {
+  const handleWebhookPost: express.RequestHandler = (req, res) => {
     if (isWhatsAppWebhookPayload(req.body)) {
       console.log("[whatsapp webhook] POST delivery received");
       res.sendStatus(200);
@@ -819,5 +819,8 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
     setImmediate(() => {
       void processFacebookWebhookPayload(req.body).catch(console.error);
     });
-  });
+  };
+
+  app.post("/webhook", handleWebhookPost);
+  app.post("/webhook/facebook", handleWebhookPost);
 }

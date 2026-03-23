@@ -150,8 +150,8 @@ async function startServer() {
   );
   app.use(express.urlencoded({ limit: REQUEST_BODY_LIMIT, extended: true }));
 
-  // Verify webhook signature for Facebook webhook endpoint
-  app.use("/webhook/facebook", verifyBotWebhookSignature);
+  // Verify webhook signature for all Meta webhook deliveries.
+  app.use("/webhook", verifyBotWebhookSignature);
 
   app.use((req, res, next) => {
     const startTime = process.hrtime.bigint();
