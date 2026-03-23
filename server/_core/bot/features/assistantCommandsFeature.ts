@@ -46,7 +46,7 @@ export const assistantCommandsFeature: BotFeature = {
           [
             t(ctx.lang, "textWithoutPhoto"),
             t(ctx.lang, "assistantPhotoTip"),
-            ...(ctx.capabilities.quickReplies
+            ...(ctx.capabilities?.quickReplies
               ? []
               : [t(ctx.lang, "assistantPhotoTipExtra")]),
           ].join("\n\n")
