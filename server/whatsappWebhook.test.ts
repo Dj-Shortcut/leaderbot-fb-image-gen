@@ -401,9 +401,10 @@ describe("whatsapp webhook flow", () => {
 
     expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
       "wa-user-8",
-      expect.stringContaining(
-        "Je kan ook gewoon een stijlnaam typen of op een genummerde optie antwoorden."
-      )
+      [
+        "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
+        "Tip: typ 'verras me' nadat je een foto hebt gestuurd voor meteen een willekeurige stijl.",
+      ].join("\n\n")
     );
   });
 
