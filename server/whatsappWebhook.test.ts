@@ -381,11 +381,29 @@ describe("whatsapp webhook flow", () => {
 
     expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
       "wa-user-6",
-      expect.stringContaining("Quick actions")
+      expect.stringContaining("Snelle acties")
     );
     expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
       "wa-user-6",
       expect.stringContaining("1. ")
+    );
+  });
+
+  it("adds a plain-text selection hint for WhatsApp help before a photo is uploaded", async () => {
+    await processWhatsAppWebhookPayload(
+      createWhatsAppPayload({
+        from: "wa-user-8",
+        timestamp: "1710000014",
+        type: "text",
+        text: { body: "help" },
+      })
+    );
+
+    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+      "wa-user-8",
+      expect.stringContaining(
+        "Je kan ook gewoon een stijlnaam typen of op een genummerde optie antwoorden."
+      )
     );
   });
 

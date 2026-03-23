@@ -1,6 +1,7 @@
 import type { BotFeature } from "../features";
 import { t } from "../../i18n";
-import { STYLE_OPTIONS } from "../../webhookHelpers";
+import { type Style } from "../../messengerStyles";
+import { STYLE_LABELS, STYLE_OPTIONS } from "../../webhookHelpers";
 
 const HELP_COMMANDS = new Set([
   "help",
@@ -27,6 +28,10 @@ function pickRandomStyle() {
   return STYLE_OPTIONS[randomIndex] ?? STYLE_OPTIONS[0];
 }
 
+function getRandomStyleLabel(style: Style): string {
+  return STYLE_LABELS[style];
+}
+
 export const assistantCommandsFeature: BotFeature = {
   name: "assistant_commands",
   async onText(ctx) {
@@ -34,11 +39,17 @@ export const assistantCommandsFeature: BotFeature = {
       if (ctx.hasPhoto) {
         await ctx.sendStateQuickReplies(
           "AWAITING_STYLE",
-          "⚡ Quick actions: choose a style, type 'remix', or type 'surprise me' for a random look."
+          t(ctx.lang, "assistantQuickActions")
         );
       } else {
         await ctx.sendText(
-          `${t(ctx.lang, "textWithoutPhoto")}\n\nTip: send 'surprise me' after uploading a photo for an instant random style.`
+          [
+            t(ctx.lang, "textWithoutPhoto"),
+            t(ctx.lang, "assistantPhotoTip"),
+            ...(ctx.capabilities.quickReplies
+              ? []
+              : [t(ctx.lang, "assistantPhotoTipExtra")]),
+          ].join("\n\n")
         );
       }
 
@@ -56,7 +67,11 @@ export const assistantCommandsFeature: BotFeature = {
     }
 
     const style = pickRandomStyle();
-    await ctx.sendText(`🎲 Nice — going with ${style}.`);
+    await ctx.sendText(
+      t(ctx.lang, "assistantRandomStyle", {
+        styleLabel: getRandomStyleLabel(style),
+      })
+    );
     await ctx.runStyleGeneration(style, ctx.state.lastPhotoUrl ?? ctx.state.lastPhoto ?? undefined);
 
     return { handled: true };
