@@ -13,6 +13,10 @@ type TranslationKey =
   | "whatIsThis"
   | "newStyle"
   | "retry"
+  | "assistantQuickActions"
+  | "assistantPhotoTip"
+  | "assistantPhotoTipExtra"
+  | "assistantRandomStyle"
   | "success"
   | "processingBlocked"
   | "styleWithoutPhoto"
@@ -44,6 +48,14 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
     whatIsThis: "Wat doe ik?",
     newStyle: "Nieuwe stijl",
     retry: "Probeer opnieuw",
+    assistantQuickActions:
+      "⚡ Snelle acties: kies een stijl, typ 'remix', of typ 'verras me' voor een willekeurige look.",
+    assistantPhotoTip:
+      "Tip: typ 'verras me' nadat je een foto hebt gestuurd voor meteen een willekeurige stijl.",
+    assistantPhotoTipExtra:
+      "Je kan ook gewoon een stijlnaam typen of op een genummerde optie antwoorden.",
+    assistantRandomStyle: ({ styleLabel }) =>
+      `🎲 Mooie keuze — ik ga voor ${styleLabel ?? "deze stijl"}.`,
     success: "Klaar ✅",
     processingBlocked: "Even geduld — je vorige afbeelding is bijna klaar.",
     styleWithoutPhoto: "Stuur eerst een foto, dan maak ik die stijl voor je.",
@@ -77,6 +89,14 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
     whatIsThis: "What is this?",
     newStyle: "New style",
     retry: "Retry",
+    assistantQuickActions:
+      "⚡ Quick actions: choose a style, type 'remix', or type 'surprise me' for a random look.",
+    assistantPhotoTip:
+      "Tip: send 'surprise me' after uploading a photo for an instant random style.",
+    assistantPhotoTipExtra:
+      "You can also type a style name directly or reply with a numbered option.",
+    assistantRandomStyle: ({ styleLabel }) =>
+      `🎲 Nice — going with ${styleLabel ?? "this style"}.`,
     success: "Done ✅",
     processingBlocked: "One sec — your previous image is almost done.",
     styleWithoutPhoto: "Send a photo first, then I can make that style for you.",

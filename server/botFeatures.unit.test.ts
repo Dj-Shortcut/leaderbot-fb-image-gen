@@ -30,6 +30,11 @@ function makeState(
 
 function makeContext(overrides: Partial<BotTextContext> = {}): BotTextContext {
   return {
+    channel: "messenger",
+    capabilities: {
+      quickReplies: true,
+      richTemplates: true,
+    },
     senderId: "p1",
     userId: "u1",
     reqId: "req-1",
@@ -240,7 +245,7 @@ describe("assistantCommandsFeature", () => {
       );
 
       expect(result).toEqual({ handled: true });
-      expect(sendText).toHaveBeenCalledWith("🎲 Nice — going with caricature.");
+      expect(sendText).toHaveBeenCalledWith("🎲 Nice — going with Caricature.");
       expect(runStyleGeneration).toHaveBeenCalledWith(
         "caricature",
         "https://img.example/original.jpg"

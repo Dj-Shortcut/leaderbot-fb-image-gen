@@ -2185,6 +2185,67 @@ describe("bot conversational editing feature", () => {
     ).toBe(true);
   });
 
+  it("uses user-facing style labels for the surprise command", async () => {
+    installOpenAiSuccessFetchMock();
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+
+    try {
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "surprise-style-user" },
+                message: {
+                  mid: "mid-surprise-photo",
+                  attachments: [
+                    {
+                      type: "image",
+                      payload: { url: "https://img.example/source.jpg" },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      sendImageMock.mockClear();
+      sendQuickRepliesMock.mockClear();
+      sendTextMock.mockClear();
+
+      await processFacebookWebhookPayload({
+        entry: [
+          {
+            messaging: [
+              {
+                sender: { id: "surprise-style-user" },
+                message: {
+                  mid: "mid-surprise-command",
+                  text: "surprise me",
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      expect(sendTextMock).toHaveBeenCalledWith(
+        "surprise-style-user",
+        "🎲 Mooie keuze — ik ga voor Caricature."
+      );
+      expect(sendImageMock).toHaveBeenCalledWith(
+        "surprise-style-user",
+        expect.stringMatching(
+          /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+        )
+      );
+    } finally {
+      randomSpy.mockRestore();
+    }
+  });
+
   it("handles /style cyberpunk as a first-class style selection", async () => {
     installOpenAiSuccessFetchMock();
     await processFacebookWebhookPayload({
