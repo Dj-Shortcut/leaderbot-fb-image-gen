@@ -765,6 +765,14 @@ function processWhatsAppWebhookPayloadSafely(payload: unknown): void {
   });
 }
 
+function processFacebookWebhookPayloadSafely(payload: unknown): void {
+  void processFacebookWebhookPayload(payload).catch(error => {
+    console.error("[messenger webhook] async processing failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
+}
+
 export function registerMetaWebhookRoutes(app: express.Express): void {
   const handleVerification: express.RequestHandler = (req, res) => {
     const configuredToken = getMetaVerifyToken();
@@ -825,7 +833,7 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
     console.log("[messenger webhook] POST delivery received");
     res.sendStatus(200);
     setImmediate(() => {
-      void processFacebookWebhookPayload(req.body).catch(console.error);
+      processFacebookWebhookPayloadSafely(req.body);
     });
   };
 
