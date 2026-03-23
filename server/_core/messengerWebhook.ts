@@ -54,7 +54,10 @@ import {
 } from "./messengerStyles";
 import { canGenerate, increment } from "./messengerQuota";
 import { storeInboundSourceImage } from "./sourceImageStore";
-import { buildStateResponseText } from "./stateResponseText";
+import {
+  buildStateResponseText,
+  resolveStateReplyPayload,
+} from "./stateResponseText";
 import { getBotFeatures } from "./bot/features";
 import type { BotLogger, BotTextContext } from "./botContext";
 import { getTodayRuntimeStats } from "./botRuntimeStats";
@@ -309,6 +312,74 @@ async function sendWhatsAppStateText(
   await sendWhatsAppText(senderId, buildStateResponseText(state, text, lang));
 }
 
+function resolveWhatsAppPrivacyPolicyUrl(): string | undefined {
+  const configured = process.env.PRIVACY_POLICY_URL?.trim();
+  if (configured && /^https?:\/\//i.test(configured)) {
+    return configured;
+  }
+
+  const appBaseUrl =
+    process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
+  if (appBaseUrl && /^https?:\/\//i.test(appBaseUrl)) {
+    return `${appBaseUrl.replace(/\/$/, "")}/privacy`;
+  }
+
+  return undefined;
+}
+
+async function handleWhatsAppPayloadSelection(
+  payload: string,
+  event: NormalizedInboundMessage,
+  reqId: string,
+  lang: Lang
+): Promise<boolean> {
+  if (payload === "WHAT_IS_THIS") {
+    await sendWhatsAppText(event.senderId, t(lang, "flowExplanation"));
+    return true;
+  }
+
+  if (payload === "PRIVACY_INFO") {
+    const privacyUrl = resolveWhatsAppPrivacyPolicyUrl();
+    await sendWhatsAppText(
+      event.senderId,
+      t(lang, "privacy", { link: privacyUrl })
+    );
+    return true;
+  }
+
+  if (payload === "CHOOSE_STYLE") {
+    await setPreselectedStyle(event.senderId, null);
+    await setSelectedStyleCategory(event.senderId, null);
+    await setFlowState(event.senderId, "AWAITING_STYLE");
+    await sendWhatsAppStyleCategoryPrompt(event.senderId, lang);
+    return true;
+  }
+
+  if (payload === "RETRY_STYLE") {
+    const currentState = await Promise.resolve(getOrCreateState(event.senderId));
+    const retryStyle = currentState.selectedStyle
+      ? parseStyle(currentState.selectedStyle)
+      : undefined;
+
+    if (retryStyle) {
+      await runWhatsAppStyleGeneration(
+        event.senderId,
+        event.userId,
+        retryStyle,
+        reqId,
+        lang
+      );
+      return true;
+    }
+
+    await setFlowState(event.senderId, "AWAITING_STYLE");
+    await sendWhatsAppStyleCategoryPrompt(event.senderId, lang);
+    return true;
+  }
+
+  return false;
+}
+
 function createWhatsAppFeatureLogger(userId: string): BotLogger {
   return {
     info(event, details = {}) {
@@ -503,6 +574,23 @@ async function handleWhatsAppTextEvent(
   }
 
   if (textBody) {
+    const selectedPayload = resolveStateReplyPayload(
+      state.stage,
+      textBody,
+      lang
+    );
+    if (
+      selectedPayload &&
+      (await handleWhatsAppPayloadSelection(
+        selectedPayload,
+        event,
+        reqId,
+        lang
+      ))
+    ) {
+      return;
+    }
+
     const selectedStyle = parseWhatsAppStyleSelection(textBody, selectedCategory);
     if (selectedStyle && state.lastPhotoUrl) {
       await runWhatsAppStyleGeneration(

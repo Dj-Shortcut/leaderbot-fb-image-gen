@@ -20,6 +20,38 @@ function localizeReplyTitle(reply: StateQuickReply, lang: Lang): string {
   }
 }
 
+function normalizeSelectionText(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+export function resolveStateReplyPayload(
+  state: ConversationState,
+  rawSelection: string,
+  lang: Lang
+): string | undefined {
+  const replies = getQuickRepliesForState(state);
+  if (replies.length === 0) {
+    return undefined;
+  }
+
+  const normalizedSelection = normalizeSelectionText(rawSelection);
+  const selectedIndex = Number.parseInt(normalizedSelection, 10);
+  if (Number.isFinite(selectedIndex) && selectedIndex > 0) {
+    return replies[selectedIndex - 1]?.payload;
+  }
+
+  const matchedReply = replies.find(reply => {
+    const localizedTitle = normalizeSelectionText(localizeReplyTitle(reply, lang));
+    const rawTitle = normalizeSelectionText(reply.title);
+    return (
+      normalizedSelection === localizedTitle ||
+      normalizedSelection === rawTitle
+    );
+  });
+
+  return matchedReply?.payload;
+}
+
 export function buildStateResponseText(
   state: ConversationState,
   leadText: string,

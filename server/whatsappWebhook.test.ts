@@ -21,7 +21,12 @@ import {
   processWhatsAppWebhookPayload,
   resetMessengerEventDedupe,
 } from "./_core/messengerWebhook";
-import { anonymizePsid, getState, resetStateStore } from "./_core/messengerState";
+import {
+  anonymizePsid,
+  getState,
+  resetStateStore,
+  setFlowState,
+} from "./_core/messengerState";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
@@ -381,6 +386,26 @@ describe("whatsapp webhook flow", () => {
     expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
       "wa-user-6",
       expect.stringContaining("1. ")
+    );
+  });
+
+  it("maps WhatsApp fallback menu selections back to their advertised actions", async () => {
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    const userKey = anonymizePsid("wa-user-7");
+    setFlowState(userKey, "RESULT_READY");
+
+    await processWhatsAppWebhookPayload(
+      createWhatsAppPayload({
+        from: "wa-user-7",
+        timestamp: "1710000013",
+        type: "text",
+        text: { body: "2" },
+      })
+    );
+
+    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+      "wa-user-7",
+      expect.stringContaining("Privacybeleid: https://leaderbot-fb-image-gen.fly.dev/privacy")
     );
   });
 });
