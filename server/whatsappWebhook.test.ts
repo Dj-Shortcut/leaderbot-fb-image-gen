@@ -391,8 +391,7 @@ describe("whatsapp webhook flow", () => {
 
   it("maps WhatsApp fallback menu selections back to their advertised actions", async () => {
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    const userKey = anonymizePsid("wa-user-7");
-    setFlowState(userKey, "RESULT_READY");
+    setFlowState("wa-user-7", "RESULT_READY");
 
     await processWhatsAppWebhookPayload(
       createWhatsAppPayload({
