@@ -269,4 +269,118 @@ describe("whatsapp webhook flow", () => {
     );
     expect(getState(anonymizePsid("wa-user-4"))?.stage).toBe("AWAITING_STYLE");
   });
+
+  it("supports /style commands on WhatsApp before the user uploads a photo", async () => {
+    downloadWhatsAppMediaMock.mockResolvedValue({
+      buffer: Buffer.alloc(6000, 7),
+      contentType: "image/jpeg",
+    });
+
+    const sourceImage = Buffer.alloc(6000, 9);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL) => {
+        const resolved = typeof url === "string" ? url : url.toString();
+
+        if (resolved.startsWith("https://leaderbot-fb-image-gen.fly.dev/generated/")) {
+          return {
+            ok: true,
+            headers: new Headers({ "content-type": "image/jpeg" }),
+            arrayBuffer: async () => sourceImage,
+          } as Response;
+        }
+
+        if (resolved === "https://api.openai.com/v1/images/edits") {
+          return {
+            ok: true,
+            json: async () => ({
+              data: [{ b64_json: Buffer.from("generated-image-2").toString("base64") }],
+            }),
+          } as Response;
+        }
+
+        throw new Error(`Unexpected fetch url: ${resolved}`);
+      })
+    );
+
+    await processWhatsAppWebhookPayload(
+      createWhatsAppPayload({
+        from: "wa-user-5",
+        timestamp: "1710000008",
+        type: "text",
+        text: { body: "/style cyberpunk" },
+      })
+    );
+
+    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+      "wa-user-5",
+      "✅ Stijl ingesteld op cyberpunk."
+    );
+    expect(getState(anonymizePsid("wa-user-5"))?.preselectedStyle).toBe(
+      "cyberpunk"
+    );
+
+    sendWhatsAppTextMock.mockClear();
+    sendWhatsAppImageMock.mockClear();
+
+    await processWhatsAppWebhookPayload(
+      createWhatsAppPayload({
+        from: "wa-user-5",
+        timestamp: "1710000009",
+        type: "image",
+        image: { id: "wamid-image-5" },
+      })
+    );
+
+    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+      "wa-user-5",
+      "Ik maak nu je Cyberpunk-stijl."
+    );
+    expect(sendWhatsAppImageMock).toHaveBeenCalledWith(
+      "wa-user-5",
+      expect.stringMatching(
+        /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/.+\.jpg$/
+      )
+    );
+    expect(getState(anonymizePsid("wa-user-5"))?.preselectedStyle).toBeNull();
+    expect(getState(anonymizePsid("wa-user-5"))?.selectedStyle).toBe(
+      "cyberpunk"
+    );
+  });
+
+  it("runs shared help commands on WhatsApp with state-aware fallback options", async () => {
+    downloadWhatsAppMediaMock.mockResolvedValue({
+      buffer: Buffer.alloc(6000, 7),
+      contentType: "image/jpeg",
+    });
+
+    await processWhatsAppWebhookPayload(
+      createWhatsAppPayload({
+        from: "wa-user-6",
+        timestamp: "1710000010",
+        type: "image",
+        image: { id: "wamid-image-6" },
+      })
+    );
+
+    sendWhatsAppTextMock.mockClear();
+
+    await processWhatsAppWebhookPayload(
+      createWhatsAppPayload({
+        from: "wa-user-6",
+        timestamp: "1710000011",
+        type: "text",
+        text: { body: "help" },
+      })
+    );
+
+    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+      "wa-user-6",
+      expect.stringContaining("Quick actions")
+    );
+    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+      "wa-user-6",
+      expect.stringContaining("1. ")
+    );
+  });
 });

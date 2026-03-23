@@ -359,6 +359,11 @@ export function createWebhookHandlers({
     payload: string
   ): BotPayloadContext {
     return {
+      channel: "messenger",
+      capabilities: {
+        quickReplies: true,
+        richTemplates: true,
+      },
       senderId: psid,
       userId,
       reqId,
@@ -403,6 +408,11 @@ export function createWebhookHandlers({
     imageUrl: string
   ): BotImageContext {
     return {
+      channel: "messenger",
+      capabilities: {
+        quickReplies: true,
+        richTemplates: true,
+      },
       senderId: psid,
       userId,
       reqId,
@@ -449,6 +459,11 @@ export function createWebhookHandlers({
     hasPhoto: boolean
   ): BotTextContext {
     return {
+      channel: "messenger",
+      capabilities: {
+        quickReplies: true,
+        richTemplates: true,
+      },
       senderId: psid,
       userId,
       reqId,

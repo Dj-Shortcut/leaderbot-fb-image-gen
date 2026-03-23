@@ -40,6 +40,8 @@ export async function sendWhatsAppBotResponse(
   response: BotResponse | null,
   options: {
     sendText: (text: string) => Promise<void>;
+    replyState?: ConversationState;
+    sendStateText?: (state: ConversationState, text: string) => Promise<void>;
   }
 ): Promise<void> {
   if (!response) {
@@ -49,6 +51,11 @@ export async function sendWhatsAppBotResponse(
   switch (response.kind) {
     case "text":
       if (!response.text) {
+        return;
+      }
+
+      if (options.replyState && options.sendStateText) {
+        await options.sendStateText(options.replyState, response.text);
         return;
       }
 

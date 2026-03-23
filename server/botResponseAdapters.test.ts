@@ -52,6 +52,23 @@ describe("botResponseAdapters", () => {
     expect(sendText).toHaveBeenCalledWith("hello");
   });
 
+  it("maps a WhatsApp text response with replyState to state text sending", async () => {
+    const sendText = vi.fn(async () => {});
+    const sendStateText = vi.fn(async () => {});
+
+    await sendWhatsAppBotResponse(
+      { kind: "text", text: "hello" },
+      {
+        replyState: "AWAITING_STYLE",
+        sendText,
+        sendStateText,
+      }
+    );
+
+    expect(sendStateText).toHaveBeenCalledWith("AWAITING_STYLE", "hello");
+    expect(sendText).not.toHaveBeenCalled();
+  });
+
   it("ignores non-text WhatsApp intents until channel support is added", async () => {
     const sendText = vi.fn(async () => {});
 
