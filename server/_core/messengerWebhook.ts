@@ -757,6 +757,14 @@ export async function processFacebookWebhookPayload(
   await handlers.processFacebookWebhookPayload(payload);
 }
 
+function processWhatsAppWebhookPayloadSafely(payload: unknown): void {
+  void processWhatsAppWebhookPayload(payload).catch(error => {
+    console.error("[whatsapp webhook] async processing failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
+}
+
 export function registerMetaWebhookRoutes(app: express.Express): void {
   const handleVerification: express.RequestHandler = (req, res) => {
     const configuredToken = getMetaVerifyToken();
@@ -795,7 +803,7 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
       console.log("[whatsapp webhook] POST delivery received");
       res.sendStatus(200);
       setImmediate(() => {
-        void processWhatsAppWebhookPayload(req.body);
+        processWhatsAppWebhookPayloadSafely(req.body);
       });
       return;
     }
