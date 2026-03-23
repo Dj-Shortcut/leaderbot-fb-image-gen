@@ -14,7 +14,11 @@ function buildSignature(body: string, secret: string): string {
   return `sha256=${digest}`;
 }
 
-async function postWebhook(body: string, signature: string): Promise<{ status: number; payload: string }> {
+async function postWebhook(
+  body: string,
+  signature: string,
+  path = "/webhook/facebook",
+): Promise<{ status: number; payload: string }> {
   const app = express();
 
   app.use(
@@ -22,7 +26,7 @@ async function postWebhook(body: string, signature: string): Promise<{ status: n
       verify: captureMetaWebhookRawBody,
     }),
   );
-  app.use("/webhook/facebook", verifyMetaWebhookSignature);
+  app.use("/webhook", verifyMetaWebhookSignature);
   registerMetaWebhookRoutes(app);
 
   const server = http.createServer(app);
@@ -39,7 +43,7 @@ async function postWebhook(body: string, signature: string): Promise<{ status: n
       {
         hostname: "127.0.0.1",
         port: address.port,
-        path: "/webhook/facebook",
+        path,
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -91,6 +95,19 @@ describe("messenger webhook payload validation", () => {
 
     expect(response.status).toBe(400);
     expect(response.payload).toContain("Invalid webhook payload");
+  });
+
+  it("accepts signed payloads on the generic /webhook callback path", async () => {
+    const secret = "test-secret";
+    process.env.FB_APP_SECRET = secret;
+
+    const body = JSON.stringify({
+      object: "whatsapp_business_account",
+      entry: [],
+    });
+    const response = await postWebhook(body, buildSignature(body, secret), "/webhook");
+
+    expect(response.status).toBe(200);
   });
 
   it("rate limits repeated signed webhook requests from the same IP", async () => {

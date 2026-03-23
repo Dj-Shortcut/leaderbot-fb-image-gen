@@ -757,6 +757,22 @@ export async function processFacebookWebhookPayload(
   await handlers.processFacebookWebhookPayload(payload);
 }
 
+function processWhatsAppWebhookPayloadSafely(payload: unknown): void {
+  void processWhatsAppWebhookPayload(payload).catch(error => {
+    console.error("[whatsapp webhook] async processing failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
+}
+
+function processFacebookWebhookPayloadSafely(payload: unknown): void {
+  void processFacebookWebhookPayload(payload).catch(error => {
+    console.error("[messenger webhook] async processing failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
+}
+
 export function registerMetaWebhookRoutes(app: express.Express): void {
   const handleVerification: express.RequestHandler = (req, res) => {
     const configuredToken = getMetaVerifyToken();
@@ -790,12 +806,12 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
   app.get("/webhook", handleVerification);
   app.get("/webhook/facebook", handleVerification);
 
-  app.post("/webhook/facebook", (req, res) => {
+  const handleWebhookPost: express.RequestHandler = (req, res) => {
     if (isWhatsAppWebhookPayload(req.body)) {
       console.log("[whatsapp webhook] POST delivery received");
       res.sendStatus(200);
       setImmediate(() => {
-        void processWhatsAppWebhookPayload(req.body);
+        processWhatsAppWebhookPayloadSafely(req.body);
       });
       return;
     }
@@ -817,7 +833,10 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
     console.log("[messenger webhook] POST delivery received");
     res.sendStatus(200);
     setImmediate(() => {
-      void processFacebookWebhookPayload(req.body).catch(console.error);
+      processFacebookWebhookPayloadSafely(req.body);
     });
-  });
+  };
+
+  app.post("/webhook", handleWebhookPost);
+  app.post("/webhook/facebook", handleWebhookPost);
 }
