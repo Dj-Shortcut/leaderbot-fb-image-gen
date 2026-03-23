@@ -30,6 +30,7 @@ import {
   setLastGenerationContext,
   setLastUserMessageAt,
   setPendingImage,
+  setPreselectedStyle,
   setSelectedStyleCategory,
   setFlowState,
   type ConversationState,
@@ -53,6 +54,14 @@ import {
 } from "./messengerStyles";
 import { canGenerate, increment } from "./messengerQuota";
 import { storeInboundSourceImage } from "./sourceImageStore";
+import {
+  buildStateResponseText,
+  resolveStateReplyPayload,
+} from "./stateResponseText";
+import { getBotFeatures } from "./bot/features";
+import type { BotLogger, BotTextContext } from "./botContext";
+import { getTodayRuntimeStats } from "./botRuntimeStats";
+import type { QuickReply } from "./messengerApi";
 
 const PRIVACY_POLICY_URL = process.env.PRIVACY_POLICY_URL?.trim() || "<link>";
 const DEFAULT_LANG = normalizeLang(process.env.DEFAULT_MESSENGER_LANG);
@@ -282,12 +291,178 @@ async function sendWhatsAppStyleOptions(
   await sendWhatsAppText(senderId, getWhatsAppStylePrompt(category, lang));
 }
 
+function buildWhatsAppReplyListText(text: string, replies: QuickReply[]): string {
+  if (replies.length === 0) {
+    return text;
+  }
+
+  return [
+    text,
+    "",
+    ...replies.map((reply, index) => `${index + 1}. ${reply.title}`),
+  ].join("\n");
+}
+
+async function sendWhatsAppStateText(
+  senderId: string,
+  state: ConversationState,
+  text: string,
+  lang: Lang
+): Promise<void> {
+  await sendWhatsAppText(senderId, buildStateResponseText(state, text, lang));
+}
+
+function resolveWhatsAppPrivacyPolicyUrl(): string | undefined {
+  const configured = process.env.PRIVACY_POLICY_URL?.trim();
+  if (configured && /^https?:\/\//i.test(configured)) {
+    return configured;
+  }
+
+  const appBaseUrl =
+    process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
+  if (appBaseUrl && /^https?:\/\//i.test(appBaseUrl)) {
+    return `${appBaseUrl.replace(/\/$/, "")}/privacy`;
+  }
+
+  return undefined;
+}
+
+async function handleWhatsAppPayloadSelection(
+  payload: string,
+  event: NormalizedInboundMessage,
+  reqId: string,
+  lang: Lang
+): Promise<boolean> {
+  if (payload === "WHAT_IS_THIS") {
+    await sendWhatsAppText(event.senderId, t(lang, "flowExplanation"));
+    return true;
+  }
+
+  if (payload === "PRIVACY_INFO") {
+    const privacyUrl = resolveWhatsAppPrivacyPolicyUrl();
+    await sendWhatsAppText(
+      event.senderId,
+      t(lang, "privacy", { link: privacyUrl })
+    );
+    return true;
+  }
+
+  if (payload === "CHOOSE_STYLE") {
+    await setPreselectedStyle(event.senderId, null);
+    await setSelectedStyleCategory(event.senderId, null);
+    await setFlowState(event.senderId, "AWAITING_STYLE");
+    await sendWhatsAppStyleCategoryPrompt(event.senderId, lang);
+    return true;
+  }
+
+  if (payload === "RETRY_STYLE") {
+    const currentState = await Promise.resolve(getOrCreateState(event.senderId));
+    const retryStyle = currentState.selectedStyle
+      ? parseStyle(currentState.selectedStyle)
+      : undefined;
+
+    if (retryStyle) {
+      await runWhatsAppStyleGeneration(
+        event.senderId,
+        event.userId,
+        retryStyle,
+        reqId,
+        lang
+      );
+      return true;
+    }
+
+    await setFlowState(event.senderId, "AWAITING_STYLE");
+    await sendWhatsAppStyleCategoryPrompt(event.senderId, lang);
+    return true;
+  }
+
+  return false;
+}
+
+function createWhatsAppFeatureLogger(userId: string): BotLogger {
+  return {
+    info(event, details = {}) {
+      console.info("[whatsapp feature]", event, {
+        user: toLogUser(userId),
+        ...details,
+      });
+    },
+    warn(event, details = {}) {
+      console.warn("[whatsapp feature]", event, {
+        user: toLogUser(userId),
+        ...details,
+      });
+    },
+    error(event, details = {}) {
+      console.error("[whatsapp feature]", event, {
+        user: toLogUser(userId),
+        ...details,
+      });
+    },
+  };
+}
+
+function createWhatsAppTextContext(
+  event: NormalizedInboundMessage,
+  reqId: string,
+  lang: Lang,
+  state: Awaited<ReturnType<typeof getOrCreateState>>,
+  messageText: string,
+  normalizedText: string,
+  hasPhoto: boolean
+): BotTextContext {
+  return {
+    channel: "whatsapp",
+    capabilities: {
+      quickReplies: false,
+      richTemplates: false,
+    },
+    senderId: event.senderId,
+    userId: event.userId,
+    reqId,
+    lang,
+    state,
+    messageText,
+    normalizedText,
+    hasPhoto,
+    sendText: text => sendWhatsAppText(event.senderId, text),
+    sendImage: imageUrl => sendWhatsAppImage(event.senderId, imageUrl),
+    sendQuickReplies: (text, replies) =>
+      sendWhatsAppText(event.senderId, buildWhatsAppReplyListText(text, replies)),
+    sendStateQuickReplies: (nextState, text) =>
+      sendWhatsAppStateText(event.senderId, nextState, text, lang),
+    setFlowState: nextState =>
+      Promise.resolve(setFlowState(event.senderId, nextState)),
+    preselectStyle: style =>
+      Promise.resolve(setPreselectedStyle(event.senderId, style)).then(
+        () => undefined
+      ),
+    chooseStyle: style =>
+      runWhatsAppStyleGeneration(event.senderId, event.userId, style, reqId, lang),
+    runStyleGeneration: (style, sourceImageUrl, promptHint) =>
+      runWhatsAppStyleGeneration(
+        event.senderId,
+        event.userId,
+        style,
+        reqId,
+        lang,
+        sourceImageUrl,
+        promptHint
+      ),
+    getRuntimeStats: () => getTodayRuntimeStats(),
+    logger: createWhatsAppFeatureLogger(event.userId),
+  };
+}
+
 async function runWhatsAppStyleGeneration(
   senderId: string,
   userId: string,
   style: Style,
   reqId: string,
-  lang: Lang
+  lang: Lang,
+  sourceImageUrl?: string,
+  promptHint?: string
 ): Promise<void> {
   const allowed = await canGenerate(senderId);
   if (!allowed) {
@@ -302,7 +477,8 @@ async function runWhatsAppStyleGeneration(
   }
 
   const state = await Promise.resolve(getOrCreateState(senderId));
-  if (!state.lastPhotoUrl) {
+  const resolvedSourceImageUrl = sourceImageUrl ?? state.lastPhotoUrl ?? undefined;
+  if (!resolvedSourceImageUrl) {
     await setFlowState(senderId, "AWAITING_PHOTO");
     await sendWhatsAppText(senderId, t(lang, "styleWithoutPhoto"));
     return;
@@ -320,7 +496,8 @@ async function runWhatsAppStyleGeneration(
   try {
     const { imageUrl, metrics } = await generator.generate({
       style,
-      sourceImageUrl: state.lastPhotoUrl,
+      sourceImageUrl: resolvedSourceImageUrl,
+      promptHint,
       userKey: userId,
       reqId,
     });
@@ -328,7 +505,7 @@ async function runWhatsAppStyleGeneration(
     await sendWhatsAppImage(senderId, imageUrl);
     await increment(senderId);
     await setLastGenerated(senderId, imageUrl);
-    await setLastGenerationContext(senderId, { style });
+    await setLastGenerationContext(senderId, { style, prompt: promptHint });
     await setFlowState(senderId, "RESULT_READY");
     await sendWhatsAppText(
       senderId,
@@ -397,6 +574,23 @@ async function handleWhatsAppTextEvent(
   }
 
   if (textBody) {
+    const selectedPayload = resolveStateReplyPayload(
+      state.stage,
+      textBody,
+      lang
+    );
+    if (
+      selectedPayload &&
+      (await handleWhatsAppPayloadSelection(
+        selectedPayload,
+        event,
+        reqId,
+        lang
+      ))
+    ) {
+      return;
+    }
+
     const selectedStyle = parseWhatsAppStyleSelection(textBody, selectedCategory);
     if (selectedStyle && state.lastPhotoUrl) {
       await runWhatsAppStyleGeneration(
@@ -423,6 +617,31 @@ async function handleWhatsAppTextEvent(
     getState: () => Promise.resolve(getOrCreateState(event.senderId)),
     setFlowState: (nextState: ConversationState) =>
       Promise.resolve(setFlowState(event.senderId, nextState)),
+    runTextFeatures: async ({
+      state: currentState,
+      messageText,
+      normalizedText: currentNormalizedText,
+      hasPhoto,
+    }) => {
+      for (const feature of getBotFeatures()) {
+        const result = await feature.onText?.(
+          createWhatsAppTextContext(
+            event,
+            reqId,
+            lang,
+            currentState,
+            messageText,
+            currentNormalizedText,
+            hasPhoto
+          )
+        );
+        if (result?.handled) {
+          return true;
+        }
+      }
+
+      return false;
+    },
     logState: (currentState, context) => {
       console.log("[whatsapp webhook] shared state", {
         context,
@@ -435,6 +654,9 @@ async function handleWhatsAppTextEvent(
 
   await sendWhatsAppBotResponse(result.response, {
     sendText: text => sendWhatsAppText(event.senderId, text),
+    replyState: result.replyState,
+    sendStateText: (stateName, text) =>
+      sendWhatsAppStateText(event.senderId, stateName, text, lang),
   });
   if (result.afterSend === "markIntroSeen") {
     await Promise.resolve(markIntroSeen(event.senderId));
@@ -460,7 +682,23 @@ async function handleWhatsAppImageEvent(
     reqId
   );
 
+  const state = await Promise.resolve(getOrCreateState(event.senderId));
+  const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");
   await setPendingImage(event.senderId, persistedImageUrl);
+
+  if (preselectedStyle) {
+    await setPreselectedStyle(event.senderId, null);
+    await runWhatsAppStyleGeneration(
+      event.senderId,
+      event.userId,
+      preselectedStyle,
+      reqId,
+      lang,
+      persistedImageUrl
+    );
+    return;
+  }
+
   await sendWhatsAppStyleCategoryPrompt(event.senderId, lang);
 }
 
