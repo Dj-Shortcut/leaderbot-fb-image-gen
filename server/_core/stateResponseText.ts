@@ -8,13 +8,13 @@ import {
 function localizeReplyTitle(reply: StateQuickReply, lang: Lang): string {
   switch (reply.payload) {
     case "WHAT_IS_THIS":
-      return lang === "en" ? "What is this?" : "Wat doe ik?";
+      return t(lang, "whatIsThis");
     case "PRIVACY_INFO":
       return t(lang, "privacyButtonLabel");
     case "CHOOSE_STYLE":
-      return lang === "en" ? "New style" : "Nieuwe stijl";
+      return t(lang, "newStyle");
     case "RETRY_STYLE":
-      return lang === "en" ? "Retry" : "Probeer opnieuw";
+      return t(lang, "retry");
     default:
       return reply.title;
   }

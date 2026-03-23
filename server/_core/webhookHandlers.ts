@@ -87,6 +87,10 @@ type HandlerDeps = {
 const IN_FLIGHT_MESSAGE =
   "\u23F3 even geduld, ik ben nog bezig met jouw restyle";
 const inFlightNoticeSent = new Set();
+const MESSENGER_CAPABILITIES = Object.freeze({
+  quickReplies: true,
+  richTemplates: true,
+});
 
 export function createWebhookHandlers({
   defaultLang,
@@ -360,10 +364,7 @@ export function createWebhookHandlers({
   ): BotPayloadContext {
     return {
       channel: "messenger",
-      capabilities: {
-        quickReplies: true,
-        richTemplates: true,
-      },
+      capabilities: MESSENGER_CAPABILITIES,
       senderId: psid,
       userId,
       reqId,
@@ -409,10 +410,7 @@ export function createWebhookHandlers({
   ): BotImageContext {
     return {
       channel: "messenger",
-      capabilities: {
-        quickReplies: true,
-        richTemplates: true,
-      },
+      capabilities: MESSENGER_CAPABILITIES,
       senderId: psid,
       userId,
       reqId,
@@ -460,10 +458,7 @@ export function createWebhookHandlers({
   ): BotTextContext {
     return {
       channel: "messenger",
-      capabilities: {
-        quickReplies: true,
-        richTemplates: true,
-      },
+      capabilities: MESSENGER_CAPABILITIES,
       senderId: psid,
       userId,
       reqId,

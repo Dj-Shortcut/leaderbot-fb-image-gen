@@ -10,6 +10,9 @@ type TranslationKey =
   | "stylePicker"
   | "styleCategoryPicker"
   | "styleCategoryCarouselIntro"
+  | "whatIsThis"
+  | "newStyle"
+  | "retry"
   | "success"
   | "processingBlocked"
   | "styleWithoutPhoto"
@@ -38,6 +41,9 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
     styleCategoryPicker: "Kies eerst een stijlgroep 👇",
     styleCategoryCarouselIntro: ({ styleLabel }) =>
       `Hier zijn je ${styleLabel ?? ""}-stijlen. Kies er eentje hieronder.`,
+    whatIsThis: "Wat doe ik?",
+    newStyle: "Nieuwe stijl",
+    retry: "Probeer opnieuw",
     success: "Klaar ✅",
     processingBlocked: "Even geduld — je vorige afbeelding is bijna klaar.",
     styleWithoutPhoto: "Stuur eerst een foto, dan maak ik die stijl voor je.",
@@ -68,6 +74,9 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
     styleCategoryPicker: "Pick a style group first 👇",
     styleCategoryCarouselIntro: ({ styleLabel }) =>
       `Here are your ${styleLabel ?? ""} styles. Pick one below.`,
+    whatIsThis: "What is this?",
+    newStyle: "New style",
+    retry: "Retry",
     success: "Done ✅",
     processingBlocked: "One sec — your previous image is almost done.",
     styleWithoutPhoto: "Send a photo first, then I can make that style for you.",
