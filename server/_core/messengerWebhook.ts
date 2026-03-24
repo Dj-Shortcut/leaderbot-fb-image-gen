@@ -41,6 +41,7 @@ import {
   createImageGenerator,
   GenerationTimeoutError,
   getGenerationMetrics,
+  InvalidSourceImageUrlError,
   MissingAppBaseUrlError,
   MissingInputImageError,
   MissingObjectStorageConfigError,
@@ -478,11 +479,26 @@ async function runWhatsAppStyleGeneration(
 
   const state = await Promise.resolve(getOrCreateState(senderId));
   const resolvedSourceImageUrl = sourceImageUrl ?? state.lastPhotoUrl ?? undefined;
+  const trustedSourceImageUrl = resolvedSourceImageUrl === state.lastPhotoUrl;
   if (!resolvedSourceImageUrl) {
     await setFlowState(senderId, "AWAITING_PHOTO");
     await sendWhatsAppText(senderId, t(lang, "styleWithoutPhoto"));
     return;
   }
+
+  console.info("[whatsapp webhook] generation requested", {
+    user: toLogUser(userId),
+    style,
+    hasPromptHint: Boolean(promptHint?.trim()),
+    sourceImageUrlHost: (() => {
+      try {
+        return new URL(resolvedSourceImageUrl).hostname.toLowerCase();
+      } catch {
+        return undefined;
+      }
+    })(),
+    trustedSourceImageUrl,
+  });
 
   await setChosenStyle(senderId, style);
   await setFlowState(senderId, "PROCESSING");
@@ -497,6 +513,7 @@ async function runWhatsAppStyleGeneration(
     const { imageUrl, metrics } = await generator.generate({
       style,
       sourceImageUrl: resolvedSourceImageUrl,
+      trustedSourceImageUrl,
       promptHint,
       userKey: userId,
       reqId,
@@ -530,7 +547,15 @@ async function runWhatsAppStyleGeneration(
     });
 
     let failureText = t(lang, "generationGenericFailure");
-    if (error instanceof MissingInputImageError) {
+    if (error instanceof InvalidSourceImageUrlError) {
+      failureText = t(lang, "missingInputImage");
+      await setFlowState(senderId, "AWAITING_PHOTO");
+      console.error("[whatsapp webhook] source image rejected", {
+        user: toLogUser(userId),
+        style,
+        sourceImageUrl: resolvedSourceImageUrl,
+      });
+    } else if (error instanceof MissingInputImageError) {
       failureText = t(lang, "missingInputImage");
       await setFlowState(senderId, "AWAITING_PHOTO");
     } else if (
@@ -568,6 +593,9 @@ async function handleWhatsAppTextEvent(
     state.lastPhotoUrl &&
     (normalizedText === "nieuwe stijl" || normalizedText === "new style")
   ) {
+    console.info("[whatsapp webhook] reopening style picker", {
+      user: toLogUser(event.userId),
+    });
     await setFlowState(event.senderId, "AWAITING_STYLE");
     await sendWhatsAppStyleCategoryPrompt(event.senderId, lang);
     return;
@@ -593,6 +621,12 @@ async function handleWhatsAppTextEvent(
 
     const selectedStyle = parseWhatsAppStyleSelection(textBody, selectedCategory);
     if (selectedStyle && state.lastPhotoUrl) {
+      console.info("[whatsapp webhook] style selected", {
+        user: toLogUser(event.userId),
+        style: selectedStyle,
+        selectedCategory,
+        textBody,
+      });
       await runWhatsAppStyleGeneration(
         event.senderId,
         event.userId,
@@ -605,6 +639,11 @@ async function handleWhatsAppTextEvent(
 
     const selectedStyleCategory = parseWhatsAppCategorySelection(textBody);
     if (selectedStyleCategory && state.lastPhotoUrl) {
+      console.info("[whatsapp webhook] style category selected", {
+        user: toLogUser(event.userId),
+        category: selectedStyleCategory,
+        textBody,
+      });
       await sendWhatsAppStyleOptions(event.senderId, selectedStyleCategory, lang);
       return;
     }
@@ -676,11 +715,22 @@ async function handleWhatsAppImageEvent(
   }
 
   const media = await downloadWhatsAppMedia(event.imageId);
+  console.info("[whatsapp webhook] image downloaded", {
+    user: toLogUser(event.userId),
+    imageId: event.imageId,
+    contentType: media.contentType,
+    byteLength: media.buffer.length,
+  });
   const persistedImageUrl = await storeInboundSourceImage(
     media.buffer,
     media.contentType,
     reqId
   );
+  console.info("[whatsapp webhook] image persisted", {
+    user: toLogUser(event.userId),
+    imageId: event.imageId,
+    persistedImageUrl,
+  });
 
   const state = await Promise.resolve(getOrCreateState(event.senderId));
   const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");

@@ -17,6 +17,7 @@ export interface ImageGenerator {
   generate(input: {
     style: Style;
     sourceImageUrl?: string;
+    trustedSourceImageUrl?: boolean;
     sourceImageData?: {
       buffer: Buffer;
       contentType: string;
@@ -52,6 +53,21 @@ export type GenerationMetrics = {
   uploadOrServeMs?: number;
   totalMs: number;
 };
+
+function getSourceUrlDiagnostics(sourceImageUrl: string): {
+  hostname?: string;
+  protocol?: string;
+} {
+  try {
+    const parsed = new URL(sourceImageUrl);
+    return {
+      hostname: parsed.hostname.toLowerCase(),
+      protocol: parsed.protocol,
+    };
+  } catch {
+    return {};
+  }
+}
 
 type ErrorWithGenerationMetrics = Error & {
   generationMetrics?: GenerationMetrics;
@@ -412,7 +428,8 @@ function isBlockedHostname(hostname: string): boolean {
 
 export function validateSourceImageUrlOrThrow(
   sourceImageUrl: string,
-  reqId?: string
+  reqId?: string,
+  options?: { trustedSourceImageUrl?: boolean }
 ): URL {
   let parsedUrl: URL;
 
@@ -459,26 +476,28 @@ export function validateSourceImageUrlOrThrow(
     throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
-  const allowedHosts = parseAllowedHostsFromEnv();
-  if (allowedHosts.length === 0) {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-      reqId,
-      reason: "allowlist_not_configured",
-    });
-    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
-  }
+  if (!options?.trustedSourceImageUrl) {
+    const allowedHosts = parseAllowedHostsFromEnv();
+    if (allowedHosts.length === 0) {
+      console.warn("SOURCE_IMAGE_URL_BLOCKED", {
+        reqId,
+        reason: "allowlist_not_configured",
+      });
+      throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+    }
 
-  if (
-    !allowedHosts.some(allowedHost =>
-      hostnameMatchesAllowedHost(hostname, allowedHost)
-    )
-  ) {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-      reqId,
-      reason: "host_not_allowed",
-      hostname,
-    });
-    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+    if (
+      !allowedHosts.some(allowedHost =>
+        hostnameMatchesAllowedHost(hostname, allowedHost)
+      )
+    ) {
+      console.warn("SOURCE_IMAGE_URL_BLOCKED", {
+        reqId,
+        reason: "host_not_allowed",
+        hostname,
+      });
+      throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+    }
   }
 
   return parsedUrl;
@@ -507,11 +526,13 @@ async function fetchWithTimeout(
 
 async function downloadSourceImageOrThrow(
   sourceImageUrl: string,
-  reqId: string
+  reqId: string,
+  options?: { trustedSourceImageUrl?: boolean }
 ): Promise<DownloadedSourceImage> {
   const validatedSourceImageUrl = validateSourceImageUrlOrThrow(
     sourceImageUrl,
-    reqId
+    reqId,
+    options
   );
   const timeoutMs = getInboundImageTimeoutMs();
   let totalFetchMs = 0;
@@ -658,6 +679,7 @@ export class OpenAiImageGenerator implements ImageGenerator {
   async generate(input: {
     style: Style;
     sourceImageUrl?: string;
+    trustedSourceImageUrl?: boolean;
     sourceImageData?: {
       buffer: Buffer;
       contentType: string;
@@ -694,9 +716,18 @@ export class OpenAiImageGenerator implements ImageGenerator {
     }
 
     try {
+      if (input.sourceImageUrl) {
+        console.info("SOURCE_IMAGE_FETCH_START", {
+          reqId: input.reqId,
+          trustedSourceImageUrl: Boolean(input.trustedSourceImageUrl),
+          ...getSourceUrlDiagnostics(input.sourceImageUrl),
+        });
+      }
       const sourceImage = input.sourceImageData
         ? normalizeProvidedSourceImage(input.sourceImageData)
-        : await downloadSourceImageOrThrow(input.sourceImageUrl!, input.reqId);
+        : await downloadSourceImageOrThrow(input.sourceImageUrl!, input.reqId, {
+            trustedSourceImageUrl: input.trustedSourceImageUrl,
+          });
       const imageBuffer = sourceImage.buffer;
       const contentType = sourceImage.contentType;
       const incomingLen = sourceImage.incomingLen;

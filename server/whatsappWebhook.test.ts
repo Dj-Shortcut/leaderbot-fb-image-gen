@@ -17,6 +17,7 @@ vi.mock("./_core/whatsappApi", () => ({
 }));
 
 import { clearGeneratedImageStore } from "./_core/generatedImageStore";
+import { OpenAiImageGenerator } from "./_core/imageService";
 import {
   processWhatsAppWebhookPayload,
   resetMessengerEventDedupe,
@@ -240,6 +241,65 @@ describe("whatsapp webhook flow", () => {
       expect.stringContaining("Klaar")
     );
     expect(getState(anonymizePsid("wa-user-3"))?.selectedStyle).toBe("disco");
+  });
+
+  it("treats persisted WhatsApp source images as trusted during later style generation", async () => {
+    downloadWhatsAppMediaMock.mockResolvedValue({
+      buffer: Buffer.alloc(6000, 7),
+      contentType: "image/jpeg",
+    });
+
+    const generateSpy = vi
+      .spyOn(OpenAiImageGenerator.prototype, "generate")
+      .mockResolvedValue({
+        imageUrl: "https://leaderbot-fb-image-gen.fly.dev/generated/fake.jpg",
+        proof: {
+          incomingLen: 6000,
+          incomingSha256: "abc",
+          openaiInputLen: 6000,
+          openaiInputSha256: "def",
+        },
+        metrics: { totalMs: 12 },
+      });
+
+    await processWhatsAppWebhookPayload(
+      createWhatsAppPayload({
+        from: "wa-user-trusted",
+        timestamp: "1710000015",
+        type: "image",
+        image: { id: "wamid-image-trusted" },
+      })
+    );
+
+    await processWhatsAppWebhookPayload(
+      createWhatsAppPayload({
+        from: "wa-user-trusted",
+        timestamp: "1710000016",
+        type: "text",
+        text: { body: "3" },
+      })
+    );
+
+    sendWhatsAppTextMock.mockClear();
+    sendWhatsAppImageMock.mockClear();
+
+    await processWhatsAppWebhookPayload(
+      createWhatsAppPayload({
+        from: "wa-user-trusted",
+        timestamp: "1710000017",
+        type: "text",
+        text: { body: "4" },
+      })
+    );
+
+    expect(generateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceImageUrl: expect.stringMatching(
+          /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/.+\.jpg$/
+        ),
+        trustedSourceImageUrl: true,
+      })
+    );
   });
 
   it("reopens the WhatsApp category picker when the user asks for a new style", async () => {
