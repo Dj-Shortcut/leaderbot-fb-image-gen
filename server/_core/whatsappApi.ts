@@ -97,7 +97,8 @@ export async function sendWhatsAppText(
 
 export async function sendWhatsAppImage(
   to: string,
-  imageUrl: string
+  imageUrl: string,
+  caption?: string
 ): Promise<void> {
   const response = await fetchWhatsAppGraph(getWhatsAppSendUrl(), {
     method: "POST",
@@ -108,7 +109,10 @@ export async function sendWhatsAppImage(
       messaging_product: "whatsapp",
       to,
       type: "image",
-      image: { link: imageUrl },
+      image: {
+        link: imageUrl,
+        ...(caption?.trim() ? { caption: caption.trim() } : {}),
+      },
     }),
   });
 

@@ -164,6 +164,16 @@ describe("whatsapp webhook flow", () => {
     expect(getState(anonymizePsid("wa-user-2"))?.selectedStyleCategory).toBe(
       "bold"
     );
+    expect(sendWhatsAppImageMock).toHaveBeenCalledWith(
+      "wa-user-2",
+      "https://leaderbot-fb-image-gen.fly.dev/style-previews/afroman-americana.png",
+      "Afroman"
+    );
+    expect(sendWhatsAppImageMock).toHaveBeenCalledWith(
+      "wa-user-2",
+      "https://leaderbot-fb-image-gen.fly.dev/style-previews/disco.png",
+      "Disco"
+    );
     expect(sendWhatsAppListMock).toHaveBeenCalledWith(
       "wa-user-2",
       expect.stringContaining("bold"),

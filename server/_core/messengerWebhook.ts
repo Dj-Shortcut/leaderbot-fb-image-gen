@@ -351,13 +351,23 @@ async function sendWhatsAppStyleOptions(
 ): Promise<void> {
   await setSelectedStyleCategory(senderId, category);
   await setFlowState(senderId, "AWAITING_STYLE");
+  const styles = getStylesForCategory(category);
+  for (const style of styles) {
+    const previewUrl = resolveWhatsAppStylePreviewUrl(style.style);
+    if (!previewUrl) {
+      continue;
+    }
+
+    await sendWhatsAppImage(senderId, previewUrl, STYLE_LABELS[style.style]);
+  }
+
   await sendWhatsAppList(
     senderId,
     lang === "en"
       ? `Pick a ${STYLE_CATEGORY_LABELS[category].toLowerCase()} style.`
       : `Kies een ${STYLE_CATEGORY_LABELS[category].toLowerCase()}-stijl.`,
     lang === "en" ? "Choose style" : "Kies stijl",
-    getStylesForCategory(category).map(style => ({
+    styles.map(style => ({
       id: style.payload,
       title: STYLE_LABELS[style.style],
       description:
@@ -396,13 +406,31 @@ function resolveWhatsAppPrivacyPolicyUrl(): string | undefined {
     return configured;
   }
 
-  const appBaseUrl =
-    process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
-  if (appBaseUrl && /^https?:\/\//i.test(appBaseUrl)) {
-    return `${appBaseUrl.replace(/\/$/, "")}/privacy`;
+  const appBaseUrl = resolveWhatsAppAppBaseUrl();
+  if (appBaseUrl) {
+    return `${appBaseUrl}/privacy`;
   }
 
   return undefined;
+}
+
+function resolveWhatsAppAppBaseUrl(): string | undefined {
+  const appBaseUrl =
+    process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
+  if (appBaseUrl && /^https?:\/\//i.test(appBaseUrl)) {
+    return appBaseUrl.replace(/\/$/, "");
+  }
+
+  return undefined;
+}
+
+function resolveWhatsAppStylePreviewUrl(style: Style): string | undefined {
+  const appBaseUrl = resolveWhatsAppAppBaseUrl();
+  if (!appBaseUrl) {
+    return undefined;
+  }
+
+  return `${appBaseUrl}/style-previews/${style}.png`;
 }
 
 async function handleWhatsAppPayloadSelection(
