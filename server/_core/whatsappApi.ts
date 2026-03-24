@@ -4,6 +4,17 @@ import { createLogger } from "./logger";
 const GRAPH_API_VERSION = "v19.0";
 const logger = createLogger({});
 
+export type WhatsAppReplyButton = {
+  id: string;
+  title: string;
+};
+
+export type WhatsAppListRow = {
+  id: string;
+  title: string;
+  description?: string;
+};
+
 function getWhatsAppAccessToken(): string {
   return getEnv("WHATSAPP_ACCESS_TOKEN");
 }
@@ -102,6 +113,80 @@ export async function sendWhatsAppImage(
   });
 
   await assertWhatsAppResponseOk(response, "whatsapp_image_send_failed");
+}
+
+export async function sendWhatsAppButtons(
+  to: string,
+  bodyText: string,
+  buttons: WhatsAppReplyButton[]
+): Promise<void> {
+  const response = await fetchWhatsAppGraph(getWhatsAppSendUrl(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "button",
+        body: { text: bodyText },
+        action: {
+          buttons: buttons.slice(0, 3).map(button => ({
+            type: "reply",
+            reply: {
+              id: button.id,
+              title: button.title.slice(0, 20),
+            },
+          })),
+        },
+      },
+    }),
+  });
+
+  await assertWhatsAppResponseOk(response, "whatsapp_buttons_send_failed");
+}
+
+export async function sendWhatsAppList(
+  to: string,
+  bodyText: string,
+  buttonText: string,
+  rows: WhatsAppListRow[],
+  sectionTitle = "Styles"
+): Promise<void> {
+  const response = await fetchWhatsAppGraph(getWhatsAppSendUrl(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "list",
+        body: { text: bodyText },
+        action: {
+          button: buttonText.slice(0, 20),
+          sections: [
+            {
+              title: sectionTitle.slice(0, 24),
+              rows: rows.slice(0, 10).map(row => ({
+                id: row.id,
+                title: row.title.slice(0, 24),
+                ...(row.description
+                  ? { description: row.description.slice(0, 72) }
+                  : {}),
+              })),
+            },
+          ],
+        },
+      },
+    }),
+  });
+
+  await assertWhatsAppResponseOk(response, "whatsapp_list_send_failed");
 }
 
 export async function downloadWhatsAppMedia(

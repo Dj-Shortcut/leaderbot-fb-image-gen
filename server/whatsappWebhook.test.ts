@@ -2,21 +2,28 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 const {
   downloadWhatsAppMediaMock,
+  sendWhatsAppButtonsMock,
   sendWhatsAppImageMock,
+  sendWhatsAppListMock,
   sendWhatsAppTextMock,
 } = vi.hoisted(() => ({
   downloadWhatsAppMediaMock: vi.fn(),
+  sendWhatsAppButtonsMock: vi.fn(async () => undefined),
   sendWhatsAppImageMock: vi.fn(async () => undefined),
+  sendWhatsAppListMock: vi.fn(async () => undefined),
   sendWhatsAppTextMock: vi.fn(async () => undefined),
 }));
 
 vi.mock("./_core/whatsappApi", () => ({
   downloadWhatsAppMedia: downloadWhatsAppMediaMock,
+  sendWhatsAppButtons: sendWhatsAppButtonsMock,
   sendWhatsAppImage: sendWhatsAppImageMock,
+  sendWhatsAppList: sendWhatsAppListMock,
   sendWhatsAppText: sendWhatsAppTextMock,
 }));
 
 import { clearGeneratedImageStore } from "./_core/generatedImageStore";
+import { OpenAiImageGenerator } from "./_core/imageService";
 import {
   processWhatsAppWebhookPayload,
   resetMessengerEventDedupe,
@@ -92,7 +99,9 @@ describe("whatsapp webhook flow", () => {
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "leaderbot-fb-image-gen.fly.dev";
     process.env.OPENAI_API_KEY = "dummy-key";
     downloadWhatsAppMediaMock.mockReset();
+    sendWhatsAppButtonsMock.mockClear();
     sendWhatsAppImageMock.mockClear();
+    sendWhatsAppListMock.mockClear();
     sendWhatsAppTextMock.mockClear();
     resetStateStore();
     resetMessengerEventDedupe();
@@ -117,9 +126,12 @@ describe("whatsapp webhook flow", () => {
     expect(getState(anonymizePsid("wa-user-1"))?.lastPhotoUrl).toMatch(
       /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/.+\.jpg$/
     );
-    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+    expect(sendWhatsAppButtonsMock).toHaveBeenCalledWith(
       "wa-user-1",
-      expect.stringContaining("1. Illustrated")
+      expect.stringContaining("stijlgroep"),
+      expect.arrayContaining([
+        expect.objectContaining({ id: "WA_ILLUSTRATED", title: "Illustrated" }),
+      ])
     );
   });
 
@@ -152,13 +164,15 @@ describe("whatsapp webhook flow", () => {
     expect(getState(anonymizePsid("wa-user-2"))?.selectedStyleCategory).toBe(
       "bold"
     );
-    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+    expect(sendWhatsAppListMock).toHaveBeenCalledWith(
       "wa-user-2",
-      expect.stringContaining("1. Afroman")
-    );
-    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
-      "wa-user-2",
-      expect.stringContaining("4. Disco")
+      expect.stringContaining("bold"),
+      "Kies stijl",
+      expect.arrayContaining([
+        expect.objectContaining({ id: "STYLE_AFROMAN_AMERICANA", title: "Afroman" }),
+        expect.objectContaining({ id: "STYLE_DISCO", title: "Disco" }),
+      ]),
+      "Bold"
     );
   });
 
@@ -208,8 +222,11 @@ describe("whatsapp webhook flow", () => {
       createWhatsAppPayload({
         from: "wa-user-3",
         timestamp: "1710000004",
-        type: "text",
-        text: { body: "3" },
+        type: "interactive",
+        interactive: {
+          type: "button_reply",
+          button_reply: { id: "WA_BOLD", title: "Bold" },
+        },
       })
     );
 
@@ -220,8 +237,11 @@ describe("whatsapp webhook flow", () => {
       createWhatsAppPayload({
         from: "wa-user-3",
         timestamp: "1710000005",
-        type: "text",
-        text: { body: "4" },
+        type: "interactive",
+        interactive: {
+          type: "list_reply",
+          list_reply: { id: "STYLE_DISCO", title: "Disco" },
+        },
       })
     );
 
@@ -240,6 +260,75 @@ describe("whatsapp webhook flow", () => {
       expect.stringContaining("Klaar")
     );
     expect(getState(anonymizePsid("wa-user-3"))?.selectedStyle).toBe("disco");
+  });
+
+  it("treats persisted WhatsApp source images as trusted during later style generation", async () => {
+    downloadWhatsAppMediaMock.mockResolvedValue({
+      buffer: Buffer.alloc(6000, 7),
+      contentType: "image/jpeg",
+    });
+
+    const generateSpy = vi
+      .spyOn(OpenAiImageGenerator.prototype, "generate")
+      .mockResolvedValue({
+        imageUrl: "https://leaderbot-fb-image-gen.fly.dev/generated/fake.jpg",
+        proof: {
+          incomingLen: 6000,
+          incomingSha256: "abc",
+          openaiInputLen: 6000,
+          openaiInputSha256: "def",
+        },
+        metrics: { totalMs: 12 },
+      });
+
+    try {
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-trusted",
+          timestamp: "1710000015",
+          type: "image",
+          image: { id: "wamid-image-trusted" },
+        })
+      );
+
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-trusted",
+          timestamp: "1710000016",
+          type: "interactive",
+          interactive: {
+            type: "button_reply",
+            button_reply: { id: "WA_BOLD", title: "Bold" },
+          },
+        })
+      );
+
+      sendWhatsAppTextMock.mockClear();
+      sendWhatsAppImageMock.mockClear();
+
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-trusted",
+          timestamp: "1710000017",
+          type: "interactive",
+          interactive: {
+            type: "list_reply",
+            list_reply: { id: "STYLE_DISCO", title: "Disco" },
+          },
+        })
+      );
+
+      expect(generateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceImageUrl: expect.stringMatching(
+            /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/.+\.jpg$/
+          ),
+          trustedSourceImageUrl: true,
+        })
+      );
+    } finally {
+      generateSpy.mockRestore();
+    }
   });
 
   it("reopens the WhatsApp category picker when the user asks for a new style", async () => {
@@ -268,9 +357,12 @@ describe("whatsapp webhook flow", () => {
       })
     );
 
-    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+    expect(sendWhatsAppButtonsMock).toHaveBeenCalledWith(
       "wa-user-4",
-      expect.stringContaining("1. Illustrated")
+      expect.any(String),
+      expect.arrayContaining([
+        expect.objectContaining({ id: "WA_ILLUSTRATED" }),
+      ])
     );
     expect(getState(anonymizePsid("wa-user-4"))?.stage).toBe("AWAITING_STYLE");
   });
@@ -425,5 +517,23 @@ describe("whatsapp webhook flow", () => {
       "wa-user-7",
       expect.stringContaining("Privacybeleid: https://leaderbot-fb-image-gen.fly.dev/privacy")
     );
+  });
+
+  it("replies clearly when WhatsApp sends an unsupported media type like video", async () => {
+    await processWhatsAppWebhookPayload(
+      createWhatsAppPayload({
+        from: "wa-user-video",
+        timestamp: "1710000018",
+        type: "video",
+        video: { id: "wamid-video-1" },
+      })
+    );
+
+    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+      "wa-user-video",
+      "Ik werk voorlopig alleen met foto's. Stuur een foto in plaats van een video of ander bestand."
+    );
+    expect(sendWhatsAppButtonsMock).not.toHaveBeenCalled();
+    expect(downloadWhatsAppMediaMock).not.toHaveBeenCalled();
   });
 });

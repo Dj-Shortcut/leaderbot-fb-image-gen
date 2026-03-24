@@ -10,6 +10,7 @@ import {
   normalizeStyle,
   parseStyle,
   styleCategoryPayloadToCategory,
+  stylePayloadToStyle,
   STYLE_CATEGORY_LABELS,
   STYLE_LABELS,
   summarizeWebhook,
@@ -17,7 +18,9 @@ import {
 import { facebookWebhookPayloadSchema } from "./webhookSchemas";
 import {
   downloadWhatsAppMedia,
+  sendWhatsAppButtons,
   sendWhatsAppImage,
+  sendWhatsAppList,
   sendWhatsAppText,
 } from "./whatsappApi";
 import { toUserKey, toLogUser } from "./privacy";
@@ -41,6 +44,7 @@ import {
   createImageGenerator,
   GenerationTimeoutError,
   getGenerationMetrics,
+  InvalidSourceImageUrlError,
   MissingAppBaseUrlError,
   MissingInputImageError,
   MissingObjectStorageConfigError,
@@ -159,6 +163,40 @@ function extractWhatsAppEvents(payload: unknown): NormalizedInboundMessage[] {
           "string"
             ? (message as { text: { body: string } }).text.body
             : null;
+        const interactiveReplyId =
+          typeof (message as {
+            interactive?: {
+              button_reply?: { id?: unknown };
+              list_reply?: { id?: unknown };
+            };
+          }).interactive?.button_reply?.id === "string"
+            ? (message as {
+                interactive: { button_reply: { id: string } };
+              }).interactive.button_reply.id
+            : typeof (message as {
+                  interactive?: { list_reply?: { id?: unknown } };
+                }).interactive?.list_reply?.id === "string"
+              ? (message as {
+                  interactive: { list_reply: { id: string } };
+                }).interactive.list_reply.id
+              : null;
+        const interactiveReplyTitle =
+          typeof (message as {
+            interactive?: {
+              button_reply?: { title?: unknown };
+              list_reply?: { title?: unknown };
+            };
+          }).interactive?.button_reply?.title === "string"
+            ? (message as {
+                interactive: { button_reply: { title: string } };
+              }).interactive.button_reply.title
+            : typeof (message as {
+                  interactive?: { list_reply?: { title?: unknown } };
+                }).interactive?.list_reply?.title === "string"
+              ? (message as {
+                  interactive: { list_reply: { title: string } };
+                }).interactive.list_reply.title
+              : null;
         const imageId =
           typeof (message as { image?: { id?: unknown } }).image?.id ===
           "string"
@@ -178,13 +216,18 @@ function extractWhatsAppEvents(payload: unknown): NormalizedInboundMessage[] {
             channel: "whatsapp",
             senderId: from,
             userId: toUserKey(from),
+            rawMessageType: messageType,
             messageType:
-              messageType === "text"
+              messageType === "text" || messageType === "interactive"
                 ? "text"
                 : messageType === "image"
                   ? "image"
                   : "unknown",
-            textBody: textBody ?? undefined,
+            textBody:
+              interactiveReplyId ??
+              interactiveReplyTitle ??
+              textBody ??
+              undefined,
             imageId: imageId ?? undefined,
             timestamp: Number.isFinite(timestampRaw) ? timestampRaw! * 1000 : undefined,
           },
@@ -236,6 +279,18 @@ function parseWhatsAppCategorySelection(
   text: string
 ): StyleCategory | undefined {
   const normalizedText = text.trim().toLowerCase();
+  if (normalizedText === "wa_illustrated") {
+    return "illustrated";
+  }
+
+  if (normalizedText === "wa_atmosphere") {
+    return "atmosphere";
+  }
+
+  if (normalizedText === "wa_bold") {
+    return "bold";
+  }
+
   const numbered = WHATSAPP_CATEGORY_CHOICES.find(
     choice => choice.key === normalizedText
   );
@@ -271,14 +326,23 @@ function parseWhatsAppStyleSelection(
     }
   }
 
-  return parseStyle(text) ?? normalizeStyle(text);
+  return stylePayloadToStyle(text) ?? parseStyle(text) ?? normalizeStyle(text);
 }
 
 async function sendWhatsAppStyleCategoryPrompt(
   senderId: string,
   lang: Lang
 ): Promise<void> {
-  await sendWhatsAppText(senderId, getWhatsAppStyleCategoryPrompt(lang));
+  await sendWhatsAppButtons(
+    senderId,
+    lang === "en"
+      ? "Choose a style group to continue."
+      : "Kies een stijlgroep om verder te gaan.",
+    WHATSAPP_CATEGORY_CHOICES.map(choice => ({
+      id: `WA_${choice.category.toUpperCase()}`,
+      title: STYLE_CATEGORY_LABELS[choice.category],
+    }))
+  );
 }
 
 async function sendWhatsAppStyleOptions(
@@ -288,7 +352,22 @@ async function sendWhatsAppStyleOptions(
 ): Promise<void> {
   await setSelectedStyleCategory(senderId, category);
   await setFlowState(senderId, "AWAITING_STYLE");
-  await sendWhatsAppText(senderId, getWhatsAppStylePrompt(category, lang));
+  await sendWhatsAppList(
+    senderId,
+    lang === "en"
+      ? `Pick a ${STYLE_CATEGORY_LABELS[category].toLowerCase()} style.`
+      : `Kies een ${STYLE_CATEGORY_LABELS[category].toLowerCase()}-stijl.`,
+    lang === "en" ? "Choose style" : "Kies stijl",
+    getStylesForCategory(category).map(style => ({
+      id: style.payload,
+      title: STYLE_LABELS[style.style],
+      description:
+        lang === "en"
+          ? `${STYLE_CATEGORY_LABELS[category]} style`
+          : `${STYLE_CATEGORY_LABELS[category]}-stijl`,
+    })),
+    STYLE_CATEGORY_LABELS[category]
+  );
 }
 
 function buildWhatsAppReplyListText(text: string, replies: QuickReply[]): string {
@@ -478,11 +557,26 @@ async function runWhatsAppStyleGeneration(
 
   const state = await Promise.resolve(getOrCreateState(senderId));
   const resolvedSourceImageUrl = sourceImageUrl ?? state.lastPhotoUrl ?? undefined;
+  const trustedSourceImageUrl = resolvedSourceImageUrl === state.lastPhotoUrl;
   if (!resolvedSourceImageUrl) {
     await setFlowState(senderId, "AWAITING_PHOTO");
     await sendWhatsAppText(senderId, t(lang, "styleWithoutPhoto"));
     return;
   }
+
+  console.info("[whatsapp webhook] generation requested", {
+    user: toLogUser(userId),
+    style,
+    hasPromptHint: Boolean(promptHint?.trim()),
+    sourceImageUrlHost: (() => {
+      try {
+        return new URL(resolvedSourceImageUrl).hostname.toLowerCase();
+      } catch {
+        return undefined;
+      }
+    })(),
+    trustedSourceImageUrl,
+  });
 
   await setChosenStyle(senderId, style);
   await setFlowState(senderId, "PROCESSING");
@@ -497,6 +591,7 @@ async function runWhatsAppStyleGeneration(
     const { imageUrl, metrics } = await generator.generate({
       style,
       sourceImageUrl: resolvedSourceImageUrl,
+      trustedSourceImageUrl,
       promptHint,
       userKey: userId,
       reqId,
@@ -530,7 +625,15 @@ async function runWhatsAppStyleGeneration(
     });
 
     let failureText = t(lang, "generationGenericFailure");
-    if (error instanceof MissingInputImageError) {
+    if (error instanceof InvalidSourceImageUrlError) {
+      failureText = t(lang, "missingInputImage");
+      await setFlowState(senderId, "AWAITING_PHOTO");
+      console.error("[whatsapp webhook] source image rejected", {
+        user: toLogUser(userId),
+        style,
+        sourceImageUrl: resolvedSourceImageUrl,
+      });
+    } else if (error instanceof MissingInputImageError) {
       failureText = t(lang, "missingInputImage");
       await setFlowState(senderId, "AWAITING_PHOTO");
     } else if (
@@ -568,6 +671,9 @@ async function handleWhatsAppTextEvent(
     state.lastPhotoUrl &&
     (normalizedText === "nieuwe stijl" || normalizedText === "new style")
   ) {
+    console.info("[whatsapp webhook] reopening style picker", {
+      user: toLogUser(event.userId),
+    });
     await setFlowState(event.senderId, "AWAITING_STYLE");
     await sendWhatsAppStyleCategoryPrompt(event.senderId, lang);
     return;
@@ -593,6 +699,12 @@ async function handleWhatsAppTextEvent(
 
     const selectedStyle = parseWhatsAppStyleSelection(textBody, selectedCategory);
     if (selectedStyle && state.lastPhotoUrl) {
+      console.info("[whatsapp webhook] style selected", {
+        user: toLogUser(event.userId),
+        style: selectedStyle,
+        selectedCategory,
+        textBody,
+      });
       await runWhatsAppStyleGeneration(
         event.senderId,
         event.userId,
@@ -605,6 +717,11 @@ async function handleWhatsAppTextEvent(
 
     const selectedStyleCategory = parseWhatsAppCategorySelection(textBody);
     if (selectedStyleCategory && state.lastPhotoUrl) {
+      console.info("[whatsapp webhook] style category selected", {
+        user: toLogUser(event.userId),
+        category: selectedStyleCategory,
+        textBody,
+      });
       await sendWhatsAppStyleOptions(event.senderId, selectedStyleCategory, lang);
       return;
     }
@@ -676,11 +793,22 @@ async function handleWhatsAppImageEvent(
   }
 
   const media = await downloadWhatsAppMedia(event.imageId);
+  console.info("[whatsapp webhook] image downloaded", {
+    user: toLogUser(event.userId),
+    imageId: event.imageId,
+    contentType: media.contentType,
+    byteLength: media.buffer.length,
+  });
   const persistedImageUrl = await storeInboundSourceImage(
     media.buffer,
     media.contentType,
     reqId
   );
+  console.info("[whatsapp webhook] image persisted", {
+    user: toLogUser(event.userId),
+    imageId: event.imageId,
+    persistedImageUrl,
+  });
 
   const state = await Promise.resolve(getOrCreateState(event.senderId));
   const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");
@@ -721,6 +849,7 @@ export async function processWhatsAppWebhookPayload(
       channel: event.channel,
       user: toLogUser(event.userId),
       messageType: event.messageType,
+      rawMessageType: event.rawMessageType,
     });
 
     await Promise.resolve(
@@ -735,6 +864,15 @@ export async function processWhatsAppWebhookPayload(
 
       if (event.messageType === "text") {
         await handleWhatsAppTextEvent(event, reqId, lang);
+        continue;
+      }
+
+      if (event.messageType === "unknown") {
+        console.warn("[whatsapp webhook] unsupported inbound message type", {
+          user: toLogUser(event.userId),
+          rawMessageType: event.rawMessageType,
+        });
+        await sendWhatsAppText(event.senderId, t(lang, "unsupportedMedia"));
       }
     } catch (error) {
       console.error("[whatsapp webhook] reply failed", {
