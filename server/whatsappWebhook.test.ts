@@ -281,50 +281,54 @@ describe("whatsapp webhook flow", () => {
         metrics: { totalMs: 12 },
       });
 
-    await processWhatsAppWebhookPayload(
-      createWhatsAppPayload({
-        from: "wa-user-trusted",
-        timestamp: "1710000015",
-        type: "image",
-        image: { id: "wamid-image-trusted" },
-      })
-    );
+    try {
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-trusted",
+          timestamp: "1710000015",
+          type: "image",
+          image: { id: "wamid-image-trusted" },
+        })
+      );
 
-    await processWhatsAppWebhookPayload(
-      createWhatsAppPayload({
-        from: "wa-user-trusted",
-        timestamp: "1710000016",
-        type: "interactive",
-        interactive: {
-          type: "button_reply",
-          button_reply: { id: "WA_BOLD", title: "Bold" },
-        },
-      })
-    );
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-trusted",
+          timestamp: "1710000016",
+          type: "interactive",
+          interactive: {
+            type: "button_reply",
+            button_reply: { id: "WA_BOLD", title: "Bold" },
+          },
+        })
+      );
 
-    sendWhatsAppTextMock.mockClear();
-    sendWhatsAppImageMock.mockClear();
+      sendWhatsAppTextMock.mockClear();
+      sendWhatsAppImageMock.mockClear();
 
-    await processWhatsAppWebhookPayload(
-      createWhatsAppPayload({
-        from: "wa-user-trusted",
-        timestamp: "1710000017",
-        type: "interactive",
-        interactive: {
-          type: "list_reply",
-          list_reply: { id: "STYLE_DISCO", title: "Disco" },
-        },
-      })
-    );
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-trusted",
+          timestamp: "1710000017",
+          type: "interactive",
+          interactive: {
+            type: "list_reply",
+            list_reply: { id: "STYLE_DISCO", title: "Disco" },
+          },
+        })
+      );
 
-    expect(generateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sourceImageUrl: expect.stringMatching(
-          /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/.+\.jpg$/
-        ),
-        trustedSourceImageUrl: true,
-      })
-    );
+      expect(generateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceImageUrl: expect.stringMatching(
+            /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/.+\.jpg$/
+          ),
+          trustedSourceImageUrl: true,
+        })
+      );
+    } finally {
+      generateSpy.mockRestore();
+    }
   });
 
   it("reopens the WhatsApp category picker when the user asks for a new style", async () => {
