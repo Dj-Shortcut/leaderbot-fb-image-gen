@@ -2,17 +2,23 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 const {
   downloadWhatsAppMediaMock,
+  sendWhatsAppButtonsMock,
   sendWhatsAppImageMock,
+  sendWhatsAppListMock,
   sendWhatsAppTextMock,
 } = vi.hoisted(() => ({
   downloadWhatsAppMediaMock: vi.fn(),
+  sendWhatsAppButtonsMock: vi.fn(async () => undefined),
   sendWhatsAppImageMock: vi.fn(async () => undefined),
+  sendWhatsAppListMock: vi.fn(async () => undefined),
   sendWhatsAppTextMock: vi.fn(async () => undefined),
 }));
 
 vi.mock("./_core/whatsappApi", () => ({
   downloadWhatsAppMedia: downloadWhatsAppMediaMock,
+  sendWhatsAppButtons: sendWhatsAppButtonsMock,
   sendWhatsAppImage: sendWhatsAppImageMock,
+  sendWhatsAppList: sendWhatsAppListMock,
   sendWhatsAppText: sendWhatsAppTextMock,
 }));
 
@@ -93,7 +99,9 @@ describe("whatsapp webhook flow", () => {
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "leaderbot-fb-image-gen.fly.dev";
     process.env.OPENAI_API_KEY = "dummy-key";
     downloadWhatsAppMediaMock.mockReset();
+    sendWhatsAppButtonsMock.mockClear();
     sendWhatsAppImageMock.mockClear();
+    sendWhatsAppListMock.mockClear();
     sendWhatsAppTextMock.mockClear();
     resetStateStore();
     resetMessengerEventDedupe();
@@ -118,9 +126,12 @@ describe("whatsapp webhook flow", () => {
     expect(getState(anonymizePsid("wa-user-1"))?.lastPhotoUrl).toMatch(
       /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/.+\.jpg$/
     );
-    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+    expect(sendWhatsAppButtonsMock).toHaveBeenCalledWith(
       "wa-user-1",
-      expect.stringContaining("1. Illustrated")
+      expect.stringContaining("stijlgroep"),
+      expect.arrayContaining([
+        expect.objectContaining({ id: "WA_ILLUSTRATED", title: "Illustrated" }),
+      ])
     );
   });
 
@@ -153,13 +164,15 @@ describe("whatsapp webhook flow", () => {
     expect(getState(anonymizePsid("wa-user-2"))?.selectedStyleCategory).toBe(
       "bold"
     );
-    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+    expect(sendWhatsAppListMock).toHaveBeenCalledWith(
       "wa-user-2",
-      expect.stringContaining("1. Afroman")
-    );
-    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
-      "wa-user-2",
-      expect.stringContaining("4. Disco")
+      expect.stringContaining("bold"),
+      "Kies stijl",
+      expect.arrayContaining([
+        expect.objectContaining({ id: "STYLE_AFROMAN_AMERICANA", title: "Afroman" }),
+        expect.objectContaining({ id: "STYLE_DISCO", title: "Disco" }),
+      ]),
+      "Bold"
     );
   });
 
@@ -209,8 +222,11 @@ describe("whatsapp webhook flow", () => {
       createWhatsAppPayload({
         from: "wa-user-3",
         timestamp: "1710000004",
-        type: "text",
-        text: { body: "3" },
+        type: "interactive",
+        interactive: {
+          type: "button_reply",
+          button_reply: { id: "WA_BOLD", title: "Bold" },
+        },
       })
     );
 
@@ -221,8 +237,11 @@ describe("whatsapp webhook flow", () => {
       createWhatsAppPayload({
         from: "wa-user-3",
         timestamp: "1710000005",
-        type: "text",
-        text: { body: "4" },
+        type: "interactive",
+        interactive: {
+          type: "list_reply",
+          list_reply: { id: "STYLE_DISCO", title: "Disco" },
+        },
       })
     );
 
@@ -275,8 +294,11 @@ describe("whatsapp webhook flow", () => {
       createWhatsAppPayload({
         from: "wa-user-trusted",
         timestamp: "1710000016",
-        type: "text",
-        text: { body: "3" },
+        type: "interactive",
+        interactive: {
+          type: "button_reply",
+          button_reply: { id: "WA_BOLD", title: "Bold" },
+        },
       })
     );
 
@@ -287,8 +309,11 @@ describe("whatsapp webhook flow", () => {
       createWhatsAppPayload({
         from: "wa-user-trusted",
         timestamp: "1710000017",
-        type: "text",
-        text: { body: "4" },
+        type: "interactive",
+        interactive: {
+          type: "list_reply",
+          list_reply: { id: "STYLE_DISCO", title: "Disco" },
+        },
       })
     );
 
@@ -328,9 +353,12 @@ describe("whatsapp webhook flow", () => {
       })
     );
 
-    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+    expect(sendWhatsAppButtonsMock).toHaveBeenCalledWith(
       "wa-user-4",
-      expect.stringContaining("1. Illustrated")
+      expect.any(String),
+      expect.arrayContaining([
+        expect.objectContaining({ id: "WA_ILLUSTRATED" }),
+      ])
     );
     expect(getState(anonymizePsid("wa-user-4"))?.stage).toBe("AWAITING_STYLE");
   });

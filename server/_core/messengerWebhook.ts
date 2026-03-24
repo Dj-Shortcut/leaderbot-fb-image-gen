@@ -10,6 +10,7 @@ import {
   normalizeStyle,
   parseStyle,
   styleCategoryPayloadToCategory,
+  stylePayloadToStyle,
   STYLE_CATEGORY_LABELS,
   STYLE_LABELS,
   summarizeWebhook,
@@ -17,7 +18,9 @@ import {
 import { facebookWebhookPayloadSchema } from "./webhookSchemas";
 import {
   downloadWhatsAppMedia,
+  sendWhatsAppButtons,
   sendWhatsAppImage,
+  sendWhatsAppList,
   sendWhatsAppText,
 } from "./whatsappApi";
 import { toUserKey, toLogUser } from "./privacy";
@@ -160,6 +163,40 @@ function extractWhatsAppEvents(payload: unknown): NormalizedInboundMessage[] {
           "string"
             ? (message as { text: { body: string } }).text.body
             : null;
+        const interactiveReplyId =
+          typeof (message as {
+            interactive?: {
+              button_reply?: { id?: unknown };
+              list_reply?: { id?: unknown };
+            };
+          }).interactive?.button_reply?.id === "string"
+            ? (message as {
+                interactive: { button_reply: { id: string } };
+              }).interactive.button_reply.id
+            : typeof (message as {
+                  interactive?: { list_reply?: { id?: unknown } };
+                }).interactive?.list_reply?.id === "string"
+              ? (message as {
+                  interactive: { list_reply: { id: string } };
+                }).interactive.list_reply.id
+              : null;
+        const interactiveReplyTitle =
+          typeof (message as {
+            interactive?: {
+              button_reply?: { title?: unknown };
+              list_reply?: { title?: unknown };
+            };
+          }).interactive?.button_reply?.title === "string"
+            ? (message as {
+                interactive: { button_reply: { title: string } };
+              }).interactive.button_reply.title
+            : typeof (message as {
+                  interactive?: { list_reply?: { title?: unknown } };
+                }).interactive?.list_reply?.title === "string"
+              ? (message as {
+                  interactive: { list_reply: { title: string } };
+                }).interactive.list_reply.title
+              : null;
         const imageId =
           typeof (message as { image?: { id?: unknown } }).image?.id ===
           "string"
@@ -180,12 +217,16 @@ function extractWhatsAppEvents(payload: unknown): NormalizedInboundMessage[] {
             senderId: from,
             userId: toUserKey(from),
             messageType:
-              messageType === "text"
+              messageType === "text" || messageType === "interactive"
                 ? "text"
                 : messageType === "image"
                   ? "image"
                   : "unknown",
-            textBody: textBody ?? undefined,
+            textBody:
+              interactiveReplyId ??
+              interactiveReplyTitle ??
+              textBody ??
+              undefined,
             imageId: imageId ?? undefined,
             timestamp: Number.isFinite(timestampRaw) ? timestampRaw! * 1000 : undefined,
           },
@@ -237,6 +278,18 @@ function parseWhatsAppCategorySelection(
   text: string
 ): StyleCategory | undefined {
   const normalizedText = text.trim().toLowerCase();
+  if (normalizedText === "wa_illustrated") {
+    return "illustrated";
+  }
+
+  if (normalizedText === "wa_atmosphere") {
+    return "atmosphere";
+  }
+
+  if (normalizedText === "wa_bold") {
+    return "bold";
+  }
+
   const numbered = WHATSAPP_CATEGORY_CHOICES.find(
     choice => choice.key === normalizedText
   );
@@ -272,14 +325,23 @@ function parseWhatsAppStyleSelection(
     }
   }
 
-  return parseStyle(text) ?? normalizeStyle(text);
+  return stylePayloadToStyle(text) ?? parseStyle(text) ?? normalizeStyle(text);
 }
 
 async function sendWhatsAppStyleCategoryPrompt(
   senderId: string,
   lang: Lang
 ): Promise<void> {
-  await sendWhatsAppText(senderId, getWhatsAppStyleCategoryPrompt(lang));
+  await sendWhatsAppButtons(
+    senderId,
+    lang === "en"
+      ? "Choose a style group to continue."
+      : "Kies een stijlgroep om verder te gaan.",
+    WHATSAPP_CATEGORY_CHOICES.map(choice => ({
+      id: `WA_${choice.category.toUpperCase()}`,
+      title: STYLE_CATEGORY_LABELS[choice.category],
+    }))
+  );
 }
 
 async function sendWhatsAppStyleOptions(
@@ -289,7 +351,22 @@ async function sendWhatsAppStyleOptions(
 ): Promise<void> {
   await setSelectedStyleCategory(senderId, category);
   await setFlowState(senderId, "AWAITING_STYLE");
-  await sendWhatsAppText(senderId, getWhatsAppStylePrompt(category, lang));
+  await sendWhatsAppList(
+    senderId,
+    lang === "en"
+      ? `Pick a ${STYLE_CATEGORY_LABELS[category].toLowerCase()} style.`
+      : `Kies een ${STYLE_CATEGORY_LABELS[category].toLowerCase()}-stijl.`,
+    lang === "en" ? "Choose style" : "Kies stijl",
+    getStylesForCategory(category).map(style => ({
+      id: style.payload,
+      title: STYLE_LABELS[style.style],
+      description:
+        lang === "en"
+          ? `${STYLE_CATEGORY_LABELS[category]} style`
+          : `${STYLE_CATEGORY_LABELS[category]}-stijl`,
+    })),
+    STYLE_CATEGORY_LABELS[category]
+  );
 }
 
 function buildWhatsAppReplyListText(text: string, replies: QuickReply[]): string {
