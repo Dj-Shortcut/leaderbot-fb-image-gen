@@ -216,6 +216,7 @@ function extractWhatsAppEvents(payload: unknown): NormalizedInboundMessage[] {
             channel: "whatsapp",
             senderId: from,
             userId: toUserKey(from),
+            rawMessageType: messageType,
             messageType:
               messageType === "text" || messageType === "interactive"
                 ? "text"
@@ -848,6 +849,7 @@ export async function processWhatsAppWebhookPayload(
       channel: event.channel,
       user: toLogUser(event.userId),
       messageType: event.messageType,
+      rawMessageType: event.rawMessageType,
     });
 
     await Promise.resolve(
@@ -862,6 +864,15 @@ export async function processWhatsAppWebhookPayload(
 
       if (event.messageType === "text") {
         await handleWhatsAppTextEvent(event, reqId, lang);
+        continue;
+      }
+
+      if (event.messageType === "unknown") {
+        console.warn("[whatsapp webhook] unsupported inbound message type", {
+          user: toLogUser(event.userId),
+          rawMessageType: event.rawMessageType,
+        });
+        await sendWhatsAppText(event.senderId, t(lang, "unsupportedMedia"));
       }
     } catch (error) {
       console.error("[whatsapp webhook] reply failed", {

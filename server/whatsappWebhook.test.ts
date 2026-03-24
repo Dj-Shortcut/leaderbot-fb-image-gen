@@ -514,4 +514,22 @@ describe("whatsapp webhook flow", () => {
       expect.stringContaining("Privacybeleid: https://leaderbot-fb-image-gen.fly.dev/privacy")
     );
   });
+
+  it("replies clearly when WhatsApp sends an unsupported media type like video", async () => {
+    await processWhatsAppWebhookPayload(
+      createWhatsAppPayload({
+        from: "wa-user-video",
+        timestamp: "1710000018",
+        type: "video",
+        video: { id: "wamid-video-1" },
+      })
+    );
+
+    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+      "wa-user-video",
+      "Ik werk voorlopig alleen met foto's. Stuur een foto in plaats van een video of ander bestand."
+    );
+    expect(sendWhatsAppButtonsMock).not.toHaveBeenCalled();
+    expect(downloadWhatsAppMediaMock).not.toHaveBeenCalled();
+  });
 });
