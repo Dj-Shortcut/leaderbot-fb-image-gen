@@ -51,7 +51,13 @@ function handleSessionRefWriteFailure<T>(
   error: unknown
 ): MaybePromise<T> {
   logSessionRefWriteFailure(session, error);
-  const rollback = rollbackSessionWrite(session);
+  let rollback: MaybePromise<void>;
+
+  try {
+    rollback = rollbackSessionWrite(session);
+  } catch {
+    throw error;
+  }
 
   if (isPromiseLike(rollback)) {
     return rollback.then(
@@ -162,13 +168,21 @@ export function upsertIdentityGameSession(
 
   if (isPromiseLike(writeSession)) {
     return writeSession.then(() =>
-      Promise.resolve(writeSessionRef(session.userId, session.sessionId))
+      Promise.resolve()
+        .then(() => writeSessionRef(session.userId, session.sessionId))
         .then(() => session)
         .catch(error => handleSessionRefWriteFailure(session, error))
     );
   }
 
-  const writeRef = writeSessionRef(session.userId, session.sessionId);
+  let writeRef: MaybePromise<void>;
+
+  try {
+    writeRef = writeSessionRef(session.userId, session.sessionId);
+  } catch (error) {
+    return handleSessionRefWriteFailure(session, error);
+  }
+
   if (isPromiseLike(writeRef)) {
     return writeRef
       .then(() => session)

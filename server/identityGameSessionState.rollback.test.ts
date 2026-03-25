@@ -128,4 +128,58 @@ describe("identityGameSessionState rollback", () => {
       consoleErrorSpy.mockRestore();
     }
   });
+
+  it("preserves the original error when rollback throws synchronously", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    writeScopedStateMock
+      .mockImplementationOnce(async () => undefined)
+      .mockImplementationOnce(() => {
+        throw new Error("ref write failed sync");
+      });
+    deleteScopedStateMock.mockImplementation(() => {
+      throw new Error("rollback failed sync");
+    });
+
+    try {
+      const { upsertIdentityGameSession } = await import(
+        "./_core/identityGameSessionState"
+      );
+
+      await expect(
+        upsertIdentityGameSession({
+          sessionId: "session-rollback-3",
+          userId: "user-rollback-3",
+          gameId: "party-alter-ego",
+          gameVersion: "v1",
+          entryIntent: {
+            sourceChannel: "messenger",
+            sourceType: "referral",
+            targetExperienceType: "identity_game",
+            targetExperienceId: "party-alter-ego",
+            receivedAt: 1710000000000,
+          },
+          status: "started",
+          answers: [],
+          derivedTraits: {},
+          startedAt: 1710000000000,
+          updatedAt: 1710000000000,
+          expiresAt: 1710086400000,
+        })
+      ).rejects.toThrow("ref write failed sync");
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "identity_game_session_ref_write_failed",
+        expect.objectContaining({
+          sessionId: "session-rollback-3",
+          userId: "user-rollback-3",
+          error: "ref write failed sync",
+        })
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
 });
