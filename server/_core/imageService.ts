@@ -18,6 +18,7 @@ export interface ImageGenerator {
     style: Style;
     sourceImageUrl?: string;
     trustedSourceImageUrl?: boolean;
+    sourceImageProvenance?: "storeInbound";
     sourceImageData?: {
       buffer: Buffer;
       contentType: string;
@@ -429,7 +430,10 @@ function isBlockedHostname(hostname: string): boolean {
 export function validateSourceImageUrlOrThrow(
   sourceImageUrl: string,
   reqId?: string,
-  options?: { trustedSourceImageUrl?: boolean }
+  options?: {
+    trustedSourceImageUrl?: boolean;
+    sourceImageProvenance?: "storeInbound";
+  }
 ): URL {
   let parsedUrl: URL;
 
@@ -476,7 +480,11 @@ export function validateSourceImageUrlOrThrow(
     throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
-  if (!options?.trustedSourceImageUrl) {
+  const allowTrustedSourceBypass =
+    options?.trustedSourceImageUrl === true &&
+    options.sourceImageProvenance === "storeInbound";
+
+  if (!allowTrustedSourceBypass) {
     const allowedHosts = parseAllowedHostsFromEnv();
     if (allowedHosts.length === 0) {
       console.warn("SOURCE_IMAGE_URL_BLOCKED", {
@@ -527,7 +535,10 @@ async function fetchWithTimeout(
 async function downloadSourceImageOrThrow(
   sourceImageUrl: string,
   reqId: string,
-  options?: { trustedSourceImageUrl?: boolean }
+  options?: {
+    trustedSourceImageUrl?: boolean;
+    sourceImageProvenance?: "storeInbound";
+  }
 ): Promise<DownloadedSourceImage> {
   const validatedSourceImageUrl = validateSourceImageUrlOrThrow(
     sourceImageUrl,
@@ -680,6 +691,7 @@ export class OpenAiImageGenerator implements ImageGenerator {
     style: Style;
     sourceImageUrl?: string;
     trustedSourceImageUrl?: boolean;
+    sourceImageProvenance?: "storeInbound";
     sourceImageData?: {
       buffer: Buffer;
       contentType: string;
@@ -720,6 +732,7 @@ export class OpenAiImageGenerator implements ImageGenerator {
         console.info("SOURCE_IMAGE_FETCH_START", {
           reqId: input.reqId,
           trustedSourceImageUrl: Boolean(input.trustedSourceImageUrl),
+          sourceImageProvenance: input.sourceImageProvenance,
           ...getSourceUrlDiagnostics(input.sourceImageUrl),
         });
       }
@@ -727,6 +740,7 @@ export class OpenAiImageGenerator implements ImageGenerator {
         ? normalizeProvidedSourceImage(input.sourceImageData)
         : await downloadSourceImageOrThrow(input.sourceImageUrl!, input.reqId, {
             trustedSourceImageUrl: input.trustedSourceImageUrl,
+            sourceImageProvenance: input.sourceImageProvenance,
           });
       const imageBuffer = sourceImage.buffer;
       const contentType = sourceImage.contentType;

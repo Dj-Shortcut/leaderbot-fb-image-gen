@@ -36,6 +36,8 @@ export type QuotaState = {
   count: number;
 };
 
+export type SourceImageOrigin = "external" | "stored";
+
 export type MessengerUserState = {
   psid: string;
   userKey: string;
@@ -44,6 +46,7 @@ export type MessengerUserState = {
   lastUserMessageAt?: number;
   lastPhotoUrl: string | null;
   lastPhoto: string | null;
+  lastPhotoSource?: SourceImageOrigin | null;
   selectedStyle: string | null;
   chosenStyle: string | null;
   selectedStyleCategory?: StyleCategory | null;
@@ -102,6 +105,7 @@ function createDefaultState(psid: string, now = Date.now()): MessengerUserState 
     lastUserMessageAt: undefined,
     lastPhotoUrl: null,
     lastPhoto: null,
+    lastPhotoSource: null,
     selectedStyle: null,
     chosenStyle: null,
     selectedStyleCategory: null,
@@ -143,6 +147,7 @@ function normalizeState(psid: string, value: PartialState | null | undefined): M
     lastUserMessageAt: value?.lastUserMessageAt ?? fallback.lastUserMessageAt,
     lastPhotoUrl: lastPhoto,
     lastPhoto,
+    lastPhotoSource: value?.lastPhotoSource ?? fallback.lastPhotoSource,
     selectedStyle,
     chosenStyle: selectedStyle,
     selectedStyleCategory:
@@ -304,12 +309,18 @@ export function setFlowState(psid: string, nextState: MessengerFlowState): Maybe
   }
 }
 
-export function setPendingImage(psid: string, imageUrl: string, now = Date.now()): MaybePromise<void> {
+export function setPendingImage(
+  psid: string,
+  imageUrl: string,
+  now = Date.now(),
+  source: SourceImageOrigin = "external"
+): MaybePromise<void> {
   const result = patchState(
     psid,
     {
       lastPhotoUrl: imageUrl,
       lastPhoto: imageUrl,
+      lastPhotoSource: source,
       pendingImageUrl: imageUrl,
       pendingImageAt: now,
       stage: "AWAITING_STYLE",
@@ -329,6 +340,7 @@ export function clearPendingImageState(psid: string, now = Date.now()): MaybePro
     {
       lastPhotoUrl: null,
       lastPhoto: null,
+      lastPhotoSource: null,
       pendingImageUrl: undefined,
       pendingImageAt: undefined,
       selectedStyle: null,

@@ -126,6 +126,9 @@ describe("whatsapp webhook flow", () => {
     expect(getState(anonymizePsid("wa-user-1"))?.lastPhotoUrl).toMatch(
       /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/.+\.jpg$/
     );
+    expect(getState(anonymizePsid("wa-user-1"))?.lastPhotoSource).toBe(
+      "stored"
+    );
     expect(sendWhatsAppButtonsMock).toHaveBeenCalledWith(
       "wa-user-1",
       expect.stringContaining("stijlgroep"),
@@ -324,6 +327,7 @@ describe("whatsapp webhook flow", () => {
             /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/.+\.jpg$/
           ),
           trustedSourceImageUrl: true,
+          sourceImageProvenance: "storeInbound",
         })
       );
     } finally {

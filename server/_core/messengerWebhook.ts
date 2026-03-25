@@ -557,7 +557,10 @@ async function runWhatsAppStyleGeneration(
 
   const state = await Promise.resolve(getOrCreateState(senderId));
   const resolvedSourceImageUrl = sourceImageUrl ?? state.lastPhotoUrl ?? undefined;
-  const trustedSourceImageUrl = resolvedSourceImageUrl === state.lastPhotoUrl;
+  const trustedSourceImageUrl =
+    resolvedSourceImageUrl !== undefined &&
+    resolvedSourceImageUrl === state.lastPhotoUrl &&
+    state.lastPhotoSource === "stored";
   if (!resolvedSourceImageUrl) {
     await setFlowState(senderId, "AWAITING_PHOTO");
     await sendWhatsAppText(senderId, t(lang, "styleWithoutPhoto"));
@@ -592,6 +595,7 @@ async function runWhatsAppStyleGeneration(
       style,
       sourceImageUrl: resolvedSourceImageUrl,
       trustedSourceImageUrl,
+      sourceImageProvenance: trustedSourceImageUrl ? "storeInbound" : undefined,
       promptHint,
       userKey: userId,
       reqId,
@@ -812,7 +816,12 @@ async function handleWhatsAppImageEvent(
 
   const state = await Promise.resolve(getOrCreateState(event.senderId));
   const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");
-  await setPendingImage(event.senderId, persistedImageUrl);
+  await setPendingImage(
+    event.senderId,
+    persistedImageUrl,
+    Date.now(),
+    "stored"
+  );
 
   if (preselectedStyle) {
     await setPreselectedStyle(event.senderId, null);
