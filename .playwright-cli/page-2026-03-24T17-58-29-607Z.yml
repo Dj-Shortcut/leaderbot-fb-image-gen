@@ -1,0 +1,408 @@
+- generic [ref=e1]:
+  - generic [ref=e12]:
+    - generic [ref=e23]:
+      - generic [ref=e25]:
+        - navigation "Structurele navigatie" [ref=e27]:
+          - generic [ref=e28]:
+            - heading "WhatsApp-beheer" [level=1] [ref=e29]
+            - heading "Overzicht" [level=1] [ref=e31]
+        - generic:
+          - toolbar
+      - generic [ref=e32]:
+        - generic [ref=e39]:
+          - generic [ref=e42]:
+            - navigation [ref=e43]:
+              - list [ref=e44]:
+                - listitem [ref=e46]:
+                  - link "Overzicht" [ref=e48] [cursor=pointer]:
+                    - /url: https://business.facebook.com/latest/whatsapp_manager/overview?business_id=904149119041282&asset_id=1467671241436356
+                  - generic:
+                    - listitem:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: Overzicht
+            - navigation "Sjablonen voor chatberichten" [ref=e53]:
+              - list [ref=e54]:
+                - listitem [ref=e55]:
+                  - generic [ref=e56]:
+                    - button "Sjablonen voor chatberichten" [expanded] [ref=e58] [cursor=pointer]
+                    - generic:
+                      - listitem:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic: Sjablonen voor chatberichten
+                          - button "Groep in-/uitvouwen" [disabled] [ref=e63]:
+                            - generic [ref=e66]: Groep in-/uitvouwen
+                  - list [ref=e69]:
+                    - generic [ref=e71]:
+                      - link "Sjablonen beheren" [ref=e73] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/message_templates?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Sjablonen beheren
+                    - generic [ref=e79]:
+                      - link "Sjabloonbibliotheek" [ref=e81] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/template_library?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Sjabloonbibliotheek
+            - navigation "Accounttools" [ref=e86]:
+              - list [ref=e87]:
+                - listitem [ref=e88]:
+                  - generic [ref=e89]:
+                    - button "Accounttools" [expanded] [ref=e91] [cursor=pointer]
+                    - generic:
+                      - listitem:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic: Accounttools
+                          - button "Groep in-/uitvouwen" [disabled] [ref=e96]:
+                            - generic [ref=e99]: Groep in-/uitvouwen
+                  - list [ref=e102]:
+                    - generic [ref=e104]:
+                      - link "Insights" [ref=e106] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/insights?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Insights
+                    - generic [ref=e112]:
+                      - link "Chatberichtlimieten" [ref=e114] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/messaging_limits?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Chatberichtlimieten
+                    - generic [ref=e120]:
+                      - link "Processen" [ref=e122] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/flows?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Processen
+                    - generic [ref=e128]:
+                      - link "Telefoonnummers" [ref=e130] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/phone_numbers?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Telefoonnummers
+                    - generic [ref=e136]:
+                      - link "Catalogus" [ref=e138] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/catalog?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Catalogus
+                    - generic [ref=e144]:
+                      - link "Activiteitlogboek" [ref=e146] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/activity_log?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Activiteitlogboek
+            - navigation "Betalingsconfiguraties" [ref=e151]:
+              - list [ref=e152]:
+                - listitem [ref=e153]:
+                  - generic [ref=e154]:
+                    - button "Betalingsconfiguraties" [expanded] [ref=e156] [cursor=pointer]
+                    - generic:
+                      - listitem:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic: Betalingsconfiguraties
+                          - button "Groep in-/uitvouwen" [disabled] [ref=e161]:
+                            - generic [ref=e164]: Groep in-/uitvouwen
+                  - list [ref=e167]:
+                    - generic [ref=e169]:
+                      - link "India" [ref=e171] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/india?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: India
+          - button "Uitvouwen" [ref=e179] [cursor=pointer]:
+            - generic [ref=e182]: Uitvouwen
+        - generic [ref=e189]:
+          - generic [ref=e190]:
+            - heading "Waarschuwingen" [level=1] [ref=e191]
+            - generic [ref=e194]:
+              - heading "Bereid je systemen voor om vanaf juni gebruikersnamen te ondersteunen" [level=4] [ref=e202]
+              - generic [ref=e207]:
+                - generic [ref=e208]: Bereid je voor op het ondersteunen van klanten die een gebruikersnaam gebruiken, door te zorgen dat je systemen zijn ingesteld voor zakelijke gebruikers-ID's.
+                - link "Meer informatie" [ref=e210] [cursor=pointer]:
+                  - /url: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids
+            - generic [ref=e213]:
+              - generic [ref=e214]:
+                - heading "Je adresboek is ingeschakeld voor je WhatsApp-gesprekken" [level=4] [ref=e221]
+                - button "Sluiten" [ref=e222] [cursor=pointer]:
+                  - generic [ref=e225]: Sluiten
+              - generic [ref=e231]:
+                - text: To make the transition to usernames easier, your contact book will automatically store contact information, like phone numbers and business-scoped user ID, for you.
+                - link "About your contact book" [ref=e232] [cursor=pointer]:
+                  - /url: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids/#contact-book
+              - generic [ref=e233]:
+                - separator [ref=e234]
+                - link "Adresboek beheren" [ref=e236] [cursor=pointer]:
+                  - /url: /latest/settings/business_info/?business_id=904149119041282
+                  - generic [ref=e240]: Adresboek beheren
+            - generic [ref=e241]:
+              - generic [ref=e243]:
+                - generic [ref=e244]:
+                  - generic [ref=e250]:
+                    - heading "Meta instructies geven om automatische gebeurtenissen in te schakelen om op de hoogte te blijven van je gesprekken?" [level=4] [ref=e252]
+                    - generic [ref=e253]:
+                      - text: Door deze informatie aan Meta te verstrekken, laat je Meta weten dat je up-to-date wilt worden gehouden over belangrijke mijlpalen. Dit is van toepassing op al je WhatsApp Business-accounts. Je kunt dit wanneer je wilt uitschakelen via de WhatsApp-accountinstellingen.
+                      - link "Meta-voorwaarden voor automatische gebeurtenissen" [ref=e254] [cursor=pointer]:
+                        - /url: https://www.facebook.com/legal/automatic-events-terms
+                  - button "Sluiten" [ref=e255] [cursor=pointer]:
+                    - generic [ref=e258]: Sluiten
+                - generic [ref=e266]:
+                  - separator [ref=e267]
+                  - link [ref=e268] [cursor=pointer]:
+                    - /url: "#"
+                    - generic [ref=e272]: Inschakelen
+              - button "Meer weergeven" [ref=e274] [cursor=pointer]:
+                - generic [ref=e275]: Meer weergeven
+            - generic [ref=e278]:
+              - generic [ref=e279]:
+                - heading "Je kunt tot 9% meer marketingberichten verzenden in vergelijking met de Cloud API" [level=4] [ref=e286]: Je kunt tot 9% meer marketingberichten verzenden in vergelijking met de Cloud API
+                - button "Sluiten" [ref=e292] [cursor=pointer]:
+                  - generic [ref=e295]: Sluiten
+              - generic [ref=e300]: Als je chatberichten verstuurt via Marketing Messages API voor WhatsApp, voorheen bekend als MM Lite API, kun je de klantervaring verbeteren en het juiste chatbericht afleveren bij meer van de juiste mensen. Marketing Messages API voor WhatsApp is nu voor iedereen beschikbaar.
+              - link "Marketing Messages API voor WhatsApp instellen" [ref=e303] [cursor=pointer]:
+                - /url: https://developers.facebook.com/docs/whatsapp/marketing-messages-lite-api/onboarding/#self-onboard-to-mm-lite-api
+          - generic [ref=e304]:
+            - generic [ref=e305]:
+              - generic [ref=e309]:
+                - generic [ref=e312]:
+                  - generic [ref=e313]:
+                    - heading "Niveaus voor chatberichten" [level=2] [ref=e315]
+                    - text: Selecteer de markt- en chatberichtcategorie om je besparingen te bekijken.
+                  - button "Collapse" [ref=e321] [cursor=pointer]:
+                    - generic [ref=e322]: Collapse
+                - generic [ref=e327]:
+                  - generic [ref=e328]:
+                    - generic [ref=e331]:
+                      - generic [ref=e337]: Markt
+                      - combobox "Markt Noord-Amerika" [ref=e342] [cursor=pointer]:
+                        - generic [ref=e349]: Noord-Amerika
+                    - generic [ref=e354]:
+                      - generic [ref=e360]: Categorie
+                      - combobox "Categorie Verificatie" [ref=e365] [cursor=pointer]:
+                        - generic [ref=e372]: Verificatie
+                  - separator [ref=e376]
+                  - generic [ref=e377]:
+                    - heading "Voortgang deze maand" [level=3] [ref=e378]
+                    - generic [ref=e379]:
+                      - generic [ref=e381]:
+                        - generic [ref=e383]: Verstuurde chatberichten
+                        - generic [ref=e386]: "0"
+                      - generic [ref=e388]:
+                        - generic [ref=e390]: Totale besparing
+                        - generic [ref=e393]: 0%
+                    - generic [ref=e395]:
+                      - generic [ref=e397]: Korting voor huidig niveau
+                      - generic [ref=e400]: 0%
+                      - progressbar [ref=e403]
+                      - generic [ref=e405]: 0/100.000 chatberichten verzonden
+                      - separator [ref=e406]
+                      - generic [ref=e409]: Ontgrendel 5% korting wanneer je nog 100.000 chatberichten stuurt
+              - generic [ref=e410]:
+                - heading "WhatsApp-accounts" [level=1] [ref=e411]
+                - generic [ref=e413]:
+                  - generic [ref=e416]:
+                    - heading "leaderbot" [level=3] [ref=e418]
+                    - generic [ref=e419]:
+                      - button "More Items" [ref=e420] [cursor=pointer]:
+                        - generic [ref=e423]: More Items
+                      - button "Minder weergeven" [ref=e426] [cursor=pointer]:
+                        - generic [ref=e427]: Minder weergeven
+                  - generic [ref=e431]:
+                    - generic [ref=e433]:
+                      - heading "Statistieken voor deze maand" [level=4] [ref=e434]
+                      - generic [ref=e435]:
+                        - generic [ref=e436]:
+                          - button "Alle berichtleveringen 0" [ref=e437] [cursor=pointer]:
+                            - generic [ref=e438]:
+                              - generic [ref=e440]: Alle berichtleveringen
+                              - strong [ref=e444]: "0"
+                          - button "Gratis levering van klantenservice 0" [ref=e445] [cursor=pointer]:
+                            - generic [ref=e446]:
+                              - generic [ref=e448]: Gratis levering van klantenservice
+                              - strong [ref=e452]: "0"
+                          - button "Geschatte kosten $0,00" [ref=e453] [cursor=pointer]:
+                            - generic [ref=e454]:
+                              - generic [ref=e456]: Geschatte kosten
+                              - strong [ref=e460]: $0,00
+                        - generic [ref=e461]:
+                          - button "Alle oproepen 0" [ref=e462] [cursor=pointer]:
+                            - generic [ref=e463]:
+                              - generic [ref=e465]: Alle oproepen
+                              - strong [ref=e469]: "0"
+                          - button "Gemiddelde factureerbare oproepduur (seconden) 0" [ref=e470] [cursor=pointer]:
+                            - generic [ref=e471]:
+                              - generic [ref=e473]: Gemiddelde factureerbare oproepduur (seconden)
+                              - strong [ref=e477]: "0"
+                          - button "Geschatte kosten $0,00" [ref=e478] [cursor=pointer]:
+                            - generic [ref=e479]:
+                              - generic [ref=e481]: Geschatte kosten
+                              - strong [ref=e485]: $0,00
+                    - generic [ref=e491]:
+                      - heading "leaderbot heeft nog geen telefoonnummers toegevoegd." [level=2] [ref=e494]
+                      - button "Telefoonnummer toevoegen" [ref=e496] [cursor=pointer]:
+                        - generic [ref=e500]: Telefoonnummer toevoegen
+                - generic [ref=e502]:
+                  - generic [ref=e505]:
+                    - heading "Test WhatsApp Business Account" [level=3] [ref=e507]
+                    - generic [ref=e508]:
+                      - button "More Items" [ref=e509] [cursor=pointer]:
+                        - generic [ref=e512]: More Items
+                      - button "Minder weergeven" [ref=e515] [cursor=pointer]:
+                        - generic [ref=e516]: Minder weergeven
+                  - grid "Telefoonnummers WhatsApp Business-account" [ref=e531]:
+                    - rowgroup [ref=e532]:
+                      - row [ref=e533]:
+                        - columnheader [ref=e534]
+                        - columnheader [ref=e535]
+                    - rowgroup [ref=e536]:
+                      - row "WhatsApp Test Number ‎+1 555-175-6105 0 chatberichten verzonden 2 van 5 ontvangers toegevoegd" [ref=e537] [cursor=pointer]:
+                        - gridcell "WhatsApp Test Number ‎+1 555-175-6105" [ref=e538]:
+                          - button "WhatsApp Test Number ‎+1 555-175-6105" [ref=e540]:
+                            - generic [ref=e542]:
+                              - img "WhatsApp" [ref=e545]
+                              - generic [ref=e546]:
+                                - generic [ref=e547]: Test Number
+                                - generic [ref=e548]: ‎+1 555-175-6105
+                        - gridcell "0 chatberichten verzonden 2 van 5 ontvangers toegevoegd" [ref=e549]:
+                          - generic [ref=e553]:
+                            - generic [ref=e554]: 0 chatberichten verzonden
+                            - generic [ref=e555]: 2 van 5 ontvangers toegevoegd
+            - generic [ref=e556]:
+              - generic [ref=e557]:
+                - heading "Bedrijfsstatus" [level=1] [ref=e558]
+                - generic [ref=e563]:
+                  - generic [ref=e565]:
+                    - generic [ref=e568]:
+                      - heading "Door bedrijf gestarte gesprekken" [level=3] [ref=e570]
+                      - generic [ref=e571]: 2 van 250 verzonden
+                      - generic [ref=e572]: Van je algemene bedrijfsaccount
+                      - link "Meer informatie over hoe dit werkt" [ref=e573] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/messaging_limits/?business_id=904149119041282&tab=business-messaging-limits&nav_ref=whatsapp_manager&asset_id=1467671241436356
+                    - generic [ref=e576]:
+                      - heading "Telefoonnummers" [level=3] [ref=e577]
+                      - generic [ref=e578]: 0 van 2 toegevoegd
+                  - separator [ref=e580]
+                  - generic [ref=e581]:
+                    - heading "Uw bedrijf laten groeien" [level=3] [ref=e582]
+                    - list [ref=e584]:
+                      - listitem [ref=e585]: Krijg meer dan 2000 dagelijkse gesprekken om meer bereik te krijgen.
+                      - listitem [ref=e586]: Toon de weergavenaam van uw bedrijf in chats en meldingen zodat klanten weten dat u het bent.
+                    - generic [ref=e587]: "Uw limieten ontgrendelen:"
+                  - generic [ref=e588]:
+                    - generic [ref=e591]:
+                      - heading "Uw bedrijf verifiëren" [level=3] [ref=e595]
+                      - link "Aan de slag" [ref=e596] [cursor=pointer]:
+                        - /url: "#"
+                    - generic [ref=e598]: OF
+                    - generic [ref=e601]:
+                      - generic [ref=e603]:
+                        - heading "Berichten van een hoge kwaliteit verzenden" [level=3] [ref=e605]
+                        - generic [ref=e611]: 2 gesprekken gestart/30d
+                      - progressbar [ref=e614]
+              - generic [ref=e616]:
+                - heading "Nieuw" [level=1] [ref=e617]
+                - generic [ref=e622]:
+                  - generic [ref=e626]:
+                    - heading "Sjabloongroepen" [level=3] [ref=e627]
+                    - generic [ref=e628]: 1 november 2024
+                    - generic [ref=e629]: Je kunt sjablonen nu samenvoegen in groepen en de prestaties hiervan bijhouden op groepsniveau. Maak een sjabloongroep om gegevens bij te houden zoals kostenstatistieken, betrokkenheidspercentages en knopinteracties.
+                  - generic [ref=e633]:
+                    - heading "Er zijn nu nieuwe kostenstatistieken beschikbaar" [level=3] [ref=e634]
+                    - generic [ref=e635]: 29 april 2024
+                    - generic [ref=e636]: Je kunt nu kostenstatistieken voor je chatberichtsjablonen zien. Bekijk statistieken voor het totale uitgegeven bedrag, de kosten per afgeleverd bericht en de kosten per klik op websiteknop.
+                  - button "Meer weergeven" [ref=e638] [cursor=pointer]:
+                    - generic [ref=e642]: Meer weergeven
+    - generic [ref=e648]:
+      - generic [ref=e650]:
+        - button "Meta Business Suite" [ref=e651] [cursor=pointer]:
+          - generic [ref=e653]: Meta Business Suite
+        - button "Pressable" [ref=e661] [cursor=pointer]
+      - navigation "Links" [ref=e669]:
+        - generic [ref=e670]: Links
+        - list [ref=e671]:
+          - listitem [ref=e676]:
+            - generic [ref=e678]:
+              - link "Alle tools" [ref=e679] [cursor=pointer]:
+                - generic [ref=e680]: Alle tools
+              - generic:
+                - generic:
+                  - generic:
+                    - generic: Alle tools
+      - generic [ref=e683]:
+        - listitem [ref=e686]:
+          - generic [ref=e688]:
+            - link "Zoeken" [ref=e689] [cursor=pointer]:
+              - generic [ref=e690]: Zoeken
+            - generic:
+              - generic:
+                - generic:
+                  - generic: Zoeken
+        - navigation "Links" [ref=e691]:
+          - generic [ref=e692]: Links
+          - list [ref=e693]:
+            - listitem [ref=e697]:
+              - generic [ref=e699]:
+                - link "Instellingen" [ref=e700] [cursor=pointer]:
+                  - /url: https://business.facebook.com/latest/settings/business_users?business_id=904149119041282&asset_id=1467671241436356
+                  - generic [ref=e701]: Instellingen
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic: Instellingen
+        - listitem [ref=e708]:
+          - generic [ref=e710]:
+            - link "Help" [ref=e711] [cursor=pointer]:
+              - generic [ref=e712]: Help
+            - generic:
+              - generic:
+                - generic:
+                  - generic: Help
+  - dialog "Bereid je systemen voor om vanaf juni gebruikersnamen te ondersteunen" [ref=e715]:
+    - generic "Bereid je systemen voor om vanaf juni gebruikersnamen te ondersteunen" [ref=e716]:
+      - generic [ref=e717]:
+        - generic [ref=e718]:
+          - heading "Bereid je systemen voor om vanaf juni gebruikersnamen te ondersteunen" [level=3] [ref=e721]
+          - button "Sluiten" [active] [ref=e724] [cursor=pointer]:
+            - generic [ref=e727]: Sluiten
+        - generic [ref=e732]: Bereid je voor op het ondersteunen van klanten die een gebruikersnaam gebruiken, door te zorgen dat je systemen zijn ingesteld voor zakelijke gebruikers-ID's.
+        - generic [ref=e734]:
+          - button "Sluiten" [ref=e735] [cursor=pointer]:
+            - generic [ref=e739]: Sluiten
+          - link "Meer informatie" [ref=e740] [cursor=pointer]:
+            - /url: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids
+            - generic [ref=e744]: Meer informatie

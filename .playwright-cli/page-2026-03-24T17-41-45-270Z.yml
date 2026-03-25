@@ -1,0 +1,744 @@
+- generic [ref=e1]:
+  - generic [ref=e6]:
+    - navigation [ref=e8]:
+      - generic [ref=e15]:
+        - generic [ref=e17]:
+          - button [ref=e19] [cursor=pointer]:
+            - img [ref=e22]
+          - link [ref=e24] [cursor=pointer]:
+            - /url: https://developers.facebook.com/
+            - img [ref=e25]
+        - generic [ref=e28]:
+          - link [ref=e29] [cursor=pointer]:
+            - /url: https://business.facebook.com/business/loginpage/?next=https%3A%2F%2Fdevelopers.facebook.com%2Fdocumentation%2Fbusiness-messaging%2Fwhatsapp%2Fabout-the-platform
+            - text: Login
+          - button [ref=e30] [cursor=pointer]:
+            - img [ref=e31]
+    - generic [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e35]: WhatsApp Business Platform
+        - button [ref=e36] [cursor=pointer]:
+          - img [ref=e39]
+      - generic [ref=e48]:
+        - navigation [ref=e50]:
+          - list [ref=e51]:
+            - listitem [ref=e52]:
+              - generic [ref=e53]:
+                - link [ref=e54] [cursor=pointer]:
+                  - /url: /docs
+                  - generic [ref=e56]: Docs
+                - img [ref=e57]
+            - listitem [ref=e59]:
+              - generic [ref=e60]:
+                - link [ref=e61] [cursor=pointer]:
+                  - /url: /documentation/business-messaging/whatsapp/overview
+                  - generic [ref=e63]: Overview
+                - img [ref=e64]
+            - listitem [ref=e66]:
+              - generic [ref=e69]: About the WhatsApp Business Platform
+        - generic [ref=e70]:
+          - heading [level=1] [ref=e71]: About the WhatsApp Business Platform
+          - generic [ref=e73]: "Updated: Dec 5, 2025"
+          - generic [ref=e74]: The WhatsApp Business Platform enables businesses to communicate with customers at scale.
+          - generic [ref=e75]:
+            - text: This documentation is intended for developers using our APIs. If you are looking for information on other ways to use WhatsApp for your business see the
+            - link [ref=e76] [cursor=pointer]:
+              - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fbusiness.whatsapp.com%2F&h=AT7zGqLumcHUrWozZU99J7oMo3St1BLIv0Vmxco7JYJjTjOtliJ5EN8eqfhFpet9OcWp1fialKTOZ-SQs4apVXYfr1VX_yExiJEUYYXXuLAAuwwXl9KBYIouW-Yd5Jsb45FvZa_9IfRZmSiwJP-seA
+              - text: WhatsApp Business site
+              - generic [ref=e77]:
+                - text: ⁠
+                - img [ref=e78]
+            - text: .
+          - generic [ref=e83]:
+            - heading [level=2] [ref=e84]: Core APIs and capabilities
+            - button [ref=e85] [cursor=pointer]:
+              - img [ref=e86]
+          - generic [ref=e91]:
+            - heading [level=3] [ref=e92]: WhatsApp Cloud API
+            - button [ref=e93] [cursor=pointer]:
+              - img [ref=e94]
+          - generic [ref=e97]: WhatsApp Cloud API enables you to programmatically message and call on WhatsApp. You can use Cloud API to send users a variety of messages, from simple text messages to rich media and interactive messages.
+          - generic [ref=e98]: "WhatsApp Cloud API includes:"
+          - list [ref=e99]:
+            - listitem [ref=e101]:
+              - strong [ref=e102]: "Messaging:"
+              - text: Send text messages, rich media, and interactive messages
+            - listitem [ref=e104]:
+              - strong [ref=e105]: "Calling:"
+              - text: Make and receive calls to customers
+            - listitem [ref=e107]:
+              - strong [ref=e108]: "Groups:"
+              - text: Create, manage, and message WhatsApp group conversations
+          - generic [ref=e109]: "WhatsApp messaging provides a powerful and private way to engage with customers. Use Cloud API to:"
+          - list [ref=e110]:
+            - listitem [ref=e112]: Send order confirmations and shipping updates
+            - listitem [ref=e114]: Share appointment availability and other reminders
+            - listitem [ref=e116]: Drive upsell and cross-sell opportunities
+            - listitem [ref=e118]: Facilitate end-to-end transactions, from product discovery to payment
+            - listitem [ref=e120]: Enable multi-factor authentication or one-time passwords to verify accounts and users
+            - listitem [ref=e122]: Deliver custom interactive conversational experiences
+          - link [ref=e124] [cursor=pointer]:
+            - /url: /documentation/business-messaging/whatsapp/messages/send-messages
+            - text: Learn more about message types on WhatsApp Cloud API.
+          - generic [ref=e127]:
+            - heading [level=3] [ref=e128]: Business Management API
+            - button [ref=e129] [cursor=pointer]:
+              - img [ref=e130]
+          - generic [ref=e133]: The WhatsApp Business Management API enables you to programmatically manage a WhatsApp Business Account and its associated assets.
+          - generic [ref=e134]: "Manage account assets with Business Management API like:"
+          - list [ref=e135]:
+            - listitem [ref=e137]:
+              - strong [ref=e138]: "Business phone numbers:"
+              - text: Add and remove phone numbers associated with your business
+            - listitem [ref=e140]:
+              - strong [ref=e141]: "Templates:"
+              - text: Create and modify message templates for scalable messaging.
+          - generic [ref=e142]: "Business Management API also gives you access to account analytics like:"
+          - list [ref=e143]:
+            - listitem [ref=e145]:
+              - strong [ref=e146]: "Messaging analytics:"
+              - text: The number and type of messages sent and delivered.
+            - listitem [ref=e148]:
+              - strong [ref=e149]: "Pricing analytics:"
+              - text: Granular pricing breakdowns for delivered messages.
+            - listitem [ref=e151]:
+              - generic [ref=e152]:
+                - strong [ref=e153]: "Template analytics:"
+                - text: Sent/read/delivered template metrics, alongside template message button clicks.
+            - listitem [ref=e155]:
+              - link [ref=e156] [cursor=pointer]:
+                - /url: /documentation/business-messaging/whatsapp/templates/overview
+                - text: Learn more about message templates.
+            - listitem [ref=e158]:
+              - link [ref=e159] [cursor=pointer]:
+                - /url: /documentation/business-messaging/whatsapp/business-phone-numbers/phone-numbers
+                - text: Learn more about managing business phone numbers.
+            - listitem [ref=e161]:
+              - link [ref=e162] [cursor=pointer]:
+                - /url: /documentation/business-messaging/whatsapp/analytics
+                - text: Learn more about account analytics.
+          - generic [ref=e165]:
+            - heading [level=3] [ref=e166]: Marketing Messages API for WhatsApp
+            - button [ref=e167] [cursor=pointer]:
+              - img [ref=e168]
+          - generic [ref=e171]: MM API for WhatsApp is an API for sending optimized marketing messages on WhatsApp.
+          - generic [ref=e172]: When you send marketing messages through the MM API for WhatsApp, you can access new features not available on Cloud API and get automatic optimizations, so high engagement messages can reach more customers.
+          - generic [ref=e173]: "The MM API for WhatsApp includes:"
+          - list [ref=e174]:
+            - listitem [ref=e176]:
+              - strong [ref=e177]: "Quality-based delivery:"
+              - text: Up to 9% higher marketing message deliveries over Cloud API for high engagement content.
+            - listitem [ref=e179]:
+              - strong [ref=e180]: "Automated creative optimizations:"
+              - text: Automatic enhancements to marketing creative to increase message performance.
+            - listitem [ref=e182]:
+              - strong [ref=e183]: "Performance benchmarks and recommendations:"
+              - text: Comparison of read and click rates versus similar templates from businesses in your region.
+            - listitem [ref=e185]:
+              - strong [ref=e186]: "Conversion metrics:"
+              - text: Measure marketing messages that lead users to perform app events such as ‘Add to Cart’, ‘Checkout Initiated’, or ‘Purchase’.
+          - link [ref=e188] [cursor=pointer]:
+            - /url: /documentation/business-messaging/whatsapp/marketing-messages/overview
+            - text: Learn more about the Marketing Messages API for WhatsApp.
+          - generic [ref=e191]:
+            - heading [level=3] [ref=e192]: Webhooks
+            - button [ref=e193] [cursor=pointer]:
+              - img [ref=e194]
+          - generic [ref=e197]: Webhooks deliver JSON payloads to your server for message status updates, incoming messages, asynchronous error handling, and many other notification utilities.
+          - generic [ref=e198]: The platform relies heavily on webhooks, as the contents of any message sent from a WhatsApp user to your business phone number is communicated via webhook, and all outgoing message delivery status updates are reported via webhook.
+          - generic [ref=e199]:
+            - link [ref=e200] [cursor=pointer]:
+              - /url: /documentation/business-messaging/whatsapp/webhooks/overview
+              - text: Learn more about webhooks
+            - text: .
+          - generic [ref=e203]:
+            - heading [level=2] [ref=e204]: Technical foundations
+            - button [ref=e205] [cursor=pointer]:
+              - img [ref=e206]
+          - generic [ref=e211]:
+            - heading [level=3] [ref=e212]: HTTP protocol and API requests
+            - button [ref=e213] [cursor=pointer]:
+              - img [ref=e214]
+          - generic [ref=e217]:
+            - text: The WhatsApp Business Platform is built on
+            - link [ref=e218] [cursor=pointer]:
+              - /url: /docs/graph-api/overview
+              - text: Graph API
+            - text: and uses HTTP protocol. API requests include path, body, and header parameters.
+          - generic [ref=e221]:
+            - heading [level=4] [ref=e222]: "Example: Sending a text message using cURL"
+            - button [ref=e223] [cursor=pointer]:
+              - img [ref=e224]
+          - generic [ref=e227]:
+            - generic [ref=e230]: "curl 'https://graph.facebook.com/v17.0/106540352242922/messages' \\ -H 'Content-Type: application/json' \\ -H 'Authorization: Bearer EAAJB...' \\ -d '{ \"messaging_product\": \"whatsapp\", \"recipient_type\": \"individual\", \"to\": \"+16505555555\", \"type\": \"text\", \"text\": { \"preview_url\": true, \"body\": \"Here's the info you requested! https://www.meta.com/quest/quest-3/\" } }'"
+            - button [ref=e231] [cursor=pointer]:
+              - img [ref=e232]
+          - link [ref=e235] [cursor=pointer]:
+            - /url: /docs/graph-api
+            - text: Learn more about the Graph API.
+          - generic [ref=e238]:
+            - heading [level=3] [ref=e239]: JSON responses
+            - button [ref=e240] [cursor=pointer]:
+              - img [ref=e241]
+          - generic [ref=e244]: API responses are formatted in JSON.
+          - generic [ref=e247]:
+            - heading [level=4] [ref=e248]: "Example: Requesting a business phone number’s metadata"
+            - button [ref=e249] [cursor=pointer]:
+              - img [ref=e250]
+          - generic [ref=e253]:
+            - generic [ref=e256]: "{ \"verified_name\": \"Lucky Shrub\", \"code_verification_status\": \"VERIFIED\", \"display_phone_number\": \"15550783881\", \"quality_rating\": \"GREEN\", \"platform_type\": \"CLOUD_API\", \"throughput\": { \"level\": \"STANDARD\" }, \"webhook_configuration\": { \"application\": \"https://www.luckyshrub.com/webhooks\" }, \"id\": \"106540352242922\" }"
+            - button [ref=e257] [cursor=pointer]:
+              - img [ref=e258]
+          - generic [ref=e262]:
+            - heading [level=3] [ref=e263]: Authentication and authorization
+            - button [ref=e264] [cursor=pointer]:
+              - img [ref=e265]
+          - generic [ref=e268]: Authentication uses OAuth (not 2.0) access tokens, while permissions restrict access to specific resources.
+          - list [ref=e269]:
+            - listitem [ref=e271]:
+              - link [ref=e272] [cursor=pointer]:
+                - /url: /documentation/business-messaging/whatsapp/access-tokens
+                - text: Learn more about access tokens.
+            - listitem [ref=e274]:
+              - link [ref=e275] [cursor=pointer]:
+                - /url: /documentation/business-messaging/whatsapp/permissions
+                - text: Learn more about permissions.
+          - generic [ref=e278]:
+            - heading [level=2] [ref=e279]: Key resources
+            - button [ref=e280] [cursor=pointer]:
+              - img [ref=e281]
+          - generic [ref=e286]:
+            - heading [level=3] [ref=e287]: Business portfolios
+            - button [ref=e288] [cursor=pointer]:
+              - img [ref=e289]
+          - generic [ref=e292]: A business portfolio allows organizations to bring all their Meta business assets together so they can be managed in one place. On the WhatsApp Business Platform, a business portfolio mainly serves as a container for WhatsApp Business Accounts (WABA). You must have a business portfolio to use the platform.
+          - generic [ref=e293]:
+            - text: Business portfolios can be verified, and verification status factors into improved functionality, such as higher throughput and
+            - link [ref=e294] [cursor=pointer]:
+              - /url: /documentation/business-messaging/whatsapp/official-business-accounts
+              - text: Official Business Account
+            - text: status.
+          - link [ref=e296] [cursor=pointer]:
+            - /url: https://www.facebook.com/business/help/486932075688253
+            - text: Learn more about business portfolios.
+            - generic [ref=e297]:
+              - text: ⁠
+              - img [ref=e298]
+          - generic [ref=e303]:
+            - heading [level=3] [ref=e304]: WhatsApp business accounts (WABA)
+            - button [ref=e305] [cursor=pointer]:
+              - img [ref=e306]
+          - generic [ref=e309]: A WhatsApp Business Account represents your business, storing metadata and linking to phone numbers, templates, and analytics.
+          - link [ref=e311] [cursor=pointer]:
+            - /url: /documentation/business-messaging/whatsapp/whatsapp-business-accounts
+            - text: Learn more about WhatsApp Business Accounts.
+          - generic [ref=e314]:
+            - heading [level=3] [ref=e315]: Business phone numbers
+            - button [ref=e316] [cursor=pointer]:
+              - img [ref=e317]
+          - generic [ref=e320]: Business phone numbers, real or virtual, are used for sending and receiving WhatsApp messages. They can have display names and earn Official Business Account status.
+          - link [ref=e322] [cursor=pointer]:
+            - /url: /documentation/business-messaging/whatsapp/business-phone-numbers/phone-numbers
+            - text: Learn more about business phone numbers.
+          - generic [ref=e325]:
+            - heading [level=3] [ref=e326]: Message templates
+            - button [ref=e327] [cursor=pointer]:
+              - img [ref=e328]
+          - generic [ref=e331]: Templates are customizable messages that you can construct in advance of sending them. Template messages generally require approval before you can send them.
+          - generic [ref=e332]:
+            - text: Templates are useful for messaging at scale. They are also the only type of message that can be sent to WhatsApp users outside of a
+            - link [ref=e333] [cursor=pointer]:
+              - /url: /documentation/business-messaging/whatsapp/messages/send-messages#customer-service-windows
+              - text: customer service window
+            - text: .
+          - generic [ref=e334]: Templates have quality scores and are subject to various messaging limits.
+          - link [ref=e336] [cursor=pointer]:
+            - /url: /documentation/business-messaging/whatsapp/templates/overview
+            - text: Learn more about message templates.
+          - generic [ref=e339]:
+            - heading [level=3] [ref=e340]: Test resources
+            - button [ref=e341] [cursor=pointer]:
+              - img [ref=e342]
+          - generic [ref=e345]:
+            - text: When you
+            - link [ref=e346] [cursor=pointer]:
+              - /url: /documentation/business-messaging/whatsapp/get-started
+              - text: get started with Cloud API
+            - text: ", a test WABA and test business phone number are automatically created for you. Test WABAs and test phone numbers are useful for testing purposes, as they have relaxed messaging limits and don’t require a payment method on file in order to send template messages."
+          - generic [ref=e347]: "You can delete your business portfolio and its test resources if:"
+          - list [ref=e348]:
+            - listitem [ref=e350]: You are an admin on the business portfolio associated with the app
+            - listitem [ref=e352]: No other apps are associated with the business portfolio
+            - listitem [ref=e354]: The business portfolio is not associated with any other WABAs
+            - listitem [ref=e356]: The WABA is not associated with any other business phone numbers.
+          - generic [ref=e357]: "To delete your business portfolio and its test resources:"
+          - list [ref=e358]:
+            - listitem [ref=e360]:
+              - text: Go to the
+              - strong [ref=e361]: App Dashboard > WhatsApp > Configuration
+              - text: panel.
+            - listitem [ref=e363]:
+              - text: Locate the
+              - strong [ref=e364]: Test Account
+              - text: section.
+            - listitem [ref=e366]:
+              - text: Click the
+              - strong [ref=e367]: Delete
+              - text: button.
+          - generic [ref=e368]: We recommend using our API Playground when testing endpoints. You can find the playground in the “API Reference” section on the left sidebar of this page. In each reference, there is a “Try it” button which opens the playground.
+          - generic [ref=e369]:
+            - text: Also helpful for testing is our
+            - link [ref=e370] [cursor=pointer]:
+              - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.postman.com%2Fmeta%2Fwhatsapp-business-platform%2F&h=AT7zGqLumcHUrWozZU99J7oMo3St1BLIv0Vmxco7JYJjTjOtliJ5EN8eqfhFpet9OcWp1fialKTOZ-SQs4apVXYfr1VX_yExiJEUYYXXuLAAuwwXl9KBYIouW-Yd5Jsb45FvZa_9IfRZmSiwJP-seA
+              - text: Postman collection
+              - generic [ref=e371]:
+                - text: ⁠
+                - img [ref=e372]
+            - text: .
+          - generic [ref=e377]:
+            - heading [level=2] [ref=e378]: Tools and integrations
+            - button [ref=e379] [cursor=pointer]:
+              - img [ref=e380]
+          - generic [ref=e385]:
+            - heading [level=3] [ref=e386]: WhatsApp Manager
+            - button [ref=e387] [cursor=pointer]:
+              - img [ref=e388]
+          - generic [ref=e391]: WhatsApp Manager is a web app for managing WABAs, phone numbers, templates, and reviewing analytics.
+          - link [ref=e393] [cursor=pointer]:
+            - /url: https://business.facebook.com/wa/manage/home/
+            - text: Access WhatsApp Manager
+            - generic [ref=e394]:
+              - text: ⁠
+              - img [ref=e395]
+          - generic [ref=e400]:
+            - heading [level=3] [ref=e401]: Third-party SDKs
+            - button [ref=e402] [cursor=pointer]:
+              - img [ref=e403]
+          - generic [ref=e406]:
+            - text: Some SDKs, like
+            - link [ref=e407] [cursor=pointer]:
+              - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fpywa.readthedocs.io%2Fen%2F2.0.1%2F&h=AT7zGqLumcHUrWozZU99J7oMo3St1BLIv0Vmxco7JYJjTjOtliJ5EN8eqfhFpet9OcWp1fialKTOZ-SQs4apVXYfr1VX_yExiJEUYYXXuLAAuwwXl9KBYIouW-Yd5Jsb45FvZa_9IfRZmSiwJP-seA
+              - text: PyWa
+              - generic [ref=e408]:
+                - text: ⁠
+                - img [ref=e409]
+            - text: (Python wrapper), are available but are not maintained or endorsed by Meta.
+          - generic [ref=e414]:
+            - heading [level=3] [ref=e415]: Postman collection
+            - button [ref=e416] [cursor=pointer]:
+              - img [ref=e417]
+          - generic [ref=e420]: The official Postman collection lets you execute common API queries.
+          - generic [ref=e421]:
+            - link [ref=e422] [cursor=pointer]:
+              - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.postman.com%2Fmeta%2Fwhatsapp-business-platform%2F&h=AT7zGqLumcHUrWozZU99J7oMo3St1BLIv0Vmxco7JYJjTjOtliJ5EN8eqfhFpet9OcWp1fialKTOZ-SQs4apVXYfr1VX_yExiJEUYYXXuLAAuwwXl9KBYIouW-Yd5Jsb45FvZa_9IfRZmSiwJP-seA
+              - text: Access the WhatsApp Business Platform Postman collection
+              - generic [ref=e423]:
+                - text: ⁠
+                - img [ref=e424]
+            - text: .
+          - generic [ref=e429]:
+            - heading [level=2] [ref=e430]: Security and performance
+            - button [ref=e431] [cursor=pointer]:
+              - img [ref=e432]
+          - generic [ref=e437]:
+            - heading [level=3] [ref=e438]: Throughput
+            - button [ref=e439] [cursor=pointer]:
+              - img [ref=e440]
+          - generic [ref=e443]: Business phone numbers can send up to 80 messages per second by default, with capacity upgrades available.
+          - link [ref=e445] [cursor=pointer]:
+            - /url: /documentation/business-messaging/whatsapp/throughput
+            - text: Learn more about throughput.
+          - generic [ref=e448]:
+            - heading [level=3] [ref=e449]: Encryption
+            - button [ref=e450] [cursor=pointer]:
+              - img [ref=e451]
+          - generic [ref=e454]: With the Cloud API, every WhatsApp message continues to be protected by Signal protocol encryption that secures messages before they leave the device. This means messages with a WABA are securely delivered to the destination chosen by each business.
+          - generic [ref=e455]: The Cloud API uses industry standard encryption techniques to protect data in transit and at rest. The API uses Graph API for sending messages and Webhooks for receiving events, and both operate over industry standard HTTPS, protected by TLS. See our Encryption Overview whitepaper for additional details.
+          - generic [ref=e456]:
+            - text: See the
+            - link [ref=e457] [cursor=pointer]:
+              - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.whatsapp.com%2Fsecurity%2FWhatsApp-Security-Whitepaper.pdf&h=AT7zGqLumcHUrWozZU99J7oMo3St1BLIv0Vmxco7JYJjTjOtliJ5EN8eqfhFpet9OcWp1fialKTOZ-SQs4apVXYfr1VX_yExiJEUYYXXuLAAuwwXl9KBYIouW-Yd5Jsb45FvZa_9IfRZmSiwJP-seA
+              - text: WhatsApp Encryption Overview whitepaper
+              - generic [ref=e458]:
+                - text: ⁠
+                - img [ref=e459]
+            - text: for additional details.
+          - generic [ref=e464]:
+            - heading [level=3] [ref=e465]: Scaling
+            - button [ref=e466] [cursor=pointer]:
+              - img [ref=e467]
+          - generic [ref=e470]: The Cloud API automatically scales usage within your rate limits.
+          - generic [ref=e473]:
+            - heading [level=3] [ref=e474]: Rate limits
+            - button [ref=e475] [cursor=pointer]:
+              - img [ref=e476]
+          - generic [ref=e479]: Requests made by your app on your WhatsApp Business Account (WABA) are counted against your app’s request count. An app’s request count is the number of requests it can make during a rolling one hour.
+          - generic [ref=e480]: For the following endpoints, your app can make 200 requests per hour, per app, per WABA, by default. For active WABAs with at least one registered phone number, your app can make 5000 requests per hour, per app, per active WABA.
+          - table [ref=e482]:
+            - rowgroup [ref=e483]:
+              - row [ref=e484]:
+                - columnheader [ref=e485]: Type of request
+                - columnheader [ref=e486]: Endpoint
+            - rowgroup [ref=e487]:
+              - row [ref=e488]:
+                - cell [ref=e489]:
+                  - code [ref=e492]: GET
+                - cell [ref=e493]:
+                  - code [ref=e496]: /<WHATSAPP_BUSINESS_ACCOUNT_ID>
+              - row [ref=e497]:
+                - cell [ref=e498]:
+                  - generic [ref=e500]:
+                    - code [ref=e501]: GET
+                    - text: ","
+                    - code [ref=e502]: POST
+                    - text: ", and"
+                    - code [ref=e503]: DELETE
+                - cell [ref=e504]:
+                  - code [ref=e507]: /<WHATSAPP_BUSINESS_ACCOUNT_ID>/assigned_users
+              - row [ref=e508]:
+                - cell [ref=e509]:
+                  - code [ref=e512]: GET
+                - cell [ref=e513]:
+                  - code [ref=e516]: /<WHATSAPP_BUSINESS_ACCOUNT_ID>/phone_numbers
+              - row [ref=e517]:
+                - cell [ref=e518]:
+                  - generic [ref=e520]:
+                    - code [ref=e521]: GET
+                    - text: ","
+                    - code [ref=e522]: POST
+                    - text: ", and"
+                    - code [ref=e523]: DELETE
+                - cell [ref=e524]:
+                  - code [ref=e527]: /<WHATSAPP_BUSINESS_ACCOUNT_ID>/message_templates
+              - row [ref=e528]:
+                - cell [ref=e529]:
+                  - generic [ref=e531]:
+                    - code [ref=e532]: GET
+                    - text: ","
+                    - code [ref=e533]: POST
+                    - text: ", and"
+                    - code [ref=e534]: DELETE
+                - cell [ref=e535]:
+                  - code [ref=e538]: /<WHATSAPP_BUSINESS_ACCOUNT_ID>/subscribed_apps
+              - row [ref=e539]:
+                - cell [ref=e540]:
+                  - code [ref=e543]: GET
+                - cell [ref=e544]:
+                  - code [ref=e547]: /<WHATSAPP_BUSINESS_ACCOUNT_TO_NUMBER_CURRENT_STATUS_ID>
+          - generic [ref=e548]:
+            - text: For the following
+            - link [ref=e549] [cursor=pointer]:
+              - /url: /documentation/business-messaging/whatsapp/solution-providers/share-and-revoke-credit-lines
+              - text: Credit Line API
+            - text: requests, your app can make 5000 requests per hour.
+          - table [ref=e551]:
+            - rowgroup [ref=e552]:
+              - row [ref=e553]:
+                - columnheader [ref=e554]: Type of request
+                - columnheader [ref=e555]: Endpoint
+            - rowgroup [ref=e556]:
+              - row [ref=e557]:
+                - cell [ref=e558]:
+                  - code [ref=e561]: GET
+                - cell [ref=e562]:
+                  - code [ref=e565]: /<BUSINESS_ID>/extendedcredits
+              - row [ref=e566]:
+                - cell [ref=e567]:
+                  - code [ref=e570]: POST
+                - cell [ref=e571]:
+                  - code [ref=e574]: /<EXTENDED_CREDIT_ID>/whatsapp_credit_sharing_and_attach
+              - row [ref=e575]:
+                - cell [ref=e576]:
+                  - generic [ref=e578]:
+                    - code [ref=e579]: GET
+                    - text: and
+                    - code [ref=e580]: DELETE
+                - cell [ref=e581]:
+                  - code [ref=e584]: /<ALLOCATION_CONFIG_ID>
+              - row [ref=e585]:
+                - cell [ref=e586]:
+                  - code [ref=e589]: GET
+                - cell [ref=e590]:
+                  - code [ref=e593]: /<EXTENDED_CREDIT_ID>/owning_credit_allocation_configs
+          - generic [ref=e594]:
+            - text: For more information on how to get your current rate usage, see
+            - link [ref=e595] [cursor=pointer]:
+              - /url: /docs/graph-api/overview/rate-limiting#headers
+              - text: Headers
+            - text: .
+          - generic [ref=e596]: "In addition, the platform applies several message rate limits:"
+          - list [ref=e597]:
+            - listitem [ref=e599]: Test message rate limit (for unverified WABAs)
+            - listitem [ref=e601]: Quality rating and messaging limits (for verified WABAs)
+            - listitem [ref=e603]: Capacity rate limit (for all accounts)
+            - listitem [ref=e605]: Business phone rate limit (per phone number)
+          - generic [ref=e608]:
+            - heading [level=4] [ref=e609]: Pair rate limits
+            - button [ref=e610] [cursor=pointer]:
+              - img [ref=e611]
+          - generic [ref=e614]:
+            - text: Business phone numbers can send 1 message every 6 seconds to the same WhatsApp user (0.17 messages/second), which equals about 10 messages per minute or 600 per hour. Exceeding this limit triggers
+            - link [ref=e615] [cursor=pointer]:
+              - /url: /documentation/business-messaging/whatsapp/support/error-codes#throttling-errors
+              - text: error code 131056
+            - text: until you are back within the allowed rate.
+          - generic [ref=e616]: You may send up to 45 messages in a 6-second burst, but this “borrows” from your future quota. After a burst, you must wait the equivalent time it would take to send those messages at the normal rate (e.g., a burst of 20 requires a ~2-minute wait before sending more to that user).
+          - generic [ref=e617]: To manage post-burst throttling, if a send request fails, retry after 4^X seconds (starting with X=0 and increasing X by 1 after each failure) until successful.
+          - generic [ref=e620]:
+            - heading [level=2] [ref=e621]: Terms and policies
+            - button [ref=e622] [cursor=pointer]:
+              - img [ref=e623]
+          - generic [ref=e628]:
+            - heading [level=3] [ref=e629]: User opt-in
+            - button [ref=e630] [cursor=pointer]:
+              - img [ref=e631]
+          - generic [ref=e634]:
+            - text: You must obtain user
+            - link [ref=e635] [cursor=pointer]:
+              - /url: /documentation/business-messaging/whatsapp/getting-opt-in
+              - text: opt-in
+            - text: before sending message templates. Opt-in must clarify your business name and intent.
+          - link [ref=e637] [cursor=pointer]:
+            - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.whatsapp.com%2Flegal%2Fbusiness-policy%2F&h=AT7zGqLumcHUrWozZU99J7oMo3St1BLIv0Vmxco7JYJjTjOtliJ5EN8eqfhFpet9OcWp1fialKTOZ-SQs4apVXYfr1VX_yExiJEUYYXXuLAAuwwXl9KBYIouW-Yd5Jsb45FvZa_9IfRZmSiwJP-seA
+            - text: Learn more about the WhatsApp Business Messaging Policy.
+            - generic [ref=e638]:
+              - text: ⁠
+              - img [ref=e639]
+          - generic [ref=e644]:
+            - heading [level=3] [ref=e645]: Terms and policies
+            - button [ref=e646] [cursor=pointer]:
+              - img [ref=e647]
+          - generic [ref=e650]: All platform use must comply with WhatsApp’s terms and policies. Using unauthorized third-party tools is prohibited.
+          - list [ref=e651]:
+            - listitem [ref=e653]:
+              - link [ref=e654] [cursor=pointer]:
+                - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.whatsapp.com%2Flegal%2Fbusiness-terms%2F&h=AT7zGqLumcHUrWozZU99J7oMo3St1BLIv0Vmxco7JYJjTjOtliJ5EN8eqfhFpet9OcWp1fialKTOZ-SQs4apVXYfr1VX_yExiJEUYYXXuLAAuwwXl9KBYIouW-Yd5Jsb45FvZa_9IfRZmSiwJP-seA
+                - text: Learn more about terms and policies.
+                - generic [ref=e655]:
+                  - text: ⁠
+                  - img [ref=e656]
+          - generic [ref=e661]:
+            - heading [level=2] [ref=e662]: Next steps
+            - button [ref=e663] [cursor=pointer]:
+              - img [ref=e664]
+          - link [ref=e668] [cursor=pointer]:
+            - /url: /documentation/business-messaging/whatsapp/get-started
+            - text: Get started with the WhatsApp Business Platform.
+          - strong [ref=e670]: Learn more
+          - list [ref=e671]:
+            - listitem [ref=e673]:
+              - link [ref=e674] [cursor=pointer]:
+                - /url: /documentation/business-messaging/whatsapp/display-names
+                - text: Display names
+            - listitem [ref=e676]:
+              - link [ref=e677] [cursor=pointer]:
+                - /url: /documentation/business-messaging/whatsapp/business-phone-numbers/phone-numbers
+                - text: Phone numbers
+            - listitem [ref=e679]:
+              - link [ref=e680] [cursor=pointer]:
+                - /url: /documentation/business-messaging/whatsapp/pricing
+                - text: Pricing
+            - listitem [ref=e682]:
+              - link [ref=e683] [cursor=pointer]:
+                - /url: /documentation/business-messaging/whatsapp/webhooks/overview
+                - text: Webhooks
+        - generic [ref=e686]:
+          - generic [ref=e687]: Did you find this page helpful?
+          - generic [ref=e688]:
+            - button [ref=e689] [cursor=pointer]:
+              - img [ref=e690]
+            - button [ref=e691] [cursor=pointer]:
+              - img [ref=e692]
+    - generic [ref=e693]:
+      - separator [ref=e694]
+      - contentinfo [ref=e695]:
+        - generic [ref=e696]:
+          - separator [ref=e697]
+          - generic [ref=e699]:
+            - generic [ref=e701]:
+              - generic [ref=e703]:
+                - img [ref=e705]
+                - list [ref=e707]
+              - generic [ref=e709]:
+                - generic [ref=e712]:
+                  - heading [level=2] [ref=e713]:
+                    - generic [ref=e714]: Build with Meta
+                  - list [ref=e715]:
+                    - listitem [ref=e716]:
+                      - link [ref=e718] [cursor=pointer]:
+                        - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.llama.com%2F&h=AT7zGqLumcHUrWozZU99J7oMo3St1BLIv0Vmxco7JYJjTjOtliJ5EN8eqfhFpet9OcWp1fialKTOZ-SQs4apVXYfr1VX_yExiJEUYYXXuLAAuwwXl9KBYIouW-Yd5Jsb45FvZa_9IfRZmSiwJP-seA
+                        - text: AI
+                    - listitem [ref=e719]:
+                      - link [ref=e721] [cursor=pointer]:
+                        - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fdevelopers.meta.com%2Fhorizon%2F&h=AT7zGqLumcHUrWozZU99J7oMo3St1BLIv0Vmxco7JYJjTjOtliJ5EN8eqfhFpet9OcWp1fialKTOZ-SQs4apVXYfr1VX_yExiJEUYYXXuLAAuwwXl9KBYIouW-Yd5Jsb45FvZa_9IfRZmSiwJP-seA
+                        - text: Meta Horizon
+                    - listitem [ref=e722]:
+                      - link [ref=e724] [cursor=pointer]:
+                        - /url: /social-technologies/
+                        - text: Social technologies
+                    - listitem [ref=e725]:
+                      - link [ref=e727] [cursor=pointer]:
+                        - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fdevelopers.meta.com%2Fwearables%2F&h=AT7zGqLumcHUrWozZU99J7oMo3St1BLIv0Vmxco7JYJjTjOtliJ5EN8eqfhFpet9OcWp1fialKTOZ-SQs4apVXYfr1VX_yExiJEUYYXXuLAAuwwXl9KBYIouW-Yd5Jsb45FvZa_9IfRZmSiwJP-seA
+                        - text: Wearables
+                - generic [ref=e730]:
+                  - heading [level=2] [ref=e731]:
+                    - generic [ref=e732]: News
+                  - list [ref=e733]:
+                    - listitem [ref=e734]:
+                      - link [ref=e736] [cursor=pointer]:
+                        - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fdevelopers.meta.com%2Fblog%2F&h=AT7zGqLumcHUrWozZU99J7oMo3St1BLIv0Vmxco7JYJjTjOtliJ5EN8eqfhFpet9OcWp1fialKTOZ-SQs4apVXYfr1VX_yExiJEUYYXXuLAAuwwXl9KBYIouW-Yd5Jsb45FvZa_9IfRZmSiwJP-seA
+                        - text: Meta for Developers
+                    - listitem [ref=e737]:
+                      - link [ref=e739] [cursor=pointer]:
+                        - /url: /blog/
+                        - text: Blog
+                    - listitem [ref=e740]:
+                      - link [ref=e742] [cursor=pointer]:
+                        - /url: /success-stories/
+                        - text: Success stories
+                - generic [ref=e745]:
+                  - heading [level=2] [ref=e746]:
+                    - generic [ref=e747]: Support
+                  - list [ref=e748]:
+                    - listitem [ref=e749]:
+                      - link [ref=e751] [cursor=pointer]:
+                        - /url: /support/
+                        - text: Developer Support
+                    - listitem [ref=e752]:
+                      - link [ref=e754] [cursor=pointer]:
+                        - /url: /support/bugs/
+                        - text: Bug tool
+                    - listitem [ref=e755]:
+                      - link [ref=e757] [cursor=pointer]:
+                        - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fmetastatus.com%2F&h=AT7zGqLumcHUrWozZU99J7oMo3St1BLIv0Vmxco7JYJjTjOtliJ5EN8eqfhFpet9OcWp1fialKTOZ-SQs4apVXYfr1VX_yExiJEUYYXXuLAAuwwXl9KBYIouW-Yd5Jsb45FvZa_9IfRZmSiwJP-seA
+                        - text: Platform status
+                    - listitem [ref=e758]:
+                      - link [ref=e760] [cursor=pointer]:
+                        - /url: https://www.facebook.com/groups/fbdevelopers/
+                        - text: Developer community forum
+                    - listitem [ref=e761]:
+                      - link [ref=e763] [cursor=pointer]:
+                        - /url: /incident/report/
+                        - text: Report an incident
+                - generic [ref=e766]:
+                  - heading [level=2] [ref=e767]:
+                    - generic [ref=e768]: About us
+                  - list [ref=e769]:
+                    - listitem [ref=e770]:
+                      - link [ref=e772] [cursor=pointer]:
+                        - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fabout.fb.com%2F&h=AT7zGqLumcHUrWozZU99J7oMo3St1BLIv0Vmxco7JYJjTjOtliJ5EN8eqfhFpet9OcWp1fialKTOZ-SQs4apVXYfr1VX_yExiJEUYYXXuLAAuwwXl9KBYIouW-Yd5Jsb45FvZa_9IfRZmSiwJP-seA
+                        - text: About
+                    - listitem [ref=e773]:
+                      - link [ref=e775] [cursor=pointer]:
+                        - /url: https://www.facebook.com/careers
+                        - text: Careers
+                - generic [ref=e778]:
+                  - heading [level=2] [ref=e779]:
+                    - generic [ref=e780]: Terms and policies
+                  - list [ref=e781]:
+                    - listitem [ref=e782]:
+                      - link [ref=e784] [cursor=pointer]:
+                        - /url: /products/responsible-platform-initiatives/
+                        - text: Responsible platform initiatives
+                    - listitem [ref=e785]:
+                      - link [ref=e787] [cursor=pointer]:
+                        - /url: /terms/dfc_platform_terms/
+                        - text: Platform terms
+                    - listitem [ref=e788]:
+                      - link [ref=e790] [cursor=pointer]:
+                        - /url: /devpolicy/
+                        - text: Developer policies
+                    - listitem [ref=e791]:
+                      - link [ref=e793] [cursor=pointer]:
+                        - /url: https://www.facebook.com/about/privacy
+                        - text: Privacy policy
+                    - listitem [ref=e794]:
+                      - link [ref=e796] [cursor=pointer]:
+                        - /url: https://www.facebook.com/help/cookies
+                        - text: Cookies
+            - button [ref=e801] [cursor=pointer]:
+              - generic [ref=e803]: English (US)
+  - dialog [ref=e811]:
+    - generic [ref=e812]:
+      - generic [ref=e815]:
+        - button "Languages" [active] [ref=e819] [cursor=pointer]:
+          - img [ref=e820]
+        - generic [ref=e823]: Allow the use of cookies from Facebook on this browser?
+        - generic [ref=e824]:
+          - generic [ref=e825]:
+            - text: We use cookies and similar technologies to help provide and improve content on
+            - link "Meta Products" [ref=e826] [cursor=pointer]:
+              - /url: https://www.facebook.com/help/1561485474074139
+            - text: . We also use them to provide a safer experience by using information we receive from cookies on and off Facebook, and to provide and improve Meta Products for people who have an account.
+          - generic [ref=e831]: "Essential cookies: These cookies are required to use Meta Products and are necessary for our sites to work as intended."
+          - generic [ref=e836]: "Cookies from other companies: We use these cookies to show you ads off of Meta Products and to provide features like maps and videos on Meta Products. These cookies are optional."
+          - generic [ref=e838]:
+            - text: You have control over the optional cookies we use. Learn more about cookies and how we use them, and review or change your choices at any time in our
+            - link "Cookies Policy" [ref=e839] [cursor=pointer]:
+              - /url: https://www.facebook.com/policies/cookies/
+            - text: .
+        - generic [ref=e840]:
+          - generic [ref=e842]: About cookies
+          - generic [ref=e843]:
+            - generic [ref=e844]:
+              - generic [ref=e847]:
+                - generic [ref=e851]: What are cookies?
+                - button "Learn more about What are cookies?" [ref=e853] [cursor=pointer]:
+                  - generic [ref=e856]: Learn more
+              - generic [ref=e860]:
+                - generic [ref=e864]: Why do we use cookies?
+                - button "Learn more about Why do we use cookies?" [ref=e866] [cursor=pointer]:
+                  - generic [ref=e869]: Learn more
+            - generic [ref=e871]:
+              - generic [ref=e874]:
+                - generic [ref=e878]: What are Meta Products?
+                - button "Learn more about What are Meta Products?" [ref=e880] [cursor=pointer]:
+                  - generic [ref=e883]: Learn more
+              - generic [ref=e887]:
+                - generic [ref=e891]: Your cookie choices
+                - button "Learn more about Your cookie choices" [ref=e893] [cursor=pointer]:
+                  - generic [ref=e896]: Learn more
+        - generic [ref=e898]:
+          - generic [ref=e900]: Cookies from other companies
+          - generic [ref=e902]:
+            - generic [ref=e905]:
+              - generic [ref=e912]:
+                - text: We use cookies from
+                - link "other companies" [ref=e913] [cursor=pointer]:
+                  - /url: https://www.facebook.com/privacy/policies/cookies/?annotations[0]=explanation%2F3_companies_list
+                - text: in order to show you ads off of our Products, and provide features like maps, payment services and video.
+              - switch "Toggle" [ref=e919] [cursor=pointer]
+            - button "Choose cookies by category" [ref=e924] [cursor=pointer]:
+              - generic [ref=e926]:
+                - generic [ref=e932]: Choose cookies by category
+                - img [ref=e935]
+          - button "How we use these cookies" [ref=e941] [cursor=pointer]:
+            - generic [ref=e943]:
+              - generic [ref=e949]: How we use these cookies
+              - img [ref=e952]
+          - button "If you allow these cookies" [ref=e958] [cursor=pointer]:
+            - generic [ref=e960]:
+              - generic [ref=e966]: If you allow these cookies
+              - img [ref=e969]
+          - button "If you don't allow these cookies" [ref=e975] [cursor=pointer]:
+            - generic [ref=e977]:
+              - generic [ref=e983]: If you don't allow these cookies
+              - img [ref=e986]
+        - generic [ref=e989]: Other ways you can control your information
+        - button "Manage your ad experience in Accounts Center" [ref=e994] [cursor=pointer]:
+          - generic [ref=e996]:
+            - generic [ref=e1002]: Manage your ad experience in Accounts Center
+            - img [ref=e1005]
+        - button "More information about online advertising" [ref=e1011] [cursor=pointer]:
+          - generic [ref=e1013]:
+            - generic [ref=e1019]: More information about online advertising
+            - img [ref=e1022]
+        - button "Controlling cookies with browser settings" [ref=e1028] [cursor=pointer]:
+          - generic [ref=e1030]:
+            - generic [ref=e1036]: Controlling cookies with browser settings
+            - img [ref=e1039]
+      - generic [ref=e1042]:
+        - button "Decline optional cookies" [ref=e1044] [cursor=pointer]:
+          - generic [ref=e1047]: Decline optional cookies
+        - button "Allow all cookies" [ref=e1049] [cursor=pointer]:
+          - generic [ref=e1052]: Allow all cookies

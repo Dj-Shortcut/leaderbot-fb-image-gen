@@ -55,4 +55,31 @@ describe("identityGameSessionState", () => {
     expect(getIdentityGameSessionBySessionId("session-1")).toBeNull();
     expect(getIdentityGameSessionByUserId("user-1")).toBeNull();
   });
+
+  it("returns null for an expired session when loaded by userId", () => {
+    resetStateStore();
+
+    const now = Date.now();
+    upsertIdentityGameSession({
+      sessionId: "expired-session-1",
+      userId: "expired-user-1",
+      gameId: "party-alter-ego",
+      gameVersion: "v1",
+      entryIntent: {
+        sourceChannel: "messenger",
+        sourceType: "referral",
+        targetExperienceType: "identity_game",
+        targetExperienceId: "party-alter-ego",
+        receivedAt: now - 10_000,
+      },
+      status: "started",
+      answers: [],
+      derivedTraits: {},
+      startedAt: now - 10_000,
+      updatedAt: now - 10_000,
+      expiresAt: now - 1_000,
+    });
+
+    expect(getIdentityGameSessionByUserId("expired-user-1")).toBeNull();
+  });
 });

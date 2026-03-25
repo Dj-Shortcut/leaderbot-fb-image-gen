@@ -1,0 +1,288 @@
+- generic:
+  - generic [ref=e1]:
+    - generic [ref=e3]:
+      - link "Meta Business Suite" [ref=e6] [cursor=pointer]:
+        - /url: /?nav_ref=bm_home_redirect_disabled_business_account
+        - text: Meta Business Suite
+      - tablist [ref=e10]:
+        - tab "Aanmelden" [ref=e11] [cursor=pointer]:
+          - button "Aanmelden" [ref=e14]
+        - tab "Account maken" [ref=e15] [cursor=pointer]:
+          - button "Account maken" [ref=e18]
+    - generic [ref=e19]:
+      - main [ref=e20]:
+        - generic [ref=e23]:
+          - generic [ref=e24]:
+            - generic [ref=e26]: Notice
+            - generic [ref=e27]: Je moet je aanmelden om verder te gaan.
+          - generic [ref=e28]:
+            - generic [ref=e29]: Aanmelden bij Facebook
+            - generic [ref=e32]:
+              - generic [ref=e33]:
+                - textbox "E-mailadres of telefoonnummer" [active] [ref=e35]
+                - generic [ref=e38]:
+                  - generic [ref=e39]: Wachtwoord
+                  - textbox "Wachtwoord" [ref=e40]:
+                    - /placeholder: ""
+              - button "Aanmelden" [ref=e42] [cursor=pointer]
+              - link "Account vergeten?" [ref=e44] [cursor=pointer]:
+                - /url: https://www.facebook.com/recover/initiate?lwv=110&ars=royal_blue_bar
+            - button "Nieuw account maken" [ref=e45] [cursor=pointer]
+      - generic [ref=e47]:
+        - list [ref=e48]:
+          - listitem [ref=e49]: Nederlands
+          - listitem [ref=e50]:
+            - link "Français (France)" [ref=e51] [cursor=pointer]:
+              - /url: https://business.facebook.com/wa/manage/home/
+          - listitem [ref=e52]:
+            - link "English (US)" [ref=e53] [cursor=pointer]:
+              - /url: https://business.facebook.com/wa/manage/home/
+          - listitem [ref=e54]:
+            - link "Türkçe" [ref=e55] [cursor=pointer]:
+              - /url: https://business.facebook.com/wa/manage/home/
+          - listitem [ref=e56]:
+            - link "Deutsch" [ref=e57] [cursor=pointer]:
+              - /url: https://business.facebook.com/wa/manage/home/
+          - listitem [ref=e58]:
+            - link "Polski" [ref=e59] [cursor=pointer]:
+              - /url: https://business.facebook.com/wa/manage/home/
+          - listitem [ref=e60]:
+            - link "Română" [ref=e61] [cursor=pointer]:
+              - /url: https://business.facebook.com/wa/manage/home/
+          - listitem [ref=e62]:
+            - link "Italiano" [ref=e63] [cursor=pointer]:
+              - /url: https://business.facebook.com/wa/manage/home/
+          - listitem [ref=e64]:
+            - link "Español" [ref=e65] [cursor=pointer]:
+              - /url: https://business.facebook.com/wa/manage/home/
+          - listitem [ref=e66]:
+            - link "Português (Brasil)" [ref=e67] [cursor=pointer]:
+              - /url: https://business.facebook.com/wa/manage/home/
+          - listitem [ref=e68]:
+            - link "العربية" [ref=e69] [cursor=pointer]:
+              - /url: https://business.facebook.com/wa/manage/home/
+          - listitem [ref=e70]:
+            - button "Meer talen weergeven" [ref=e71] [cursor=pointer]
+        - contentinfo "Facebook-websitelinks" [ref=e74]:
+          - list [ref=e75]:
+            - listitem [ref=e76]:
+              - link "Registreren" [ref=e77] [cursor=pointer]:
+                - /url: /reg/
+            - listitem [ref=e78]:
+              - link "Aanmelden" [ref=e79] [cursor=pointer]:
+                - /url: /login/
+            - listitem [ref=e80]:
+              - link "Messenger" [ref=e81] [cursor=pointer]:
+                - /url: https://messenger.com/
+            - listitem [ref=e82]:
+              - link "Facebook Lite" [ref=e83] [cursor=pointer]:
+                - /url: /lite/
+            - listitem [ref=e84]:
+              - link "Video" [ref=e85] [cursor=pointer]:
+                - /url: https://business.facebook.com/watch/
+            - listitem [ref=e86]:
+              - link "Meta Pay" [ref=e87] [cursor=pointer]:
+                - /url: https://about.meta.com/technologies/meta-pay
+            - listitem [ref=e88]:
+              - link "Meta Store" [ref=e89] [cursor=pointer]:
+                - /url: https://www.meta.com/
+            - listitem [ref=e90]:
+              - link "Meta Quest" [ref=e91] [cursor=pointer]:
+                - /url: https://www.meta.com/quest/
+            - listitem [ref=e92]:
+              - link "Ray-Ban Meta" [ref=e93] [cursor=pointer]:
+                - /url: https://www.meta.com/smart-glasses/
+            - listitem [ref=e94]:
+              - link "Meta AI" [ref=e95] [cursor=pointer]:
+                - /url: https://www.meta.ai/
+            - listitem [ref=e96]:
+              - link "Instagram" [ref=e97] [cursor=pointer]:
+                - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.instagram.com%2F&h=AT7mK386Fb_7FgKvTSyEHTw1JB4_STeKRPycix7GuqxTDw8YUZgutbRI91gyrdZszM_lvhIclz_9FQzVLI73kVa4R4ZFjgLsLik8SlLYx_eJBZ4xUdsvRTwEwWq6DF9NSZhce-6NdTrlhx-0XTiJAA
+            - listitem [ref=e98]:
+              - link "Threads" [ref=e99] [cursor=pointer]:
+                - /url: https://www.threads.com/
+            - listitem [ref=e100]:
+              - link "Privacybeleid" [ref=e101] [cursor=pointer]:
+                - /url: /privacy/policy/?entry_point=facebook_page_footer
+            - listitem [ref=e102]:
+              - link "Privacycentrum" [ref=e103] [cursor=pointer]:
+                - /url: /privacy/center/?entry_point=facebook_page_footer
+            - listitem [ref=e104]:
+              - link "Info" [ref=e105] [cursor=pointer]:
+                - /url: https://about.meta.com/
+            - listitem [ref=e106]:
+              - link "Advertentie maken" [ref=e107] [cursor=pointer]:
+                - /url: /ad_campaign/landing.php?placement=pflo&campaign_id=402047449186&nav_source=unknown&extra_1=auto
+            - listitem [ref=e108]:
+              - link "Pagina maken" [ref=e109] [cursor=pointer]:
+                - /url: /pages/create/?ref_type=site_footer
+            - listitem [ref=e110]:
+              - link "Ontwikkelaars" [ref=e111] [cursor=pointer]:
+                - /url: https://developers.facebook.com/?ref=pf
+            - listitem [ref=e112]:
+              - link "Vacatures" [ref=e113] [cursor=pointer]:
+                - /url: /careers/?ref=pf
+            - listitem [ref=e114]:
+              - link "Cookies" [ref=e115] [cursor=pointer]:
+                - /url: /policies/cookies/
+            - listitem [ref=e116]:
+              - link "Jouw advertentievoorkeuren" [ref=e117] [cursor=pointer]:
+                - /url: https://www.facebook.com/help/568137493302217
+                - text: Jouw advertentievoorkeuren
+            - listitem [ref=e119]:
+              - link "Gebruiksvoorwaarden" [ref=e120] [cursor=pointer]:
+                - /url: /policies?ref=pf
+            - listitem [ref=e121]:
+              - link "Help" [ref=e122] [cursor=pointer]:
+                - /url: /help/?ref=pf
+            - listitem [ref=e123]:
+              - link "Contacten uploaden en niet-gebruikers" [ref=e124] [cursor=pointer]:
+                - /url: https://www.facebook.com/help/637205020878504
+            - listitem:
+              - link "Instellingen" [ref=e125] [cursor=pointer]:
+                - /url: /settings
+            - listitem:
+              - link "Activiteitlogboek" [ref=e126] [cursor=pointer]:
+                - /url: https://business.facebook.com/allactivity?privacy_source=activity_log_top_menu
+        - generic [ref=e128]: Meta © 2026
+  - dialog [ref=e131]:
+    - generic [ref=e135]:
+      - generic [ref=e136]:
+        - button [ref=e139] [cursor=pointer]
+        - generic [ref=e143]: Het gebruik van cookies van Facebook toestaan in deze browser?
+      - generic [ref=e144]:
+        - generic [ref=e145]:
+          - paragraph [ref=e146]:
+            - text: We gebruiken cookies en vergelijkbare technologieën om inhoud in
+            - link "Meta-producten" [ref=e147] [cursor=pointer]:
+              - /url: https://www.facebook.com/help/1561485474074139
+            - text: aan te bieden en te verbeteren. We gebruiken ze ook om een veiligere ervaring te bieden door informatie te gebruiken die we ontvangen van cookies op en buiten Facebook, en om Meta-producten aan te bieden en te verbeteren voor mensen die een account hebben.
+          - list [ref=e148]:
+            - listitem [ref=e149]:
+              - generic [ref=e150]: "Essentiële cookies: deze cookies zijn vereist om Meta-producten te kunnen gebruiken en zijn noodzakelijk om onze sites naar behoren te laten werken."
+            - listitem [ref=e151]:
+              - generic [ref=e152]: "Cookies van andere bedrijven: we gebruiken deze cookies om advertenties aan je weer te geven buiten Meta-producten en om functies als kaarten en video's aan te bieden in Meta-producten. Deze cookies zijn optioneel."
+          - paragraph [ref=e153]:
+            - text: Jij bepaalt welke optionele cookies we kunnen gebruiken. In ons
+            - link "Cookiebeleid" [ref=e154] [cursor=pointer]:
+              - /url: https://www.facebook.com/privacy/policies/cookies
+            - text: vind je meer informatie over cookies en hoe we ze gebruiken, en je kunt je keuzes op ieder moment controleren of wijzigen.
+          - separator [ref=e155]
+        - generic [ref=e156]:
+          - heading "Informatie over cookies" [level=2] [ref=e157]
+          - generic [ref=e158]:
+            - generic "Wat zijn cookies?" [ref=e159]:
+              - img "background image" [ref=e160]
+              - generic [ref=e161]:
+                - generic [ref=e162]: Wat zijn cookies?
+                - button "Meer informatie" [ref=e163] [cursor=pointer]
+            - generic "Waarom gebruiken we cookies?" [ref=e164]:
+              - img "background image" [ref=e165]
+              - generic [ref=e166]:
+                - generic [ref=e167]: Waarom gebruiken we cookies?
+                - button "Meer informatie" [ref=e168] [cursor=pointer]
+            - generic "Wat zijn Meta-producten?" [ref=e169]:
+              - img "background image" [ref=e170]
+              - generic [ref=e171]:
+                - generic [ref=e172]: Wat zijn Meta-producten?
+                - button "Meer informatie" [ref=e173] [cursor=pointer]
+            - generic "Je cookievoorkeuren" [ref=e174]:
+              - img "background image" [ref=e175]
+              - generic [ref=e176]:
+                - generic [ref=e177]: Je cookievoorkeuren
+                - button "Meer informatie" [ref=e178] [cursor=pointer]
+          - separator [ref=e179]
+        - generic [ref=e180]:
+          - heading "Cookies van andere bedrijven" [level=2] [ref=e181]
+          - paragraph [ref=e182]:
+            - text: We gebruiken cookies van
+            - link "andere bedrijven" [ref=e183] [cursor=pointer]:
+              - /url: https://www.facebook.com/privacy/policies/cookies/?annotations[0]=explanation%2F3_companies_list
+            - text: om advertenties aan je weer te geven buiten onze producten, en om functies als kaarten, betalingsservices en video's aan te bieden.
+          - generic [ref=e184]:
+            - generic [ref=e185]:
+              - button "Hoe we deze cookies gebruiken" [ref=e186] [cursor=pointer]:
+                - generic [ref=e189]: Hoe we deze cookies gebruiken
+              - generic [ref=e192]:
+                - generic [ref=e193]: "We gebruiken cookies van andere bedrijven in onze producten:"
+                - list [ref=e195]:
+                  - listitem [ref=e196]:
+                    - generic [ref=e197]: Advertenties aan je weergeven over onze producten en functies in apps en op websites van andere bedrijven.
+                  - listitem [ref=e198]:
+                    - generic [ref=e199]: Functies in onze producten aanbieden, zoals kaarten, betalingsservices en video's.
+                  - listitem [ref=e200]:
+                    - generic [ref=e201]: Analyses uitvoeren.
+            - generic [ref=e202]:
+              - button "Als je deze cookies toestaat, gebeurt het volgende" [ref=e203] [cursor=pointer]:
+                - generic [ref=e206]: Als je deze cookies toestaat, gebeurt het volgende
+              - list [ref=e211]:
+                - listitem [ref=e212]:
+                  - generic [ref=e213]: Functies die je gebruikt in Meta-producten worden niet beïnvloed.
+                - listitem [ref=e214]:
+                  - generic [ref=e215]: We kunnen advertenties buiten Meta-producten beter voor je personaliseren en de prestaties hiervan meten.
+                - listitem [ref=e216]:
+                  - generic [ref=e217]: Andere bedrijven ontvangen informatie over je door hun cookies te gebruiken.
+            - generic [ref=e218]:
+              - button "Als je deze cookies niet toestaat, gebeurt het volgende" [ref=e219] [cursor=pointer]:
+                - generic [ref=e222]: Als je deze cookies niet toestaat, gebeurt het volgende
+              - list [ref=e227]:
+                - listitem [ref=e228]:
+                  - generic [ref=e229]: Sommige functies in onze producten werken mogelijk niet.
+                - listitem [ref=e230]:
+                  - generic [ref=e231]: We gebruiken geen cookies van andere bedrijven om advertenties voor je te personaliseren buiten Meta-producten of om de prestaties hiervan te meten.
+        - generic [ref=e232]:
+          - heading "Andere manieren waarop je je gegevens kunt beheren" [level=2] [ref=e234]
+          - generic [ref=e235]:
+            - button "Je advertentie-ervaring beheren in het Accountcentrum" [ref=e236] [cursor=pointer]:
+              - generic [ref=e239]: Je advertentie-ervaring beheren in het Accountcentrum
+            - generic [ref=e244]:
+              - paragraph [ref=e245]: Je kunt de volgende instellingen gebruiken om je advertentie-ervaring te beheren.
+              - paragraph [ref=e246]: Advertentievoorkeuren
+              - paragraph [ref=e247]: Je kunt in je advertentievoorkeuren kiezen of we advertenties aan je weergeven en bepalen welke gegevens we hiervoor mogen gebruiken.
+              - paragraph [ref=e248]: Advertentie-instellingen
+              - paragraph [ref=e249]:
+                - text: Als we advertenties aan je weergeven, gebruiken we gegevens die adverteerders en andere partners aan ons verstrekken over je activiteit buiten producten van Meta-bedrijven, waaronder websites en apps, om betere advertenties aan je weer te geven. Je kunt in je
+                - link "advertentie-instellingen" [ref=e250] [cursor=pointer]:
+                  - /url: https://www.facebook.com/settings/ads/
+                - text: bepalen of we deze gegevens mogen gebruiken om advertenties aan je weer te geven.
+          - generic [ref=e251]:
+            - button "Meer informatie over online advertenties" [ref=e252] [cursor=pointer]:
+              - generic [ref=e255]: Meer informatie over online advertenties
+            - paragraph [ref=e261]:
+              - text: Je kunt je afmelden voor het zien van online op interesse gebaseerde advertenties van Meta en andere deelnemende bedrijven via de
+              - link "Digital Advertising Alliance" [ref=e262] [cursor=pointer]:
+                - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Foptout.aboutads.info%2F&h=AT5HDxmnD1XcQ1ilperX9ryX4j-twOlI7rBoyOJ6osr1Vn4vB_mpc0jACtSFwTbDqUp0YB7RldJdWa9gs_tvyMtZw74JXBpnNTkLM-DXWdFa-sG7FC5YTmWVInRxHafVlk9dy1V7gB4O7KpuHTWFSA
+              - text: in de VS, de
+              - link "Digital Advertising Alliance of Canada" [ref=e263] [cursor=pointer]:
+                - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fyouradchoices.ca%2F&h=AT7XMUsYC15MAoWMPYcueZr74JCm817mLnYr4u6yKH-gEBItaGABNJEFkfVEB7shhA1fqjfZZbAJHrSzhskywz5_Lc9aiqgHlpExD2QswdI5iX5pzUaYgxXm84RVLvNpx0wHu27NOBt2trUS51Srhw
+              - text: in Canada of de
+              - link "European Interactive Digital Advertising Alliance" [ref=e264] [cursor=pointer]:
+                - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.youronlinechoices.com%2F&h=AT6wv5D4fLZnPshoRkCpPn3c6HKujQL5Y-pFChBlEeXkdKYTxJeGoDGo2U4-o-u8F02q5gLQJXP7QpbMGCA4_8O409U-w-Y53MvJ6wj7cKtYtXavIWQmusya71AgYe22djocW_ewVtIE1iPygNDWgw
+              - text: in Europa, of via de instellingen van je mobiele apparaat als je Android, iOS 13 of een eerdere versie van iOS gebruikt. Houd er rekening mee dat adblockers en tools die ons cookiegebruik beperken, deze instellingen kunnen verstoren.
+          - generic [ref=e265]:
+            - button "Cookies beheren via browserinstellingen" [ref=e266] [cursor=pointer]:
+              - generic [ref=e269]: Cookies beheren via browserinstellingen
+            - generic [ref=e274]:
+              - paragraph [ref=e275]: Je browser of apparaat kan instellingen bieden waarmee je kunt kiezen of je browsercookies wilt instellen of verwijderen. Deze instellingen variëren per browser en producenten kunnen zowel de instellingen die ze beschikbaar maken als de werking van deze instellingen op elk moment wijzigen. Vanaf 5 oktober 2020 kun je aanvullende informatie vinden over de beheeropties die worden aangeboden door populaire browsers via de links hieronder. Bepaalde onderdelen van Meta-producten werken mogelijk niet naar behoren als je browsercookies hebt uitgeschakeld. Houd er rekening mee dat deze beheeropties verschillen van de instellingen die Facebook aanbiedt.
+              - list [ref=e276]:
+                - listitem [ref=e277]:
+                  - link "Google Chrome" [ref=e278] [cursor=pointer]:
+                    - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fsupport.google.com%2Fchrome%2Fanswer%2F95647&h=AT6kKM7KY7yJzMfqCZ1b_GOLQ-CQPHyptftYc5W1jvU7Lq6Ufey7nBIvBZUqGE2WpImJTIjzJwwuTF6cQlDro8WjviCHFC-HSpDR3PD2BI-nX3he9kyz25ryBsCyz-j0uwkx8XUQPrIZ4wX8NfwM3w
+                - listitem [ref=e279]:
+                  - link "Internet Explorer" [ref=e280] [cursor=pointer]:
+                    - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fsupport.microsoft.com%2Fen-ie%2Fhelp%2F17442%2Fwindows-internet-explorer-delete-manage-cookies&h=AT6J_SLR0sZhPUl7VLO4Vk-VICJe65pQlxktfup5VjHGxjMEFYnvlUHKiajOMAq8ttVlYvPoXKiGKLRCNKD0CucsuZzg9YM-4C_m02CaaF6MP9wto7gMYmK0cYy74YlDx0MvQdjeMro_RzG5OA_ixg
+                - listitem [ref=e281]:
+                  - link "Firefox" [ref=e282] [cursor=pointer]:
+                    - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fsupport.mozilla.org%2Fen-US%2Fkb%2Fenable-and-disable-cookies-website-preferences&h=AT6AMcSgut-fn6J54vIcv3jMuxU8DUQBk5AZVYvlg-U9oc6m-u_mvRuRbZd8xBH317hLiDnjqkFDGEq0xZNDaiFHIlWI7EIl6uTswIeytI_zYx62QGLt7XHU72kLmlYhqrh9bijY2p8NZL69V4ZfEg
+                - listitem [ref=e283]:
+                  - link "Safari" [ref=e284] [cursor=pointer]:
+                    - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fsupport.apple.com%2Fen-ie%2Fguide%2Fsafari%2Fsfri11471%2Fmac&h=AT74fELeVn3FapU6AvKT9-zzn3fq01c8h1-G4dD-M32CnTy1mChkXxl43RG6vrvhL_PSmMF24bjHDTWzprkjq0MGFCPjmRojHAgP3tJpneBd26t3XVLyBuN4bAzljVgFjndqjVOiMTc8eik7iAmL4g
+                - listitem [ref=e285]:
+                  - link "Safari Mobile" [ref=e286] [cursor=pointer]:
+                    - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fsupport.apple.com%2Fen-us%2FHT201265&h=AT6Kd3l5adN9gWy9usuETPDJbea0kXiZA6vOFm4FrwVB5gIwWUu8cCBuomjbi2I_sO7fVLw-IXoGa6VejNkiBDQYu4a-yo2mX6a3Q0eqjYWPKWWT1us1oQgNOiNh4QeeRAswbeqhYJhSW8JEUILfSA
+                - listitem [ref=e287]:
+                  - link "Opera" [ref=e288] [cursor=pointer]:
+                    - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fblogs.opera.com%2Fnews%2F2015%2F08%2Fhow-to-manage-cookies-in-opera%2F&h=AT4ljYEGB60HfetYOewam21CEHb9uw2yACDaDoUVlGJxRHjlWlyeWKUAFHTObwJBIxZRNmW7yhW4VIx2qItn_nQlS9EvavGAaj83IdUM1YCXO6qAVQwJS1Vq9pu6lCbUeerVo9xEOBASki0EuxmfuQ
+      - generic [ref=e289]:
+        - button "Optionele cookies afwijzen" [ref=e290] [cursor=pointer]
+        - button "Alle cookies toestaan" [ref=e291] [cursor=pointer]

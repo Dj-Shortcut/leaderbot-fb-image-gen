@@ -1,0 +1,95 @@
+- generic [ref=e12]:
+  - generic [ref=e14]:
+    - generic [ref=e17]:
+      - img [ref=e20]
+      - generic [ref=e24]: Ontdek de dingen die je geweldig vindt.
+    - generic [ref=e34]:
+      - generic [ref=e41]: Aanmelden bij Facebook
+      - generic [ref=e46]:
+        - generic [ref=e50]:
+          - textbox "E-mailadres of mobiel nummer" [active] [ref=e51]
+          - generic: E-mailadres of mobiel nummer
+        - generic [ref=e55]:
+          - textbox "Wachtwoord" [ref=e56]
+          - generic: Wachtwoord
+        - button "Aanmelden" [ref=e59] [cursor=pointer]:
+          - generic [ref=e62]: Aanmelden
+        - link "Wachtwoord vergeten?" [ref=e65] [cursor=pointer]:
+          - /url: https://www.facebook.com/recover/initiate/?privacy_mutation_token=eyJ0eXBlIjo1LCJjcmVhdGlvbl90aW1lIjoxNzc0Mzc0MTE2fQ%3D%3D&ars=facebook_login&next=%2Fbusiness%2Floginpage%2Ffbauth%2F%3Ff3_request_id%3Ddibpdacaadjkpppibbjgeiffdebnacfpfjbopcmh%26next%3Dhttps%253A%252F%252Fdevelopers.facebook.com%252Fdocumentation%252Fbusiness-messaging%252Fwhatsapp%252Fabout-the-platform
+          - generic [ref=e68]: Wachtwoord vergeten?
+        - link "Nieuw account maken" [ref=e71] [cursor=pointer]:
+          - /url: /reg/?entry_point=login&next=%2Fbusiness%2Floginpage%2Ffbauth%2F%3Ff3_request_id%3Ddibpdacaadjkpppibbjgeiffdebnacfpfjbopcmh%26next%3Dhttps%253A%252F%252Fdevelopers.facebook.com%252Fdocumentation%252Fbusiness-messaging%252Fwhatsapp%252Fabout-the-platform
+          - generic [ref=e74]: Nieuw account maken
+        - img "Meta-logo" [ref=e76]
+  - separator [ref=e84]
+  - main [ref=e90]:
+    - separator [ref=e92]
+    - generic [ref=e97]:
+      - generic [ref=e99]:
+        - generic [ref=e101]: Nederlands
+        - link "Français (France)" [ref=e104] [cursor=pointer]:
+          - /url: "#"
+        - link "English (US)" [ref=e107] [cursor=pointer]:
+          - /url: "#"
+        - link "Türkçe" [ref=e110] [cursor=pointer]:
+          - /url: "#"
+        - link "Deutsch" [ref=e113] [cursor=pointer]:
+          - /url: "#"
+        - link "Polski" [ref=e116] [cursor=pointer]:
+          - /url: "#"
+        - link "Română" [ref=e119] [cursor=pointer]:
+          - /url: "#"
+        - link "Meer talen..." [ref=e122] [cursor=pointer]:
+          - /url: "#"
+      - generic [ref=e125]:
+        - link "Registreren" [ref=e128] [cursor=pointer]:
+          - /url: https://www.facebook.com/reg/
+        - link "Aanmelden" [ref=e131] [cursor=pointer]:
+          - /url: https://www.facebook.com/login/
+        - link "Messenger" [ref=e134] [cursor=pointer]:
+          - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fmessenger.com%2F&h=AT6nM39YNsrRlpnZWnP3z3STy8oS5qGYJKbNZtM8jBcwcwvLfmGWq8t5krYqIkm24tvqRri8fArN8CIBWS4xpqhHeDujO2dbBu9kVJioHCPLShdQ_v6hLS9t8RZPnGqyxft6aFJV9j2OEsIcAGzIkA
+        - link "Facebook Lite" [ref=e137] [cursor=pointer]:
+          - /url: https://www.facebook.com/lite/
+        - link "Video" [ref=e140] [cursor=pointer]:
+          - /url: https://www.facebook.com/watch/
+        - link "Meta Pay" [ref=e143] [cursor=pointer]:
+          - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fabout.meta.com%2Ftechnologies%2Fmeta-pay&h=AT6nM39YNsrRlpnZWnP3z3STy8oS5qGYJKbNZtM8jBcwcwvLfmGWq8t5krYqIkm24tvqRri8fArN8CIBWS4xpqhHeDujO2dbBu9kVJioHCPLShdQ_v6hLS9t8RZPnGqyxft6aFJV9j2OEsIcAGzIkA
+        - link "Meta Store" [ref=e146] [cursor=pointer]:
+          - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.meta.com%2F&h=AT6nM39YNsrRlpnZWnP3z3STy8oS5qGYJKbNZtM8jBcwcwvLfmGWq8t5krYqIkm24tvqRri8fArN8CIBWS4xpqhHeDujO2dbBu9kVJioHCPLShdQ_v6hLS9t8RZPnGqyxft6aFJV9j2OEsIcAGzIkA
+        - link "Meta Quest" [ref=e149] [cursor=pointer]:
+          - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.meta.com%2Fquest%2F&h=AT6nM39YNsrRlpnZWnP3z3STy8oS5qGYJKbNZtM8jBcwcwvLfmGWq8t5krYqIkm24tvqRri8fArN8CIBWS4xpqhHeDujO2dbBu9kVJioHCPLShdQ_v6hLS9t8RZPnGqyxft6aFJV9j2OEsIcAGzIkA
+        - link "Ray-Ban Meta" [ref=e152] [cursor=pointer]:
+          - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.meta.com%2Fsmart-glasses%2F&h=AT6nM39YNsrRlpnZWnP3z3STy8oS5qGYJKbNZtM8jBcwcwvLfmGWq8t5krYqIkm24tvqRri8fArN8CIBWS4xpqhHeDujO2dbBu9kVJioHCPLShdQ_v6hLS9t8RZPnGqyxft6aFJV9j2OEsIcAGzIkA
+        - link "Meta AI" [ref=e155] [cursor=pointer]:
+          - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.meta.ai%2F&h=AT6nM39YNsrRlpnZWnP3z3STy8oS5qGYJKbNZtM8jBcwcwvLfmGWq8t5krYqIkm24tvqRri8fArN8CIBWS4xpqhHeDujO2dbBu9kVJioHCPLShdQ_v6hLS9t8RZPnGqyxft6aFJV9j2OEsIcAGzIkA
+        - link "Instagram" [ref=e158] [cursor=pointer]:
+          - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.instagram.com%2F&h=AT6nM39YNsrRlpnZWnP3z3STy8oS5qGYJKbNZtM8jBcwcwvLfmGWq8t5krYqIkm24tvqRri8fArN8CIBWS4xpqhHeDujO2dbBu9kVJioHCPLShdQ_v6hLS9t8RZPnGqyxft6aFJV9j2OEsIcAGzIkA
+        - link "Threads" [ref=e161] [cursor=pointer]:
+          - /url: https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.threads.com%2F&h=AT6nM39YNsrRlpnZWnP3z3STy8oS5qGYJKbNZtM8jBcwcwvLfmGWq8t5krYqIkm24tvqRri8fArN8CIBWS4xpqhHeDujO2dbBu9kVJioHCPLShdQ_v6hLS9t8RZPnGqyxft6aFJV9j2OEsIcAGzIkA
+        - link "Privacybeleid" [ref=e164] [cursor=pointer]:
+          - /url: https://www.facebook.com/privacy/policy/?entry_point=facebook_page_footer
+        - link "Privacycentrum" [ref=e167] [cursor=pointer]:
+          - /url: https://www.facebook.com/privacy/center/?entry_point=facebook_page_footer
+        - link "Cookie-instellingen" [ref=e170] [cursor=pointer]:
+          - /url: https://www.facebook.com/privacy/cookie_settings/
+        - link "Info" [ref=e173] [cursor=pointer]:
+          - /url: https://www.facebook.com/about/
+        - link "Advertentie maken" [ref=e176] [cursor=pointer]:
+          - /url: https://www.facebook.com/ad_campaign/landing.php?placement=pflo&campaign_id=402047449186&nav_source=unknown&extra_1=auto
+        - link "Pagina maken" [ref=e179] [cursor=pointer]:
+          - /url: https://www.facebook.com/pages/create/?ref_type=site_footer
+        - link "Ontwikkelaars" [ref=e182] [cursor=pointer]:
+          - /url: https://developers.facebook.com/?ref=pf
+        - link "Vacatures" [ref=e185] [cursor=pointer]:
+          - /url: https://www.facebook.com/careers/?ref=pf
+        - link "Cookies" [ref=e188] [cursor=pointer]:
+          - /url: https://www.facebook.com/policies/cookies/
+        - link "Jouw advertentievoorkeuren" [ref=e191] [cursor=pointer]:
+          - /url: https://www.facebook.com/help/568137493302217
+        - link "Voorwaarden" [ref=e194] [cursor=pointer]:
+          - /url: https://www.facebook.com/policies?ref=pf
+        - link "Help" [ref=e197] [cursor=pointer]:
+          - /url: https://www.facebook.com/help/?ref=pf
+        - link "Contacten uploaden en niet-gebruikers" [ref=e200] [cursor=pointer]:
+          - /url: https://www.facebook.com/help/637205020878504
+      - generic [ref=e203]: Meta © 2026

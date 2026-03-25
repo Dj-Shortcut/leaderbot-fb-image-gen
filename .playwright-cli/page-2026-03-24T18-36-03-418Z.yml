@@ -1,0 +1,420 @@
+- generic [ref=e1]:
+  - generic [ref=e8]:
+    - generic [ref=e19]:
+      - generic [ref=e21]:
+        - navigation [ref=e23]:
+          - generic [ref=e24]:
+            - heading [level=1] [ref=e25]: WhatsApp-beheer
+            - heading [level=1] [ref=e27]: Telefoonnummers
+        - toolbar [ref=e29]:
+          - generic [ref=e30]:
+            - generic [ref=e36]: Selecteer een WhatsApp Business-account
+            - button [ref=e40] [cursor=pointer]:
+              - generic [ref=e46]: leaderbot
+      - generic [ref=e48]:
+        - generic [ref=e55]:
+          - generic [ref=e58]:
+            - navigation [ref=e59]:
+              - list [ref=e60]:
+                - listitem [ref=e62]:
+                  - link [ref=e64] [cursor=pointer]:
+                    - /url: https://business.facebook.com/latest/whatsapp_manager/overview?business_id=904149119041282&asset_id=1467671241436356
+                  - generic:
+                    - listitem:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: Overzicht
+            - navigation [ref=e69]:
+              - list [ref=e70]:
+                - listitem [ref=e71]:
+                  - generic [ref=e72]:
+                    - button [expanded] [ref=e74] [cursor=pointer]
+                    - generic:
+                      - listitem:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic: Sjablonen voor chatberichten
+                          - button [disabled] [ref=e79]:
+                            - generic [ref=e82]: Groep in-/uitvouwen
+                  - list [ref=e85]:
+                    - generic [ref=e87]:
+                      - link [ref=e89] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/message_templates?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Sjablonen beheren
+                    - generic [ref=e95]:
+                      - link [ref=e97] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/template_library?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Sjabloonbibliotheek
+            - navigation [ref=e102]:
+              - list [ref=e103]:
+                - listitem [ref=e104]:
+                  - generic [ref=e105]:
+                    - button [expanded] [ref=e107] [cursor=pointer]
+                    - generic:
+                      - listitem:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic: Accounttools
+                          - button [disabled] [ref=e112]:
+                            - generic [ref=e115]: Groep in-/uitvouwen
+                  - list [ref=e118]:
+                    - generic [ref=e120]:
+                      - link [ref=e122] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/insights?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Insights
+                    - generic [ref=e128]:
+                      - link [ref=e130] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/messaging_limits?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Chatberichtlimieten
+                    - generic [ref=e136]:
+                      - link [ref=e138] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/flows?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Processen
+                    - generic [ref=e144]:
+                      - link [ref=e146] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/phone_numbers?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Telefoonnummers
+                    - generic [ref=e152]:
+                      - link [ref=e154] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/catalog?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Catalogus
+                    - generic [ref=e160]:
+                      - link [ref=e162] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/activity_log?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: Activiteitlogboek
+            - navigation [ref=e167]:
+              - list [ref=e168]:
+                - listitem [ref=e169]:
+                  - generic [ref=e170]:
+                    - button [expanded] [ref=e172] [cursor=pointer]
+                    - generic:
+                      - listitem:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic: Betalingsconfiguraties
+                          - button [disabled] [ref=e177]:
+                            - generic [ref=e180]: Groep in-/uitvouwen
+                  - list [ref=e183]:
+                    - generic [ref=e185]:
+                      - link [ref=e187] [cursor=pointer]:
+                        - /url: https://business.facebook.com/latest/whatsapp_manager/india?business_id=904149119041282&asset_id=1467671241436356
+                      - generic:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: India
+          - button [ref=e195] [cursor=pointer]:
+            - generic [ref=e198]: Uitvouwen
+        - generic [ref=e204]:
+          - generic [ref=e205]:
+            - generic [ref=e207]:
+              - heading [level=4] [ref=e215]: Er zijn nu limieten voor chatberichten ingesteld voor je algemene bedrijfsaccount
+              - generic [ref=e217]:
+                - generic [ref=e221]: Hiermee kies je het aantal telefoonnummers dat je nodig hebt zonder limieten op telefoonnummers. Verhoog je limieten door je bedrijf te verifiëren.
+                - generic [ref=e222]:
+                  - separator [ref=e223]
+                  - link [ref=e225] [cursor=pointer]:
+                    - /url: https://business.facebook.com/wa/manage/home/?business_id=904149119041282&waba_id=1467671241436356
+                    - text: Meer informatie
+            - button [ref=e227] [cursor=pointer]:
+              - generic [ref=e228]: Meer weergeven
+          - generic [ref=e229]:
+            - generic [ref=e234]:
+              - generic [ref=e236]:
+                - generic [ref=e242]: Zoeken op telefoonnummer of naam
+                - searchbox [ref=e254]
+              - generic [ref=e255]:
+                - generic [ref=e261]: Land
+                - combobox [ref=e266] [cursor=pointer]:
+                  - generic [ref=e273]: Filteren op land
+              - generic [ref=e276]:
+                - generic [ref=e282]: Filteren op telefoonstatus
+                - combobox [ref=e287] [cursor=pointer]:
+                  - generic [ref=e296]: Filteren op status
+              - button [ref=e299] [cursor=pointer]:
+                - generic [ref=e303]: Telefoonnummer toevoegen
+            - generic [ref=e308]:
+              - grid [ref=e313]:
+                - rowgroup [ref=e314]:
+                  - row [ref=e315]:
+                    - columnheader [ref=e316]:
+                      - heading [level=4] [ref=e320]: Telefoonnummer
+                    - columnheader [ref=e321]:
+                      - heading [level=4] [ref=e325]: Naam
+                    - columnheader [ref=e326]:
+                      - heading [level=4] [ref=e330]: Status
+                    - columnheader [ref=e331]:
+                      - heading [level=4] [ref=e335]: Kwaliteitsscore
+                    - columnheader [ref=e336]
+                - rowgroup [ref=e339]:
+                  - row [ref=e340] [cursor=pointer]:
+                    - gridcell [ref=e341]:
+                      - button [pressed] [ref=e343]:
+                        - generic [ref=e345]:
+                          - img [ref=e348]
+                          - generic [ref=e349]:
+                            - generic [ref=e350]: ‎+32 469 79 26 56
+                            - generic [ref=e351]: 🇧🇪 België
+                    - gridcell [ref=e352]:
+                      - generic [ref=e359]: leaderbot
+                    - gridcell [ref=e360]:
+                      - generic [ref=e364]:
+                        - generic [ref=e366]: Niet-geverifieerd
+                        - status [ref=e367]: Niet-geverifieerd
+                    - gridcell [ref=e368]
+                    - gridcell [ref=e369]:
+                      - group [ref=e373]:
+                        - button [ref=e374]:
+                          - generic [ref=e377]: Verwijderen
+                        - button [ref=e381]:
+                          - generic [ref=e384]: Instellingen
+              - generic [ref=e391]:
+                - generic [ref=e392]:
+                  - generic [ref=e395]:
+                    - generic [ref=e398]:
+                      - heading [level=3] [ref=e399]: 🇧🇪 ‎+32 469 79 26 56
+                      - generic [ref=e401]:
+                        - generic [ref=e403]: leaderbot
+                        - generic [ref=e404]:
+                          - text: "Telefoonnummer-ID:"
+                          - link [ref=e406] [cursor=pointer]:
+                            - /url: "#"
+                            - text: "1038678682661758"
+                    - button [ref=e408] [cursor=pointer]:
+                      - generic [ref=e411]: Sluiten
+                  - tablist [ref=e415]:
+                    - tab [ref=e416] [cursor=pointer]:
+                      - generic [ref=e419]: Statistieken
+                    - tab [selected] [ref=e420] [cursor=pointer]:
+                      - generic [ref=e423]: Profiel
+                    - tab [ref=e424] [cursor=pointer]:
+                      - generic [ref=e427]: Certificaat
+                    - tab [ref=e428] [cursor=pointer]:
+                      - generic [ref=e431]: Automatiseringen
+                    - button [ref=e432] [cursor=pointer]:
+                      - generic [ref=e435]: Meer
+                  - separator [ref=e438]
+                - generic [ref=e441]:
+                  - generic [ref=e442]:
+                    - generic [ref=e445]:
+                      - generic [ref=e452]:
+                        - heading [level=4] [ref=e454]: Verificatie telefoonnummer vereist
+                        - generic [ref=e455]: Verifieer dit telefoonnummer om chatberichten te sturen.
+                      - generic [ref=e458]:
+                        - separator [ref=e459]
+                        - link [ref=e462] [cursor=pointer]:
+                          - /url: "#"
+                          - text: Verficatiecode verzenden
+                    - generic [ref=e463]:
+                      - generic [ref=e464]:
+                        - generic [ref=e465]:
+                          - heading [level=3] [ref=e466]: Profielfoto
+                          - generic [ref=e467]: Dit is zichtbaar op je bedrijfsprofiel
+                        - button [disabled] [ref=e470]:
+                          - generic [ref=e476]: Bestand selecteren
+                      - generic [ref=e477]:
+                        - heading [level=3] [ref=e478]: Weergavenaam
+                        - generic [ref=e480]: leaderbot
+                        - button [ref=e482] [cursor=pointer]:
+                          - generic [ref=e486]: Bewerken
+                      - generic [ref=e487]:
+                        - generic [ref=e488]:
+                          - heading [level=3] [ref=e489]: Officieel bedrijfsaccount
+                          - generic [ref=e490]:
+                            - text: Een officieel bedrijfsaccount heeft een blauw vinkje
+                            - text: naast de naam. Hiermee wordt aangegeven dat WhatsApp heeft bevestigd dat dit account eigendom is van een authentiek, bekend merk.
+                            - link [ref=e492] [cursor=pointer]:
+                              - /url: https://developers.facebook.com/documentation/business-messaging/whatsapp/official-business-accounts/
+                              - text: Meer informatie.
+                        - button [disabled] [ref=e495]:
+                          - generic [ref=e499]: Verzoek verzenden
+                      - generic [ref=e500]:
+                        - heading [level=3] [ref=e501]: Bedrijfsinformatie
+                        - generic [ref=e502]: Voeg meer informatie over je bedrijf toe
+                      - generic [ref=e505]:
+                        - generic [ref=e511]: Categorie
+                        - combobox [ref=e516] [cursor=pointer]:
+                          - generic [ref=e523]: Entertainment
+                      - generic [ref=e527]:
+                        - generic [ref=e533]: Beschrijving∙Optioneel
+                        - generic [ref=e538]:
+                          - textbox [ref=e540]: AI image transformations inside Meta. Simple. Instant. Fun.
+                          - generic [ref=e543]: 59/512
+                      - generic [ref=e545]:
+                        - generic [ref=e551]: Adres∙Optioneel
+                        - generic [ref=e557]:
+                          - textbox [ref=e560]:
+                            - /placeholder: Bedrijfsadres invoeren
+                          - generic [ref=e562]: 0/256
+                      - generic [ref=e564]:
+                        - generic [ref=e570]: E-mailadres∙Optioneel
+                        - generic [ref=e576]:
+                          - textbox [ref=e579]:
+                            - /placeholder: Voer een zakelijk e-mailadres in
+                          - generic [ref=e581]: 0/128
+                      - generic [ref=e583]:
+                        - generic [ref=e589]: Website:∙Optioneel
+                        - generic [ref=e595]:
+                          - textbox [ref=e598]:
+                            - /placeholder: https://www.voorbeeld.com
+                          - generic [ref=e600]: 0/256
+                      - generic [ref=e601]:
+                        - generic [ref=e607]: Website:∙Optioneel
+                        - generic [ref=e613]:
+                          - textbox [ref=e616]:
+                            - /placeholder: https://www.voorbeeld.com
+                          - generic [ref=e618]: 0/256
+                    - button [disabled] [ref=e619]:
+                      - generic [ref=e623]: Opslaan
+                  - generic [ref=e624]:
+                    - generic [ref=e625]:
+                      - generic [ref=e629]:
+                        - generic [ref=e630]:
+                          - progressbar
+                        - heading [level=2] [ref=e632]: leaderbot
+                        - heading [level=4] [ref=e634]: +32 469 79 26 56
+                        - generic [ref=e638]: Delen
+                      - generic [ref=e640]:
+                        - generic [ref=e644]: AI image transformations inside Meta. Simple. Instant. Fun.
+                        - generic [ref=e648]: Entertainment
+                    - generic [ref=e649]: Deze ervaring kan er op elk apparaat anders uitzien.
+    - generic [ref=e655]:
+      - generic [ref=e657]:
+        - button [ref=e658] [cursor=pointer]:
+          - generic [ref=e660]: Meta Business Suite
+        - button [ref=e668] [cursor=pointer]
+      - navigation [ref=e676]:
+        - generic [ref=e677]: Links
+        - list [ref=e678]:
+          - listitem [ref=e683]:
+            - generic [ref=e685]:
+              - link [ref=e686] [cursor=pointer]:
+                - generic [ref=e687]: Alle tools
+              - generic:
+                - generic:
+                  - generic:
+                    - generic: Alle tools
+      - generic [ref=e690]:
+        - listitem [ref=e693]:
+          - generic [ref=e695]:
+            - link [ref=e696] [cursor=pointer]:
+              - generic [ref=e697]: Zoeken
+            - generic:
+              - generic:
+                - generic:
+                  - generic: Zoeken
+        - navigation [ref=e698]:
+          - generic [ref=e699]: Links
+          - list [ref=e700]:
+            - listitem [ref=e704]:
+              - generic [ref=e706]:
+                - link [ref=e707] [cursor=pointer]:
+                  - /url: https://business.facebook.com/latest/settings/business_users?business_id=904149119041282&asset_id=1467671241436356
+                  - generic [ref=e708]: Instellingen
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic: Instellingen
+        - listitem [ref=e715]:
+          - generic [ref=e717]:
+            - link [ref=e718] [cursor=pointer]:
+              - generic [ref=e719]: Help
+            - generic:
+              - generic:
+                - generic:
+                  - generic: Help
+  - dialog "Je telefoonnummer verifiëren" [ref=e722]:
+    - generic "Je telefoonnummer verifiëren" [ref=e723]:
+      - generic [ref=e724]:
+        - generic [ref=e725]:
+          - generic [ref=e727]:
+            - heading "Je telefoonnummer verifiëren" [level=3] [ref=e728]
+            - generic [ref=e729]: We hebben een verificatiecode gestuurd naar ⁦⁦+32 469 79 26 56⁩⁩. Het kan even duren voordat je deze ontvangt. Voer de 6-cijferige code in om je nummer te verifiëren.
+          - button "Sluiten" [ref=e732] [cursor=pointer]:
+            - generic [ref=e735]: Sluiten
+        - generic [ref=e741]:
+          - generic [ref=e742]:
+            - heading "Verificatiecode" [level=4] [ref=e744]
+            - generic [ref=e745]:
+              - textbox "Cijfer verificatiecode 1" [ref=e746]
+              - textbox "Cijfer verificatiecode 2" [ref=e747]
+              - textbox "Cijfer verificatiecode 3" [ref=e748]
+              - textbox "Cijfer verificatiecode 4" [ref=e749]
+              - textbox "Cijfer verificatiecode 5" [ref=e750]
+              - textbox "Cijfer verificatiecode 6" [ref=e751]
+          - alert [ref=e753]:
+            - generic [ref=e757]: You have requested a verification code too many times. Please try again later.
+          - generic [ref=e758]:
+            - link "Code opnieuw sturen" [ref=e761] [cursor=pointer]:
+              - /url: "#"
+            - generic [ref=e763]:
+              - generic [ref=e769]: Kies hoe je je nummer wilt verifiëren
+              - radiogroup "Kies hoe je je nummer wilt verifiëren" [ref=e773]:
+                - generic [ref=e776] [cursor=pointer]:
+                  - radio "Sms-bericht" [checked] [ref=e781]
+                  - generic [ref=e786]: Sms-bericht
+                - generic [ref=e789] [cursor=pointer]:
+                  - radio "Telefoongesprek" [ref=e794]
+                  - generic [ref=e797]: Telefoongesprek
+        - generic [ref=e799]:
+          - button "Terug" [ref=e800] [cursor=pointer]:
+            - generic [ref=e804]: Terug
+          - button "Volgende" [disabled] [ref=e805]:
+            - generic [ref=e809]: Volgende
+  - dialog "Limiet voor aantal verificatiecodes overschreden" [ref=e816]:
+    - generic [ref=e819]:
+      - generic [ref=e820]:
+        - generic [ref=e821]:
+          - heading "Limiet voor aantal verificatiecodes overschreden" [level=2] [ref=e824]:
+            - generic [ref=e825]: Limiet voor aantal verificatiecodes overschreden
+          - button "Sluiten" [ref=e827] [cursor=pointer]:
+            - img [ref=e828]
+        - separator [ref=e830]
+      - generic [ref=e838]: You have requested a verification code too many times. Please try again later.
+      - button "OK" [ref=e845] [cursor=pointer]:
+        - generic [ref=e848]: OK

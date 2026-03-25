@@ -87,7 +87,13 @@ export function getIdentityGameSessionByUserId(
 
       return Promise.resolve(
         getIdentityGameSessionBySessionId(current.sessionId)
-      );
+      ).then(session => {
+        if (!session || isExpired(session)) {
+          return null;
+        }
+
+        return session;
+      });
     });
   }
 
@@ -95,7 +101,23 @@ export function getIdentityGameSessionByUserId(
     return null;
   }
 
-  return getIdentityGameSessionBySessionId(ref.sessionId);
+  const session = getIdentityGameSessionBySessionId(ref.sessionId);
+
+  if (isPromiseLike(session)) {
+    return session.then(current => {
+      if (!current || isExpired(current)) {
+        return null;
+      }
+
+      return current;
+    });
+  }
+
+  if (!session || isExpired(session)) {
+    return null;
+  }
+
+  return session;
 }
 
 export function getIdentityGameSessionByActiveExperience(

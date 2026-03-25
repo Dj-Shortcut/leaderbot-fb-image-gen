@@ -44,4 +44,14 @@ describe("entryIntent parsing", () => {
 
     expect(result?.targetExperienceId).toBe("my-game");
   });
+
+  it("prefers locale encoded in the ref over the channel-provided locale hint", () => {
+    const result = parseGameEntryIntent({
+      channel: "messenger",
+      ref: "game:party-alter-ego?locale=en",
+      localeHint: "nl_BE",
+    });
+
+    expect(result?.localeHint).toBe("en");
+  });
 });
