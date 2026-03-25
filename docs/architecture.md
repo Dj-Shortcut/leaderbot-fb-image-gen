@@ -39,7 +39,7 @@ ASCII version:
                     | - /api/trpc                      |
                     | - /auth/github/*                 |
                     | - /healthz, /__version          |
-                    | - /generated/*         |
+                    | - /metrics, /generated/*        |
                     +----+---------------+-------------+
                          |               |
           inbound events |               | outbound API / auth / storage
@@ -132,6 +132,27 @@ flowchart TD
    - result sent via Messenger Send API or WhatsApp Cloud API,
    - state -> `RESULT_READY` (or `FAILURE` on error).
 
+### Source image provenance and trust
+
+Source-image handling now distinguishes between externally supplied image URLs and internally persisted source images.
+
+- `lastPhotoSource` in conversation state records whether the active source image is `external` or `stored`
+- WhatsApp media that is downloaded and re-persisted through `storeInboundSourceImage(...)` is marked as `stored`
+- Messenger attachment URLs and other direct inbound URLs remain `external`
+
+Security motivation:
+
+- prevent external image injection from bypassing `SOURCE_IMAGE_ALLOWED_HOSTS`
+- ensure only app-owned persisted source images can use the trusted-source fast path
+
+Enforcement model:
+
+- image generation validates source URLs before fetching them
+- the allowlist bypass is only allowed when the source is both marked trusted and proven to come from stored inbound media
+- rejected trusted-source URLs are cleared from conversation state before the flow returns to `AWAITING_PHOTO`, so users do not get stuck retrying the same invalid URL
+
+This provenance model is part of the image-generation security boundary and is especially important for the WhatsApp flow, where inbound media is first downloaded, then persisted to an application-owned public URL for later reuse.
+
 Core files:
 
 - `server/_core/messengerWebhook.ts`
@@ -149,6 +170,7 @@ Core files:
 
 - stage/status (`IDLE` .. `FAILURE`)
 - latest photo URL fields
+- latest photo provenance (`external` vs `stored`)
 - selected style and optional preselected referral style
 - preferred language
 - pending/generated image references
