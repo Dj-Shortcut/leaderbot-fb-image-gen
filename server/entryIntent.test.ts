@@ -36,6 +36,30 @@ describe("entryIntent parsing", () => {
     ).toBeNull();
   });
 
+  it("accepts a bare identity-ai-v1 ref from a Messenger deep link", () => {
+    const result = parseGameEntryIntent({
+      channel: "messenger",
+      ref: "identity-ai-v1",
+      sourceType: "referral",
+      localeHint: "nl",
+      receivedAt: 1710000000000,
+    });
+
+    expect(result).toEqual({
+      sourceChannel: "messenger",
+      sourceType: "referral",
+      targetExperienceType: "identity_game",
+      targetExperienceId: "identity-ai-v1",
+      entryMode: undefined,
+      campaignId: undefined,
+      creativeId: undefined,
+      entryVariant: undefined,
+      localeHint: "nl",
+      rawRef: "identity-ai-v1",
+      receivedAt: 1710000000000,
+    });
+  });
+
   it("collapses repeated separators when normalizing game ids", () => {
     const result = parseGameEntryIntent({
       channel: "messenger",
