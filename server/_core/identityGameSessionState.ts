@@ -76,10 +76,26 @@ function handleSessionRefWriteFailure<T>(
 export function getIdentityGameSessionBySessionId(
   sessionId: string
 ): MaybePromise<IdentityGameSession | null> {
-  return readScopedState<IdentityGameSession>(
+  const session = readScopedState<IdentityGameSession>(
     IDENTITY_GAME_SESSION_SCOPE,
     sessionId
   );
+
+  if (isPromiseLike(session)) {
+    return session.then(current => {
+      if (!current || isExpired(current)) {
+        return null;
+      }
+
+      return current;
+    });
+  }
+
+  if (!session || isExpired(session)) {
+    return null;
+  }
+
+  return session;
 }
 
 export function getIdentityGameSessionByUserId(
