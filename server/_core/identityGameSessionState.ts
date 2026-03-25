@@ -99,7 +99,7 @@ export function getIdentityGameSessionByUserId(
       return Promise.resolve(
         getIdentityGameSessionBySessionId(current.sessionId)
       ).then(session => {
-        if (!session || isExpired(session)) {
+        if (!session) {
           return null;
         }
 
