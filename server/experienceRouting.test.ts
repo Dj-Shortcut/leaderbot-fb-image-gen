@@ -676,6 +676,82 @@ describe("identity-ai-v1 routing", () => {
     expect(setActiveExperience).not.toHaveBeenCalled();
   });
 
+  it("does not let START_GAME reopen a resolving session", async () => {
+    const userKey = anonymizePsid("identity-ai-v1-resolving-start-user");
+    const setActiveExperience = vi.fn(async () => undefined);
+
+    await upsertIdentityGameSession({
+      sessionId: "resolving-start-session",
+      userId: userKey,
+      gameId: "identity-ai-v1",
+      gameVersion: "v1",
+      entryIntent: {
+        sourceChannel: "messenger",
+        sourceType: "referral",
+        targetExperienceType: "identity_game",
+        targetExperienceId: "identity-ai-v1",
+        localeHint: "en",
+        receivedAt: 1710000000000,
+      },
+      status: "resolving",
+      currentQuestionId: "identity-ai-v1-q3",
+      answers: [
+        {
+          questionId: "identity-ai-v1-q1",
+          answerId: "q1_build",
+          recordedAt: 1710000001000,
+        },
+        {
+          questionId: "identity-ai-v1-q2",
+          answerId: "q2_build",
+          recordedAt: 1710000002000,
+        },
+      ],
+      derivedTraits: {},
+      startedAt: 1710000000000,
+      updatedAt: 1710000003000,
+      expiresAt: Date.now() + 60_000,
+      resultRef: "builder",
+    });
+
+    const result = await routeActiveExperience({
+      state: {
+        ...(await Promise.resolve(getOrCreateState(userKey))),
+        psid: userKey,
+        userKey,
+        lastEntryIntent: {
+          sourceChannel: "messenger",
+          sourceType: "referral",
+          targetExperienceType: "identity_game",
+          targetExperienceId: "identity-ai-v1",
+          localeHint: "en",
+          receivedAt: 1710000000000,
+        },
+        activeExperience: {
+          type: "identity_game",
+          id: "identity-ai-v1",
+          sessionId: "resolving-start-session",
+          status: "resolving",
+          startedAt: 1710000000000,
+          updatedAt: 1710000003000,
+        },
+      },
+      action: "START_GAME",
+      setLastEntryIntent: vi.fn(async () => undefined),
+      setActiveExperience,
+    });
+
+    expect(result).toEqual({
+      handled: true,
+      response: {
+        kind: "error",
+        text:
+          "Your identity game session was recognized, but the actual game flow is not enabled in this phase yet.",
+      },
+    });
+    expect(setActiveExperience).not.toHaveBeenCalled();
+  });
+
   it("falls back to normal thread handling after game completion", async () => {
     const psid = "identity-ai-v1-post-complete-user";
     const generateSpy = vi

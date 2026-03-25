@@ -259,7 +259,17 @@ export async function routeActiveExperience(
   }
 
   if (isIdentityAiV1GameId(activeSession.gameId)) {
-    if (normalizedAction === "START_GAME") {
+    if (activeSession.status === "resolving" || activeSession.status === "completed") {
+      return {
+        handled: true,
+        response: {
+          kind: "error",
+          text: t(lang, "identityGameSessionPending"),
+        },
+      };
+    }
+
+    if (normalizedAction === "START_GAME" && activeSession.status === "started") {
       const inProgressSession: IdentityGameSession = {
         ...activeSession,
         status: "in_progress",
@@ -274,16 +284,6 @@ export async function routeActiveExperience(
     }
 
     if (activeSession.status === "started") {
-      return {
-        handled: true,
-        response: {
-          kind: "error",
-          text: t(lang, "identityGameSessionPending"),
-        },
-      };
-    }
-
-    if (activeSession.status === "resolving" || activeSession.status === "completed") {
       return {
         handled: true,
         response: {
