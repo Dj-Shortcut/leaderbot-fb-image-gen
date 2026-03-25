@@ -12,6 +12,7 @@ vi.mock("./_core/stateStore", () => ({
 
 describe("identityGameSessionState async expiry", () => {
   beforeEach(() => {
+    vi.resetModules();
     readScopedStateMock.mockReset();
   });
 
