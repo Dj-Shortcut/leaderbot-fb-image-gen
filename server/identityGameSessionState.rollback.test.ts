@@ -116,6 +116,10 @@ describe("identityGameSessionState rollback", () => {
         })
       ).rejects.toThrow("ref write failed");
 
+      expect(deleteScopedStateMock).toHaveBeenCalledWith(
+        "identity-game-session",
+        "session-rollback-2"
+      );
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         "identity_game_session_ref_write_failed",
         expect.objectContaining({
