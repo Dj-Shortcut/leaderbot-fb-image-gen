@@ -1,5 +1,6 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
+import { createHash } from "node:crypto";
 import { z, ZodError } from "zod";
 import { normalizeLang, t, type Lang } from "./i18n";
 import { createWebhookHandlers } from "./webhookHandlers";
@@ -93,6 +94,25 @@ export { detectAck, getGreetingResponse, summarizeWebhook };
 
 export function resetMessengerEventDedupe(): void {
   resetWebhookReplayProtection();
+}
+
+function summarizeSensitiveUrl(url: string): {
+  host: string;
+  shortHash: string;
+} {
+  const shortHash = createHash("sha256").update(url).digest("hex").slice(0, 12);
+
+  try {
+    return {
+      host: new URL(url).host || "invalid-url",
+      shortHash,
+    };
+  } catch {
+    return {
+      host: "invalid-url",
+      shortHash,
+    };
+  }
 }
 
 function getMetaVerifyToken(): string {
@@ -639,7 +659,7 @@ async function runWhatsAppStyleGeneration(
       console.error("[whatsapp webhook] source image rejected", {
         user: toLogUser(userId),
         style,
-        sourceImageUrl: resolvedSourceImageUrl,
+        sourceImageUrl: summarizeSensitiveUrl(resolvedSourceImageUrl),
       });
     } else if (error instanceof MissingInputImageError) {
       failureText = t(lang, "missingInputImage");
