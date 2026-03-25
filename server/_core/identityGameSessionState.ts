@@ -54,9 +54,14 @@ function handleSessionRefWriteFailure<T>(
   const rollback = rollbackSessionWrite(session);
 
   if (isPromiseLike(rollback)) {
-    return rollback.then(() => {
-      throw error;
-    });
+    return rollback.then(
+      () => {
+        throw error;
+      },
+      () => {
+        throw error;
+      }
+    );
   }
 
   throw error;

@@ -45,6 +45,20 @@ describe("entryIntent parsing", () => {
     expect(result?.targetExperienceId).toBe("my-game");
   });
 
+  it("collapses repeated preserved separators into a single hyphen", () => {
+    const dashed = parseGameEntryIntent({
+      channel: "messenger",
+      ref: "game:my--game",
+    });
+    const underscored = parseGameEntryIntent({
+      channel: "messenger",
+      ref: "game:my__game",
+    });
+
+    expect(dashed?.targetExperienceId).toBe("my-game");
+    expect(underscored?.targetExperienceId).toBe("my-game");
+  });
+
   it("prefers locale encoded in the ref over the channel-provided locale hint", () => {
     const result = parseGameEntryIntent({
       channel: "messenger",

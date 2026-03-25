@@ -43,7 +43,7 @@ function normalizeExperienceId(value: string): string {
       continue;
     }
 
-    if (isPreservedSeparator || !lastWasSeparator) {
+    if ((isPreservedSeparator || !isAlphaNumeric) && !lastWasSeparator) {
       result += "-";
       lastWasSeparator = true;
     }
