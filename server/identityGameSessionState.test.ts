@@ -28,9 +28,9 @@ describe("identityGameSessionState", () => {
       status: "started" as const,
       answers: [],
       derivedTraits: {},
-      startedAt: 1710000000000,
-      updatedAt: 1710000000000,
-      expiresAt: 1710086400000,
+      startedAt: Date.now(),
+      updatedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
     };
 
     upsertIdentityGameSession(session);
@@ -43,8 +43,8 @@ describe("identityGameSessionState", () => {
       id: "party-alter-ego",
       sessionId: "session-1",
       status: "started",
-      startedAt: 1710000000000,
-      updatedAt: 1710000000000,
+      startedAt: session.startedAt,
+      updatedAt: session.updatedAt,
     };
 
     expect(getIdentityGameSessionByActiveExperience(activeExperience)).toEqual(

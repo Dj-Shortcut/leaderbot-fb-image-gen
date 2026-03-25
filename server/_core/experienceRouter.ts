@@ -29,8 +29,8 @@ function normalizeAction(action: string | null | undefined): string | null {
 
 function resolveRouterLang(input: ExperienceRouterInput): "nl" | "en" {
   return normalizeLang(
-    input.state.preferredLang ??
-      input.entryIntent?.localeHint ??
+    input.entryIntent?.localeHint ??
+      input.state.preferredLang ??
       input.state.lastEntryIntent?.localeHint
   );
 }

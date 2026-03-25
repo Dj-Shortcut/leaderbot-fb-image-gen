@@ -26,9 +26,10 @@ import {
 import { anonymizePsid, getState, resetStateStore } from "./_core/messengerState";
 import {
   getIdentityGameSessionByActiveExperience,
+  upsertIdentityGameSession,
 } from "./_core/identityGameSessionState";
 import { parseGameEntryIntent } from "./_core/entryIntent";
-import { routeEntryIntent } from "./_core/experienceRouter";
+import { routeActiveExperience, routeEntryIntent } from "./_core/experienceRouter";
 
 describe("experience routing", () => {
   beforeEach(() => {
@@ -262,6 +263,89 @@ describe("experience routing", () => {
         sessionId: expect.not.stringMatching(/^existing-session-id$/),
       })
     );
+  });
+
+  it("prefers entryIntent localeHint over preferredLang when resolving router copy", async () => {
+    const setLastEntryIntent = vi.fn(async () => {});
+    const setActiveExperience = vi.fn(async () => {});
+
+    const result = await routeEntryIntent({
+      state: {
+        ...getState(anonymizePsid("locale-priority-user"))!,
+        psid: anonymizePsid("locale-priority-user"),
+        userKey: anonymizePsid("locale-priority-user"),
+        preferredLang: "nl",
+      },
+      entryIntent: parseGameEntryIntent({
+        channel: "messenger",
+        ref: "game:party-alter-ego?entryMode=confirm_first&locale=en",
+        receivedAt: 1710000200000,
+      }),
+      setLastEntryIntent,
+      setActiveExperience,
+    });
+
+    expect(result).toEqual({
+      handled: true,
+      response: {
+        kind: "options_prompt",
+        prompt: "This game entry was recognized. Ready to start later?",
+        options: [
+          { id: "START_GAME", title: "Start game" },
+          { id: "LATER", title: "Later" },
+        ],
+        selectionMode: "single",
+        fallbackText: "Reply with START_GAME or LATER.",
+      },
+    });
+  });
+
+  it("treats expired active sessions as missing", async () => {
+    const userKey = anonymizePsid("expired-session-user");
+    await upsertIdentityGameSession({
+      sessionId: "expired-session-id",
+      userId: userKey,
+      gameId: "party-alter-ego",
+      gameVersion: "v1",
+      entryIntent: {
+        sourceChannel: "messenger",
+        sourceType: "referral",
+        targetExperienceType: "identity_game",
+        targetExperienceId: "party-alter-ego",
+        receivedAt: 1710000000000,
+      },
+      status: "started",
+      answers: [],
+      derivedTraits: {},
+      startedAt: 1710000000000,
+      updatedAt: 1710000000000,
+      expiresAt: Date.now() - 1000,
+    });
+
+    const setLastEntryIntent = vi.fn(async () => {});
+    const setActiveExperience = vi.fn(async () => {});
+
+    const result = await routeActiveExperience({
+      state: {
+        ...getState(userKey)!,
+        psid: userKey,
+        userKey,
+        activeExperience: {
+          type: "identity_game",
+          id: "party-alter-ego",
+          sessionId: "expired-session-id",
+          status: "started",
+          startedAt: 1710000000000,
+          updatedAt: 1710000000000,
+        },
+      },
+      action: null,
+      setLastEntryIntent,
+      setActiveExperience,
+    });
+
+    expect(result).toEqual({ handled: false });
+    expect(setActiveExperience).toHaveBeenCalledWith(null);
   });
 
   it("keeps mandatory routing order by letting ActiveExperience win over explicit legacy commands", async () => {

@@ -14,6 +14,10 @@ type IdentityGameSessionRef = {
   sessionId: string;
 };
 
+function isExpired(session: IdentityGameSession): boolean {
+  return session.expiresAt <= Date.now();
+}
+
 function writeSessionRef(
   userId: string,
   sessionId: string
@@ -101,7 +105,23 @@ export function getIdentityGameSessionByActiveExperience(
     return null;
   }
 
-  return getIdentityGameSessionBySessionId(activeExperience.sessionId);
+  const session = getIdentityGameSessionBySessionId(activeExperience.sessionId);
+
+  if (isPromiseLike(session)) {
+    return session.then(current => {
+      if (!current || isExpired(current)) {
+        return null;
+      }
+
+      return current;
+    });
+  }
+
+  if (!session || isExpired(session)) {
+    return null;
+  }
+
+  return session;
 }
 
 export function upsertIdentityGameSession(
