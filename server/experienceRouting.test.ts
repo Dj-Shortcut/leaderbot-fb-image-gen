@@ -227,6 +227,72 @@ describe("experience routing", () => {
     );
   });
 
+  it("falls through to normal text handling after LATER releases active experience ownership", async () => {
+    const psid = "later-release-fallback-user";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              postback: {
+                payload: "GET_STARTED",
+                referral: {
+                  ref: "game:party-alter-ego?entryMode=confirm_first",
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-later-release",
+                quick_reply: { payload: "LATER" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    sendTextMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-after-release",
+                text: "hi",
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const state = getState(anonymizePsid(psid));
+    expect(state?.activeExperience).toBeNull();
+    expect(state?.hasSeenIntro).toBe(true);
+    expect(state?.stage).toBe("AWAITING_PHOTO");
+    expect(sendTextMock).not.toHaveBeenCalledWith(
+      psid,
+      "Je identity game-sessie is herkend, maar de game flow zelf is nog niet geactiveerd in deze fase."
+    );
+  });
+
   it("creates a fresh session id when a different game entry replaces the current active experience", async () => {
     const state = {
       ...getState(anonymizePsid("replace-game-user"))!,

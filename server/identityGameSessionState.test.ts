@@ -109,4 +109,42 @@ describe("identityGameSessionState", () => {
 
     expect(getIdentityGameSessionBySessionId("expired-session-2")).toBeNull();
   });
+
+  it("returns null when activeExperience points at a session from another game", () => {
+    resetStateStore();
+
+    const now = Date.now();
+    const session = {
+      sessionId: "cross-game-session",
+      userId: "cross-game-user",
+      gameId: "game-b",
+      gameVersion: "v1",
+      entryIntent: {
+        sourceChannel: "messenger" as const,
+        sourceType: "referral" as const,
+        targetExperienceType: "identity_game" as const,
+        targetExperienceId: "game-b",
+        receivedAt: now,
+      },
+      status: "started" as const,
+      answers: [],
+      derivedTraits: {},
+      startedAt: now,
+      updatedAt: now,
+      expiresAt: now + 60_000,
+    };
+
+    upsertIdentityGameSession(session);
+
+    const activeExperience: ActiveExperience = {
+      type: "identity_game",
+      id: "game-a",
+      sessionId: "cross-game-session",
+      status: "started",
+      startedAt: now,
+      updatedAt: now,
+    };
+
+    expect(getIdentityGameSessionByActiveExperience(activeExperience)).toBeNull();
+  });
 });
