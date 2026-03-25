@@ -3,6 +3,8 @@ import {
   STYLE_CATEGORY_CONFIGS,
   getStylesForCategory,
 } from "./messengerStyles";
+import type { ActiveExperience } from "./activeExperience";
+import type { EntryIntent } from "./entryIntent";
 import type { Lang } from "./i18n";
 import { toUserKey } from "./privacy";
 import {
@@ -43,6 +45,8 @@ export type MessengerUserState = {
   userKey: string;
   stage: MessengerFlowState;
   state: MessengerFlowState;
+  lastEntryIntent?: EntryIntent | null;
+  activeExperience?: ActiveExperience | null;
   lastUserMessageAt?: number;
   lastPhotoUrl: string | null;
   lastPhoto: string | null;
@@ -102,6 +106,8 @@ function createDefaultState(psid: string, now = Date.now()): MessengerUserState 
     userKey: getUserKey(psid),
     stage: "IDLE",
     state: "IDLE",
+    lastEntryIntent: null,
+    activeExperience: null,
     lastUserMessageAt: undefined,
     lastPhotoUrl: null,
     lastPhoto: null,
@@ -144,6 +150,8 @@ function normalizeState(psid: string, value: PartialState | null | undefined): M
     hasSeenIntro: value?.hasSeenIntro ?? fallback.hasSeenIntro,
     stage,
     state: stage,
+    lastEntryIntent: value?.lastEntryIntent ?? fallback.lastEntryIntent,
+    activeExperience: value?.activeExperience ?? fallback.activeExperience,
     lastUserMessageAt: value?.lastUserMessageAt ?? fallback.lastUserMessageAt,
     lastPhotoUrl: lastPhoto,
     lastPhoto,
@@ -307,6 +315,49 @@ export function setFlowState(psid: string, nextState: MessengerFlowState): Maybe
   if (isPromiseLike(result)) {
     return result.then(() => undefined);
   }
+}
+
+export function setLastEntryIntent(
+  psid: string,
+  entryIntent: EntryIntent | null,
+  now = Date.now()
+): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      lastEntryIntent: entryIntent,
+    },
+    now
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
+}
+
+export function setActiveExperience(
+  psid: string,
+  activeExperience: ActiveExperience | null,
+  now = Date.now()
+): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      activeExperience,
+    },
+    now
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
+}
+
+export function clearActiveExperience(
+  psid: string,
+  now = Date.now()
+): MaybePromise<void> {
+  return setActiveExperience(psid, null, now);
 }
 
 export function setPendingImage(

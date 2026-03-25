@@ -1,5 +1,8 @@
 import type { Lang } from "./i18n";
-import type { BotChannel } from "./normalizedInboundMessage";
+import type {
+  BotChannel,
+  BotChannelCapabilities,
+} from "./normalizedInboundMessage";
 import type {
   ConversationState,
   MessengerUserState,
@@ -14,11 +17,6 @@ export type BotLogger = {
   info(event: string, details?: Record<string, unknown>): void;
   warn(event: string, details?: Record<string, unknown>): void;
   error(event: string, details?: Record<string, unknown>): void;
-};
-
-export type BotChannelCapabilities = {
-  quickReplies: boolean;
-  richTemplates: boolean;
 };
 
 type BotContextBase = {

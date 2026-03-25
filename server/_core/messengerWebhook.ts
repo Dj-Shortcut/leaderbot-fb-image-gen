@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { z, ZodError } from "zod";
 import { normalizeLang, t, type Lang } from "./i18n";
 import { createWebhookHandlers } from "./webhookHandlers";
+import { routeActiveExperience, routeEntryIntent } from "./experienceRouter";
 import { resetWebhookReplayProtection } from "./webhookReplayProtection";
 import {
   detectAck,
@@ -33,10 +34,12 @@ import {
   setChosenStyle,
   setLastGenerated,
   setLastGenerationContext,
+  setLastEntryIntent,
   setLastUserMessageAt,
   setPendingImage,
   setPreselectedStyle,
   setSelectedStyleCategory,
+  setActiveExperience,
   setFlowState,
   type ConversationState,
 } from "./messengerState";
@@ -237,6 +240,10 @@ function extractWhatsAppEvents(payload: unknown): NormalizedInboundMessage[] {
             channel: "whatsapp",
             senderId: from,
             userId: toUserKey(from),
+            channelCapabilities: {
+              quickReplies: false,
+              richTemplates: false,
+            },
             rawMessageType: messageType,
             messageType:
               messageType === "text" || messageType === "interactive"
@@ -251,6 +258,10 @@ function extractWhatsAppEvents(payload: unknown): NormalizedInboundMessage[] {
               undefined,
             imageId: imageId ?? undefined,
             timestamp: Number.isFinite(timestampRaw) ? timestampRaw! * 1000 : undefined,
+            rawEventMeta: {
+              interactiveReplyId: interactiveReplyId ?? undefined,
+              interactiveReplyTitle: interactiveReplyTitle ?? undefined,
+            },
           },
         ];
       });
@@ -891,11 +902,85 @@ export async function processWhatsAppWebhookPayload(
 
     try {
       if (event.messageType === "image") {
+        const currentState = await Promise.resolve(getOrCreateState(event.senderId));
+        const entryIntentRoute = await routeEntryIntent({
+          state: currentState,
+          entryIntent: event.entryIntent ?? null,
+          setLastEntryIntent: nextEntryIntent =>
+            Promise.resolve(setLastEntryIntent(event.senderId, nextEntryIntent)),
+          setActiveExperience: nextActiveExperience =>
+            Promise.resolve(setActiveExperience(event.senderId, nextActiveExperience)),
+        });
+        if (entryIntentRoute.handled) {
+          await sendWhatsAppBotResponse(entryIntentRoute.response ?? null, {
+            sendText: text => sendWhatsAppText(event.senderId, text),
+            sendOptionsPrompt: (prompt, options, fallbackText) =>
+              sendWhatsAppText(
+                event.senderId,
+                fallbackText ??
+                  [prompt, ...options.map(option => option.title)].join("\n")
+              ),
+          });
+          continue;
+        }
+
+        const activeExperienceRoute = await routeActiveExperience({
+          state: currentState,
+          action: event.textBody ?? null,
+          setLastEntryIntent: nextEntryIntent =>
+            Promise.resolve(setLastEntryIntent(event.senderId, nextEntryIntent)),
+          setActiveExperience: nextActiveExperience =>
+            Promise.resolve(setActiveExperience(event.senderId, nextActiveExperience)),
+        });
+        if (activeExperienceRoute.handled) {
+          await sendWhatsAppBotResponse(activeExperienceRoute.response ?? null, {
+            sendText: text => sendWhatsAppText(event.senderId, text),
+          });
+          continue;
+        }
+
         await handleWhatsAppImageEvent(event, reqId, lang);
         continue;
       }
 
       if (event.messageType === "text") {
+        const currentState = await Promise.resolve(getOrCreateState(event.senderId));
+        const entryIntentRoute = await routeEntryIntent({
+          state: currentState,
+          entryIntent: event.entryIntent ?? null,
+          setLastEntryIntent: nextEntryIntent =>
+            Promise.resolve(setLastEntryIntent(event.senderId, nextEntryIntent)),
+          setActiveExperience: nextActiveExperience =>
+            Promise.resolve(setActiveExperience(event.senderId, nextActiveExperience)),
+        });
+        if (entryIntentRoute.handled) {
+          await sendWhatsAppBotResponse(entryIntentRoute.response ?? null, {
+            sendText: text => sendWhatsAppText(event.senderId, text),
+            sendOptionsPrompt: (prompt, options, fallbackText) =>
+              sendWhatsAppText(
+                event.senderId,
+                fallbackText ??
+                  [prompt, ...options.map(option => option.title)].join("\n")
+              ),
+          });
+          continue;
+        }
+
+        const activeExperienceRoute = await routeActiveExperience({
+          state: currentState,
+          action: event.textBody ?? null,
+          setLastEntryIntent: nextEntryIntent =>
+            Promise.resolve(setLastEntryIntent(event.senderId, nextEntryIntent)),
+          setActiveExperience: nextActiveExperience =>
+            Promise.resolve(setActiveExperience(event.senderId, nextActiveExperience)),
+        });
+        if (activeExperienceRoute.handled) {
+          await sendWhatsAppBotResponse(activeExperienceRoute.response ?? null, {
+            sendText: text => sendWhatsAppText(event.senderId, text),
+          });
+          continue;
+        }
+
         await handleWhatsAppTextEvent(event, reqId, lang);
         continue;
       }
