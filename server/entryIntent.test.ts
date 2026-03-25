@@ -35,4 +35,13 @@ describe("entryIntent parsing", () => {
       })
     ).toBeNull();
   });
+
+  it("collapses repeated separators when normalizing game ids", () => {
+    const result = parseGameEntryIntent({
+      channel: "messenger",
+      ref: "game: My Game!! ",
+    });
+
+    expect(result?.targetExperienceId).toBe("my-game");
+  });
 });

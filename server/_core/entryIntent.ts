@@ -27,7 +27,12 @@ export type EntryIntent = {
 };
 
 function normalizeExperienceId(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 function resolveSourceType(value: string | null): EntrySourceType {
