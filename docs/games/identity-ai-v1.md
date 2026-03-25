@@ -12,7 +12,7 @@ It does not redefine shared infrastructure such as:
 - session storage architecture
 - channel normalization rules
 
-Those remain defined by [`docs/architecture/identity-games.md`](/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/docs/architecture/identity-games.md).
+Those remain defined by [`docs/architecture/identity-games.md`](../architecture/identity-games.md).
 
 ## Core Concept
 The user answers 3 short questions and is classified into 1 of 4 AI archetypes:
@@ -168,5 +168,5 @@ V1 should use one shared visual prompt style for all four archetypes so the resu
 
 ## Assumptions
 - This document is the single source of truth for `Identity AI V1` content and flow
-- Shared identity-game infrastructure remains defined in [`docs/architecture/identity-games.md`](/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/docs/architecture/identity-games.md)
+- Shared identity-game infrastructure remains defined in [`docs/architecture/identity-games.md`](../architecture/identity-games.md)
 - V1 is Messenger-first, but the game flow should remain channel-agnostic where possible
