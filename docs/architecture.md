@@ -249,6 +249,13 @@ Design rule:
 
 The normative design for that work lives in `docs/architecture/identity-games.md`.
 
+Identity-game documentation is split into two layers:
+
+- Shared foundation and mandatory infrastructure rules live in [`docs/architecture/identity-games.md`](/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/docs/architecture/identity-games.md)
+- Concrete game content and player-flow specs live under [`docs/games/`](/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/docs/games)
+
+The first game spec is [`docs/games/identity-ai-v1.md`](/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/docs/games/identity-ai-v1.md).
+
 ## 6) Deployment model
 
 Leaderbot ships as a standard Node.js service and can run on multiple targets.
