@@ -67,6 +67,8 @@ export async function sendMessengerBotResponse(
 
       if (response.caption) {
         await options.sendText(response.caption);
+      } else {
+        await options.sendText("[Image not available]");
       }
       return;
     case "error":
@@ -144,6 +146,8 @@ export async function sendWhatsAppBotResponse(
 
       if (response.caption) {
         await options.sendText(response.caption);
+      } else {
+        await options.sendText("[Image not available]");
       }
       return;
     case "error":

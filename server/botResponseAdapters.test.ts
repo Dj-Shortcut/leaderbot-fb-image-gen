@@ -131,4 +131,22 @@ describe("botResponseAdapters", () => {
 
     expect(sendText).toHaveBeenCalledWith("Something broke");
   });
+
+  it("falls back to a placeholder when an image intent has no channel image sender", async () => {
+    const sendText = vi.fn(async () => {});
+    const sendStateText = vi.fn(async () => {});
+
+    await sendMessengerBotResponse(
+      {
+        kind: "image",
+        imageUrl: "https://cdn.example/result.jpg",
+      },
+      {
+        sendText,
+        sendStateText,
+      }
+    );
+
+    expect(sendText).toHaveBeenCalledWith("[Image not available]");
+  });
 });
