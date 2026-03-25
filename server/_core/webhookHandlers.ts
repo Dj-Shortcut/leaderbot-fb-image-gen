@@ -1137,8 +1137,14 @@ export function createWebhookHandlers({
       return;
     }
 
+    const activeExperienceAction =
+      event.postback?.payload ??
+      event.message?.quick_reply?.payload ??
+      event.message?.text?.trim() ??
+      null;
     const activeExperienceRoute = await routeActiveExperience({
       state,
+      action: activeExperienceAction,
       setLastEntryIntent: nextEntryIntent =>
         Promise.resolve(setLastEntryIntent(psid, nextEntryIntent)),
       setActiveExperience: nextActiveExperience =>

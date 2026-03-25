@@ -127,4 +127,100 @@ describe("experience routing", () => {
     );
     expect(sendQuickRepliesMock).not.toHaveBeenCalled();
   });
+
+  it("handles START_GAME within the active experience instead of dropping the quick reply", async () => {
+    const psid = "confirm-game-user";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              postback: {
+                payload: "GET_STARTED",
+                referral: {
+                  ref: "game:party-alter-ego?entryMode=confirm_first",
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    sendTextMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-start-game",
+                quick_reply: { payload: "START_GAME" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const state = getState(anonymizePsid(psid));
+    expect(state?.activeExperience?.status).toBe("in_progress");
+    expect(sendTextMock).toHaveBeenCalledWith(
+      psid,
+      "De game-start is bevestigd. De echte vraagflow volgt in de volgende fase."
+    );
+  });
+
+  it("handles LATER within the active experience and releases thread ownership", async () => {
+    const psid = "later-game-user";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              postback: {
+                payload: "GET_STARTED",
+                referral: {
+                  ref: "game:party-alter-ego?entryMode=confirm_first",
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    sendTextMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-later-game",
+                quick_reply: { payload: "LATER" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const state = getState(anonymizePsid(psid));
+    expect(state?.activeExperience).toBeNull();
+    expect(sendTextMock).toHaveBeenCalledWith(
+      psid,
+      "Geen probleem. Deze game-link blijft herkenbaar voor later."
+    );
+  });
 });

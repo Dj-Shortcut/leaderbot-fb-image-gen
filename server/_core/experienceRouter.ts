@@ -16,9 +16,15 @@ type ExperienceRouteResult = {
 type ExperienceRouterInput = {
   state: MessengerUserState;
   entryIntent?: EntryIntent | null;
+  action?: string | null;
   setLastEntryIntent: (entryIntent: EntryIntent | null) => Promise<void>;
   setActiveExperience: (activeExperience: ActiveExperience | null) => Promise<void>;
 };
+
+function normalizeAction(action: string | null | undefined): string | null {
+  const normalized = action?.trim().toUpperCase();
+  return normalized ? normalized : null;
+}
 
 function buildPlaceholderSession(
   state: MessengerUserState,
@@ -118,6 +124,46 @@ export async function routeActiveExperience(
   if (!activeSession) {
     await input.setActiveExperience(null);
     return { handled: false };
+  }
+
+  const action = normalizeAction(input.action);
+
+  if (action === "LATER") {
+    const abandonedSession: IdentityGameSession = {
+      ...activeSession,
+      status: "abandoned",
+      updatedAt: Date.now(),
+    };
+    await Promise.resolve(upsertIdentityGameSession(abandonedSession));
+    await input.setActiveExperience(null);
+    return {
+      handled: true,
+      response: {
+        kind: "text",
+        text: "Geen probleem. Deze game-link blijft herkenbaar voor later.",
+      },
+    };
+  }
+
+  if (action === "START_GAME") {
+    const inProgressSession: IdentityGameSession = {
+      ...activeSession,
+      status: "in_progress",
+      updatedAt: Date.now(),
+    };
+    await Promise.resolve(upsertIdentityGameSession(inProgressSession));
+    await input.setActiveExperience({
+      ...activeExperience,
+      status: "in_progress",
+      updatedAt: inProgressSession.updatedAt,
+    });
+    return {
+      handled: true,
+      response: {
+        kind: "text",
+        text: "De game-start is bevestigd. De echte vraagflow volgt in de volgende fase.",
+      },
+    };
   }
 
   return {

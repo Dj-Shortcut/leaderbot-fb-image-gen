@@ -926,6 +926,7 @@ export async function processWhatsAppWebhookPayload(
 
         const activeExperienceRoute = await routeActiveExperience({
           state: currentState,
+          action: event.textBody ?? null,
           setLastEntryIntent: nextEntryIntent =>
             Promise.resolve(setLastEntryIntent(event.senderId, nextEntryIntent)),
           setActiveExperience: nextActiveExperience =>
@@ -967,6 +968,7 @@ export async function processWhatsAppWebhookPayload(
 
         const activeExperienceRoute = await routeActiveExperience({
           state: currentState,
+          action: event.textBody ?? null,
           setLastEntryIntent: nextEntryIntent =>
             Promise.resolve(setLastEntryIntent(event.senderId, nextEntryIntent)),
           setActiveExperience: nextActiveExperience =>
