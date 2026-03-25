@@ -18,6 +18,8 @@ Primary bootstrap is in `server/_core/index.ts`.
 
 The bot runtime now has an explicit boundary in `server/_core/bot/index.ts`, with future feature hooks centralized in `server/_core/bot/features.ts`.
 
+The next planned product layer is a set of mini identity games. That work is intentionally blocked on a foundation-first design documented in `docs/architecture/identity-games.md`, so identity-game logic does not get mixed into the current flat style-state or channel handlers.
+
 ## Architecture diagrams
 
 ASCII version:
@@ -77,38 +79,38 @@ Mermaid version:
 
 ```mermaid
 flowchart TD
-    MM["Meta Messenger<br/>Webhook + Send API"]
-    UA["Admin / Browser / Monitoring"]
+    mm["Meta Messenger<br/>Webhook + Send API"]
+    ua["Admin / Browser / Monitoring"]
 
-    subgraph LB["Leaderbot Server"]
-        WH["/webhook/facebook"]
-        TRPC["/api/trpc"]
-        AUTH["/auth/github/*"]
-        OPS["/healthz, /__version, /generated/*"]
-        HANDLERS["Webhook handlers<br/>signature check, dedupe, i18n,<br/>state transitions, quota checks"]
-        IMG["Image service"]
+    subgraph lb["Leaderbot Server"]
+        wh["/webhook/facebook"]
+        trpc["/api/trpc"]
+        auth["/auth/github/*"]
+        ops["/healthz, /__version, /generated/*"]
+        handlers["Webhook handlers<br/>signature check, dedupe, i18n,<br/>state transitions, quota checks"]
+        img["Image service"]
     end
 
-    REDIS["Redis / state store"]
-    OPENAI["OpenAI Images API"]
-    GITHUB["GitHub OAuth"]
-    PROXY["Storage proxy<br/>Fly app"]
-    R2["Cloudflare R2<br/>Public asset URL"]
+    redis["Redis / state store"]
+    openai["OpenAI Images API"]
+    github["GitHub OAuth"]
+    proxy["Storage proxy<br/>Fly app"]
+    r2["Cloudflare R2<br/>Public asset URL"]
 
-    MM --> WH
-    WH --> HANDLERS
-    HANDLERS --> IMG
-    HANDLERS --> REDIS
-    REDIS --> HANDLERS
-    IMG --> OPENAI
-    IMG --> PROXY
-    PROXY --> R2
-    IMG --> MM
+    mm --> wh
+    wh --> handlers
+    handlers --> img
+    handlers --> redis
+    redis --> handlers
+    img --> openai
+    img --> proxy
+    proxy --> r2
+    img --> mm
 
-    UA --> TRPC
-    UA --> AUTH
-    UA --> OPS
-    AUTH --> GITHUB
+    ua --> trpc
+    ua --> auth
+    ua --> ops
+    auth --> github
 ```
 
 ## 2) Request flow (Meta messaging)
@@ -204,6 +206,26 @@ The current bot boundary is intentionally incremental:
 - Outbound behavior is represented first as a small `BotResponse` intent layer (`text`, `ack`, `typing`), then translated by channel adapters.
 
 This keeps Messenger and WhatsApp aligned for text without forcing media/image abstractions before the contracts are ready.
+
+## 5c) Identity-games foundation
+
+The identity-games feature is planned as a separate experience layer, not as an extension of the legacy style flow.
+
+Required foundation before implementation:
+
+- explicit `EntryIntent` normalization at the channel edge
+- explicit `ActiveExperience` ownership in shared state
+- mandatory routing order: `EntryIntent`, then `ActiveExperience`, then explicit command, then fallback flow
+- richer outbound intents for option-driven and result-driven experiences
+- isolated experience session storage
+
+Design rule:
+
+- Messenger and WhatsApp differences must be absorbed at the normalization boundary
+- shared logic must not inspect raw provider payloads
+- identity-game state must not be stored in `selectedStyle`, `stage`, `preselectedStyle`, or related legacy style fields
+
+The normative design for that work lives in `docs/architecture/identity-games.md`.
 
 ## 6) Deployment model
 
