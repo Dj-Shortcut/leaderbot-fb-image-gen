@@ -302,7 +302,7 @@ describe("experience routing", () => {
 
   it("treats expired active sessions as missing", async () => {
     const userKey = anonymizePsid("expired-session-user");
-    upsertIdentityGameSession({
+    await upsertIdentityGameSession({
       sessionId: "expired-session-id",
       userId: userKey,
       gameId: "party-alter-ego",
