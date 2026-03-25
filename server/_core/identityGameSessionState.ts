@@ -158,7 +158,7 @@ export function getIdentityGameSessionByActiveExperience(
 
   if (isPromiseLike(session)) {
     return session.then(current => {
-      if (!current) {
+      if (!current || current.gameId !== activeExperience.id) {
         return null;
       }
 
@@ -166,7 +166,7 @@ export function getIdentityGameSessionByActiveExperience(
     });
   }
 
-  if (!session) {
+  if (!session || session.gameId !== activeExperience.id) {
     return null;
   }
 
