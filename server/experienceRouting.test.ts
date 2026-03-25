@@ -98,6 +98,43 @@ describe("identity-ai-v1 routing", () => {
     );
   });
 
+  it("starts Identity AI V1 from a bare ref value like the m.me deep-link payload", async () => {
+    const psid = "identity-ai-v1-bare-ref-user";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid, locale: "en_US" },
+              postback: {
+                payload: "GET_STARTED",
+                referral: {
+                  ref: "identity-ai-v1",
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      psid,
+      "When a new AI tool drops, what do you do first?",
+      expect.arrayContaining([
+        expect.objectContaining({ payload: "q1_build" }),
+        expect.objectContaining({ payload: "q1_vision" }),
+        expect.objectContaining({ payload: "q1_analyst" }),
+        expect.objectContaining({ payload: "q1_operate" }),
+      ])
+    );
+    expect(sendTextMock).not.toHaveBeenCalledWith(
+      psid,
+      expect.stringContaining("Send a photo")
+    );
+  });
+
   it("resumes the same active non-expired game at the current question", async () => {
     const userKey = anonymizePsid("identity-ai-v1-resume-user");
     await upsertIdentityGameSession({
