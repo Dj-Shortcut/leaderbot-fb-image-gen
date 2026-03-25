@@ -25,6 +25,39 @@ function writeSessionRef(
   );
 }
 
+function logSessionRefWriteFailure(
+  session: IdentityGameSession,
+  error: unknown
+): void {
+  console.error("identity_game_session_ref_write_failed", {
+    sessionId: session.sessionId,
+    userId: session.userId,
+    error: error instanceof Error ? error.message : String(error),
+  });
+}
+
+function rollbackSessionWrite(
+  session: IdentityGameSession
+): MaybePromise<void> {
+  return deleteScopedState(IDENTITY_GAME_SESSION_SCOPE, session.sessionId);
+}
+
+function handleSessionRefWriteFailure<T>(
+  session: IdentityGameSession,
+  error: unknown
+): MaybePromise<T> {
+  logSessionRefWriteFailure(session, error);
+  const rollback = rollbackSessionWrite(session);
+
+  if (isPromiseLike(rollback)) {
+    return rollback.then(() => {
+      throw error;
+    });
+  }
+
+  throw error;
+}
+
 export function getIdentityGameSessionBySessionId(
   sessionId: string
 ): MaybePromise<IdentityGameSession | null> {
@@ -82,15 +115,17 @@ export function upsertIdentityGameSession(
 
   if (isPromiseLike(writeSession)) {
     return writeSession.then(() =>
-      Promise.resolve(writeSessionRef(session.userId, session.sessionId)).then(
-        () => session
-      )
+      Promise.resolve(writeSessionRef(session.userId, session.sessionId))
+        .then(() => session)
+        .catch(error => handleSessionRefWriteFailure(session, error))
     );
   }
 
   const writeRef = writeSessionRef(session.userId, session.sessionId);
   if (isPromiseLike(writeRef)) {
-    return writeRef.then(() => session);
+    return writeRef
+      .then(() => session)
+      .catch(error => handleSessionRefWriteFailure(session, error));
   }
 
   return session;
