@@ -1,0 +1,121 @@
+import type { ActiveExperience, IdentityGameSession } from "./activeExperience";
+import {
+  deleteScopedState,
+  isPromiseLike,
+  readScopedState,
+  type MaybePromise,
+  writeScopedState,
+} from "./stateStore";
+
+const IDENTITY_GAME_SESSION_SCOPE = "identity-game-session";
+const IDENTITY_GAME_USER_SCOPE = "identity-game-session-user";
+
+type IdentityGameSessionRef = {
+  sessionId: string;
+};
+
+function writeSessionRef(
+  userId: string,
+  sessionId: string
+): MaybePromise<void> {
+  return writeScopedState<IdentityGameSessionRef>(
+    IDENTITY_GAME_USER_SCOPE,
+    userId,
+    { sessionId }
+  );
+}
+
+export function getIdentityGameSessionBySessionId(
+  sessionId: string
+): MaybePromise<IdentityGameSession | null> {
+  return readScopedState<IdentityGameSession>(
+    IDENTITY_GAME_SESSION_SCOPE,
+    sessionId
+  );
+}
+
+export function getIdentityGameSessionByUserId(
+  userId: string
+): MaybePromise<IdentityGameSession | null> {
+  const ref = readScopedState<IdentityGameSessionRef>(
+    IDENTITY_GAME_USER_SCOPE,
+    userId
+  );
+
+  if (isPromiseLike(ref)) {
+    return ref.then(current => {
+      if (!current?.sessionId) {
+        return null;
+      }
+
+      return Promise.resolve(
+        getIdentityGameSessionBySessionId(current.sessionId)
+      );
+    });
+  }
+
+  if (!ref?.sessionId) {
+    return null;
+  }
+
+  return getIdentityGameSessionBySessionId(ref.sessionId);
+}
+
+export function getIdentityGameSessionByActiveExperience(
+  activeExperience: ActiveExperience | null | undefined
+): MaybePromise<IdentityGameSession | null> {
+  if (!activeExperience?.sessionId || activeExperience.type !== "identity_game") {
+    return null;
+  }
+
+  return getIdentityGameSessionBySessionId(activeExperience.sessionId);
+}
+
+export function upsertIdentityGameSession(
+  session: IdentityGameSession
+): MaybePromise<IdentityGameSession> {
+  const writeSession = writeScopedState(
+    IDENTITY_GAME_SESSION_SCOPE,
+    session.sessionId,
+    session
+  );
+
+  if (isPromiseLike(writeSession)) {
+    return writeSession.then(() =>
+      Promise.resolve(writeSessionRef(session.userId, session.sessionId)).then(
+        () => session
+      )
+    );
+  }
+
+  const writeRef = writeSessionRef(session.userId, session.sessionId);
+  if (isPromiseLike(writeRef)) {
+    return writeRef.then(() => session);
+  }
+
+  return session;
+}
+
+export function clearIdentityGameSession(
+  sessionId: string,
+  userId?: string
+): MaybePromise<void> {
+  const deleteSession = deleteScopedState(IDENTITY_GAME_SESSION_SCOPE, sessionId);
+
+  const finish = () => {
+    if (!userId) {
+      return undefined;
+    }
+
+    return deleteScopedState(IDENTITY_GAME_USER_SCOPE, userId);
+  };
+
+  if (isPromiseLike(deleteSession)) {
+    return deleteSession.then(() => finish()).then(() => undefined);
+  }
+
+  const deleteRef = finish();
+  if (isPromiseLike(deleteRef)) {
+    return deleteRef.then(() => undefined);
+  }
+}

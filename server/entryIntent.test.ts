@@ -1,0 +1,38 @@
+import { describe, expect, it } from "vitest";
+import { parseGameEntryIntent } from "./_core/entryIntent";
+
+describe("entryIntent parsing", () => {
+  it("normalizes a Messenger deep link into an identity game entry intent", () => {
+    const result = parseGameEntryIntent({
+      channel: "messenger",
+      ref: "game:party-alter-ego?entryMode=confirm_first&campaignId=camp-1&creativeId=creative-9&entryVariant=feed-a",
+      sourceType: "referral",
+      localeHint: "nl",
+      receivedAt: 1710000000000,
+    });
+
+    expect(result).toEqual({
+      sourceChannel: "messenger",
+      sourceType: "referral",
+      targetExperienceType: "identity_game",
+      targetExperienceId: "party-alter-ego",
+      entryMode: "confirm_first",
+      campaignId: "camp-1",
+      creativeId: "creative-9",
+      entryVariant: "feed-a",
+      localeHint: "nl",
+      rawRef:
+        "game:party-alter-ego?entryMode=confirm_first&campaignId=camp-1&creativeId=creative-9&entryVariant=feed-a",
+      receivedAt: 1710000000000,
+    });
+  });
+
+  it("ignores non-game refs so style deep links can keep their own flow", () => {
+    expect(
+      parseGameEntryIntent({
+        channel: "messenger",
+        ref: "style_disco",
+      })
+    ).toBeNull();
+  });
+});

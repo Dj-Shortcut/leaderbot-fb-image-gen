@@ -81,4 +81,54 @@ describe("botResponseAdapters", () => {
 
     expect(sendText).not.toHaveBeenCalled();
   });
+
+  it("maps Messenger options prompts to the dedicated sender when available", async () => {
+    const sendText = vi.fn(async () => {});
+    const sendStateText = vi.fn(async () => {});
+    const sendOptionsPrompt = vi.fn(async () => {});
+
+    await sendMessengerBotResponse(
+      {
+        kind: "options_prompt",
+        prompt: "Choose",
+        options: [
+          { id: "ONE", title: "One" },
+          { id: "TWO", title: "Two" },
+        ],
+        selectionMode: "single",
+        fallbackText: "Choose: One or Two",
+      },
+      {
+        sendText,
+        sendStateText,
+        sendOptionsPrompt,
+      }
+    );
+
+    expect(sendOptionsPrompt).toHaveBeenCalledWith(
+      "Choose",
+      [
+        { id: "ONE", title: "One" },
+        { id: "TWO", title: "Two" },
+      ],
+      "Choose: One or Two"
+    );
+    expect(sendText).not.toHaveBeenCalled();
+  });
+
+  it("maps WhatsApp error responses to plain text", async () => {
+    const sendText = vi.fn(async () => {});
+
+    await sendWhatsAppBotResponse(
+      {
+        kind: "error",
+        text: "Something broke",
+      },
+      {
+        sendText,
+      }
+    );
+
+    expect(sendText).toHaveBeenCalledWith("Something broke");
+  });
 });

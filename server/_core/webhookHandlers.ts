@@ -23,16 +23,20 @@ import {
   setFlowState,
   setLastGenerated,
   setLastGenerationContext,
+  setLastEntryIntent,
   setLastUserMessageAt,
   setPendingImage,
   setPreselectedStyle,
   setPreferredLang,
   setSelectedStyleCategory,
+  setActiveExperience,
   markIntroSeen,
   anonymizePsid,
   type ConversationState,
 } from "./messengerState";
 import { normalizeLang, t, type Lang } from "./i18n";
+import { routeActiveExperience, routeEntryIntent } from "./experienceRouter";
+import { parseGameEntryIntent } from "./entryIntent";
 import { toLogUser, toUserKey } from "./privacy";
 import {
   getStylesForCategory,
@@ -1089,9 +1093,67 @@ export function createWebhookHandlers({
       }
     }
 
-    const referralStyle = parseReferralStyle(
-      event.postback?.referral?.ref ?? event.referral?.ref
-    );
+    const referralRef = event.postback?.referral?.ref ?? event.referral?.ref;
+    const entryIntent = parseGameEntryIntent({
+      channel: "messenger",
+      ref: referralRef,
+      sourceType: event.postback?.payload ? "postback" : "referral",
+      localeHint: localeLang ?? undefined,
+      receivedAt: event.timestamp ?? Date.now(),
+    });
+    const entryIntentRoute = await routeEntryIntent({
+      state,
+      entryIntent,
+      setLastEntryIntent: nextEntryIntent =>
+        Promise.resolve(setLastEntryIntent(psid, nextEntryIntent)),
+      setActiveExperience: nextActiveExperience =>
+        Promise.resolve(setActiveExperience(psid, nextActiveExperience)),
+    });
+    if (entryIntentRoute.handled) {
+      await sendMessengerBotResponse(entryIntentRoute.response ?? null, {
+        sendText: text => sendLoggedText(psid, text, reqId),
+        sendStateText: (stateName, text) =>
+          sendStateQuickReplies(psid, stateName, text, reqId),
+        sendOptionsPrompt: async (prompt, options, fallbackText) => {
+          await sendLoggedQuickReplies(
+            psid,
+            prompt,
+            options.map(option => ({
+              content_type: "text",
+              title: option.title,
+              payload: option.id,
+            })),
+            reqId
+          );
+
+          if (fallbackText) {
+            safeLog("entry_intent_options_fallback_available", {
+              user: toLogUser(userId),
+              fallbackText,
+            });
+          }
+        },
+      });
+      return;
+    }
+
+    const activeExperienceRoute = await routeActiveExperience({
+      state,
+      setLastEntryIntent: nextEntryIntent =>
+        Promise.resolve(setLastEntryIntent(psid, nextEntryIntent)),
+      setActiveExperience: nextActiveExperience =>
+        Promise.resolve(setActiveExperience(psid, nextActiveExperience)),
+    });
+    if (activeExperienceRoute.handled) {
+      await sendMessengerBotResponse(activeExperienceRoute.response ?? null, {
+        sendText: text => sendLoggedText(psid, text, reqId),
+        sendStateText: (stateName, text) =>
+          sendStateQuickReplies(psid, stateName, text, reqId),
+      });
+      return;
+    }
+
+    const referralStyle = parseReferralStyle(referralRef);
     if (referralStyle) {
       await clearPendingImageState(psid);
       await setPreselectedStyle(psid, referralStyle);
