@@ -77,7 +77,7 @@ Allowed `status` values:
 
 Rules:
 - Only one `ActiveExperience` owns the conversation at a time.
-- Shared routing first checks explicit `EntryIntent`, then active experience resume, then generic flow.
+- Shared routing must follow the mandatory order: `EntryIntent`, then `ActiveExperience`, then explicit command, then fallback flow.
 - Existing flat flow stage may remain temporarily for current style flow, but games must not reuse it.
 
 ### 3. Routing priority
@@ -204,10 +204,10 @@ Shared orchestration returns normalized outbound intents only. Channel adapters 
 This boundary is the seam that keeps Messenger/WhatsApp differences out of shared logic.
 
 ## Implementation Sequence
-1. Introduce `EntryIntent` and channel-level parsers.
-2. Introduce `ActiveExperience` and mandatory routing priority.
-3. Introduce richer outbound intent contracts plus Messenger/WhatsApp adapters.
-4. Introduce isolated experience session storage with the required retrieval paths.
+1. Add `EntryIntent` and channel-level parsers.
+2. Define `ActiveExperience` and mandatory routing priority.
+3. Specify richer outbound intent contracts plus Messenger/WhatsApp adapters.
+4. Implement isolated experience session storage with the required retrieval paths.
 5. Move existing deep-link/referral handling to the normalization boundary.
 6. Add tests proving shared logic no longer depends on raw channel payload shape.
 7. Only after this foundation is stable, start the first identity game implementation.
