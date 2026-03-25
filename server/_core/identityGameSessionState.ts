@@ -76,10 +76,26 @@ function handleSessionRefWriteFailure<T>(
 export function getIdentityGameSessionBySessionId(
   sessionId: string
 ): MaybePromise<IdentityGameSession | null> {
-  return readScopedState<IdentityGameSession>(
+  const session = readScopedState<IdentityGameSession>(
     IDENTITY_GAME_SESSION_SCOPE,
     sessionId
   );
+
+  if (isPromiseLike(session)) {
+    return session.then(current => {
+      if (!current || isExpired(current)) {
+        return null;
+      }
+
+      return current;
+    });
+  }
+
+  if (!session || isExpired(session)) {
+    return null;
+  }
+
+  return session;
 }
 
 export function getIdentityGameSessionByUserId(
@@ -99,7 +115,7 @@ export function getIdentityGameSessionByUserId(
       return Promise.resolve(
         getIdentityGameSessionBySessionId(current.sessionId)
       ).then(session => {
-        if (!session || isExpired(session)) {
+        if (!session) {
           return null;
         }
 
@@ -116,7 +132,7 @@ export function getIdentityGameSessionByUserId(
 
   if (isPromiseLike(session)) {
     return session.then(current => {
-      if (!current || isExpired(current)) {
+      if (!current) {
         return null;
       }
 
@@ -124,7 +140,7 @@ export function getIdentityGameSessionByUserId(
     });
   }
 
-  if (!session || isExpired(session)) {
+  if (!session) {
     return null;
   }
 
@@ -142,7 +158,7 @@ export function getIdentityGameSessionByActiveExperience(
 
   if (isPromiseLike(session)) {
     return session.then(current => {
-      if (!current || isExpired(current)) {
+      if (!current) {
         return null;
       }
 
@@ -150,7 +166,7 @@ export function getIdentityGameSessionByActiveExperience(
     });
   }
 
-  if (!session || isExpired(session)) {
+  if (!session) {
     return null;
   }
 
