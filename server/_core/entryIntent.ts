@@ -27,12 +27,33 @@ export type EntryIntent = {
 };
 
 function normalizeExperienceId(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const normalized = value.trim().toLowerCase();
+  let result = "";
+  let lastWasSeparator = false;
+
+  for (const character of normalized) {
+    const isAlphaNumeric =
+      (character >= "a" && character <= "z") ||
+      (character >= "0" && character <= "9");
+    const isPreservedSeparator = character === "_" || character === "-";
+
+    if (isAlphaNumeric) {
+      result += character;
+      lastWasSeparator = false;
+      continue;
+    }
+
+    if (isPreservedSeparator || !lastWasSeparator) {
+      result += "-";
+      lastWasSeparator = true;
+    }
+  }
+
+  if (result.endsWith("-")) {
+    result = result.slice(0, -1);
+  }
+
+  return result.startsWith("-") ? result.slice(1) : result;
 }
 
 function resolveSourceType(value: string | null): EntrySourceType {
