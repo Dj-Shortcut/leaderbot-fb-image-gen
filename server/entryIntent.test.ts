@@ -68,4 +68,14 @@ describe("entryIntent parsing", () => {
 
     expect(result?.localeHint).toBe("en");
   });
+
+  it("ignores an empty locale query value and falls back to the input locale hint", () => {
+    const result = parseGameEntryIntent({
+      channel: "messenger",
+      ref: "game:party-alter-ego?locale=%20%20",
+      localeHint: "nl_BE",
+    });
+
+    expect(result?.localeHint).toBe("nl_BE");
+  });
 });

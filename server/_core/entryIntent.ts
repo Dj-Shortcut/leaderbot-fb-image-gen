@@ -116,6 +116,7 @@ export function parseGameEntryIntent(input: {
   }
 
   const params = new URLSearchParams(query);
+  const localeFromQuery = params.get("locale")?.trim();
 
   return {
     sourceChannel: input.channel,
@@ -128,7 +129,7 @@ export function parseGameEntryIntent(input: {
     campaignId: params.get("campaignId") ?? undefined,
     creativeId: params.get("creativeId") ?? undefined,
     entryVariant: params.get("entryVariant") ?? undefined,
-    localeHint: params.get("locale") ?? input.localeHint ?? undefined,
+    localeHint: localeFromQuery || input.localeHint || undefined,
     rawRef,
     receivedAt: input.receivedAt ?? Date.now(),
   };
