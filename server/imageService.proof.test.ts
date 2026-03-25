@@ -551,6 +551,7 @@ describe("OpenAi image-to-image proof", () => {
       style: "disco",
       sourceImageUrl: "https://pub-storage.example/inbound-source/test.jpg",
       trustedSourceImageUrl: true,
+      sourceImageProvenance: "storeInbound",
       userKey: "user-1",
       reqId: "req-trusted-stored-source",
     });
@@ -559,6 +560,28 @@ describe("OpenAi image-to-image proof", () => {
     expect(result.imageUrl).toMatch(
       /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
     );
+  });
+
+  it("does not bypass SOURCE_IMAGE_ALLOWED_HOSTS without stored-source provenance", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example";
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await expect(
+      generator.generate({
+        style: "disco",
+        sourceImageUrl: "https://pub-storage.example/inbound-source/test.jpg",
+        trustedSourceImageUrl: true,
+        userKey: "user-1",
+        reqId: "req-missing-provenance",
+      })
+    ).rejects.toBeInstanceOf(InvalidSourceImageUrlError);
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("rejects source image URLs with embedded credentials before fetch", async () => {

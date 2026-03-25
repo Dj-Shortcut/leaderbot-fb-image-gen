@@ -641,11 +641,17 @@ export function createWebhookHandlers({
 
       const state = await getOrCreateState(psid);
       const lastImageUrl = sourceImageUrl ?? state.lastPhotoUrl;
+      const trustedSourceImageUrl =
+        lastImageUrl !== undefined &&
+        lastImageUrl === state.lastPhotoUrl &&
+        state.lastPhotoSource === "stored";
 
       try {
         const { imageUrl, proof, metrics } = await generator.generate({
           style,
           sourceImageUrl: lastImageUrl ?? undefined,
+          trustedSourceImageUrl,
+          sourceImageProvenance: trustedSourceImageUrl ? "storeInbound" : undefined,
           promptHint,
           userKey: userId,
           reqId,

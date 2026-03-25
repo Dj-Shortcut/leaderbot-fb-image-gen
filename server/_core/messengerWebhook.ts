@@ -1,5 +1,6 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
+import { createHash } from "node:crypto";
 import { z, ZodError } from "zod";
 import { normalizeLang, t, type Lang } from "./i18n";
 import { createWebhookHandlers } from "./webhookHandlers";
@@ -26,6 +27,7 @@ import {
 import { toUserKey, toLogUser } from "./privacy";
 import { handleSharedTextMessage } from "./sharedTextHandler";
 import {
+  clearPendingImageState,
   getOrCreateState,
   markIntroSeen,
   setChosenStyle,
@@ -92,6 +94,25 @@ export { detectAck, getGreetingResponse, summarizeWebhook };
 
 export function resetMessengerEventDedupe(): void {
   resetWebhookReplayProtection();
+}
+
+function summarizeSensitiveUrl(url: string): {
+  host: string;
+  shortHash: string;
+} {
+  const shortHash = createHash("sha256").update(url).digest("hex").slice(0, 12);
+
+  try {
+    return {
+      host: new URL(url).host || "invalid-url",
+      shortHash,
+    };
+  } catch {
+    return {
+      host: "invalid-url",
+      shortHash,
+    };
+  }
 }
 
 function getMetaVerifyToken(): string {
@@ -557,7 +578,10 @@ async function runWhatsAppStyleGeneration(
 
   const state = await Promise.resolve(getOrCreateState(senderId));
   const resolvedSourceImageUrl = sourceImageUrl ?? state.lastPhotoUrl ?? undefined;
-  const trustedSourceImageUrl = resolvedSourceImageUrl === state.lastPhotoUrl;
+  const trustedSourceImageUrl =
+    resolvedSourceImageUrl !== undefined &&
+    resolvedSourceImageUrl === state.lastPhotoUrl &&
+    state.lastPhotoSource === "stored";
   if (!resolvedSourceImageUrl) {
     await setFlowState(senderId, "AWAITING_PHOTO");
     await sendWhatsAppText(senderId, t(lang, "styleWithoutPhoto"));
@@ -592,6 +616,7 @@ async function runWhatsAppStyleGeneration(
       style,
       sourceImageUrl: resolvedSourceImageUrl,
       trustedSourceImageUrl,
+      sourceImageProvenance: trustedSourceImageUrl ? "storeInbound" : undefined,
       promptHint,
       userKey: userId,
       reqId,
@@ -627,11 +652,14 @@ async function runWhatsAppStyleGeneration(
     let failureText = t(lang, "generationGenericFailure");
     if (error instanceof InvalidSourceImageUrlError) {
       failureText = t(lang, "missingInputImage");
+      if (!sourceImageUrl || resolvedSourceImageUrl === state.lastPhotoUrl) {
+        await clearPendingImageState(senderId);
+      }
       await setFlowState(senderId, "AWAITING_PHOTO");
       console.error("[whatsapp webhook] source image rejected", {
         user: toLogUser(userId),
         style,
-        sourceImageUrl: resolvedSourceImageUrl,
+        sourceImageUrl: summarizeSensitiveUrl(resolvedSourceImageUrl),
       });
     } else if (error instanceof MissingInputImageError) {
       failureText = t(lang, "missingInputImage");
@@ -812,7 +840,12 @@ async function handleWhatsAppImageEvent(
 
   const state = await Promise.resolve(getOrCreateState(event.senderId));
   const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");
-  await setPendingImage(event.senderId, persistedImageUrl);
+  await setPendingImage(
+    event.senderId,
+    persistedImageUrl,
+    Date.now(),
+    "stored"
+  );
 
   if (preselectedStyle) {
     await setPreselectedStyle(event.senderId, null);

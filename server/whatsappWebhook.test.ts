@@ -23,7 +23,10 @@ vi.mock("./_core/whatsappApi", () => ({
 }));
 
 import { clearGeneratedImageStore } from "./_core/generatedImageStore";
-import { OpenAiImageGenerator } from "./_core/imageService";
+import {
+  InvalidSourceImageUrlError,
+  OpenAiImageGenerator,
+} from "./_core/imageService";
 import {
   processWhatsAppWebhookPayload,
   resetMessengerEventDedupe,
@@ -125,6 +128,9 @@ describe("whatsapp webhook flow", () => {
     expect(downloadWhatsAppMediaMock).toHaveBeenCalledWith("wamid-image-1");
     expect(getState(anonymizePsid("wa-user-1"))?.lastPhotoUrl).toMatch(
       /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/.+\.jpg$/
+    );
+    expect(getState(anonymizePsid("wa-user-1"))?.lastPhotoSource).toBe(
+      "stored"
     );
     expect(sendWhatsAppButtonsMock).toHaveBeenCalledWith(
       "wa-user-1",
@@ -324,8 +330,64 @@ describe("whatsapp webhook flow", () => {
             /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/.+\.jpg$/
           ),
           trustedSourceImageUrl: true,
+          sourceImageProvenance: "storeInbound",
         })
       );
+    } finally {
+      generateSpy.mockRestore();
+    }
+  });
+
+  it("clears a rejected stored WhatsApp photo when the trusted source URL is invalid", async () => {
+    downloadWhatsAppMediaMock.mockResolvedValue({
+      buffer: Buffer.alloc(6000, 7),
+      contentType: "image/jpeg",
+    });
+
+    const generateSpy = vi
+      .spyOn(OpenAiImageGenerator.prototype, "generate")
+      .mockRejectedValue(
+        new InvalidSourceImageUrlError("sourceImageUrl is not allowed")
+      );
+
+    try {
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-invalid-source",
+          timestamp: "1710000020",
+          type: "image",
+          image: { id: "wamid-image-invalid-source" },
+        })
+      );
+
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-invalid-source",
+          timestamp: "1710000021",
+          type: "interactive",
+          interactive: {
+            type: "button_reply",
+            button_reply: { id: "WA_BOLD", title: "Bold" },
+          },
+        })
+      );
+
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-invalid-source",
+          timestamp: "1710000022",
+          type: "interactive",
+          interactive: {
+            type: "list_reply",
+            list_reply: { id: "STYLE_DISCO", title: "Disco" },
+          },
+        })
+      );
+
+      const nextState = getState(anonymizePsid("wa-user-invalid-source"));
+      expect(nextState?.lastPhotoUrl).toBeNull();
+      expect(nextState?.lastPhotoSource).toBeNull();
+      expect(nextState?.stage).toBe("AWAITING_PHOTO");
     } finally {
       generateSpy.mockRestore();
     }
