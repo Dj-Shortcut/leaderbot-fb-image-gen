@@ -150,7 +150,7 @@ const QUESTIONS: [QuestionDefinition, QuestionDefinition, QuestionDefinition] = 
         id: "q3_vision",
         title: {
           en: "The spark",
-          nl: "De spark",
+          nl: "De vonk",
         },
         family: "visionary",
       },
@@ -166,7 +166,7 @@ const QUESTIONS: [QuestionDefinition, QuestionDefinition, QuestionDefinition] = 
         id: "q3_operate",
         title: {
           en: "The coordinator",
-          nl: "De coordinator",
+          nl: "De coördinator",
         },
         family: "operator",
       },
@@ -238,7 +238,7 @@ const ARCHETYPES: Record<IdentityAiV1ArchetypeId, ArchetypeDefinition> = {
     },
     explanationLine: {
       en: "Your answers kept favoring structure, coordination, and durable systems.",
-      nl: "Jouw antwoorden kozen telkens voor structuur, coordinatie en duurzame systemen.",
+      nl: "Jouw antwoorden kozen telkens voor structuur, coördinatie en duurzame systemen.",
     },
     visualDescriptor:
       "calm AI operator in a command center, elegant systems dashboards, structured flow, composed authority",

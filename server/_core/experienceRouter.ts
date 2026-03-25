@@ -7,9 +7,7 @@ import {
   applyIdentityAiV1Answer,
   buildIdentityAiV1QuestionResponse,
   createIdentityAiV1Session,
-  formatIdentityAiV1ResultText,
   generateIdentityAiV1ImageResponse,
-  IDENTITY_AI_V1_GAME_ID,
   isIdentityAiV1GameId,
   isIdentityAiV1SessionResumable,
 } from "./identityAiV1";
