@@ -116,7 +116,7 @@ export function getIdentityGameSessionByUserId(
 
   if (isPromiseLike(session)) {
     return session.then(current => {
-      if (!current || isExpired(current)) {
+      if (!current) {
         return null;
       }
 
@@ -124,7 +124,7 @@ export function getIdentityGameSessionByUserId(
     });
   }
 
-  if (!session || isExpired(session)) {
+  if (!session) {
     return null;
   }
 
@@ -142,7 +142,7 @@ export function getIdentityGameSessionByActiveExperience(
 
   if (isPromiseLike(session)) {
     return session.then(current => {
-      if (!current || isExpired(current)) {
+      if (!current) {
         return null;
       }
 
@@ -150,7 +150,7 @@ export function getIdentityGameSessionByActiveExperience(
     });
   }
 
-  if (!session || isExpired(session)) {
+  if (!session) {
     return null;
   }
 
