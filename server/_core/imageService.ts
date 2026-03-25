@@ -715,19 +715,20 @@ export class OpenAiImageGenerator implements ImageGenerator {
       throw new InvalidGenerationInputError("Style is required");
     }
 
-    if (!input.sourceImageUrl && !input.sourceImageData) {
-      console.error("MISSING_INPUT_IMAGE", {
-        reqId: input.reqId,
-        reason: "missing_source_url",
-      });
-      throw new MissingInputImageError("source image is required");
-    }
-
     if (!process.env.OPENAI_API_KEY) {
       throw new MissingOpenAiApiKeyError("OPENAI_API_KEY is missing");
     }
 
     try {
+      const prompt = buildStylePrompt(input.style, input.promptHint);
+      const hasSourceImage = Boolean(input.sourceImageUrl || input.sourceImageData);
+      let imageBuffer: Buffer = Buffer.from([]);
+      let contentType = "image/jpeg";
+      let incomingLen = 0;
+      let incomingSha256 = sha256(imageBuffer);
+      let openAiInputHash = incomingSha256;
+      let openAiInputByteLen = 0;
+
       if (input.sourceImageUrl) {
         console.info("SOURCE_IMAGE_FETCH_START", {
           reqId: input.reqId,
@@ -736,51 +737,62 @@ export class OpenAiImageGenerator implements ImageGenerator {
           ...getSourceUrlDiagnostics(input.sourceImageUrl),
         });
       }
-      const sourceImage = input.sourceImageData
-        ? normalizeProvidedSourceImage(input.sourceImageData)
-        : await downloadSourceImageOrThrow(input.sourceImageUrl!, input.reqId, {
-            trustedSourceImageUrl: input.trustedSourceImageUrl,
-            sourceImageProvenance: input.sourceImageProvenance,
-          });
-      const imageBuffer = sourceImage.buffer;
-      const contentType = sourceImage.contentType;
-      const incomingLen = sourceImage.incomingLen;
-      const incomingSha256 = sourceImage.incomingSha256;
-      partialMetrics.fbImageFetchMs = sourceImage.fbImageFetchMs;
-      const openAiInputHash = sha256(imageBuffer);
-      const openAiInputByteLen = safeLen(imageBuffer);
+      if (hasSourceImage) {
+        const sourceImage = input.sourceImageData
+          ? normalizeProvidedSourceImage(input.sourceImageData)
+          : await downloadSourceImageOrThrow(input.sourceImageUrl!, input.reqId, {
+              trustedSourceImageUrl: input.trustedSourceImageUrl,
+              sourceImageProvenance: input.sourceImageProvenance,
+            });
+        imageBuffer = sourceImage.buffer;
+        contentType = sourceImage.contentType;
+        incomingLen = sourceImage.incomingLen;
+        incomingSha256 = sourceImage.incomingSha256;
+        partialMetrics.fbImageFetchMs = sourceImage.fbImageFetchMs;
+        openAiInputHash = sha256(imageBuffer);
+        openAiInputByteLen = safeLen(imageBuffer);
+      }
 
       const openAiRetryLimit = getOpenAiRetryLimit();
       const openAiRetryBaseMs = getOpenAiRetryBaseMs();
       const openAiTimeoutMs = getOpenAiTimeoutMs();
-
-      const createOpenAiFormData = (): FormData => {
-        const formData = new FormData();
-        const prompt = buildStylePrompt(input.style, input.promptHint);
-        formData.set("model", "gpt-image-1");
-        formData.set("prompt", prompt);
-        formData.set("size", "1024x1024");
-        formData.set("output_format", "jpeg");
-        formData.set(
-          "image",
-          new Blob([new Uint8Array(imageBuffer)], { type: contentType }),
-          "source-image"
-        );
-        return formData;
-      };
 
       let response: Response | undefined;
       for (let attempt = 0; attempt <= openAiRetryLimit; attempt += 1) {
         const openAiStartedAt = Date.now();
         try {
           response = await fetchWithTimeout(
-            new URL("https://api.openai.com/v1/images/edits"),
+            new URL(
+              hasSourceImage
+                ? "https://api.openai.com/v1/images/edits"
+                : "https://api.openai.com/v1/images/generations"
+            ),
             {
               method: "POST",
               headers: {
                 Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                ...(hasSourceImage ? {} : { "Content-Type": "application/json" }),
               },
-              body: createOpenAiFormData(),
+              body: hasSourceImage
+                ? (() => {
+                    const formData = new FormData();
+                    formData.set("model", "gpt-image-1");
+                    formData.set("prompt", prompt);
+                    formData.set("size", "1024x1024");
+                    formData.set("output_format", "jpeg");
+                    formData.set(
+                      "image",
+                      new Blob([new Uint8Array(imageBuffer)], { type: contentType }),
+                      "source-image"
+                    );
+                    return formData;
+                  })()
+                : JSON.stringify({
+                    model: "gpt-image-1",
+                    prompt,
+                    size: "1024x1024",
+                    output_format: "jpeg",
+                  }),
             },
             openAiTimeoutMs
           );

@@ -1133,7 +1133,33 @@ export function createWebhookHandlers({
             });
           }
         },
+        sendImage: (imageUrl, caption) => {
+          if (caption) {
+            return sendLoggedText(psid, caption, reqId).then(() =>
+              sendLoggedImage(psid, imageUrl, reqId)
+            );
+          }
+
+          return sendLoggedImage(psid, imageUrl, reqId);
+        },
       });
+      if (entryIntentRoute.afterSend) {
+        const followUpResponse = await entryIntentRoute.afterSend();
+        await sendMessengerBotResponse(followUpResponse, {
+          sendText: text => sendLoggedText(psid, text, reqId),
+          sendStateText: (stateName, text) =>
+            sendStateQuickReplies(psid, stateName, text, reqId),
+          sendImage: (imageUrl, caption) => {
+            if (caption) {
+              return sendLoggedText(psid, caption, reqId).then(() =>
+                sendLoggedImage(psid, imageUrl, reqId)
+              );
+            }
+
+            return sendLoggedImage(psid, imageUrl, reqId);
+          },
+        });
+      }
       return;
     }
 
@@ -1155,7 +1181,71 @@ export function createWebhookHandlers({
         sendText: text => sendLoggedText(psid, text, reqId),
         sendStateText: (stateName, text) =>
           sendStateQuickReplies(psid, stateName, text, reqId),
+        sendOptionsPrompt: async (prompt, options, fallbackText) => {
+          await sendLoggedQuickReplies(
+            psid,
+            prompt,
+            options.map(option => ({
+              content_type: "text",
+              title: option.title,
+              payload: option.id,
+            })),
+            reqId
+          );
+
+          if (fallbackText) {
+            safeLog("active_experience_options_fallback_available", {
+              user: toLogUser(userId),
+              fallbackText,
+            });
+          }
+        },
+        sendImage: (imageUrl, caption) => {
+          if (caption) {
+            return sendLoggedText(psid, caption, reqId).then(() =>
+              sendLoggedImage(psid, imageUrl, reqId)
+            );
+          }
+
+          return sendLoggedImage(psid, imageUrl, reqId);
+        },
       });
+      if (activeExperienceRoute.afterSend) {
+        const followUpResponse = await activeExperienceRoute.afterSend();
+        await sendMessengerBotResponse(followUpResponse, {
+          sendText: text => sendLoggedText(psid, text, reqId),
+          sendStateText: (stateName, text) =>
+            sendStateQuickReplies(psid, stateName, text, reqId),
+          sendOptionsPrompt: async (prompt, options, fallbackText) => {
+            await sendLoggedQuickReplies(
+              psid,
+              prompt,
+              options.map(option => ({
+                content_type: "text",
+                title: option.title,
+                payload: option.id,
+              })),
+              reqId
+            );
+
+            if (fallbackText) {
+              safeLog("active_experience_options_fallback_available", {
+                user: toLogUser(userId),
+                fallbackText,
+              });
+            }
+          },
+          sendImage: (imageUrl, caption) => {
+            if (caption) {
+              return sendLoggedText(psid, caption, reqId).then(() =>
+                sendLoggedImage(psid, imageUrl, reqId)
+              );
+            }
+
+            return sendLoggedImage(psid, imageUrl, reqId);
+          },
+        });
+      }
       return;
     }
 

@@ -920,7 +920,31 @@ export async function processWhatsAppWebhookPayload(
                 fallbackText ??
                   [prompt, ...options.map(option => option.title)].join("\n")
               ),
+            sendImage: (imageUrl, caption) => {
+              if (caption) {
+                return sendWhatsAppText(event.senderId, caption).then(() =>
+                  sendWhatsAppImage(event.senderId, imageUrl)
+                );
+              }
+
+              return sendWhatsAppImage(event.senderId, imageUrl);
+            },
           });
+          if (entryIntentRoute.afterSend) {
+            const followUpResponse = await entryIntentRoute.afterSend();
+            await sendWhatsAppBotResponse(followUpResponse, {
+              sendText: text => sendWhatsAppText(event.senderId, text),
+              sendImage: (imageUrl, caption) => {
+                if (caption) {
+                  return sendWhatsAppText(event.senderId, caption).then(() =>
+                    sendWhatsAppImage(event.senderId, imageUrl)
+                  );
+                }
+
+                return sendWhatsAppImage(event.senderId, imageUrl);
+              },
+            });
+          }
           continue;
         }
 
@@ -935,7 +959,43 @@ export async function processWhatsAppWebhookPayload(
         if (activeExperienceRoute.handled) {
           await sendWhatsAppBotResponse(activeExperienceRoute.response ?? null, {
             sendText: text => sendWhatsAppText(event.senderId, text),
+            sendOptionsPrompt: (prompt, options, fallbackText) =>
+              sendWhatsAppText(
+                event.senderId,
+                fallbackText ??
+                  [prompt, ...options.map(option => option.title)].join("\n")
+              ),
+            sendImage: (imageUrl, caption) => {
+              if (caption) {
+                return sendWhatsAppText(event.senderId, caption).then(() =>
+                  sendWhatsAppImage(event.senderId, imageUrl)
+                );
+              }
+
+              return sendWhatsAppImage(event.senderId, imageUrl);
+            },
           });
+          if (activeExperienceRoute.afterSend) {
+            const followUpResponse = await activeExperienceRoute.afterSend();
+            await sendWhatsAppBotResponse(followUpResponse, {
+              sendText: text => sendWhatsAppText(event.senderId, text),
+              sendOptionsPrompt: (prompt, options, fallbackText) =>
+                sendWhatsAppText(
+                  event.senderId,
+                  fallbackText ??
+                    [prompt, ...options.map(option => option.title)].join("\n")
+                ),
+              sendImage: (imageUrl, caption) => {
+                if (caption) {
+                  return sendWhatsAppText(event.senderId, caption).then(() =>
+                    sendWhatsAppImage(event.senderId, imageUrl)
+                  );
+                }
+
+                return sendWhatsAppImage(event.senderId, imageUrl);
+              },
+            });
+          }
           continue;
         }
 
@@ -962,7 +1022,31 @@ export async function processWhatsAppWebhookPayload(
                 fallbackText ??
                   [prompt, ...options.map(option => option.title)].join("\n")
               ),
+            sendImage: (imageUrl, caption) => {
+              if (caption) {
+                return sendWhatsAppText(event.senderId, caption).then(() =>
+                  sendWhatsAppImage(event.senderId, imageUrl)
+                );
+              }
+
+              return sendWhatsAppImage(event.senderId, imageUrl);
+            },
           });
+          if (entryIntentRoute.afterSend) {
+            const followUpResponse = await entryIntentRoute.afterSend();
+            await sendWhatsAppBotResponse(followUpResponse, {
+              sendText: text => sendWhatsAppText(event.senderId, text),
+              sendImage: (imageUrl, caption) => {
+                if (caption) {
+                  return sendWhatsAppText(event.senderId, caption).then(() =>
+                    sendWhatsAppImage(event.senderId, imageUrl)
+                  );
+                }
+
+                return sendWhatsAppImage(event.senderId, imageUrl);
+              },
+            });
+          }
           continue;
         }
 
@@ -977,7 +1061,43 @@ export async function processWhatsAppWebhookPayload(
         if (activeExperienceRoute.handled) {
           await sendWhatsAppBotResponse(activeExperienceRoute.response ?? null, {
             sendText: text => sendWhatsAppText(event.senderId, text),
+            sendOptionsPrompt: (prompt, options, fallbackText) =>
+              sendWhatsAppText(
+                event.senderId,
+                fallbackText ??
+                  [prompt, ...options.map(option => option.title)].join("\n")
+              ),
+            sendImage: (imageUrl, caption) => {
+              if (caption) {
+                return sendWhatsAppText(event.senderId, caption).then(() =>
+                  sendWhatsAppImage(event.senderId, imageUrl)
+                );
+              }
+
+              return sendWhatsAppImage(event.senderId, imageUrl);
+            },
           });
+          if (activeExperienceRoute.afterSend) {
+            const followUpResponse = await activeExperienceRoute.afterSend();
+            await sendWhatsAppBotResponse(followUpResponse, {
+              sendText: text => sendWhatsAppText(event.senderId, text),
+              sendOptionsPrompt: (prompt, options, fallbackText) =>
+                sendWhatsAppText(
+                  event.senderId,
+                  fallbackText ??
+                    [prompt, ...options.map(option => option.title)].join("\n")
+                ),
+              sendImage: (imageUrl, caption) => {
+                if (caption) {
+                  return sendWhatsAppText(event.senderId, caption).then(() =>
+                    sendWhatsAppImage(event.senderId, imageUrl)
+                  );
+                }
+
+                return sendWhatsAppImage(event.senderId, imageUrl);
+              },
+            });
+          }
           continue;
         }
 
