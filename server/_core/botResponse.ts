@@ -31,6 +31,11 @@ export type BotResponse =
       caption?: string;
     }
   | {
+      kind: "handoff_state";
+      state: string;
+      text?: string;
+    }
+  | {
       kind: "error";
       text: string;
     }

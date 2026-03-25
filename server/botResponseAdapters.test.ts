@@ -149,4 +149,24 @@ describe("botResponseAdapters", () => {
 
     expect(sendText).toHaveBeenCalledWith("[Image not available]");
   });
+
+  it("passes through handoff_state text without failing on unsupported channel handling", async () => {
+    const sendText = vi.fn(async () => {});
+    const sendStateText = vi.fn(async () => {});
+
+    await sendMessengerBotResponse(
+      {
+        kind: "handoff_state",
+        state: "identity_game_waiting",
+        text: "Handing off",
+      },
+      {
+        sendText,
+        sendStateText,
+      }
+    );
+
+    expect(sendText).toHaveBeenCalledWith("Handing off");
+    expect(sendStateText).not.toHaveBeenCalled();
+  });
 });

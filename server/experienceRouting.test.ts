@@ -263,4 +263,50 @@ describe("experience routing", () => {
       })
     );
   });
+
+  it("keeps mandatory routing order by letting ActiveExperience win over explicit legacy commands", async () => {
+    const psid = "active-before-command-user";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              postback: {
+                payload: "GET_STARTED",
+                referral: {
+                  ref: "game:party-alter-ego",
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    sendTextMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              postback: { payload: "CHOOSE_STYLE" },
+            },
+          ],
+        },
+      ],
+    });
+
+    const state = getState(anonymizePsid(psid));
+    expect(state?.activeExperience?.type).toBe("identity_game");
+    expect(sendTextMock).toHaveBeenCalledWith(
+      psid,
+      "Je identity game-sessie is herkend, maar de game flow zelf is nog niet geactiveerd in deze fase."
+    );
+    expect(sendQuickRepliesMock).not.toHaveBeenCalled();
+  });
 });

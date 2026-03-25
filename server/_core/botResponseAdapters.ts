@@ -71,6 +71,11 @@ export async function sendMessengerBotResponse(
         await options.sendText("[Image not available]");
       }
       return;
+    case "handoff_state":
+      if (response.text) {
+        await options.sendText(response.text);
+      }
+      return;
     case "error":
       await options.sendText(response.text);
       return;
@@ -148,6 +153,11 @@ export async function sendWhatsAppBotResponse(
         await options.sendText(response.caption);
       } else {
         await options.sendText("[Image not available]");
+      }
+      return;
+    case "handoff_state":
+      if (response.text) {
+        await options.sendText(response.text);
       }
       return;
     case "error":
