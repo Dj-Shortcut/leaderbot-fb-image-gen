@@ -89,7 +89,7 @@ flowchart TD
         wh["/webhook/facebook"]
         trpc["/api/trpc"]
         auth["/auth/github/*"]
-        ops["/healthz, /__version, /generated/*"]
+        ops["/healthz, /__version, /metrics, /generated/*"]
         handlers["Webhook handlers<br/>signature check, dedupe, i18n,<br/>state transitions, quota checks"]
         img["Image service<br/>OpenAI"]
     end
