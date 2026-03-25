@@ -27,6 +27,8 @@ import { anonymizePsid, getState, resetStateStore } from "./_core/messengerState
 import {
   getIdentityGameSessionByActiveExperience,
 } from "./_core/identityGameSessionState";
+import { parseGameEntryIntent } from "./_core/entryIntent";
+import { routeEntryIntent } from "./_core/experienceRouter";
 
 describe("experience routing", () => {
   beforeEach(() => {
@@ -221,6 +223,44 @@ describe("experience routing", () => {
     expect(sendTextMock).toHaveBeenCalledWith(
       psid,
       "Geen probleem. Deze game-link blijft herkenbaar voor later."
+    );
+  });
+
+  it("creates a fresh session id when a different game entry replaces the current active experience", async () => {
+    const state = {
+      ...getState(anonymizePsid("replace-game-user"))!,
+      psid: anonymizePsid("replace-game-user"),
+      userKey: anonymizePsid("replace-game-user"),
+      activeExperience: {
+        type: "identity_game" as const,
+        id: "party-alter-ego",
+        sessionId: "existing-session-id",
+        status: "started" as const,
+        startedAt: 1710000000000,
+        updatedAt: 1710000000000,
+      },
+    };
+
+    const setLastEntryIntent = vi.fn(async () => {});
+    const setActiveExperience = vi.fn(async () => {});
+
+    const result = await routeEntryIntent({
+      state,
+      entryIntent: parseGameEntryIntent({
+        channel: "messenger",
+        ref: "game:which-vibe-are-you",
+        receivedAt: 1710000100000,
+      }),
+      setLastEntryIntent,
+      setActiveExperience,
+    });
+
+    expect(result.handled).toBe(true);
+    expect(setActiveExperience).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "which-vibe-are-you",
+        sessionId: expect.not.stringMatching(/^existing-session-id$/),
+      })
     );
   });
 });

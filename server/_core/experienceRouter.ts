@@ -28,11 +28,10 @@ function normalizeAction(action: string | null | undefined): string | null {
 
 function buildPlaceholderSession(
   state: MessengerUserState,
-  entryIntent: EntryIntent,
-  activeExperience?: ActiveExperience | null
+  entryIntent: EntryIntent
 ): IdentityGameSession {
   const startedAt = entryIntent.receivedAt;
-  const sessionId = activeExperience?.sessionId ?? randomUUID();
+  const sessionId = randomUUID();
 
   return {
     sessionId,
@@ -68,11 +67,7 @@ export async function routeEntryIntent(
           entryIntent: input.entryIntent,
           updatedAt: input.entryIntent.receivedAt,
         }
-      : buildPlaceholderSession(
-          input.state,
-          input.entryIntent,
-          input.state.activeExperience
-        );
+      : buildPlaceholderSession(input.state, input.entryIntent);
 
   await Promise.resolve(upsertIdentityGameSession(session));
   await input.setActiveExperience({
