@@ -43,7 +43,7 @@ function normalizeExperienceId(value: string): string {
       continue;
     }
 
-    if (isPreservedSeparator || !lastWasSeparator) {
+    if ((isPreservedSeparator || !isAlphaNumeric) && !lastWasSeparator) {
       result += "-";
       lastWasSeparator = true;
     }
@@ -128,7 +128,7 @@ export function parseGameEntryIntent(input: {
     campaignId: params.get("campaignId") ?? undefined,
     creativeId: params.get("creativeId") ?? undefined,
     entryVariant: params.get("entryVariant") ?? undefined,
-    localeHint: input.localeHint ?? params.get("locale") ?? undefined,
+    localeHint: params.get("locale") ?? input.localeHint ?? undefined,
     rawRef,
     receivedAt: input.receivedAt ?? Date.now(),
   };

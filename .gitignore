@@ -102,6 +102,7 @@ jspm_packages/
 # Temporary folders
 tmp/
 temp/
+.playwright-cli/
 
 # Database
 *.db

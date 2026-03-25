@@ -51,12 +51,23 @@ function handleSessionRefWriteFailure<T>(
   error: unknown
 ): MaybePromise<T> {
   logSessionRefWriteFailure(session, error);
-  const rollback = rollbackSessionWrite(session);
+  let rollback: MaybePromise<void>;
+
+  try {
+    rollback = rollbackSessionWrite(session);
+  } catch {
+    throw error;
+  }
 
   if (isPromiseLike(rollback)) {
-    return rollback.then(() => {
-      throw error;
-    });
+    return rollback.then(
+      () => {
+        throw error;
+      },
+      () => {
+        throw error;
+      }
+    );
   }
 
   throw error;
@@ -87,7 +98,13 @@ export function getIdentityGameSessionByUserId(
 
       return Promise.resolve(
         getIdentityGameSessionBySessionId(current.sessionId)
-      );
+      ).then(session => {
+        if (!session || isExpired(session)) {
+          return null;
+        }
+
+        return session;
+      });
     });
   }
 
@@ -95,7 +112,23 @@ export function getIdentityGameSessionByUserId(
     return null;
   }
 
-  return getIdentityGameSessionBySessionId(ref.sessionId);
+  const session = getIdentityGameSessionBySessionId(ref.sessionId);
+
+  if (isPromiseLike(session)) {
+    return session.then(current => {
+      if (!current || isExpired(current)) {
+        return null;
+      }
+
+      return current;
+    });
+  }
+
+  if (!session || isExpired(session)) {
+    return null;
+  }
+
+  return session;
 }
 
 export function getIdentityGameSessionByActiveExperience(
@@ -135,13 +168,21 @@ export function upsertIdentityGameSession(
 
   if (isPromiseLike(writeSession)) {
     return writeSession.then(() =>
-      Promise.resolve(writeSessionRef(session.userId, session.sessionId))
+      Promise.resolve()
+        .then(() => writeSessionRef(session.userId, session.sessionId))
         .then(() => session)
         .catch(error => handleSessionRefWriteFailure(session, error))
     );
   }
 
-  const writeRef = writeSessionRef(session.userId, session.sessionId);
+  let writeRef: MaybePromise<void>;
+
+  try {
+    writeRef = writeSessionRef(session.userId, session.sessionId);
+  } catch (error) {
+    return handleSessionRefWriteFailure(session, error);
+  }
+
   if (isPromiseLike(writeRef)) {
     return writeRef
       .then(() => session)
