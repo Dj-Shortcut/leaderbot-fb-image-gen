@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { ActiveExperience, IdentityGameSession } from "./activeExperience";
 import type { BotResponse } from "./botResponse";
 import type { EntryIntent } from "./entryIntent";
+import { normalizeLang, t } from "./i18n";
 import {
   getIdentityGameSessionByActiveExperience,
   upsertIdentityGameSession,
@@ -24,6 +25,14 @@ type ExperienceRouterInput = {
 function normalizeAction(action: string | null | undefined): string | null {
   const normalized = action?.trim().toUpperCase();
   return normalized ? normalized : null;
+}
+
+function resolveRouterLang(input: ExperienceRouterInput): "nl" | "en" {
+  return normalizeLang(
+    input.state.preferredLang ??
+      input.entryIntent?.localeHint ??
+      input.state.lastEntryIntent?.localeHint
+  );
 }
 
 function buildPlaceholderSession(
@@ -56,6 +65,7 @@ export async function routeEntryIntent(
   }
 
   await input.setLastEntryIntent(input.entryIntent);
+  const lang = resolveRouterLang(input);
 
   const existingSession = await Promise.resolve(
     getIdentityGameSessionByActiveExperience(input.state.activeExperience)
@@ -84,13 +94,16 @@ export async function routeEntryIntent(
       handled: true,
       response: {
         kind: "options_prompt",
-        prompt: "Deze game-entry is herkend. Klaar om later te starten?",
+        prompt: t(lang, "identityGameConfirmFirstPrompt"),
         options: [
-          { id: "START_GAME", title: "Start game" },
-          { id: "LATER", title: "Later" },
+          { id: "START_GAME", title: t(lang, "identityGameConfirmStart") },
+          { id: "LATER", title: t(lang, "identityGameConfirmLater") },
         ],
         selectionMode: "single",
-        fallbackText: "Antwoord met START_GAME of LATER.",
+        fallbackText:
+          lang === "en"
+            ? "Reply with START_GAME or LATER."
+            : "Antwoord met START_GAME of LATER.",
       },
     };
   }
@@ -99,7 +112,7 @@ export async function routeEntryIntent(
     handled: true,
     response: {
       kind: "text",
-      text: "Deze identity game-entry is herkend. De game flow zelf volgt in de volgende fase.",
+      text: t(lang, "identityGameEntryRecognized"),
     },
   };
 }
@@ -122,6 +135,10 @@ export async function routeActiveExperience(
   }
 
   const action = normalizeAction(input.action);
+  const lang = resolveRouterLang({
+    ...input,
+    entryIntent: input.state.lastEntryIntent,
+  });
 
   if (action === "LATER") {
     const abandonedSession: IdentityGameSession = {
@@ -135,7 +152,7 @@ export async function routeActiveExperience(
       handled: true,
       response: {
         kind: "text",
-        text: "Geen probleem. Deze game-link blijft herkenbaar voor later.",
+        text: t(lang, "identityGameDeferred"),
       },
     };
   }
@@ -156,7 +173,7 @@ export async function routeActiveExperience(
       handled: true,
       response: {
         kind: "text",
-        text: "De game-start is bevestigd. De echte vraagflow volgt in de volgende fase.",
+        text: t(lang, "identityGameStartConfirmed"),
       },
     };
   }
@@ -165,7 +182,7 @@ export async function routeActiveExperience(
     handled: true,
     response: {
       kind: "error",
-      text: "Je identity game-sessie is herkend, maar de game flow zelf is nog niet geactiveerd in deze fase.",
+      text: t(lang, "identityGameSessionPending"),
     },
   };
 }
