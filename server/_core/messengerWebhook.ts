@@ -26,6 +26,7 @@ import {
 import { toUserKey, toLogUser } from "./privacy";
 import { handleSharedTextMessage } from "./sharedTextHandler";
 import {
+  clearPendingImageState,
   getOrCreateState,
   markIntroSeen,
   setChosenStyle,
@@ -631,6 +632,9 @@ async function runWhatsAppStyleGeneration(
     let failureText = t(lang, "generationGenericFailure");
     if (error instanceof InvalidSourceImageUrlError) {
       failureText = t(lang, "missingInputImage");
+      if (!sourceImageUrl || resolvedSourceImageUrl === state.lastPhotoUrl) {
+        await clearPendingImageState(senderId);
+      }
       await setFlowState(senderId, "AWAITING_PHOTO");
       console.error("[whatsapp webhook] source image rejected", {
         user: toLogUser(userId),
