@@ -169,6 +169,83 @@ describe("identity-ai-v1 routing", () => {
     });
   });
 
+  it("does not resume an expired same-game session and starts from question 1 instead", async () => {
+    const userKey = anonymizePsid("identity-ai-v1-expired-resume-user");
+    await upsertIdentityGameSession({
+      sessionId: "expired-resume-session",
+      userId: userKey,
+      gameId: "identity-ai-v1",
+      gameVersion: "v1",
+      entryIntent: {
+        sourceChannel: "messenger",
+        sourceType: "referral",
+        targetExperienceType: "identity_game",
+        targetExperienceId: "identity-ai-v1",
+        receivedAt: 1710000000000,
+      },
+      status: "in_progress",
+      currentQuestionId: "identity-ai-v1-q2",
+      answers: [
+        {
+          questionId: "identity-ai-v1-q1",
+          answerId: "q1_build",
+          recordedAt: 1710000001000,
+        },
+      ],
+      derivedTraits: {},
+      startedAt: 1710000000000,
+      updatedAt: 1710000001000,
+      expiresAt: Date.now() - 1_000,
+    });
+
+    const setLastEntryIntent = vi.fn(async () => undefined);
+    const setActiveExperience = vi.fn(async () => undefined);
+
+    const result = await routeEntryIntent({
+      state: {
+        ...(await Promise.resolve(getOrCreateState(userKey))),
+        psid: userKey,
+        userKey,
+      },
+      entryIntent: parseGameEntryIntent({
+        channel: "messenger",
+        ref: "game:identity-ai-v1?locale=en",
+        receivedAt: 1710000002000,
+      }),
+      setLastEntryIntent,
+      setActiveExperience,
+    });
+
+    expect(result).toEqual({
+      handled: true,
+      response: {
+        kind: "options_prompt",
+        prompt: "When a new AI tool drops, what do you do first?",
+        options: [
+          { id: "q1_build", title: "Open it and start making something" },
+          { id: "q1_vision", title: "Imagine what it could become" },
+          { id: "q1_analyst", title: "Figure out how it actually works" },
+          { id: "q1_operate", title: "See where it fits in a system" },
+        ],
+        selectionMode: "single",
+        fallbackText: [
+          "When a new AI tool drops, what do you do first?",
+          "1. Open it and start making something",
+          "2. Imagine what it could become",
+          "3. Figure out how it actually works",
+          "4. See where it fits in a system",
+          "Reply with one of these exact options:",
+        ].join("\n"),
+      },
+    });
+    expect(setActiveExperience).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "identity-ai-v1",
+        sessionId: expect.not.stringMatching(/^expired-resume-session$/),
+      })
+    );
+  });
+
   it("does not silently reuse a different game's session", async () => {
     const userKey = anonymizePsid("identity-ai-v1-replace-user");
     const setLastEntryIntent = vi.fn(async () => undefined);
@@ -521,6 +598,82 @@ describe("identity-ai-v1 routing", () => {
     } finally {
       generateSpy.mockRestore();
     }
+  });
+
+  it("does not re-enter answer resolution while the session is resolving", async () => {
+    const userKey = anonymizePsid("identity-ai-v1-resolving-user");
+    const setActiveExperience = vi.fn(async () => undefined);
+
+    await upsertIdentityGameSession({
+      sessionId: "resolving-session",
+      userId: userKey,
+      gameId: "identity-ai-v1",
+      gameVersion: "v1",
+      entryIntent: {
+        sourceChannel: "messenger",
+        sourceType: "referral",
+        targetExperienceType: "identity_game",
+        targetExperienceId: "identity-ai-v1",
+        localeHint: "en",
+        receivedAt: 1710000000000,
+      },
+      status: "resolving",
+      currentQuestionId: "identity-ai-v1-q3",
+      answers: [
+        {
+          questionId: "identity-ai-v1-q1",
+          answerId: "q1_build",
+          recordedAt: 1710000001000,
+        },
+        {
+          questionId: "identity-ai-v1-q2",
+          answerId: "q2_build",
+          recordedAt: 1710000002000,
+        },
+      ],
+      derivedTraits: {},
+      startedAt: 1710000000000,
+      updatedAt: 1710000003000,
+      expiresAt: Date.now() + 60_000,
+      resultRef: "builder",
+    });
+
+    const result = await routeActiveExperience({
+      state: {
+        ...(await Promise.resolve(getOrCreateState(userKey))),
+        psid: userKey,
+        userKey,
+        lastEntryIntent: {
+          sourceChannel: "messenger",
+          sourceType: "referral",
+          targetExperienceType: "identity_game",
+          targetExperienceId: "identity-ai-v1",
+          localeHint: "en",
+          receivedAt: 1710000000000,
+        },
+        activeExperience: {
+          type: "identity_game",
+          id: "identity-ai-v1",
+          sessionId: "resolving-session",
+          status: "resolving",
+          startedAt: 1710000000000,
+          updatedAt: 1710000003000,
+        },
+      },
+      action: "q3_build",
+      setLastEntryIntent: vi.fn(async () => undefined),
+      setActiveExperience,
+    });
+
+    expect(result).toEqual({
+      handled: true,
+      response: {
+        kind: "error",
+        text:
+          "Your identity game session was recognized, but the actual game flow is not enabled in this phase yet.",
+      },
+    });
+    expect(setActiveExperience).not.toHaveBeenCalled();
   });
 
   it("falls back to normal thread handling after game completion", async () => {

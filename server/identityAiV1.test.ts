@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getIdentityAiV1AnswerIdsByQuestion,
+  isIdentityAiV1SessionResumable,
   resolveIdentityAiV1Archetype,
 } from "./_core/identityAiV1";
 
@@ -17,5 +18,30 @@ describe("identityAiV1 resolver", () => {
         }
       }
     }
+  });
+
+  it("treats expired sessions as not resumable", () => {
+    expect(
+      isIdentityAiV1SessionResumable({
+        sessionId: "expired-identity-ai-v1-session",
+        userId: "user-1",
+        gameId: "identity-ai-v1",
+        gameVersion: "v1",
+        entryIntent: {
+          sourceChannel: "messenger",
+          sourceType: "referral",
+          targetExperienceType: "identity_game",
+          targetExperienceId: "identity-ai-v1",
+          receivedAt: Date.now() - 10_000,
+        },
+        status: "in_progress",
+        currentQuestionId: "identity-ai-v1-q2",
+        answers: [],
+        derivedTraits: {},
+        startedAt: Date.now() - 10_000,
+        updatedAt: Date.now() - 5_000,
+        expiresAt: Date.now() - 1_000,
+      })
+    ).toBe(false);
   });
 });

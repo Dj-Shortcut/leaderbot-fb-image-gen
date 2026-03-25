@@ -352,6 +352,10 @@ export function isIdentityAiV1SessionResumable(
     return false;
   }
 
+  if (session.expiresAt <= Date.now()) {
+    return false;
+  }
+
   return session.status === "started" || session.status === "in_progress";
 }
 

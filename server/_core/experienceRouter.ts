@@ -70,6 +70,10 @@ function buildPlaceholderSession(
 }
 
 function isIdentityGameSessionActive(session: IdentityGameSession): boolean {
+  if (session.expiresAt <= Date.now()) {
+    return false;
+  }
+
   return session.status === "started" || session.status === "in_progress";
 }
 
@@ -272,6 +276,16 @@ export async function routeActiveExperience(
     }
 
     if (activeSession.status === "started") {
+      return {
+        handled: true,
+        response: {
+          kind: "error",
+          text: t(lang, "identityGameSessionPending"),
+        },
+      };
+    }
+
+    if (activeSession.status === "resolving" || activeSession.status === "completed") {
       return {
         handled: true,
         response: {
