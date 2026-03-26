@@ -119,6 +119,13 @@ describe("identity-ai-v1 routing", () => {
       ],
     });
 
+    const state = getState(anonymizePsid(psid));
+    expect(state?.activeExperience?.type).toBe("identity_game");
+    expect(state?.activeExperience?.id).toBe("identity-ai-v1");
+    expect(state?.selectedStyle).toBeNull();
+    expect(state?.preselectedStyle).toBeNull();
+    expect(state?.stage).toBe("IDLE");
+
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
       "When a new AI tool drops, what do you do first?",

@@ -60,6 +60,29 @@ describe("entryIntent parsing", () => {
     });
   });
 
+  it("accepts bare refs for other identity-prefixed variants", () => {
+    const result = parseGameEntryIntent({
+      channel: "messenger",
+      ref: "identity-team-mirror",
+      sourceType: "referral",
+      receivedAt: 1710000000001,
+    });
+
+    expect(result).toEqual({
+      sourceChannel: "messenger",
+      sourceType: "referral",
+      targetExperienceType: "identity_game",
+      targetExperienceId: "identity-team-mirror",
+      entryMode: undefined,
+      campaignId: undefined,
+      creativeId: undefined,
+      entryVariant: undefined,
+      localeHint: undefined,
+      rawRef: "identity-team-mirror",
+      receivedAt: 1710000000001,
+    });
+  });
+
   it("collapses repeated separators when normalizing game ids", () => {
     const result = parseGameEntryIntent({
       channel: "messenger",
