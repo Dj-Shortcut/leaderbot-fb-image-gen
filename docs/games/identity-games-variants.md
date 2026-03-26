@@ -12,6 +12,15 @@ Variants run through the Messenger-based flow and are distributed through the ca
 - Each variant MUST define exactly 4 archetypes.
 - `resolutionMap` MUST be deterministic and complete for all valid answer triples.
 
+## Runtime Validation Rules (V1)
+The following rules are hard validation requirements enforced by runtime checks.
+
+- Option ids MUST use canonical structural format: alphanumeric plus `_` or `-` only.
+- Option ids MUST NOT contain structural separators used by `resolutionMap` keys.
+- Duplicate option ids within the same question are invalid.
+- Archetype coverage MUST include all 4 V1 archetypes.
+- Duplicate archetype ids are invalid.
+
 ## Variant Intent
 Variant Intent is REQUIRED before creating a variant.
 
@@ -82,6 +91,10 @@ Rules:
 - Variant ordering MUST remain stable.
 - Adding or removing variants can change mapping outcomes.
 - Changes to `variants[]` MUST be treated as a versioned update.
+
+## Deterministic Resolution Behavior (V1)
+- Majority-family outcomes MUST resolve to the repeated archetype family.
+- For all-different triples, resolution MUST deterministically use the first question's family.
 
 Recommended:
 - Use append-only updates where possible.
