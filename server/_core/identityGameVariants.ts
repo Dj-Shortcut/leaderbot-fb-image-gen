@@ -453,7 +453,7 @@ export function registerIdentityGameShareRoutes(
       return;
     }
 
-    const messengerUrl = buildMessengerEntryUrl(pageId, variantId);
+    const messengerUrl = buildMessengerEntryUrl(pageId, canonicalVariantId);
     const shareMeta = resolveShareMeta(variant);
 
     res

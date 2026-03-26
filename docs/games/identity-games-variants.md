@@ -51,6 +51,8 @@ The Content Quality Gate is normative and MUST be evaluated before promotion.
 Variants that do not pass all checks MUST NOT be promoted to `qa` or `active`.
 
 ## Variant V2: Visual Variations
+This section defines planned V2 requirements and is forward-looking until V2 runtime support is implemented.
+
 Each archetype SHOULD define `variants[]` for visual and micro-copy variation.
 
 Each item in `variants[]` MUST include:

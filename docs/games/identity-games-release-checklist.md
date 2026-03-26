@@ -30,5 +30,5 @@ Required checklist before promoting a variant to `active`.
 - [ ] Variant id
 - [ ] Canonical share URL
 - [ ] Messenger page id
-- [ ] Facebook Debugger refresh timestamp
+- [ ] Facebook Debugger refresh timestamp (ISO 8601, e.g. `2026-03-26T15:04:05Z`)
 - [ ] Reviewer/owner sign-off
