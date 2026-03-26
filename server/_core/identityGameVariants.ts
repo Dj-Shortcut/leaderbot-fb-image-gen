@@ -252,7 +252,10 @@ export function registerIdentityGameShareRoutes(
 
     res
       .status(200)
-      .setHeader("Cache-Control", "public, max-age=300")
+      .setHeader(
+        "Cache-Control",
+        variant.status === "active" ? "public, max-age=300" : "no-store"
+      )
       .type("text/html; charset=utf-8")
       .send(
         renderSharePageHtml({

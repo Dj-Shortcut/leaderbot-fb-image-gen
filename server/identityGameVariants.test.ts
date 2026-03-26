@@ -150,9 +150,24 @@ describe("identity game variants catalog and share routes", () => {
     try {
       const response = await fetch(`${server.baseUrl}/play/identity-qa-flow`);
       expect(response.status).toBe(200);
+      expect(response.headers.get("cache-control")).toBe("no-store");
       const html = await response.text();
       expect(html).toContain("Discover your AI archetype");
       expect(html).toContain("https://leaderbot.live/og/identity-games-default.jpg");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("keeps public cache for active variants", async () => {
+    const app = express();
+    registerIdentityGameShareRoutes(app, { pageId: "61587343141159", nodeEnv: "development" });
+
+    const server = await listen(app);
+    try {
+      const response = await fetch(`${server.baseUrl}/play/identity-ai-v1`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("cache-control")).toBe("public, max-age=300");
     } finally {
       await server.close();
     }
