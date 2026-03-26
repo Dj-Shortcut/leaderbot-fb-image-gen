@@ -169,6 +169,75 @@ const IDENTITY_AI_V1_ARCHETYPES: readonly [
   },
 ];
 
+const DJ_V1_QUESTIONS: readonly [
+  z.infer<typeof questionSchema>,
+  z.infer<typeof questionSchema>,
+  z.infer<typeof questionSchema>
+] = [
+  {
+    id: "dj-v1-q1",
+    prompt: "Wat is je eerste reflex als de vloer volloopt?",
+    options: [
+      { id: "dj_q1_a1", title: "Alles strak in de mix houden", archetypeId: "builder" },
+      { id: "dj_q1_a2", title: "De vibe van de crowd volgen", archetypeId: "visionary" },
+      { id: "dj_q1_a3", title: "Iets onverwachts droppen", archetypeId: "analyst" },
+      { id: "dj_q1_a4", title: "Terug naar pure classics", archetypeId: "operator" },
+    ],
+  },
+  {
+    id: "dj-v1-q2",
+    prompt: "Waar let je het meest op tijdens je set?",
+    options: [
+      { id: "dj_q2_a1", title: "Timing, levels en controle", archetypeId: "builder" },
+      { id: "dj_q2_a2", title: "Reacties op de dansvloer", archetypeId: "visionary" },
+      { id: "dj_q2_a3", title: "Verrassing en contrast", archetypeId: "analyst" },
+      { id: "dj_q2_a4", title: "Trackselectie en roots", archetypeId: "operator" },
+    ],
+  },
+  {
+    id: "dj-v1-q3",
+    prompt: "Hoe wil je dat mensen je set onthouden?",
+    options: [
+      { id: "dj_q3_a1", title: "Messcherp en technisch", archetypeId: "builder" },
+      { id: "dj_q3_a2", title: "Energiek en verbindend", archetypeId: "visionary" },
+      { id: "dj_q3_a3", title: "Onvoorspelbaar en gedurfd", archetypeId: "analyst" },
+      { id: "dj_q3_a4", title: "Smaakvol en tijdloos", archetypeId: "operator" },
+    ],
+  },
+];
+
+const DJ_V1_ARCHETYPES: readonly [
+  z.infer<typeof archetypeSchema>,
+  z.infer<typeof archetypeSchema>,
+  z.infer<typeof archetypeSchema>,
+  z.infer<typeof archetypeSchema>
+] = [
+  {
+    id: "builder",
+    title: "Control Freak",
+    identityLine: "Jij houdt elke overgang onder volledige controle.",
+    explanationLine: "Strak, precies en altijd met een plan achter de decks.",
+  },
+  {
+    id: "visionary",
+    title: "Crowd Pleaser",
+    identityLine: "Jij leest de zaal en bouwt energie op maat.",
+    explanationLine: "Je set leeft van connectie, timing en publieksgevoel.",
+  },
+  {
+    id: "analyst",
+    title: "Wildcard",
+    identityLine: "Jij kiest risico boven voorspelbaarheid.",
+    explanationLine: "Onverwachte keuzes maken jouw sets memorabel.",
+  },
+  {
+    id: "operator",
+    title: "Purist",
+    identityLine: "Jij bewaakt smaak, selectie en muzikale kern.",
+    explanationLine: "Je draait met respect voor sound, roots en kwaliteit.",
+  },
+];
+
 export const GAME_VARIANTS: readonly GameVariantDefinition[] = [
   {
     variantId: "identity-ai-v1",
@@ -191,6 +260,30 @@ export const GAME_VARIANTS: readonly GameVariantDefinition[] = [
       title: "Which AI are you?",
       description: "Play a 3-question reveal and meet your AI archetype.",
       imageUrl: "https://leaderbot.live/og/identity-ai-v1-invite-v1.png",
+    },
+  },
+  {
+    variantId: "dj",
+    status: "active",
+    version: "v1",
+    entryRefs: ["dj", "game:dj"],
+    questions: DJ_V1_QUESTIONS,
+    archetypes: DJ_V1_ARCHETYPES,
+    resolutionMap: buildDeterministicResolutionMap(DJ_V1_QUESTIONS),
+    copy: {
+      intro: "Beantwoord 3 vragen en ontdek wat voor DJ je echt bent.",
+      invalid: "Die keuze hoort niet bij de 4 geldige opties.",
+      replay: "Nog een ronde? Open de game-link opnieuw.",
+    },
+    imagePrompt: {
+      styleKey: "dj-v1-club-portrait",
+      variantDescriptor:
+        "high-energy DJ portrait reveal, club lighting, social-first composition",
+    },
+    share: {
+      title: "Wat voor DJ ben jij écht?",
+      description: "Dit ga je niet leuk vinden 😄",
+      imageUrl: "https://leaderbot.live/og/dj-v1-invite-v1.png",
     },
   },
 ];

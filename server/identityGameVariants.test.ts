@@ -228,6 +228,26 @@ describe("identity game variants catalog and share routes", () => {
     }
   });
 
+  it("serves DJ share metadata and non-identity Messenger ref format", async () => {
+    const app = express();
+    registerIdentityGameShareRoutes(app, { pageId: "61587343141159", nodeEnv: "development" });
+
+    const server = await listen(app);
+    try {
+      const response = await fetch(`${server.baseUrl}/play/dj`);
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain('property="og:title" content="Wat voor DJ ben jij écht?"');
+      expect(html).toContain('property="og:description" content="Dit ga je niet leuk vinden 😄"');
+      expect(html).toContain(
+        'property="og:image" content="https://leaderbot.live/og/dj-v1-invite-v1.png"'
+      );
+      expect(html).toContain("https://m.me/61587343141159?ref=game%3Adj");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("redirects active variants to canonical leaderbot.live in production", async () => {
     const app = express();
     registerIdentityGameShareRoutes(app, { pageId: "61587343141159", nodeEnv: "production" });
@@ -475,6 +495,13 @@ describe("identity game variants catalog and share routes", () => {
     const identityAiV1 = GAME_VARIANTS.find(variant => variant.variantId === "identity-ai-v1");
     expect(identityAiV1).toBeDefined();
     expect(identityAiV1!.resolutionMap["q1_build|q2_vision|q3_analyst"]).toBe("builder");
+  });
+
+  it("builds a full deterministic 64-key map for dj and uses first-answer fallback", () => {
+    const djVariant = GAME_VARIANTS.find(variant => variant.variantId === "dj");
+    expect(djVariant).toBeDefined();
+    expect(Object.keys(djVariant!.resolutionMap)).toHaveLength(64);
+    expect(djVariant!.resolutionMap["dj_q1_a3|dj_q2_a2|dj_q3_a1"]).toBe("analyst");
   });
 
   it("rejects variants with invalid option id separators", () => {
