@@ -168,6 +168,16 @@ describe("identity game variants catalog and share routes", () => {
     ).toThrow("MESSENGER_PAGE_ID is required");
   });
 
+  it("fails fast when messenger page id is not numeric", () => {
+    const app = express();
+    expect(() =>
+      registerIdentityGameShareRoutes(app, {
+        pageId: "61587343141159/extra",
+        nodeEnv: "development",
+      })
+    ).toThrow("MESSENGER_PAGE_ID must be a numeric Facebook page id");
+  });
+
   it("rejects active variants with missing share metadata", () => {
     const variants: GameVariantDefinition[] = [
       createVariant({
@@ -337,7 +347,7 @@ describe("identity game variants catalog and share routes", () => {
     }
   });
 
-  it("escapes inline redirect script content to prevent closing script injection", async () => {
+  it("renders inline redirect script with safe encoded messenger URL", async () => {
     const variant: GameVariantDefinition = createVariant({
       variantId: "identity-script-safety",
       status: "active",
@@ -351,7 +361,7 @@ describe("identity game variants catalog and share routes", () => {
 
     const app = express();
     registerIdentityGameShareRoutes(app, {
-      pageId: '61587343141159</script><script>alert("x")</script>',
+      pageId: "61587343141159",
       nodeEnv: "development",
       variants: [variant],
     });
@@ -361,10 +371,10 @@ describe("identity game variants catalog and share routes", () => {
       const response = await fetch(`${server.baseUrl}/play/identity-script-safety`);
       expect(response.status).toBe(200);
       const html = await response.text();
-      expect(html).toContain("\\u003c/script\\u003e\\u003cscript\\u003ealert");
-      expect(html).not.toContain(
-        '<script>window.location.replace("https://m.me/61587343141159</script>'
+      expect(html).toContain(
+        'window.location.replace("https://m.me/61587343141159?ref=identity-script-safety")'
       );
+      expect(html).not.toContain("</script><script>");
     } finally {
       await server.close();
     }

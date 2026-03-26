@@ -331,7 +331,7 @@ function buildMessengerEntryUrl(pageId: string, variantId: string): string {
     ? normalizedVariantId
     : `game:${normalizedVariantId}`;
   const ref = encodeURIComponent(refValue);
-  return `https://m.me/${pageId}?ref=${ref}`;
+  return `https://m.me/${encodeURIComponent(pageId)}?ref=${ref}`;
 }
 
 function resolveShareMeta(variant: GameVariantDefinition): {
@@ -410,6 +410,9 @@ function resolvePageId(overridePageId?: string): string {
   const pageId = (overridePageId ?? process.env.MESSENGER_PAGE_ID ?? "").trim();
   if (!pageId) {
     throw new Error("MESSENGER_PAGE_ID is required for identity game share routes");
+  }
+  if (!/^\d+$/.test(pageId)) {
+    throw new Error("MESSENGER_PAGE_ID must be a numeric Facebook page id");
   }
   return pageId;
 }
