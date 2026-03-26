@@ -143,6 +143,14 @@ function resolveShareMeta(variant: GameVariantDefinition): {
   };
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
 function renderSharePageHtml(input: {
   canonicalUrl: string;
   messengerUrl: string;
@@ -150,24 +158,30 @@ function renderSharePageHtml(input: {
   description: string;
   imageUrl: string;
 }): string {
+  const safeCanonicalUrl = escapeHtml(input.canonicalUrl);
+  const safeMessengerUrl = escapeHtml(input.messengerUrl);
+  const safeTitle = escapeHtml(input.title);
+  const safeDescription = escapeHtml(input.description);
+  const safeImageUrl = escapeHtml(input.imageUrl);
+
   return `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${input.title}</title>
-    <link rel="canonical" href="${input.canonicalUrl}" />
+    <title>${safeTitle}</title>
+    <link rel="canonical" href="${safeCanonicalUrl}" />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="${input.canonicalUrl}" />
-    <meta property="og:title" content="${input.title}" />
-    <meta property="og:description" content="${input.description}" />
-    <meta property="og:image" content="${input.imageUrl}" />
-    <meta http-equiv="refresh" content="0;url=${input.messengerUrl}" />
+    <meta property="og:url" content="${safeCanonicalUrl}" />
+    <meta property="og:title" content="${safeTitle}" />
+    <meta property="og:description" content="${safeDescription}" />
+    <meta property="og:image" content="${safeImageUrl}" />
+    <meta http-equiv="refresh" content="0;url=${safeMessengerUrl}" />
     <script>window.location.replace(${JSON.stringify(input.messengerUrl)});</script>
   </head>
   <body>
     <p>Redirecting to Messenger...</p>
-    <p><a href="${input.messengerUrl}">Continue</a></p>
+    <p><a href="${safeMessengerUrl}">Continue</a></p>
   </body>
 </html>`;
 }

@@ -157,4 +157,39 @@ describe("identity game variants catalog and share routes", () => {
       await server.close();
     }
   });
+
+  it("escapes share metadata when rendering OG html", async () => {
+    const variant: GameVariantDefinition = {
+      variantId: "identity-escaped",
+      status: "active",
+      version: "v1",
+      entryRefs: ["identity-escaped"],
+      share: {
+        title: 'Reveal <your> "AI" self',
+        description: 'Fast & fun <cta>',
+        imageUrl: "https://leaderbot.live/og/escaped.jpg?v=2",
+      },
+    };
+
+    const app = express();
+    registerIdentityGameShareRoutes(app, {
+      pageId: "61587343141159",
+      nodeEnv: "development",
+      variants: [variant],
+    });
+
+    const server = await listen(app);
+    try {
+      const response = await fetch(`${server.baseUrl}/play/identity-escaped`);
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain("Reveal &lt;your&gt; &quot;AI&quot; self");
+      expect(html).toContain("Fast &amp; fun &lt;cta&gt;");
+      expect(html).toContain(
+        'window.location.replace("https://m.me/61587343141159?ref=identity-escaped")'
+      );
+    } finally {
+      await server.close();
+    }
+  });
 });
