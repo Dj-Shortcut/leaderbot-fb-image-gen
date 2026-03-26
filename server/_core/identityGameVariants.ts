@@ -283,7 +283,7 @@ export const GAME_VARIANTS: readonly GameVariantDefinition[] = [
     share: {
       title: "Wat voor DJ ben jij écht?",
       description: "Dit ga je niet leuk vinden 😄",
-      imageUrl: "https://leaderbot.live/dj.png",
+      imageUrl: "https://leaderbot.live/og/dj-v1-invite-v1.png",
     },
   },
 ];
