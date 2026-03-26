@@ -476,4 +476,57 @@ describe("identity game variants catalog and share routes", () => {
     expect(identityAiV1).not.toBeNull();
     expect(identityAiV1?.resolutionMap["q1_build|q2_vision|q3_analyst"]).toBe("builder");
   });
+
+  it("rejects variants with invalid option id separators", () => {
+    const invalidOptionIdVariant = createVariant({
+      variantId: "identity-invalid-option-id",
+      questions: [
+        {
+          id: "q1",
+          prompt: "Q1",
+          options: [
+            { id: "q1|builder", title: "A", archetypeId: "builder" },
+            { id: "q1_visionary", title: "B", archetypeId: "visionary" },
+            { id: "q1_analyst", title: "C", archetypeId: "analyst" },
+            { id: "q1_operator", title: "D", archetypeId: "operator" },
+          ],
+        },
+        createVariant().questions[1],
+        createVariant().questions[2],
+      ],
+    });
+
+    expect(() => assertIdentityGameVariantCatalog([invalidOptionIdVariant])).toThrow(
+      "Invalid variant definition"
+    );
+  });
+
+  it("rejects variants with duplicate option ids in one question", () => {
+    const duplicateOptionIdVariant = createVariant({
+      variantId: "identity-duplicate-option-id",
+      questions: [
+        {
+          id: "q1",
+          prompt: "Q1",
+          options: [
+            { id: "q1_dup", title: "A", archetypeId: "builder" },
+            { id: "q1_dup", title: "B", archetypeId: "visionary" },
+            { id: "q1_analyst", title: "C", archetypeId: "analyst" },
+            { id: "q1_operator", title: "D", archetypeId: "operator" },
+          ],
+        },
+        createVariant().questions[1],
+        createVariant().questions[2],
+      ],
+      resolutionMap: Object.fromEntries(
+        Object.keys(createVariant().resolutionMap)
+          .filter(key => !key.startsWith("q1_builder|") && !key.startsWith("q1_visionary|"))
+          .map(key => [key.replace("q1_builder|", "q1_dup|").replace("q1_visionary|", "q1_dup|"), "builder"])
+      ),
+    });
+
+    expect(() => assertIdentityGameVariantCatalog([duplicateOptionIdVariant])).toThrow(
+      "has duplicate option id: q1_dup"
+    );
+  });
 });

@@ -8,9 +8,10 @@ const DEFAULT_SHARE_DESCRIPTION =
 const DEFAULT_SHARE_IMAGE_URL =
   "https://leaderbot.live/og/identity-games-default.jpg";
 const V1_ARCHETYPE_IDS = ["builder", "visionary", "analyst", "operator"] as const;
+const structuralOptionIdSchema = z.string().trim().regex(/^[a-z0-9_-]+$/i);
 
 const optionSchema = z.object({
-  id: z.string().trim().min(1),
+  id: structuralOptionIdSchema,
   title: z.string().trim().min(1),
   archetypeId: z.enum(V1_ARCHETYPE_IDS),
 });
@@ -278,6 +279,17 @@ export function assertIdentityGameVariantCatalog(
     const mapKeySet = new Set(mapKeys);
     const archetypeIds = new Set(variant.archetypes.map(archetype => archetype.id));
     const missingArchetypes = V1_ARCHETYPE_IDS.filter(id => !archetypeIds.has(id));
+    for (const question of variant.questions) {
+      const seenOptionIds = new Set<string>();
+      for (const option of question.options) {
+        if (seenOptionIds.has(option.id)) {
+          errors.push(
+            `Variant ${variant.variantId} question ${question.id} has duplicate option id: ${option.id}`
+          );
+        }
+        seenOptionIds.add(option.id);
+      }
+    }
 
     if (missingArchetypes.length > 0) {
       errors.push(
