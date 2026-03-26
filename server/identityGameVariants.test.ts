@@ -76,6 +76,24 @@ describe("identity game variants catalog and share routes", () => {
     );
   });
 
+  it("allows active share image urls with benign query params", () => {
+    const variants: GameVariantDefinition[] = [
+      {
+        variantId: "identity-benign-query",
+        status: "active",
+        version: "v1",
+        entryRefs: ["identity-benign-query"],
+        share: {
+          title: "Test",
+          description: "Test",
+          imageUrl: "https://leaderbot.live/og/identity-benign.jpg?v=2",
+        },
+      },
+    ];
+
+    expect(() => assertIdentityGameVariantCatalog(variants)).not.toThrow();
+  });
+
   it("serves OG tags and Messenger redirect for canonical share URLs", async () => {
     const app = express();
     registerIdentityGameShareRoutes(app, { pageId: "61587343141159", nodeEnv: "development" });

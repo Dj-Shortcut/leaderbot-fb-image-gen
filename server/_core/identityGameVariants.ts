@@ -70,7 +70,7 @@ function isLikelyPublicImageUrl(rawUrl: string): boolean {
     }
   }
 
-  return false;
+  return true;
 }
 
 export function assertIdentityGameVariantCatalog(
