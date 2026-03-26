@@ -270,6 +270,31 @@ describe("identity game variants catalog and share routes", () => {
     }
   });
 
+  it("uses game: ref prefix for non-identity variants", async () => {
+    const qaVariant: GameVariantDefinition = createVariant({
+      variantId: "quiz-speed-v1",
+      status: "qa",
+      entryRefs: ["quiz-speed-v1", "game:quiz-speed-v1"],
+    });
+
+    const app = express();
+    registerIdentityGameShareRoutes(app, {
+      pageId: "61587343141159",
+      nodeEnv: "development",
+      variants: [qaVariant],
+    });
+
+    const server = await listen(app);
+    try {
+      const response = await fetch(`${server.baseUrl}/play/quiz-speed-v1`);
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain("https://m.me/61587343141159?ref=game%3Aquiz-speed-v1");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("escapes share metadata when rendering OG html", async () => {
     const variant: GameVariantDefinition = createVariant({
       variantId: "identity-escaped",

@@ -313,7 +313,11 @@ export function getVariantById(
 }
 
 function buildMessengerEntryUrl(pageId: string, variantId: string): string {
-  const ref = encodeURIComponent(normalizeVariantId(variantId));
+  const normalizedVariantId = normalizeVariantId(variantId);
+  const refValue = normalizedVariantId.startsWith("identity-")
+    ? normalizedVariantId
+    : `game:${normalizedVariantId}`;
+  const ref = encodeURIComponent(refValue);
   return `https://m.me/${pageId}?ref=${ref}`;
 }
 
