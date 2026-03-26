@@ -33,7 +33,7 @@ export const GAME_VARIANTS: readonly GameVariantDefinition[] = [
     share: {
       title: "Which AI are you?",
       description: "Play a 3-question reveal and meet your AI archetype.",
-      imageUrl: "https://leaderbot.live/og/identity-ai-v1.jpg",
+      imageUrl: "https://leaderbot.live/og/identity-ai-v1-invite-v1.png",
     },
   },
 ];
