@@ -8,9 +8,10 @@ const DEFAULT_SHARE_DESCRIPTION =
 const DEFAULT_SHARE_IMAGE_URL =
   "https://leaderbot.live/og/identity-games-default.jpg";
 const V1_ARCHETYPE_IDS = ["builder", "visionary", "analyst", "operator"] as const;
+const structuralOptionIdSchema = z.string().trim().regex(/^[a-z0-9_-]+$/i);
 
 const optionSchema = z.object({
-  id: z.string().trim().min(1),
+  id: structuralOptionIdSchema,
   title: z.string().trim().min(1),
   archetypeId: z.enum(V1_ARCHETYPE_IDS),
 });
@@ -71,6 +72,8 @@ function resolveFamilies(
   if (second === third) {
     return second;
   }
+  // In all-different triples, V1 intentionally resolves to the first question's family.
+  // This mirrors the documented deterministic fallback used by identity-ai-v1.
   return first;
 }
 
@@ -275,6 +278,28 @@ export function assertIdentityGameVariantCatalog(
     const mapKeys = Object.keys(variant.resolutionMap);
     const mapKeySet = new Set(mapKeys);
     const archetypeIds = new Set(variant.archetypes.map(archetype => archetype.id));
+    const missingArchetypes = V1_ARCHETYPE_IDS.filter(id => !archetypeIds.has(id));
+    for (const question of variant.questions) {
+      const seenOptionIds = new Set<string>();
+      for (const option of question.options) {
+        if (seenOptionIds.has(option.id)) {
+          errors.push(
+            `Variant ${variant.variantId} question ${question.id} has duplicate option id: ${option.id}`
+          );
+        }
+        seenOptionIds.add(option.id);
+      }
+    }
+
+    if (missingArchetypes.length > 0) {
+      errors.push(
+        `Variant ${variant.variantId} is missing archetypes: ${missingArchetypes.join(", ")}`
+      );
+    }
+
+    if (archetypeIds.size < variant.archetypes.length) {
+      errors.push(`Variant ${variant.variantId} has duplicate archetype ids`);
+    }
 
     for (const tripleKey of expectedTriples) {
       if (!mapKeySet.has(tripleKey)) {
@@ -318,7 +343,7 @@ function buildMessengerEntryUrl(pageId: string, variantId: string): string {
     ? normalizedVariantId
     : `game:${normalizedVariantId}`;
   const ref = encodeURIComponent(refValue);
-  return `https://m.me/${pageId}?ref=${ref}`;
+  return `https://m.me/${encodeURIComponent(pageId)}?ref=${ref}`;
 }
 
 function resolveShareMeta(variant: GameVariantDefinition): {
@@ -398,6 +423,9 @@ function resolvePageId(overridePageId?: string): string {
   if (!pageId) {
     throw new Error("MESSENGER_PAGE_ID is required for identity game share routes");
   }
+  if (!/^\d+$/.test(pageId)) {
+    throw new Error("MESSENGER_PAGE_ID must be a numeric Facebook page id");
+  }
   return pageId;
 }
 
@@ -416,6 +444,7 @@ export function registerIdentityGameShareRoutes(
   const canonicalDomain =
     (options.canonicalDomain ?? IDENTITY_GAME_CANONICAL_DOMAIN).toLowerCase();
   const pageId = resolvePageId(options.pageId);
+  assertIdentityGameVariantCatalog(variants);
 
   app.get("/play/:variantId", (req: Request, res: Response) => {
     const variantId = normalizeVariantId(req.params.variantId ?? "");
@@ -433,11 +462,12 @@ export function registerIdentityGameShareRoutes(
       variant.status === "active" &&
       currentHost !== canonicalDomain
     ) {
-      res.redirect(308, canonicalUrl);
+      // Keep canonical-host redirects temporary because variant status/domain policy can evolve.
+      res.redirect(307, canonicalUrl);
       return;
     }
 
-    const messengerUrl = buildMessengerEntryUrl(pageId, variantId);
+    const messengerUrl = buildMessengerEntryUrl(pageId, canonicalVariantId);
     const shareMeta = resolveShareMeta(variant);
 
     res

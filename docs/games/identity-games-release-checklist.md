@@ -1,30 +1,34 @@
 # Identity Games Release Checklist
 
 ## Purpose
-This checklist is required before promoting an identity game variant to `active`.
+Required checklist before promoting a variant to `active`.
 
-## Required Checks
-- Variant passes fixed V1 shape validation (3 questions, 4 options, 4 archetypes).
-- Variant has a complete deterministic `resolutionMap`.
-- Share metadata is complete:
-  - `share.title`
-  - `share.description`
-  - `share.imageUrl`
-- Canonical production share URL resolves on:
-  - `https://leaderbot.live/play/{variantId}`
-- Canonical share URL points to Messenger:
-  - `https://m.me/{PAGE_ID}?ref={variantId}`
+## Required Checks (V1)
+- [ ] Structure validation passed (3 questions, 4 options each, 4 archetypes).
+- [ ] Deterministic `resolutionMap` is complete for all valid answer triples.
+- [ ] Share metadata is complete: `share.title`, `share.description`, `share.imageUrl`.
+- [ ] Canonical production URL resolves on `https://leaderbot.live/play/{variantId}`.
+- [ ] Canonical URL redirects to Messenger entry `https://m.me/{PAGE_ID}?ref={variantId}`.
+
+## Content Quality Gate
+- [ ] Content Quality Gate passed.
+- [ ] Variant Intent defined and reviewed.
+
+## Visual Variations (V2 Readiness)
+- [ ] Each archetype defines visual variants (recommended: 8-16).
+- [ ] Deterministic mapping is stable across deployments.
+- [ ] Variant selection uses no runtime randomness.
+- [ ] Micro-copy aligns with archetype (no contradiction, no tone drift).
+- [ ] Variants are perceptibly distinct (no near-duplicates).
 
 ## Mandatory OG Preview Refresh
-- After any update to share title, description, or image:
-  - run Facebook Sharing Debugger on the canonical URL
-  - trigger preview refresh/scrape again
-  - verify updated `og:title`, `og:description`, and `og:image` are visible
+- [ ] Run Facebook Sharing Debugger after updates to share title, description, or image.
+- [ ] Force re-scrape on the canonical URL.
+- [ ] Verify updated `og:title`, `og:description`, and `og:image`.
 
 ## Launch Record
-Capture before launch:
-- Variant id
-- Canonical share URL
-- Messenger page id
-- Facebook Debugger refresh timestamp
-- Reviewer/owner sign-off
+- [ ] Variant id
+- [ ] Canonical share URL
+- [ ] Messenger page id
+- [ ] Facebook Debugger refresh timestamp (ISO 8601, e.g. `2026-03-26T15:04:05Z`)
+- [ ] Reviewer/owner sign-off

@@ -3,6 +3,7 @@ import express from "express";
 import { describe, expect, it } from "vitest";
 import {
   assertIdentityGameVariantCatalog,
+  GAME_VARIANTS,
   registerIdentityGameShareRoutes,
   type GameVariantDefinition,
 } from "./_core/identityGameVariants";
@@ -167,6 +168,16 @@ describe("identity game variants catalog and share routes", () => {
     ).toThrow("MESSENGER_PAGE_ID is required");
   });
 
+  it("fails fast when messenger page id is not numeric", () => {
+    const app = express();
+    expect(() =>
+      registerIdentityGameShareRoutes(app, {
+        pageId: "61587343141159/extra",
+        nodeEnv: "development",
+      })
+    ).toThrow("MESSENGER_PAGE_ID must be a numeric Facebook page id");
+  });
+
   it("rejects active variants with missing share metadata", () => {
     const variants: GameVariantDefinition[] = [
       createVariant({
@@ -227,7 +238,7 @@ describe("identity game variants catalog and share routes", () => {
         "/play/identity-ai-v1",
         "alt.example.com"
       );
-      expect(response.status).toBe(308);
+      expect(response.status).toBe(307);
       expect(response.headers.location).toBe(
         "https://leaderbot.live/play/identity-ai-v1"
       );
@@ -336,7 +347,7 @@ describe("identity game variants catalog and share routes", () => {
     }
   });
 
-  it("escapes inline redirect script content to prevent closing script injection", async () => {
+  it("renders inline redirect script with safe encoded messenger URL", async () => {
     const variant: GameVariantDefinition = createVariant({
       variantId: "identity-script-safety",
       status: "active",
@@ -350,7 +361,7 @@ describe("identity game variants catalog and share routes", () => {
 
     const app = express();
     registerIdentityGameShareRoutes(app, {
-      pageId: '61587343141159</script><script>alert("x")</script>',
+      pageId: "61587343141159",
       nodeEnv: "development",
       variants: [variant],
     });
@@ -360,10 +371,10 @@ describe("identity game variants catalog and share routes", () => {
       const response = await fetch(`${server.baseUrl}/play/identity-script-safety`);
       expect(response.status).toBe(200);
       const html = await response.text();
-      expect(html).toContain("\\u003c/script\\u003e\\u003cscript\\u003ealert");
-      expect(html).not.toContain(
-        '<script>window.location.replace("https://m.me/61587343141159</script>'
+      expect(html).toContain(
+        'window.location.replace("https://m.me/61587343141159?ref=identity-script-safety")'
       );
+      expect(html).not.toContain("</script><script>");
     } finally {
       await server.close();
     }
@@ -379,6 +390,143 @@ describe("identity game variants catalog and share routes", () => {
 
     expect(() => assertIdentityGameVariantCatalog([variant])).toThrow(
       "missing resolutionMap key"
+    );
+  });
+
+  it("rejects variants with duplicate archetype ids", () => {
+    const duplicateArchetypesVariant = createVariant({
+      variantId: "identity-duplicate-archetypes",
+      archetypes: [
+        {
+          id: "builder",
+          title: "Builder",
+          identityLine: "Builder identity",
+          explanationLine: "Builder explanation",
+        },
+        {
+          id: "builder",
+          title: "Builder clone",
+          identityLine: "Builder clone identity",
+          explanationLine: "Builder clone explanation",
+        },
+        {
+          id: "analyst",
+          title: "Analyst",
+          identityLine: "Analyst identity",
+          explanationLine: "Analyst explanation",
+        },
+        {
+          id: "operator",
+          title: "Operator",
+          identityLine: "Operator identity",
+          explanationLine: "Operator explanation",
+        },
+      ],
+      resolutionMap: Object.fromEntries(
+        Object.keys(createVariant().resolutionMap).map(key => [key, "builder"])
+      ),
+    });
+
+    expect(() => assertIdentityGameVariantCatalog([duplicateArchetypesVariant])).toThrow(
+      "duplicate archetype ids"
+    );
+  });
+
+  it("rejects variants missing required archetype coverage", () => {
+    const missingArchetypeVariant = createVariant({
+      variantId: "identity-missing-visionary",
+      archetypes: [
+        {
+          id: "builder",
+          title: "Builder",
+          identityLine: "Builder identity",
+          explanationLine: "Builder explanation",
+        },
+        {
+          id: "builder",
+          title: "Builder duplicate",
+          identityLine: "Builder duplicate identity",
+          explanationLine: "Builder duplicate explanation",
+        },
+        {
+          id: "analyst",
+          title: "Analyst",
+          identityLine: "Analyst identity",
+          explanationLine: "Analyst explanation",
+        },
+        {
+          id: "operator",
+          title: "Operator",
+          identityLine: "Operator identity",
+          explanationLine: "Operator explanation",
+        },
+      ],
+      resolutionMap: Object.fromEntries(
+        Object.keys(createVariant().resolutionMap).map(key => [key, "builder"])
+      ),
+    });
+
+    expect(() => assertIdentityGameVariantCatalog([missingArchetypeVariant])).toThrow(
+      "missing archetypes: visionary"
+    );
+  });
+
+  it("uses first-answer fallback for all-different deterministic resolution triples", () => {
+    const identityAiV1 = GAME_VARIANTS.find(variant => variant.variantId === "identity-ai-v1");
+    expect(identityAiV1).not.toBeNull();
+    expect(identityAiV1?.resolutionMap["q1_build|q2_vision|q3_analyst"]).toBe("builder");
+  });
+
+  it("rejects variants with invalid option id separators", () => {
+    const invalidOptionIdVariant = createVariant({
+      variantId: "identity-invalid-option-id",
+      questions: [
+        {
+          id: "q1",
+          prompt: "Q1",
+          options: [
+            { id: "q1|builder", title: "A", archetypeId: "builder" },
+            { id: "q1_visionary", title: "B", archetypeId: "visionary" },
+            { id: "q1_analyst", title: "C", archetypeId: "analyst" },
+            { id: "q1_operator", title: "D", archetypeId: "operator" },
+          ],
+        },
+        createVariant().questions[1],
+        createVariant().questions[2],
+      ],
+    });
+
+    expect(() => assertIdentityGameVariantCatalog([invalidOptionIdVariant])).toThrow(
+      "Invalid variant definition"
+    );
+  });
+
+  it("rejects variants with duplicate option ids in one question", () => {
+    const duplicateOptionIdVariant = createVariant({
+      variantId: "identity-duplicate-option-id",
+      questions: [
+        {
+          id: "q1",
+          prompt: "Q1",
+          options: [
+            { id: "q1_dup", title: "A", archetypeId: "builder" },
+            { id: "q1_dup", title: "B", archetypeId: "visionary" },
+            { id: "q1_analyst", title: "C", archetypeId: "analyst" },
+            { id: "q1_operator", title: "D", archetypeId: "operator" },
+          ],
+        },
+        createVariant().questions[1],
+        createVariant().questions[2],
+      ],
+      resolutionMap: Object.fromEntries(
+        Object.keys(createVariant().resolutionMap)
+          .filter(key => !key.startsWith("q1_builder|") && !key.startsWith("q1_visionary|"))
+          .map(key => [key.replace("q1_builder|", "q1_dup|").replace("q1_visionary|", "q1_dup|"), "builder"])
+      ),
+    });
+
+    expect(() => assertIdentityGameVariantCatalog([duplicateOptionIdVariant])).toThrow(
+      "has duplicate option id: q1_dup"
     );
   });
 });
