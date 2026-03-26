@@ -473,8 +473,8 @@ describe("identity game variants catalog and share routes", () => {
 
   it("uses first-answer fallback for all-different deterministic resolution triples", () => {
     const identityAiV1 = GAME_VARIANTS.find(variant => variant.variantId === "identity-ai-v1");
-    expect(identityAiV1).not.toBeNull();
-    expect(identityAiV1?.resolutionMap["q1_build|q2_vision|q3_analyst"]).toBe("builder");
+    expect(identityAiV1).toBeDefined();
+    expect(identityAiV1!.resolutionMap["q1_build|q2_vision|q3_analyst"]).toBe("builder");
   });
 
   it("rejects variants with invalid option id separators", () => {
