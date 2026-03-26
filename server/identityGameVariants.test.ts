@@ -7,6 +7,105 @@ import {
   type GameVariantDefinition,
 } from "./_core/identityGameVariants";
 
+function createVariant(overrides: Partial<GameVariantDefinition> = {}): GameVariantDefinition {
+  const base: GameVariantDefinition = {
+    variantId: "identity-test-v1",
+    status: "qa",
+    version: "v1",
+    entryRefs: ["identity-test-v1", "game:identity-test-v1"],
+    questions: [
+      {
+        id: "q1",
+        prompt: "Q1",
+        options: [
+          { id: "q1_builder", title: "A", archetypeId: "builder" },
+          { id: "q1_visionary", title: "B", archetypeId: "visionary" },
+          { id: "q1_analyst", title: "C", archetypeId: "analyst" },
+          { id: "q1_operator", title: "D", archetypeId: "operator" },
+        ],
+      },
+      {
+        id: "q2",
+        prompt: "Q2",
+        options: [
+          { id: "q2_builder", title: "A", archetypeId: "builder" },
+          { id: "q2_visionary", title: "B", archetypeId: "visionary" },
+          { id: "q2_analyst", title: "C", archetypeId: "analyst" },
+          { id: "q2_operator", title: "D", archetypeId: "operator" },
+        ],
+      },
+      {
+        id: "q3",
+        prompt: "Q3",
+        options: [
+          { id: "q3_builder", title: "A", archetypeId: "builder" },
+          { id: "q3_visionary", title: "B", archetypeId: "visionary" },
+          { id: "q3_analyst", title: "C", archetypeId: "analyst" },
+          { id: "q3_operator", title: "D", archetypeId: "operator" },
+        ],
+      },
+    ],
+    archetypes: [
+      {
+        id: "builder",
+        title: "Builder",
+        identityLine: "Builder identity",
+        explanationLine: "Builder explanation",
+      },
+      {
+        id: "visionary",
+        title: "Visionary",
+        identityLine: "Visionary identity",
+        explanationLine: "Visionary explanation",
+      },
+      {
+        id: "analyst",
+        title: "Analyst",
+        identityLine: "Analyst identity",
+        explanationLine: "Analyst explanation",
+      },
+      {
+        id: "operator",
+        title: "Operator",
+        identityLine: "Operator identity",
+        explanationLine: "Operator explanation",
+      },
+    ],
+    resolutionMap: {},
+    copy: {
+      intro: "intro",
+      invalid: "invalid",
+      replay: "replay",
+    },
+    imagePrompt: {
+      styleKey: "style",
+      variantDescriptor: "descriptor",
+    },
+  };
+
+  const withMap: GameVariantDefinition = {
+    ...base,
+    resolutionMap: {
+      ...base.resolutionMap,
+      ...Object.fromEntries(
+        base.questions[0].options.flatMap(option1 =>
+          base.questions[1].options.flatMap(option2 =>
+            base.questions[2].options.map(option3 => [
+              `${option1.id}|${option2.id}|${option3.id}`,
+              option1.archetypeId,
+            ])
+          )
+        )
+      ),
+    },
+  };
+
+  return {
+    ...withMap,
+    ...overrides,
+  };
+}
+
 async function listen(app: express.Express) {
   const server = http.createServer(app);
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -63,12 +162,12 @@ async function listen(app: express.Express) {
 describe("identity game variants catalog and share routes", () => {
   it("rejects active variants with missing share metadata", () => {
     const variants: GameVariantDefinition[] = [
-      {
+      createVariant({
         variantId: "identity-broken",
         status: "active",
-        version: "v1",
         entryRefs: ["identity-broken"],
-      },
+        share: undefined,
+      }),
     ];
 
     expect(() => assertIdentityGameVariantCatalog(variants)).toThrow(
@@ -78,17 +177,16 @@ describe("identity game variants catalog and share routes", () => {
 
   it("allows active share image urls with benign query params", () => {
     const variants: GameVariantDefinition[] = [
-      {
+      createVariant({
         variantId: "identity-benign-query",
         status: "active",
-        version: "v1",
         entryRefs: ["identity-benign-query"],
         share: {
           title: "Test",
           description: "Test",
           imageUrl: "https://leaderbot.live/og/identity-benign.jpg?v=2",
         },
-      },
+      }),
     ];
 
     expect(() => assertIdentityGameVariantCatalog(variants)).not.toThrow();
@@ -132,12 +230,11 @@ describe("identity game variants catalog and share routes", () => {
   });
 
   it("uses global OG defaults when non-active variants do not define share metadata", async () => {
-    const qaVariant: GameVariantDefinition = {
+    const qaVariant: GameVariantDefinition = createVariant({
       variantId: "identity-qa-flow",
       status: "qa",
-      version: "v1",
       entryRefs: ["identity-qa-flow"],
-    };
+    });
 
     const app = express();
     registerIdentityGameShareRoutes(app, {
@@ -174,17 +271,16 @@ describe("identity game variants catalog and share routes", () => {
   });
 
   it("escapes share metadata when rendering OG html", async () => {
-    const variant: GameVariantDefinition = {
+    const variant: GameVariantDefinition = createVariant({
       variantId: "identity-escaped",
       status: "active",
-      version: "v1",
       entryRefs: ["identity-escaped"],
       share: {
         title: 'Reveal <your> "AI" self',
         description: 'Fast & fun <cta>',
         imageUrl: "https://leaderbot.live/og/escaped.jpg?v=2",
       },
-    };
+    });
 
     const app = express();
     registerIdentityGameShareRoutes(app, {
@@ -209,17 +305,16 @@ describe("identity game variants catalog and share routes", () => {
   });
 
   it("escapes inline redirect script content to prevent closing script injection", async () => {
-    const variant: GameVariantDefinition = {
+    const variant: GameVariantDefinition = createVariant({
       variantId: "identity-script-safety",
       status: "active",
-      version: "v1",
       entryRefs: ["identity-script-safety"],
       share: {
         title: "Safe",
         description: "Safe",
         imageUrl: "https://leaderbot.live/og/safe.png",
       },
-    };
+    });
 
     const app = express();
     registerIdentityGameShareRoutes(app, {
@@ -240,5 +335,18 @@ describe("identity game variants catalog and share routes", () => {
     } finally {
       await server.close();
     }
+  });
+
+  it("rejects variants with incomplete resolution maps", () => {
+    const variant = createVariant({
+      variantId: "identity-incomplete-map",
+      resolutionMap: {
+        "q1_builder|q2_builder|q3_builder": "builder",
+      },
+    });
+
+    expect(() => assertIdentityGameVariantCatalog([variant])).toThrow(
+      "missing resolutionMap key"
+    );
   });
 });

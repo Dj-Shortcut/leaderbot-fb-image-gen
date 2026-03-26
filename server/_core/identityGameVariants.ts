@@ -7,6 +7,37 @@ const DEFAULT_SHARE_DESCRIPTION =
   "Answer 3 quick questions and reveal your AI identity.";
 const DEFAULT_SHARE_IMAGE_URL =
   "https://leaderbot.live/og/identity-games-default.jpg";
+const V1_ARCHETYPE_IDS = ["builder", "visionary", "analyst", "operator"] as const;
+
+const optionSchema = z.object({
+  id: z.string().trim().min(1),
+  title: z.string().trim().min(1),
+  archetypeId: z.enum(V1_ARCHETYPE_IDS),
+});
+
+const questionSchema = z.object({
+  id: z.string().trim().min(1),
+  prompt: z.string().trim().min(1),
+  options: z.tuple([optionSchema, optionSchema, optionSchema, optionSchema]),
+});
+
+const archetypeSchema = z.object({
+  id: z.enum(V1_ARCHETYPE_IDS),
+  title: z.string().trim().min(1),
+  identityLine: z.string().trim().min(1),
+  explanationLine: z.string().trim().min(1),
+});
+
+const copySchema = z.object({
+  intro: z.string().trim().min(1),
+  invalid: z.string().trim().min(1),
+  replay: z.string().trim().min(1),
+});
+
+const imagePromptSchema = z.object({
+  styleKey: z.string().trim().min(1),
+  variantDescriptor: z.string().trim().min(1),
+});
 
 const shareSchema = z.object({
   title: z.string().trim().min(1),
@@ -19,10 +50,121 @@ const variantSchema = z.object({
   status: z.enum(["draft", "qa", "active"]),
   version: z.string().trim().min(1),
   entryRefs: z.array(z.string().trim().min(1)).min(1),
+  questions: z.tuple([questionSchema, questionSchema, questionSchema]),
+  archetypes: z.tuple([archetypeSchema, archetypeSchema, archetypeSchema, archetypeSchema]),
+  resolutionMap: z.record(z.string().trim().min(1), z.enum(V1_ARCHETYPE_IDS)),
+  copy: copySchema,
+  imagePrompt: imagePromptSchema,
   share: shareSchema.optional(),
 });
 
 export type GameVariantDefinition = z.infer<typeof variantSchema>;
+
+function resolveFamilies(
+  first: (typeof V1_ARCHETYPE_IDS)[number],
+  second: (typeof V1_ARCHETYPE_IDS)[number],
+  third: (typeof V1_ARCHETYPE_IDS)[number]
+): (typeof V1_ARCHETYPE_IDS)[number] {
+  if (first === second || first === third) {
+    return first;
+  }
+  if (second === third) {
+    return second;
+  }
+  return first;
+}
+
+function buildDeterministicResolutionMap(
+  questions: readonly [
+    z.infer<typeof questionSchema>,
+    z.infer<typeof questionSchema>,
+    z.infer<typeof questionSchema>
+  ]
+): Record<string, (typeof V1_ARCHETYPE_IDS)[number]> {
+  const map: Record<string, (typeof V1_ARCHETYPE_IDS)[number]> = {};
+  for (const option1 of questions[0].options) {
+    for (const option2 of questions[1].options) {
+      for (const option3 of questions[2].options) {
+        const key = `${option1.id}|${option2.id}|${option3.id}`;
+        map[key] = resolveFamilies(
+          option1.archetypeId,
+          option2.archetypeId,
+          option3.archetypeId
+        );
+      }
+    }
+  }
+  return map;
+}
+
+const IDENTITY_AI_V1_QUESTIONS: readonly [
+  z.infer<typeof questionSchema>,
+  z.infer<typeof questionSchema>,
+  z.infer<typeof questionSchema>
+] = [
+  {
+    id: "identity-ai-v1-q1",
+    prompt: "When a new AI tool drops, what do you do first?",
+    options: [
+      { id: "q1_build", title: "Open it and start making something", archetypeId: "builder" },
+      { id: "q1_vision", title: "Imagine what it could become", archetypeId: "visionary" },
+      { id: "q1_analyst", title: "Figure out how it actually works", archetypeId: "analyst" },
+      { id: "q1_operate", title: "See where it fits in a system", archetypeId: "operator" },
+    ],
+  },
+  {
+    id: "identity-ai-v1-q2",
+    prompt: "What kind of result feels most satisfying to you?",
+    options: [
+      { id: "q2_build", title: "A finished thing I can use now", archetypeId: "builder" },
+      { id: "q2_vision", title: "A bold idea no one saw coming", archetypeId: "visionary" },
+      { id: "q2_analyst", title: "A clean answer that makes sense", archetypeId: "analyst" },
+      { id: "q2_operate", title: "A process that runs smoothly", archetypeId: "operator" },
+    ],
+  },
+  {
+    id: "identity-ai-v1-q3",
+    prompt: "What role do you naturally take in a smart team?",
+    options: [
+      { id: "q3_build", title: "The maker", archetypeId: "builder" },
+      { id: "q3_vision", title: "The spark", archetypeId: "visionary" },
+      { id: "q3_analyst", title: "The decoder", archetypeId: "analyst" },
+      { id: "q3_operate", title: "The coordinator", archetypeId: "operator" },
+    ],
+  },
+];
+
+const IDENTITY_AI_V1_ARCHETYPES: readonly [
+  z.infer<typeof archetypeSchema>,
+  z.infer<typeof archetypeSchema>,
+  z.infer<typeof archetypeSchema>,
+  z.infer<typeof archetypeSchema>
+] = [
+  {
+    id: "builder",
+    title: "Builder",
+    identityLine: "Your dominant AI instinct is to turn momentum into something real.",
+    explanationLine: "You lean toward making, shipping, and moving fast.",
+  },
+  {
+    id: "visionary",
+    title: "Visionary",
+    identityLine: "Your dominant AI instinct is to spot the future before it arrives.",
+    explanationLine: "You lean toward possibility, originality, and bold leaps.",
+  },
+  {
+    id: "analyst",
+    title: "Analyst",
+    identityLine: "Your dominant AI instinct is to decode patterns before you commit.",
+    explanationLine: "You lean toward clarity, logic, and understanding systems.",
+  },
+  {
+    id: "operator",
+    title: "Operator",
+    identityLine: "Your dominant AI instinct is to make complex things run smoothly.",
+    explanationLine: "You lean toward structure, coordination, and durable systems.",
+  },
+];
 
 export const GAME_VARIANTS: readonly GameVariantDefinition[] = [
   {
@@ -30,6 +172,18 @@ export const GAME_VARIANTS: readonly GameVariantDefinition[] = [
     status: "active",
     version: "v1",
     entryRefs: ["identity-ai-v1", "game:identity-ai-v1"],
+    questions: IDENTITY_AI_V1_QUESTIONS,
+    archetypes: IDENTITY_AI_V1_ARCHETYPES,
+    resolutionMap: buildDeterministicResolutionMap(IDENTITY_AI_V1_QUESTIONS),
+    copy: {
+      intro: "Answer 3 quick questions to reveal your AI archetype.",
+      invalid: "That answer does not match one of the 4 choices.",
+      replay: "Want another round? Open the game link again.",
+    },
+    imagePrompt: {
+      styleKey: "identity-ai-v1-cinematic",
+      variantDescriptor: "cinematic AI portrait reveal, high contrast, premium social style",
+    },
     share: {
       title: "Which AI are you?",
       description: "Play a 3-question reveal and meet your AI archetype.",
@@ -105,6 +259,38 @@ export function assertIdentityGameVariantCatalog(
       } else if (!isLikelyPublicImageUrl(variant.share.imageUrl)) {
         errors.push(
           `Active variant ${variant.variantId} has non-public or non-cache-safe share.imageUrl`
+        );
+      }
+    }
+
+    const expectedTriples = new Set<string>();
+    for (const option1 of variant.questions[0].options) {
+      for (const option2 of variant.questions[1].options) {
+        for (const option3 of variant.questions[2].options) {
+          expectedTriples.add(`${option1.id}|${option2.id}|${option3.id}`);
+        }
+      }
+    }
+
+    const mapKeys = Object.keys(variant.resolutionMap);
+    const mapKeySet = new Set(mapKeys);
+    const archetypeIds = new Set(variant.archetypes.map(archetype => archetype.id));
+
+    for (const tripleKey of expectedTriples) {
+      if (!mapKeySet.has(tripleKey)) {
+        errors.push(`Variant ${variant.variantId} is missing resolutionMap key: ${tripleKey}`);
+      }
+    }
+
+    for (const tripleKey of mapKeys) {
+      if (!expectedTriples.has(tripleKey)) {
+        errors.push(`Variant ${variant.variantId} has unknown resolutionMap key: ${tripleKey}`);
+      }
+
+      const mappedArchetypeId = variant.resolutionMap[tripleKey];
+      if (!archetypeIds.has(mappedArchetypeId)) {
+        errors.push(
+          `Variant ${variant.variantId} maps ${tripleKey} to unknown archetype: ${mappedArchetypeId}`
         );
       }
     }
