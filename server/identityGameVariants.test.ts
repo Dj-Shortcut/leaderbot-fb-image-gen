@@ -238,7 +238,7 @@ describe("identity game variants catalog and share routes", () => {
         "/play/identity-ai-v1",
         "alt.example.com"
       );
-      expect(response.status).toBe(308);
+      expect(response.status).toBe(307);
       expect(response.headers.location).toBe(
         "https://leaderbot.live/play/identity-ai-v1"
       );

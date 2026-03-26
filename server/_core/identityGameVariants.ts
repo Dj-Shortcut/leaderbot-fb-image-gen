@@ -444,6 +444,7 @@ export function registerIdentityGameShareRoutes(
   const canonicalDomain =
     (options.canonicalDomain ?? IDENTITY_GAME_CANONICAL_DOMAIN).toLowerCase();
   const pageId = resolvePageId(options.pageId);
+  assertIdentityGameVariantCatalog(variants);
 
   app.get("/play/:variantId", (req: Request, res: Response) => {
     const variantId = normalizeVariantId(req.params.variantId ?? "");
@@ -461,7 +462,8 @@ export function registerIdentityGameShareRoutes(
       variant.status === "active" &&
       currentHost !== canonicalDomain
     ) {
-      res.redirect(308, canonicalUrl);
+      // Keep canonical-host redirects temporary because variant status/domain policy can evolve.
+      res.redirect(307, canonicalUrl);
       return;
     }
 
