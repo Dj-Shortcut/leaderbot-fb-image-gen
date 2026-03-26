@@ -3,6 +3,7 @@ import express from "express";
 import { describe, expect, it } from "vitest";
 import {
   assertIdentityGameVariantCatalog,
+  GAME_VARIANTS,
   registerIdentityGameShareRoutes,
   type GameVariantDefinition,
 } from "./_core/identityGameVariants";
@@ -458,5 +459,11 @@ describe("identity game variants catalog and share routes", () => {
     expect(() => assertIdentityGameVariantCatalog([missingArchetypeVariant])).toThrow(
       "missing archetypes: visionary"
     );
+  });
+
+  it("uses first-answer fallback for all-different deterministic resolution triples", () => {
+    const identityAiV1 = GAME_VARIANTS.find(variant => variant.variantId === "identity-ai-v1");
+    expect(identityAiV1).not.toBeNull();
+    expect(identityAiV1?.resolutionMap["q1_build|q2_vision|q3_analyst"]).toBe("builder");
   });
 });

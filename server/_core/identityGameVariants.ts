@@ -71,6 +71,8 @@ function resolveFamilies(
   if (second === third) {
     return second;
   }
+  // In all-different triples, V1 intentionally resolves to the first question's family.
+  // This mirrors the documented deterministic fallback used by identity-ai-v1.
   return first;
 }
 
