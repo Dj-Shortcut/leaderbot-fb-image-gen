@@ -132,3 +132,6 @@ Suggested implementation tickets:
 - Validation ticket: block activation on incomplete share/domain requirements.
 - Route ticket: implement `/play/{variantId}` as OG surface + Messenger redirect.
 - Release ticket: add mandatory OG cache refresh step to launch checklist.
+
+Operational checklist:
+- Use [`docs/games/identity-games-release-checklist.md`](./identity-games-release-checklist.md) before setting any variant to `active`.
