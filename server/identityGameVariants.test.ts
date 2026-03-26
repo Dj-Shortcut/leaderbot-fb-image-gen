@@ -192,4 +192,38 @@ describe("identity game variants catalog and share routes", () => {
       await server.close();
     }
   });
+
+  it("escapes inline redirect script content to prevent closing script injection", async () => {
+    const variant: GameVariantDefinition = {
+      variantId: "identity-script-safety",
+      status: "active",
+      version: "v1",
+      entryRefs: ["identity-script-safety"],
+      share: {
+        title: "Safe",
+        description: "Safe",
+        imageUrl: "https://leaderbot.live/og/safe.png",
+      },
+    };
+
+    const app = express();
+    registerIdentityGameShareRoutes(app, {
+      pageId: '61587343141159</script><script>alert("x")</script>',
+      nodeEnv: "development",
+      variants: [variant],
+    });
+
+    const server = await listen(app);
+    try {
+      const response = await fetch(`${server.baseUrl}/play/identity-script-safety`);
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain("\\u003c/script\\u003e\\u003cscript\\u003ealert");
+      expect(html).not.toContain(
+        '<script>window.location.replace("https://m.me/61587343141159</script>'
+      );
+    } finally {
+      await server.close();
+    }
+  });
 });

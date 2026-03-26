@@ -151,6 +151,14 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+function toSafeInlineScriptString(value: string): string {
+  return JSON.stringify(value)
+    .replaceAll("<", "\\u003c")
+    .replaceAll(">", "\\u003e")
+    .replaceAll("\u2028", "\\u2028")
+    .replaceAll("\u2029", "\\u2029");
+}
+
 function renderSharePageHtml(input: {
   canonicalUrl: string;
   messengerUrl: string;
@@ -177,7 +185,7 @@ function renderSharePageHtml(input: {
     <meta property="og:description" content="${safeDescription}" />
     <meta property="og:image" content="${safeImageUrl}" />
     <meta http-equiv="refresh" content="0;url=${safeMessengerUrl}" />
-    <script>window.location.replace(${JSON.stringify(input.messengerUrl)});</script>
+    <script>window.location.replace(${toSafeInlineScriptString(input.messengerUrl)});</script>
   </head>
   <body>
     <p>Redirecting to Messenger...</p>
