@@ -275,6 +275,17 @@ export function assertIdentityGameVariantCatalog(
     const mapKeys = Object.keys(variant.resolutionMap);
     const mapKeySet = new Set(mapKeys);
     const archetypeIds = new Set(variant.archetypes.map(archetype => archetype.id));
+    const missingArchetypes = V1_ARCHETYPE_IDS.filter(id => !archetypeIds.has(id));
+
+    if (missingArchetypes.length > 0) {
+      errors.push(
+        `Variant ${variant.variantId} is missing archetypes: ${missingArchetypes.join(", ")}`
+      );
+    }
+
+    if (archetypeIds.size < variant.archetypes.length) {
+      errors.push(`Variant ${variant.variantId} has duplicate archetype ids`);
+    }
 
     for (const tripleKey of expectedTriples) {
       if (!mapKeySet.has(tripleKey)) {

@@ -381,4 +381,82 @@ describe("identity game variants catalog and share routes", () => {
       "missing resolutionMap key"
     );
   });
+
+  it("rejects variants with duplicate archetype ids", () => {
+    const duplicateArchetypesVariant = createVariant({
+      variantId: "identity-duplicate-archetypes",
+      archetypes: [
+        {
+          id: "builder",
+          title: "Builder",
+          identityLine: "Builder identity",
+          explanationLine: "Builder explanation",
+        },
+        {
+          id: "builder",
+          title: "Builder clone",
+          identityLine: "Builder clone identity",
+          explanationLine: "Builder clone explanation",
+        },
+        {
+          id: "analyst",
+          title: "Analyst",
+          identityLine: "Analyst identity",
+          explanationLine: "Analyst explanation",
+        },
+        {
+          id: "operator",
+          title: "Operator",
+          identityLine: "Operator identity",
+          explanationLine: "Operator explanation",
+        },
+      ],
+      resolutionMap: Object.fromEntries(
+        Object.keys(createVariant().resolutionMap).map(key => [key, "builder"])
+      ),
+    });
+
+    expect(() => assertIdentityGameVariantCatalog([duplicateArchetypesVariant])).toThrow(
+      "duplicate archetype ids"
+    );
+  });
+
+  it("rejects variants missing required archetype coverage", () => {
+    const missingArchetypeVariant = createVariant({
+      variantId: "identity-missing-visionary",
+      archetypes: [
+        {
+          id: "builder",
+          title: "Builder",
+          identityLine: "Builder identity",
+          explanationLine: "Builder explanation",
+        },
+        {
+          id: "builder",
+          title: "Builder duplicate",
+          identityLine: "Builder duplicate identity",
+          explanationLine: "Builder duplicate explanation",
+        },
+        {
+          id: "analyst",
+          title: "Analyst",
+          identityLine: "Analyst identity",
+          explanationLine: "Analyst explanation",
+        },
+        {
+          id: "operator",
+          title: "Operator",
+          identityLine: "Operator identity",
+          explanationLine: "Operator explanation",
+        },
+      ],
+      resolutionMap: Object.fromEntries(
+        Object.keys(createVariant().resolutionMap).map(key => [key, "builder"])
+      ),
+    });
+
+    expect(() => assertIdentityGameVariantCatalog([missingArchetypeVariant])).toThrow(
+      "missing archetypes: visionary"
+    );
+  });
 });
