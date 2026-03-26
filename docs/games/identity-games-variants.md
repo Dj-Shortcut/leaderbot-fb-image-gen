@@ -57,6 +57,8 @@ Behavior:
   - `https://m.me/{PAGE_ID}?ref={variantId}`
 - The Messenger link format stays unchanged.
 - Preview customization is done on `/play/{variantId}`, not inside `m.me`.
+- Bare `ref={variantId}` compatibility in shared parsing applies to identity game variant ids that normalize to an `identity-...` prefix.
+- If a future variant id does not follow that prefix convention, use `ref=game:{variantId}` for explicit game entry.
 
 Open Graph requirements for each variant share URL:
 - `og:title` (variant-specific hook)

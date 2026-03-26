@@ -1,7 +1,6 @@
 import type { BotChannel } from "./normalizedInboundMessage";
 
 export type EntryMode = "auto_start" | "confirm_first";
-const IDENTITY_AI_V1_BARE_REF = "identity-ai-v1";
 
 export type EntrySourceType =
   | "deep_link"
@@ -87,6 +86,11 @@ function resolveEntryMode(value: string | null): EntryMode | undefined {
   return undefined;
 }
 
+function isBareIdentityVariantRef(refHead: string): boolean {
+  const normalized = normalizeExperienceId(refHead);
+  return normalized.startsWith("identity-");
+}
+
 export function parseGameEntryIntent(input: {
   channel: BotChannel;
   ref?: string | null;
@@ -107,7 +111,7 @@ export function parseGameEntryIntent(input: {
     gameId = normalizedHead.slice("game:".length);
   } else if (/^identity[_-]?game:/i.test(normalizedHead)) {
     gameId = normalizedHead.slice(normalizedHead.indexOf(":") + 1);
-  } else if (normalizeExperienceId(normalizedHead) === IDENTITY_AI_V1_BARE_REF) {
+  } else if (isBareIdentityVariantRef(normalizedHead)) {
     gameId = normalizedHead;
   } else {
     return null;
