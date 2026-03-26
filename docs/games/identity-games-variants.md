@@ -16,9 +16,9 @@ Variants run through the Messenger-based flow and are distributed through the ca
 The following rules are hard validation requirements enforced by runtime checks.
 
 - Option ids MUST use canonical structural format: alphanumeric plus `_` or `-` only.
-- Option ids MUST NOT contain structural separators used by `resolutionMap` keys.
+- Option ids MUST NOT contain the pipe character (`|`), which is the structural separator used by `resolutionMap` keys.
 - Duplicate option ids within the same question are invalid.
-- Archetype coverage MUST include all 4 V1 archetypes.
+- Archetype coverage MUST include all 4 V1 archetypes: `builder`, `visionary`, `analyst`, `operator`.
 - Duplicate archetype ids are invalid.
 
 ## Variant Intent

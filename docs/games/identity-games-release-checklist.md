@@ -9,7 +9,7 @@ Required checklist before promoting a variant to `active`.
 - [ ] Share metadata is complete: `share.title`, `share.description`, `share.imageUrl`.
 - [ ] Canonical production URL resolves on `https://leaderbot.live/play/{variantId}`.
 - [ ] Canonical URL redirects to Messenger entry with correct `ref` contract:
-- [ ] Identity variants use direct identity ref: `ref={variantId}`.
+- [ ] Identity variants (`variantId` starts with `identity-`, matching `variantId.startsWith("identity-")`) use direct identity ref: `ref={variantId}`.
 - [ ] Non-identity variants use namespaced ref: `ref=game:{variantId}` (URL-encoded in transport).
 - [ ] `MESSENGER_PAGE_ID` is configured in each environment that serves share redirects.
 - [ ] `MESSENGER_PAGE_ID` is numeric and uses valid Facebook page id format.
