@@ -41,6 +41,10 @@ import {
   recordHttpRequestMetric,
   registerMetricsRoute,
 } from "./observability";
+import {
+  assertIdentityGameVariantCatalog,
+  registerIdentityGameShareRoutes,
+} from "./identityGameVariants";
 
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
@@ -129,6 +133,7 @@ async function startServer() {
   assertWhatsAppConfig();
   assertPrivacyConfig();
   assertProductionWebhookReplayProtectionConfig();
+  assertIdentityGameVariantCatalog();
   await ensureStateStoreReady();
   await ensureWebhookReplayProtectionReady();
   await ensureHttpRateLimiterReady();
@@ -350,6 +355,7 @@ async function startServer() {
     );
   }
   registerChatRoutes(app);
+  registerIdentityGameShareRoutes(app);
   app.use(
     "/api/trpc",
     createExpressMiddleware({
