@@ -1,36 +1,27 @@
 # Leaderbot Foundation Plan for Mini Identity Games
 
 ## Status
-This document defines the required foundation BEFORE any identity game implementation.
+This document defines the required architecture for identity game entry, routing, and shared runtime behavior.
 
 This document is normative.
 Implementations must follow this design unless explicitly revised.
 
-No game logic should be built until:
-- EntryIntent is implemented
-- ActiveExperience routing is in place
-- outbound intents are extended
-- isolated experience state is supported
-
-Premature building is explicitly out of scope.
-
-This is the foundation.
-
-We are not building a game yet.
-We first build:
+Core requirements:
 - EntryIntent normalization
 - ActiveExperience ownership
 - routing priority
 - richer outbound intents
 - isolated experience state
+- shared variant runtime orchestration
+- canonical share entry route behavior
 
 Everything must align to this.
 No shortcuts through the existing style flow.
 
 ## Summary
-Before building any game flow, first introduce a clean experience foundation that separates channel ingress from shared orchestration. The immediate goal is not game logic yet, but a stable substrate for direct deep-linked experience starts, isolated experience state, and option/result-driven responses that work across Messenger and WhatsApp without leaking channel quirks into shared code.
+The system separates channel ingress from shared orchestration so direct deep-linked starts, isolated experience state, and option/result-driven responses work across Messenger and WhatsApp without leaking channel quirks into shared code.
 
-The key rule for this phase is: absorb Messenger/WhatsApp differences at the normalization boundary, then let shared logic work only with normalized `EntryIntent`, `ActiveExperience`, and richer outbound intents.
+The key rule is: absorb Messenger/WhatsApp differences at the normalization boundary, then let shared logic work only with normalized `EntryIntent`, `ActiveExperience`, shared variant runtime rules, and richer outbound intents.
 
 ## Core Changes
 
@@ -94,6 +85,16 @@ Rules:
 - A deep-linked experience may show a lightweight confirm step when `entryMode=confirm_first`.
 - Shared routing must make this decision before channel-specific UX rendering.
 - No webhook handler should contain game-specific routing branches.
+- Active variants MUST be resolved through shared runtime contracts, not per-game runtime branching.
+
+### 3.1 Variant Share Entry Routes
+Shared share entry routes are part of runtime behavior and MUST be treated as a stable contract.
+
+Rules:
+- Canonical share URLs MUST use `/play/{variantId}` on the canonical domain.
+- Share entry handling MUST remain in shared runtime modules.
+- In production, active variants MAY enforce canonical-host redirects before share-page render.
+- Share entry routes MUST render OG metadata and Messenger redirect behavior from shared variant metadata.
 
 ### 4. Richer outbound intents
 Extend the outbound contract so shared logic can express option/result-driven experiences.
@@ -208,9 +209,9 @@ This boundary is the seam that keeps Messenger/WhatsApp differences out of share
 2. Define `ActiveExperience` and mandatory routing priority.
 3. Specify richer outbound intent contracts plus Messenger/WhatsApp adapters.
 4. Implement isolated experience session storage with the required retrieval paths.
-5. Move existing deep-link/referral handling to the normalization boundary.
-6. Add tests proving shared logic no longer depends on raw channel payload shape.
-7. Only after this foundation is stable, start the first identity game implementation.
+5. Keep deep-link/referral handling at the normalization boundary and out of per-game handlers.
+6. Keep variant orchestration and share entry behavior in shared runtime modules.
+7. Add tests proving shared logic no longer depends on raw channel payload shape.
 
 ## Test Plan
 - Messenger deep link normalizes into `EntryIntent` without shared code touching raw referral fields.
@@ -225,7 +226,6 @@ This boundary is the seam that keeps Messenger/WhatsApp differences out of share
 - Game sessions can be loaded by `userId`, `sessionId`, and `activeExperience` reference.
 
 ## Assumptions
-- This phase is foundation-only.
-- No game logic should be implemented during this phase.
+- Shared variant runtime and canonical share entry routes exist and are normative.
 - Messenger is the first live entry surface, but the contracts must already fit WhatsApp later.
 - Existing style flow may temporarily keep its current flat stage model, but the new foundation must not depend on it.
