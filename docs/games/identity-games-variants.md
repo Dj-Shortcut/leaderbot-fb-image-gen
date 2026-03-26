@@ -103,3 +103,30 @@ Share validation:
 - No per-variant preview customization inside Messenger (`m.me`)
 - No runtime dynamic OG generation (static OG metadata per variant is enough for V1)
 - No second runtime framework layer beyond this JSON-first variant model
+
+## Execution Addendum (Ticket-Ready)
+This addendum translates the design into enforceable release criteria.
+
+Activation gates:
+- A variant can move to `active` only if:
+  - fixed V1 shape validation passes (3 questions, 4 options each, 4 archetypes)
+  - deterministic resolution map is complete
+  - share metadata is complete (`share.title`, `share.description`, `share.imageUrl`)
+  - canonical production URL is valid on `https://leaderbot.live/play/{variantId}`
+- Active variants must not launch from alternative production domains.
+
+Distribution acceptance:
+- The canonical share URL must expose `og:title`, `og:description`, and `og:image`.
+- The canonical share URL must redirect to `https://m.me/{PAGE_ID}?ref={variantId}`.
+- If share metadata is missing on non-active variants, global OG defaults are used.
+
+Operations acceptance:
+- After any OG text/image update, refresh preview cache via Facebook Sharing Debugger before launch.
+- `share.imageUrl` must remain public, stable, and cache-safe.
+- Canonical variant share URLs are immutable once the variant is active.
+
+Suggested implementation tickets:
+- Schema ticket: lock `share` fields in `GameVariantDefinition`.
+- Validation ticket: block activation on incomplete share/domain requirements.
+- Route ticket: implement `/play/{variantId}` as OG surface + Messenger redirect.
+- Release ticket: add mandatory OG cache refresh step to launch checklist.
