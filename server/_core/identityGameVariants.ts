@@ -338,7 +338,8 @@ function escapeHtml(value: string): string {
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#x27;");
 }
 
 function toSafeInlineScriptString(value: string): string {
@@ -424,7 +425,8 @@ export function registerIdentityGameShareRoutes(
       return;
     }
 
-    const canonicalUrl = `https://${canonicalDomain}/play/${variantId}`;
+    const canonicalVariantId = normalizeVariantId(variant.variantId);
+    const canonicalUrl = `https://${canonicalDomain}/play/${canonicalVariantId}`;
     const currentHost = getRequestHost(req);
     if (
       isProductionEnv(options.nodeEnv) &&
@@ -432,11 +434,6 @@ export function registerIdentityGameShareRoutes(
       currentHost !== canonicalDomain
     ) {
       res.redirect(308, canonicalUrl);
-      return;
-    }
-
-    if (!pageId) {
-      res.status(503).type("text/plain").send("Messenger page id not configured");
       return;
     }
 
