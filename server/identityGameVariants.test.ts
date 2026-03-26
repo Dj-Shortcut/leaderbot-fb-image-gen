@@ -239,7 +239,9 @@ describe("identity game variants catalog and share routes", () => {
       const html = await response.text();
       expect(html).toContain('property="og:title" content="Wat voor DJ ben jij écht?"');
       expect(html).toContain('property="og:description" content="Dit ga je niet leuk vinden 😄"');
-      expect(html).toContain('property="og:image" content="https://leaderbot.live/dj.png"');
+      expect(html).toContain(
+        'property="og:image" content="https://leaderbot.live/og/dj-v1-invite-v1.png"'
+      );
       expect(html).toContain("https://m.me/61587343141159?ref=game%3Adj");
     } finally {
       await server.close();
