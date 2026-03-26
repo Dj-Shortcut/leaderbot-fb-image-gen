@@ -394,6 +394,9 @@ function isProductionEnv(inputNodeEnv?: string): boolean {
 
 function resolvePageId(overridePageId?: string): string {
   const pageId = (overridePageId ?? process.env.MESSENGER_PAGE_ID ?? "").trim();
+  if (!pageId) {
+    throw new Error("MESSENGER_PAGE_ID is required for identity game share routes");
+  }
   return pageId;
 }
 

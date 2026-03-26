@@ -160,6 +160,13 @@ async function listen(app: express.Express) {
 }
 
 describe("identity game variants catalog and share routes", () => {
+  it("fails fast when messenger page id is missing", () => {
+    const app = express();
+    expect(() =>
+      registerIdentityGameShareRoutes(app, { pageId: "   ", nodeEnv: "development" })
+    ).toThrow("MESSENGER_PAGE_ID is required");
+  });
+
   it("rejects active variants with missing share metadata", () => {
     const variants: GameVariantDefinition[] = [
       createVariant({
