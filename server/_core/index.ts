@@ -53,6 +53,7 @@ const SHUTDOWN_GRACE_PERIOD_MS = 5_000;
 const INVITE_PATH = "/invite/identity-ai-v1";
 const INVITE_MESSENGER_URL = "https://m.me/61587343141159?ref=identity-ai-v1";
 const DEFAULT_PUBLIC_BASE_URL = "https://leaderbot.live";
+const INVITE_OG_IMAGE_PATH = "/og/identity-ai-v1-invite-v1.png";
 
 function normalizeBaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim().replace(/\/+$/, "");
@@ -363,7 +364,7 @@ async function startServer() {
   app.get(INVITE_PATH, (req, res) => {
     const baseUrl = getPublicBaseUrl(req);
     const inviteUrl = `${baseUrl}${INVITE_PATH}`;
-    const ogImageUrl = `${baseUrl}/og/identity-ai-v1-invite-v1.png`;
+    const ogImageUrl = `${baseUrl}${INVITE_OG_IMAGE_PATH}`;
 
     res.type("html").send(`
 <!doctype html>
@@ -375,10 +376,14 @@ async function startServer() {
     <meta property="og:title" content="Welke AI ben jij?" />
     <meta property="og:description" content="Ontdek het in 30 seconden 🤖" />
     <meta property="og:image" content="${ogImageUrl}" />
+    <meta property="og:image:url" content="${ogImageUrl}" />
+    <meta property="og:image:secure_url" content="${ogImageUrl}" />
     <meta property="og:url" content="${inviteUrl}" />
     <meta property="og:type" content="website" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="${ogImageUrl}" />
     <meta http-equiv="refresh" content="3;url=${INVITE_MESSENGER_URL}" />
     <style>
       :root { color-scheme: light; }
