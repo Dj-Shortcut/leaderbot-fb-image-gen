@@ -382,7 +382,6 @@ async function startServer() {
     <meta property="og:type" content="website" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta http-equiv="refresh" content="3;url=${INVITE_MESSENGER_URL}" />
     <style>
       :root { color-scheme: light; }
       body {
@@ -415,11 +414,6 @@ async function startServer() {
       <p>Ontdek het in 30 seconden 🤖</p>
       <a class="cta" href="${INVITE_MESSENGER_URL}">Start in Messenger</a>
     </main>
-    <script>
-      setTimeout(function () {
-        window.location.href = "${INVITE_MESSENGER_URL}";
-      }, 3000);
-    </script>
   </body>
 </html>`);
   });
