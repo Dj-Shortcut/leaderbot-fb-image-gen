@@ -329,6 +329,7 @@ Multi-channel text routing now also has a small adapter-level test in `server/bo
 ## Style additions
 
 When adding or updating image styles, use [`docs/style-guide.md`](docs/style-guide.md) as the quality and consistency checklist for prompts, previews, naming, and review.
+For Facebook/Messenger share assets, use [`docs/invite-image-export-checklist.md`](docs/invite-image-export-checklist.md) as the required export, naming, and cache-busting workflow.
 
 ## Admin login (GitHub OAuth)
 
