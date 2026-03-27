@@ -52,6 +52,7 @@ const REQUEST_BODY_LIMIT = "10mb";
 const SHUTDOWN_GRACE_PERIOD_MS = 5_000;
 const INVITE_PATH = "/invite/identity-ai-v1";
 const INVITE_MESSENGER_URL = "https://m.me/61587343141159?ref=identity-ai-v1";
+const DEFAULT_PUBLIC_BASE_URL = "https://leaderbot.live";
 
 function normalizeBaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim().replace(/\/+$/, "");
@@ -61,15 +62,12 @@ function normalizeBaseUrl(baseUrl: string): string {
   return `https://${trimmed}`;
 }
 
-function getPublicBaseUrl(req: express.Request): string {
+function getPublicBaseUrl(_req: express.Request): string {
   const configuredBaseUrl = process.env.APP_BASE_URL;
   if (configuredBaseUrl) {
     return normalizeBaseUrl(configuredBaseUrl);
   }
-
-  const host = req.get("host");
-  const protocol = req.protocol || "https";
-  return host ? `${protocol}://${host}` : "https://localhost";
+  return DEFAULT_PUBLIC_BASE_URL;
 }
 
 function toError(reason: unknown): Error {
