@@ -50,6 +50,27 @@ const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
 const REQUEST_BODY_LIMIT = "10mb";
 const SHUTDOWN_GRACE_PERIOD_MS = 5_000;
+const INVITE_PATH = "/invite/identity-ai-v1";
+const INVITE_MESSENGER_URL = "https://m.me/61587343141159?ref=identity-ai-v1";
+
+function normalizeBaseUrl(baseUrl: string): string {
+  const trimmed = baseUrl.trim().replace(/\/+$/, "");
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
+}
+
+function getPublicBaseUrl(req: express.Request): string {
+  const configuredBaseUrl = process.env.APP_BASE_URL;
+  if (configuredBaseUrl) {
+    return normalizeBaseUrl(configuredBaseUrl);
+  }
+
+  const host = req.get("host");
+  const protocol = req.protocol || "https";
+  return host ? `${protocol}://${host}` : "https://localhost";
+}
 
 function toError(reason: unknown): Error {
   if (reason instanceof Error) {
@@ -339,6 +360,67 @@ async function startServer() {
     </body>
     </html>
   `);
+  });
+
+  app.get(INVITE_PATH, (req, res) => {
+    const baseUrl = getPublicBaseUrl(req);
+    const inviteUrl = `${baseUrl}${INVITE_PATH}`;
+    const ogImageUrl = `${baseUrl}/og/identity-ai-v1-invite-v1.png`;
+
+    res.type("html").send(`
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Welke AI ben jij?</title>
+    <meta property="og:title" content="Welke AI ben jij?" />
+    <meta property="og:description" content="Ontdek het in 30 seconden 🤖" />
+    <meta property="og:image" content="${ogImageUrl}" />
+    <meta property="og:url" content="${inviteUrl}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta http-equiv="refresh" content="3;url=${INVITE_MESSENGER_URL}" />
+    <style>
+      :root { color-scheme: light; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: Arial, sans-serif;
+        background: linear-gradient(180deg, #f7fafc 0%, #edf2f7 100%);
+        color: #111827;
+      }
+      main {
+        text-align: center;
+        padding: 24px;
+      }
+      a.cta {
+        display: inline-block;
+        text-decoration: none;
+        font-weight: 700;
+        background: #1877f2;
+        color: #fff;
+        padding: 12px 20px;
+        border-radius: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Welke AI ben jij?</h1>
+      <p>Ontdek het in 30 seconden 🤖</p>
+      <a class="cta" href="${INVITE_MESSENGER_URL}">Start in Messenger</a>
+    </main>
+    <script>
+      setTimeout(function () {
+        window.location.href = "${INVITE_MESSENGER_URL}";
+      }, 3000);
+    </script>
+  </body>
+</html>`);
   });
 
   registerGitHubAdminRoutes(app);
