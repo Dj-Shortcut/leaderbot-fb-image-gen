@@ -50,21 +50,56 @@ const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
 const REQUEST_BODY_LIMIT = "10mb";
 const SHUTDOWN_GRACE_PERIOD_MS = 5_000;
-const INVITE_PATH = "/invite/identity-ai-v1";
-const INVITE_MESSENGER_URL = "https://m.me/61587343141159?ref=identity-ai-v1";
 const DEFAULT_PUBLIC_BASE_URL = "https://leaderbot.live";
-const INVITE_OG_IMAGES = [
+type InviteOgImage = {
+  path: string;
+  width: string;
+  height: string;
+  alt: string;
+};
+
+type InvitePageConfig = {
+  path: string;
+  title: string;
+  description: string;
+  messengerUrl: string;
+  ogImages: readonly InviteOgImage[];
+};
+
+const INVITE_PAGE_CONFIGS: readonly InvitePageConfig[] = [
   {
-    path: "/og/identity-ai-v1-invite-v2.png",
-    width: "1536",
-    height: "1024",
-    alt: "Welke AI ben jij? Ontdek het in 30 seconden.",
+    path: "/invite/identity-ai-v1",
+    title: "Welke AI ben jij?",
+    description: "Ontdek het in 30 seconden 🤖",
+    messengerUrl: "https://m.me/61587343141159?ref=identity-ai-v1",
+    ogImages: [
+      {
+        path: "/og/identity-ai-v1-invite-v2.png",
+        width: "1536",
+        height: "1024",
+        alt: "Welke AI ben jij? Ontdek het in 30 seconden.",
+      },
+      {
+        path: "/og/identity-ai-v1-invite-v1.png",
+        width: "1024",
+        height: "1536",
+        alt: "Welke AI ben jij? Ontdek het in 30 seconden.",
+      },
+    ],
   },
   {
-    path: "/og/identity-ai-v1-invite-v1.png",
-    width: "1024",
-    height: "1536",
-    alt: "Welke AI ben jij? Ontdek het in 30 seconden.",
+    path: "/invite/dj-v1",
+    title: "Welke DJ ben jij?",
+    description: "Jouw stijl verraadt meer dan je denkt 🎧",
+    messengerUrl: "https://m.me/61587343141159?ref=game:dj-v1",
+    ogImages: [
+      {
+        path: "/og/dj-v1-1200x630.png",
+        width: "1200",
+        height: "630",
+        alt: "Leaderbot DJ game preview",
+      },
+    ],
   },
 ] as const;
 
@@ -99,6 +134,86 @@ function assertInviteShareConfig(): void {
       "FB_APP_ID (or VITE_APP_ID) must be configured in production for invite Open Graph metadata."
     );
   }
+}
+
+function renderInvitePageHtml(input: {
+  baseUrl: string;
+  invitePath: string;
+  title: string;
+  description: string;
+  messengerUrl: string;
+  ogImages: readonly InviteOgImage[];
+  fbAppId: string;
+}): string {
+  const inviteUrl = `${input.baseUrl}${input.invitePath}`;
+  const ogImageMeta = input.ogImages
+    .map((image) => {
+      const imageUrl = `${input.baseUrl}${image.path}`;
+      const lines = [
+        `<meta property="og:image" content="${imageUrl}" />`,
+        `<meta property="og:image:url" content="${imageUrl}" />`,
+        `<meta property="og:image:secure_url" content="${imageUrl}" />`,
+        `<meta property="og:image:alt" content="${image.alt}" />`,
+      ];
+
+      if (image.width) {
+        lines.push(`<meta property="og:image:width" content="${image.width}" />`);
+      }
+      if (image.height) {
+        lines.push(`<meta property="og:image:height" content="${image.height}" />`);
+      }
+
+      return lines.join("\n    ");
+    })
+    .join("\n    ");
+
+  return `
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${input.title}</title>
+    <meta property="og:title" content="${input.title}" />
+    <meta property="og:description" content="${input.description}" />
+    ${ogImageMeta}
+    <meta property="og:url" content="${inviteUrl}" />
+    <meta property="og:type" content="website" />
+    ${input.fbAppId ? `<meta property="fb:app_id" content="${input.fbAppId}" />` : ""}
+    <style>
+      :root { color-scheme: light; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: Arial, sans-serif;
+        background: linear-gradient(180deg, #f7fafc 0%, #edf2f7 100%);
+        color: #111827;
+      }
+      main {
+        text-align: center;
+        padding: 24px;
+      }
+      a.cta {
+        display: inline-block;
+        text-decoration: none;
+        font-weight: 700;
+        background: #1877f2;
+        color: #fff;
+        padding: 12px 20px;
+        border-radius: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>${input.title}</h1>
+      <p>${input.description}</p>
+      <a class="cta" href="${input.messengerUrl}">Start in Messenger</a>
+    </main>
+  </body>
+</html>`;
 }
 
 function toError(reason: unknown): Error {
@@ -298,14 +413,24 @@ async function startServer() {
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <style>
-        body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; line-height: 1.6; padding: 0 20px; color: #1a1a1a; }
-        h1, h2 { color: #222; }
+        :root { color-scheme: dark; }
+        body {
+          font-family: Arial, sans-serif;
+          max-width: 700px;
+          margin: 40px auto;
+          line-height: 1.6;
+          padding: 24px;
+          color: #e5e7eb;
+          background: #0b1220;
+        }
+        h1, h2 { color: #f9fafb; }
         ul { padding-left: 20px; }
+        a { color: #93c5fd; }
       </style>
     </head>
     <body>
       <h1>Privacy Policy – Leaderbot</h1>
-      <p><strong>Last updated:</strong> 2026-02-24</p>
+      <p><strong>Last updated:</strong> 27 March 2026</p>
       <p>Leaderbot ("we", "our") is a Messenger-based service that transforms user-submitted images using AI styles.</p>
 
       <h2>What data we collect</h2>
@@ -362,9 +487,19 @@ async function startServer() {
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <style>
-        body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; line-height: 1.6; padding: 0 20px; color: #1a1a1a; }
-        h1, h2 { color: #222; }
+        :root { color-scheme: dark; }
+        body {
+          font-family: Arial, sans-serif;
+          max-width: 700px;
+          margin: 40px auto;
+          line-height: 1.6;
+          padding: 24px;
+          color: #e5e7eb;
+          background: #0b1220;
+        }
+        h1, h2 { color: #f9fafb; }
         ul { padding-left: 20px; }
+        a { color: #93c5fd; }
       </style>
     </head>
     <body>
@@ -392,77 +527,27 @@ async function startServer() {
   `);
   });
 
-  app.get(INVITE_PATH, (req, res) => {
-    const baseUrl = getPublicBaseUrl(req);
-    const inviteUrl = `${baseUrl}${INVITE_PATH}`;
-    const fbAppId = getFacebookAppId();
-    const ogImageMeta = INVITE_OG_IMAGES.map((image) => {
-      const imageUrl = `${baseUrl}${image.path}`;
-      const lines = [
-        `<meta property="og:image" content="${imageUrl}" />`,
-        `<meta property="og:image:url" content="${imageUrl}" />`,
-        `<meta property="og:image:secure_url" content="${imageUrl}" />`,
-        `<meta property="og:image:alt" content="${image.alt}" />`,
-      ];
+  for (const inviteConfig of INVITE_PAGE_CONFIGS) {
+    app.get(inviteConfig.path, (req, res) => {
+      const baseUrl = getPublicBaseUrl(req);
+      const fbAppId = getFacebookAppId();
 
-      if (image.width) {
-        lines.push(`<meta property="og:image:width" content="${image.width}" />`);
-      }
-      if (image.height) {
-        lines.push(`<meta property="og:image:height" content="${image.height}" />`);
-      }
-
-      return lines.join("\n    ");
-    }).join("\n    ");
-
-    res.type("html").send(`
-<!doctype html>
-<html lang="nl">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Welke AI ben jij?</title>
-    <meta property="og:title" content="Welke AI ben jij?" />
-    <meta property="og:description" content="Ontdek het in 30 seconden 🤖" />
-    ${ogImageMeta}
-    <meta property="og:url" content="${inviteUrl}" />
-    <meta property="og:type" content="website" />
-    ${fbAppId ? `<meta property="fb:app_id" content="${fbAppId}" />` : ""}
-    <style>
-      :root { color-scheme: light; }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        font-family: Arial, sans-serif;
-        background: linear-gradient(180deg, #f7fafc 0%, #edf2f7 100%);
-        color: #111827;
-      }
-      main {
-        text-align: center;
-        padding: 24px;
-      }
-      a.cta {
-        display: inline-block;
-        text-decoration: none;
-        font-weight: 700;
-        background: #1877f2;
-        color: #fff;
-        padding: 12px 20px;
-        border-radius: 10px;
-      }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>Welke AI ben jij?</h1>
-      <p>Ontdek het in 30 seconden 🤖</p>
-      <a class="cta" href="${INVITE_MESSENGER_URL}">Start in Messenger</a>
-    </main>
-  </body>
-</html>`);
-  });
+      res
+        .status(200)
+        .type("text/html; charset=utf-8")
+        .send(
+          renderInvitePageHtml({
+            baseUrl,
+            invitePath: inviteConfig.path,
+            title: inviteConfig.title,
+            description: inviteConfig.description,
+            messengerUrl: inviteConfig.messengerUrl,
+            ogImages: inviteConfig.ogImages,
+            fbAppId,
+          })
+        );
+    });
+  }
 
   registerGitHubAdminRoutes(app);
 
