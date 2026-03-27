@@ -430,6 +430,7 @@ async function startServer() {
     </head>
     <body>
       <h1>Privacy Policy – Leaderbot</h1>
+      <p><a href="/privacy-nl" lang="nl">Nederlandse versie</a></p>
       <p><strong>Last updated:</strong> 27 March 2026</p>
       <p>Leaderbot ("we", "our") is a Messenger-based service that transforms user-submitted images using AI styles.</p>
 
@@ -504,6 +505,7 @@ async function startServer() {
     </head>
     <body>
       <h1>User Data Deletion Instructions – Leaderbot</h1>
+      <p><a href="/data-deletion-nl" lang="nl">Nederlandse versie</a></p>
       <p>If you want your data removed from Leaderbot, you can request deletion at any time.</p>
 
       <h2>Data that can be deleted</h2>
@@ -522,6 +524,131 @@ async function startServer() {
 
       <h2>Processing timeframe</h2>
       <p>After we verify your request details, deletion is completed within a reasonable timeframe.</p>
+    </body>
+    </html>
+  `);
+  });
+
+  app.get("/privacy-nl", (_req, res) => {
+    res.type("html").send(`
+    <!DOCTYPE html>
+    <html lang="nl">
+    <head>
+      <title>Privacybeleid – Leaderbot</title>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <style>
+        :root { color-scheme: dark; }
+        body {
+          font-family: Arial, sans-serif;
+          max-width: 700px;
+          margin: 40px auto;
+          line-height: 1.6;
+          padding: 24px;
+          color: #e5e7eb;
+          background: #0b1220;
+        }
+        h1, h2 { color: #f9fafb; }
+        ul { padding-left: 20px; }
+        a { color: #93c5fd; }
+      </style>
+    </head>
+    <body>
+      <h1>Privacybeleid – Leaderbot</h1>
+      <p><a href="/privacy" lang="en">English version</a></p>
+      <p><strong>Laatst bijgewerkt:</strong> 27 maart 2026</p>
+      <p>Leaderbot ("wij", "ons") is een Messenger-dienst die door gebruikers ingestuurde afbeeldingen transformeert met AI-stijlen.</p>
+
+      <h2>Welke gegevens we verzamelen</h2>
+      <p>Wanneer je via Facebook Messenger met Leaderbot communiceert, kunnen wij het volgende ontvangen:</p>
+      <ul>
+        <li>Berichten die je naar de pagina stuurt</li>
+        <li>Afbeeldingen die je indient voor transformatie</li>
+        <li>Basisberichtmetadata die nodig is om de dienst te leveren (bijvoorbeeld afzender-ID en tijdstempels)</li>
+      </ul>
+      <p>We vragen niet om je wachtwoord en hebben geen toegang tot je privéprofielgegevens buiten wat Messenger voor deze integratie doorgeeft.</p>
+
+      <h2>Hoe we gegevens gebruiken</h2>
+      <p>We gebruiken je gegevens alleen om:</p>
+      <ul>
+        <li>Je verzoek te ontvangen</li>
+        <li>Je ingestuurde afbeelding te verwerken en te transformeren</li>
+        <li>De getransformeerde afbeelding terug te sturen via Messenger</li>
+        <li>De betrouwbaarheid van de dienst te bewaren, misbruik te voorkomen en problemen op te lossen</li>
+      </ul>
+
+      <h2>Verwerking en bewaartermijn van afbeeldingen</h2>
+      <p>Afbeeldingen worden verwerkt om de gevraagde transformatie te genereren.</p>
+      <p>We verkopen je afbeeldingen niet.</p>
+      <p>We gebruiken je afbeeldingen niet voor marketing naar jou.</p>
+      <p>We delen je afbeeldingen niet met derden, behalve waar nodig om de dienst te leveren (bijvoorbeeld beeldverwerkingsproviders).</p>
+      <p>Afbeeldingen en gegenereerde resultaten worden alleen bewaard zolang dat nodig is om het resultaat te leveren en basisoperationele stabiliteit te waarborgen, en worden daarna verwijderd of geanonimiseerd.</p>
+
+      <h2>Delen en derde partijen</h2>
+      <p>We kunnen externe infrastructuurproviders gebruiken (hosting, logging en beeldverwerking) uitsluitend om de dienst te laten werken. We delen geen persoonsgegevens voor advertentiedoeleinden.</p>
+
+      <h2>Beveiliging</h2>
+      <p>We nemen redelijke maatregelen om gegevens te beschermen tijdens transport en opslag. Geen enkel systeem is 100% veilig, maar we proberen gegevensblootstelling en toegang tot een minimum te beperken.</p>
+
+      <h2>Jouw keuzes</h2>
+      <p>Je kunt het gebruik van de dienst op elk moment stoppen door de pagina niet langer te berichten.</p>
+
+      <h2>Verzoeken tot gegevensverwijdering</h2>
+      <p>Als je wilt dat we gegevens verwijderen die gekoppeld zijn aan je interacties, neem dan contact op via: privacy@leaderbot.live</p>
+      <p>Vermeld je Facebook-profielnaam en het geschatte tijdstip waarop je de pagina een bericht stuurde, zodat we je gesprekscontext kunnen terugvinden.</p>
+
+      <h2>Contact</h2>
+      <p>E-mail: privacy@leaderbot.live</p>
+    </body>
+    </html>
+  `);
+  });
+
+  app.get("/data-deletion-nl", (_req, res) => {
+    res.type("html").send(`
+    <!DOCTYPE html>
+    <html lang="nl">
+    <head>
+      <title>Instructies Gegevensverwijdering – Leaderbot</title>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <style>
+        :root { color-scheme: dark; }
+        body {
+          font-family: Arial, sans-serif;
+          max-width: 700px;
+          margin: 40px auto;
+          line-height: 1.6;
+          padding: 24px;
+          color: #e5e7eb;
+          background: #0b1220;
+        }
+        h1, h2 { color: #f9fafb; }
+        ul { padding-left: 20px; }
+        a { color: #93c5fd; }
+      </style>
+    </head>
+    <body>
+      <h1>Instructies Gegevensverwijdering – Leaderbot</h1>
+      <p><a href="/data-deletion" lang="en">English version</a></p>
+      <p>Als je je gegevens uit Leaderbot wil laten verwijderen, kun je op elk moment een verwijderverzoek indienen.</p>
+
+      <h2>Gegevens die verwijderd kunnen worden</h2>
+      <ul>
+        <li>Gespreks-ID's en berichtlogs die gekoppeld zijn aan je interactiegeschiedenis</li>
+        <li>Bewaarde afbeeldingen en gegenereerde resultaten, indien nog opgeslagen</li>
+      </ul>
+
+      <h2>Hoe je verwijdering aanvraagt</h2>
+      <p>Stuur je verzoek via e-mail naar: <strong>privacy@leaderbot.live</strong></p>
+      <p>Om je records correct te identificeren, vermeld:</p>
+      <ul>
+        <li>Je Facebook-profielnaam</li>
+        <li>Het geschatte tijdstip waarop je de pagina een bericht stuurde</li>
+      </ul>
+
+      <h2>Verwerkingstermijn</h2>
+      <p>Nadat we je verzoekdetails hebben geverifieerd, ronden we verwijdering binnen een redelijke termijn af.</p>
     </body>
     </html>
   `);
