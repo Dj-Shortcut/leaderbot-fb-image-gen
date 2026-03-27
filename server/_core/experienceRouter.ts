@@ -37,6 +37,37 @@ function normalizeAction(action: string | null | undefined): string | null {
   return normalized ? normalized : null;
 }
 
+type ControlAction = "START_GAME" | "LATER";
+
+function normalizeControlAction(
+  action: string | null | undefined
+): ControlAction | null {
+  const normalized = normalizeAction(action);
+  if (!normalized) {
+    return null;
+  }
+
+  const uppercase = normalized.toUpperCase();
+  if (uppercase === "START_GAME" || uppercase === "LATER") {
+    return uppercase;
+  }
+
+  const compact = uppercase.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  if (
+    compact === "START GAME" ||
+    compact === "START" ||
+    compact === "START SPEL" ||
+    compact === "SPEL STARTEN"
+  ) {
+    return "START_GAME";
+  }
+  if (compact === "LATER" || compact === "LATERAAN" || compact === "NU NIET") {
+    return "LATER";
+  }
+
+  return null;
+}
+
 function resolveRouterLang(input: ExperienceRouterInput): "nl" | "en" {
   return normalizeLang(
     input.entryIntent?.localeHint ??
@@ -235,13 +266,13 @@ export async function routeActiveExperience(
   }
 
   const action = normalizeAction(input.action);
-  const normalizedAction = action?.toUpperCase() ?? null;
+  const controlAction = normalizeControlAction(action);
   const lang = resolveRouterLang({
     ...input,
     entryIntent: input.state.lastEntryIntent,
   });
 
-  if (normalizedAction === "LATER") {
+  if (controlAction === "LATER") {
     const abandonedSession: IdentityGameSession = {
       ...activeSession,
       status: "abandoned",
@@ -269,7 +300,7 @@ export async function routeActiveExperience(
       };
     }
 
-    if (normalizedAction === "START_GAME" && activeSession.status === "started") {
+    if (controlAction === "START_GAME" && activeSession.status === "started") {
       const inProgressSession: IdentityGameSession = {
         ...activeSession,
         status: "in_progress",
@@ -344,7 +375,7 @@ export async function routeActiveExperience(
     };
   }
 
-  if (normalizedAction === "START_GAME") {
+  if (controlAction === "START_GAME") {
     const inProgressSession: IdentityGameSession = {
       ...activeSession,
       status: "in_progress",
