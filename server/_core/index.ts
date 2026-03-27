@@ -71,6 +71,23 @@ function getPublicBaseUrl(_req: express.Request): string {
   return DEFAULT_PUBLIC_BASE_URL;
 }
 
+function getFacebookAppId(): string {
+  return (process.env.FB_APP_ID ?? process.env.VITE_APP_ID ?? "").trim();
+}
+
+function assertInviteShareConfig(): void {
+  if (process.env.NODE_ENV !== "production") {
+    return;
+  }
+
+  const fbAppId = getFacebookAppId();
+  if (!fbAppId) {
+    throw new Error(
+      "FB_APP_ID (or VITE_APP_ID) must be configured in production for invite Open Graph metadata."
+    );
+  }
+}
+
 function toError(reason: unknown): Error {
   if (reason instanceof Error) {
     return reason;
@@ -152,6 +169,7 @@ async function startServer() {
   assertAuthConfig();
   assertWhatsAppConfig();
   assertPrivacyConfig();
+  assertInviteShareConfig();
   assertProductionWebhookReplayProtectionConfig();
   assertIdentityGameVariantCatalog();
   await ensureStateStoreReady();
@@ -365,6 +383,7 @@ async function startServer() {
     const baseUrl = getPublicBaseUrl(req);
     const inviteUrl = `${baseUrl}${INVITE_PATH}`;
     const ogImageUrl = `${baseUrl}${INVITE_OG_IMAGE_PATH}`;
+    const fbAppId = getFacebookAppId();
 
     res.type("html").send(`
 <!doctype html>
@@ -376,12 +395,14 @@ async function startServer() {
     <meta property="og:title" content="Welke AI ben jij?" />
     <meta property="og:description" content="Ontdek het in 30 seconden 🤖" />
     <meta property="og:image" content="${ogImageUrl}" />
+    <meta property="og:image:alt" content="Welke AI ben jij? Ontdek het in 30 seconden." />
     <meta property="og:image:url" content="${ogImageUrl}" />
     <meta property="og:image:secure_url" content="${ogImageUrl}" />
     <meta property="og:url" content="${inviteUrl}" />
     <meta property="og:type" content="website" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    ${fbAppId ? `<meta property="fb:app_id" content="${fbAppId}" />` : ""}
     <style>
       :root { color-scheme: light; }
       body {
