@@ -343,11 +343,11 @@ async function startServer() {
       <p>You can stop using the service at any time by not messaging the Page.</p>
 
       <h2>Data deletion requests</h2>
-      <p>If you want us to delete data associated with your interactions, contact us at: shortcutcomputerguy@gmail.com</p>
+      <p>If you want us to delete data associated with your interactions, contact us at: privacy@leaderbot.live</p>
       <p>Include your Facebook profile name and the approximate time you messaged the Page so we can locate your conversation context.</p>
 
       <h2>Contact</h2>
-      <p>Email: shortcutcomputerguy@gmail.com</p>
+      <p>Email: privacy@leaderbot.live</p>
     </body>
     </html>
   `);
@@ -378,7 +378,7 @@ async function startServer() {
       </ul>
 
       <h2>How to request deletion</h2>
-      <p>Email your request to: <strong>shortcutcomputerguy@gmail.com</strong></p>
+      <p>Email your request to: <strong>privacy@leaderbot.live</strong></p>
       <p>To help us identify your records accurately, include:</p>
       <ul>
         <li>Your Facebook profile name</li>
