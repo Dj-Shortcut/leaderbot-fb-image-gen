@@ -32,9 +32,50 @@ type ExperienceRouterInput = {
   setActiveExperience: (activeExperience: ActiveExperience | null) => Promise<void>;
 };
 
+/**
+ * Normalizes inbound user input while preserving semantic content for answer parsing.
+ * Returns `null` for empty/whitespace-only input.
+ */
 function normalizeAction(action: string | null | undefined): string | null {
   const normalized = action?.trim();
   return normalized ? normalized : null;
+}
+
+type ControlAction = "START_GAME" | "LATER";
+const START_GAME_TEXT_VARIANTS = new Set([
+  "START GAME",
+  "START",
+  "START SPEL",
+  "SPEL STARTEN",
+]);
+const LATER_TEXT_VARIANTS = new Set(["LATER", "LATER AAN", "NU NIET"]);
+
+/**
+ * Maps human-entered control text to canonical game commands.
+ * This keeps confirm-first flows resilient across typed labels and quick-reply payloads.
+ */
+function normalizeControlAction(
+  action: string | null | undefined
+): ControlAction | null {
+  const normalized = normalizeAction(action);
+  if (!normalized) {
+    return null;
+  }
+
+  const uppercase = normalized.toUpperCase();
+  if (uppercase === "START_GAME" || uppercase === "LATER") {
+    return uppercase;
+  }
+
+  const compact = uppercase.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  if (START_GAME_TEXT_VARIANTS.has(compact)) {
+    return "START_GAME";
+  }
+  if (LATER_TEXT_VARIANTS.has(compact)) {
+    return "LATER";
+  }
+
+  return null;
 }
 
 function resolveRouterLang(input: ExperienceRouterInput): "nl" | "en" {
@@ -235,13 +276,13 @@ export async function routeActiveExperience(
   }
 
   const action = normalizeAction(input.action);
-  const normalizedAction = action?.toUpperCase() ?? null;
+  const controlAction = normalizeControlAction(action);
   const lang = resolveRouterLang({
     ...input,
     entryIntent: input.state.lastEntryIntent,
   });
 
-  if (normalizedAction === "LATER") {
+  if (controlAction === "LATER") {
     const abandonedSession: IdentityGameSession = {
       ...activeSession,
       status: "abandoned",
@@ -269,7 +310,7 @@ export async function routeActiveExperience(
       };
     }
 
-    if (normalizedAction === "START_GAME" && activeSession.status === "started") {
+    if (controlAction === "START_GAME" && activeSession.status === "started") {
       const inProgressSession: IdentityGameSession = {
         ...activeSession,
         status: "in_progress",
@@ -344,7 +385,7 @@ export async function routeActiveExperience(
     };
   }
 
-  if (normalizedAction === "START_GAME") {
+  if (controlAction === "START_GAME") {
     const inProgressSession: IdentityGameSession = {
       ...activeSession,
       status: "in_progress",

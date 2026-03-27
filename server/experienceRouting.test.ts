@@ -796,6 +796,136 @@ describe("identity-ai-v1 routing", () => {
     expect(setActiveExperience).not.toHaveBeenCalled();
   });
 
+  it("accepts typed 'start game' text when a confirm-first session is waiting", async () => {
+    const userKey = anonymizePsid("identity-ai-v1-start-game-text-user");
+    const setActiveExperience = vi.fn(async () => undefined);
+
+    await upsertIdentityGameSession({
+      sessionId: "started-session",
+      userId: userKey,
+      gameId: "identity-ai-v1",
+      gameVersion: "v1",
+      entryIntent: {
+        sourceChannel: "messenger",
+        sourceType: "referral",
+        targetExperienceType: "identity_game",
+        targetExperienceId: "identity-ai-v1",
+        localeHint: "en",
+        receivedAt: 1710000000000,
+        entryMode: "confirm_first",
+      },
+      status: "started",
+      answers: [],
+      derivedTraits: {},
+      startedAt: 1710000000000,
+      updatedAt: 1710000000000,
+      expiresAt: Date.now() + 60_000,
+      currentQuestionId: "identity-ai-v1-q1",
+      questionIndex: 1,
+    });
+
+    const result = await routeActiveExperience({
+      state: {
+        ...(await Promise.resolve(getOrCreateState(userKey))),
+        psid: userKey,
+        userKey,
+        lastEntryIntent: {
+          sourceChannel: "messenger",
+          sourceType: "referral",
+          targetExperienceType: "identity_game",
+          targetExperienceId: "identity-ai-v1",
+          localeHint: "en",
+          receivedAt: 1710000000000,
+          entryMode: "confirm_first",
+        },
+        activeExperience: {
+          type: "identity_game",
+          id: "identity-ai-v1",
+          sessionId: "started-session",
+          status: "started",
+          startedAt: 1710000000000,
+          updatedAt: 1710000000000,
+        },
+      },
+      action: "start game",
+      setLastEntryIntent: vi.fn(async () => undefined),
+      setActiveExperience,
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.response).toMatchObject({
+      kind: "options_prompt",
+      prompt: "When a new AI tool drops, what do you do first?",
+    });
+    expect(setActiveExperience).toHaveBeenCalledOnce();
+  });
+
+  it("accepts Dutch 'nu niet' text as the later action", async () => {
+    const userKey = anonymizePsid("identity-ai-v1-later-text-user");
+    const setActiveExperience = vi.fn(async () => undefined);
+
+    await upsertIdentityGameSession({
+      sessionId: "later-session",
+      userId: userKey,
+      gameId: "identity-ai-v1",
+      gameVersion: "v1",
+      entryIntent: {
+        sourceChannel: "messenger",
+        sourceType: "referral",
+        targetExperienceType: "identity_game",
+        targetExperienceId: "identity-ai-v1",
+        localeHint: "nl",
+        receivedAt: 1710000000000,
+        entryMode: "confirm_first",
+      },
+      status: "started",
+      answers: [],
+      derivedTraits: {},
+      startedAt: 1710000000000,
+      updatedAt: 1710000000000,
+      expiresAt: Date.now() + 60_000,
+      currentQuestionId: "identity-ai-v1-q1",
+      questionIndex: 1,
+    });
+
+    const result = await routeActiveExperience({
+      state: {
+        ...(await Promise.resolve(getOrCreateState(userKey))),
+        psid: userKey,
+        userKey,
+        lastEntryIntent: {
+          sourceChannel: "messenger",
+          sourceType: "referral",
+          targetExperienceType: "identity_game",
+          targetExperienceId: "identity-ai-v1",
+          localeHint: "nl",
+          receivedAt: 1710000000000,
+          entryMode: "confirm_first",
+        },
+        activeExperience: {
+          type: "identity_game",
+          id: "identity-ai-v1",
+          sessionId: "later-session",
+          status: "started",
+          startedAt: 1710000000000,
+          updatedAt: 1710000000000,
+        },
+      },
+      action: "nu niet",
+      setLastEntryIntent: vi.fn(async () => undefined),
+      setActiveExperience,
+    });
+
+    expect(result).toEqual({
+      handled: true,
+      response: {
+        kind: "text",
+        text: "Geen probleem. Deze game-link blijft herkenbaar voor later.",
+      },
+    });
+    expect(setActiveExperience).toHaveBeenCalledWith(null);
+  });
+
   it("falls back to normal thread handling after game completion", async () => {
     const psid = "identity-ai-v1-post-complete-user";
     const generateSpy = vi
