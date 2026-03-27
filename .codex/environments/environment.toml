@@ -4,16 +4,3 @@ name = "leaderbot-fb-image-gen"
 
 [setup]
 script = ""
-
-[[actions]]
-name = "fly deploy"
-icon = "tool"
-command = "fly deploy -a leaderbot-live"
-
-[[actions]]
-name = "fly deploy"
-icon = "tool"
-command = '''
-cd /d C:\Users\Gebruiker\Desktop\projecten\leaderbot-fb-image-gen
-fly deploy -a leaderbot-live
-'''
