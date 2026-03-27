@@ -5,7 +5,7 @@ This repo's main app already expects a Forge-style storage proxy via:
 - `BUILT_IN_FORGE_API_URL`
 - `BUILT_IN_FORGE_API_KEY`
 
-The proxy implemented in [storage-proxy/index.ts](/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/storage-proxy/index.ts) keeps that contract and stores objects in Cloudflare R2.
+The proxy implemented in [`storage-proxy/index.ts`](../storage-proxy/index.ts) keeps that contract and stores objects in Cloudflare R2.
 
 Deployed Fly app note:
 

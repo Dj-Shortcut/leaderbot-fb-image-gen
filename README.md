@@ -124,10 +124,6 @@ For the identity-games foundation and execution order, see [`docs/architecture/i
 
 For the first concrete game spec, see [`docs/games/identity-ai-v1.md`](docs/games/identity-ai-v1.md).
 
-For identity-game foundation rules, see [`docs/architecture/identity-games.md`](docs/architecture/identity-games.md).
-
-For the first concrete game spec, see [`docs/games/identity-ai-v1.md`](docs/games/identity-ai-v1.md).
-
 ## State model
 
 Conversation state is modeled per Messenger user (`psid`) with a normalized shape in `MessengerUserState`.
