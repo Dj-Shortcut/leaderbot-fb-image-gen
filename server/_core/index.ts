@@ -382,8 +382,6 @@ async function startServer() {
     <meta property="og:type" content="website" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="${ogImageUrl}" />
     <meta http-equiv="refresh" content="3;url=${INVITE_MESSENGER_URL}" />
     <style>
       :root { color-scheme: light; }
