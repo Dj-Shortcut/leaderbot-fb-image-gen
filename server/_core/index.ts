@@ -413,14 +413,24 @@ async function startServer() {
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <style>
-        body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; line-height: 1.6; padding: 0 20px; color: #1a1a1a; }
-        h1, h2 { color: #222; }
+        :root { color-scheme: dark; }
+        body {
+          font-family: Arial, sans-serif;
+          max-width: 700px;
+          margin: 40px auto;
+          line-height: 1.6;
+          padding: 24px;
+          color: #e5e7eb;
+          background: #0b1220;
+        }
+        h1, h2 { color: #f9fafb; }
         ul { padding-left: 20px; }
+        a { color: #93c5fd; }
       </style>
     </head>
     <body>
       <h1>Privacy Policy – Leaderbot</h1>
-      <p><strong>Last updated:</strong> 2026-02-24</p>
+      <p><strong>Last updated:</strong> 27 March 2026</p>
       <p>Leaderbot ("we", "our") is a Messenger-based service that transforms user-submitted images using AI styles.</p>
 
       <h2>What data we collect</h2>
@@ -458,11 +468,11 @@ async function startServer() {
       <p>You can stop using the service at any time by not messaging the Page.</p>
 
       <h2>Data deletion requests</h2>
-      <p>If you want us to delete data associated with your interactions, contact us at: shortcutcomputerguy@gmail.com</p>
+      <p>If you want us to delete data associated with your interactions, contact us at: privacy@leaderbot.live</p>
       <p>Include your Facebook profile name and the approximate time you messaged the Page so we can locate your conversation context.</p>
 
       <h2>Contact</h2>
-      <p>Email: shortcutcomputerguy@gmail.com</p>
+      <p>Email: privacy@leaderbot.live</p>
     </body>
     </html>
   `);
@@ -477,9 +487,19 @@ async function startServer() {
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <style>
-        body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; line-height: 1.6; padding: 0 20px; color: #1a1a1a; }
-        h1, h2 { color: #222; }
+        :root { color-scheme: dark; }
+        body {
+          font-family: Arial, sans-serif;
+          max-width: 700px;
+          margin: 40px auto;
+          line-height: 1.6;
+          padding: 24px;
+          color: #e5e7eb;
+          background: #0b1220;
+        }
+        h1, h2 { color: #f9fafb; }
         ul { padding-left: 20px; }
+        a { color: #93c5fd; }
       </style>
     </head>
     <body>
@@ -493,7 +513,7 @@ async function startServer() {
       </ul>
 
       <h2>How to request deletion</h2>
-      <p>Email your request to: <strong>shortcutcomputerguy@gmail.com</strong></p>
+      <p>Email your request to: <strong>privacy@leaderbot.live</strong></p>
       <p>To help us identify your records accurately, include:</p>
       <ul>
         <li>Your Facebook profile name</li>
