@@ -32,13 +32,28 @@ type ExperienceRouterInput = {
   setActiveExperience: (activeExperience: ActiveExperience | null) => Promise<void>;
 };
 
+/**
+ * Normalizes inbound user input while preserving semantic content for answer parsing.
+ * Returns `null` for empty/whitespace-only input.
+ */
 function normalizeAction(action: string | null | undefined): string | null {
   const normalized = action?.trim();
   return normalized ? normalized : null;
 }
 
 type ControlAction = "START_GAME" | "LATER";
+const START_GAME_TEXT_VARIANTS = new Set([
+  "START GAME",
+  "START",
+  "START SPEL",
+  "SPEL STARTEN",
+]);
+const LATER_TEXT_VARIANTS = new Set(["LATER", "LATER AAN", "NU NIET"]);
 
+/**
+ * Maps human-entered control text to canonical game commands.
+ * This keeps confirm-first flows resilient across typed labels and quick-reply payloads.
+ */
 function normalizeControlAction(
   action: string | null | undefined
 ): ControlAction | null {
@@ -53,15 +68,10 @@ function normalizeControlAction(
   }
 
   const compact = uppercase.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-  if (
-    compact === "START GAME" ||
-    compact === "START" ||
-    compact === "START SPEL" ||
-    compact === "SPEL STARTEN"
-  ) {
+  if (START_GAME_TEXT_VARIANTS.has(compact)) {
     return "START_GAME";
   }
-  if (compact === "LATER" || compact === "LATERAAN" || compact === "NU NIET") {
+  if (LATER_TEXT_VARIANTS.has(compact)) {
     return "LATER";
   }
 
