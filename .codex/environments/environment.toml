@@ -9,3 +9,8 @@ script = ""
 name = "Uitvoeren"
 icon = "run"
 command = "fly scale count 1"
+
+[[actions]]
+name = "fly deploy"
+icon = "tool"
+command = "fly deploy -a leaderbot-live"
