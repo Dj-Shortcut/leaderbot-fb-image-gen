@@ -53,7 +53,20 @@ const SHUTDOWN_GRACE_PERIOD_MS = 5_000;
 const INVITE_PATH = "/invite/identity-ai-v1";
 const INVITE_MESSENGER_URL = "https://m.me/61587343141159?ref=identity-ai-v1";
 const DEFAULT_PUBLIC_BASE_URL = "https://leaderbot.live";
-const INVITE_OG_IMAGE_PATH = "/og/identity-ai-v1-invite-v1.png";
+const INVITE_OG_IMAGES = [
+  {
+    path: "/og/identity-ai-v1-invite-v2.png",
+    width: "1536",
+    height: "1024",
+    alt: "Welke AI ben jij? Ontdek het in 30 seconden.",
+  },
+  {
+    path: "/og/identity-ai-v1-invite-v1.png",
+    width: "1024",
+    height: "1536",
+    alt: "Welke AI ben jij? Ontdek het in 30 seconden.",
+  },
+] as const;
 
 function normalizeBaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim().replace(/\/+$/, "");
@@ -382,8 +395,25 @@ async function startServer() {
   app.get(INVITE_PATH, (req, res) => {
     const baseUrl = getPublicBaseUrl(req);
     const inviteUrl = `${baseUrl}${INVITE_PATH}`;
-    const ogImageUrl = `${baseUrl}${INVITE_OG_IMAGE_PATH}`;
     const fbAppId = getFacebookAppId();
+    const ogImageMeta = INVITE_OG_IMAGES.map((image) => {
+      const imageUrl = `${baseUrl}${image.path}`;
+      const lines = [
+        `<meta property="og:image" content="${imageUrl}" />`,
+        `<meta property="og:image:url" content="${imageUrl}" />`,
+        `<meta property="og:image:secure_url" content="${imageUrl}" />`,
+        `<meta property="og:image:alt" content="${image.alt}" />`,
+      ];
+
+      if (image.width) {
+        lines.push(`<meta property="og:image:width" content="${image.width}" />`);
+      }
+      if (image.height) {
+        lines.push(`<meta property="og:image:height" content="${image.height}" />`);
+      }
+
+      return lines.join("\n    ");
+    }).join("\n    ");
 
     res.type("html").send(`
 <!doctype html>
@@ -394,14 +424,9 @@ async function startServer() {
     <title>Welke AI ben jij?</title>
     <meta property="og:title" content="Welke AI ben jij?" />
     <meta property="og:description" content="Ontdek het in 30 seconden 🤖" />
-    <meta property="og:image" content="${ogImageUrl}" />
-    <meta property="og:image:alt" content="Welke AI ben jij? Ontdek het in 30 seconden." />
-    <meta property="og:image:url" content="${ogImageUrl}" />
-    <meta property="og:image:secure_url" content="${ogImageUrl}" />
+    ${ogImageMeta}
     <meta property="og:url" content="${inviteUrl}" />
     <meta property="og:type" content="website" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
     ${fbAppId ? `<meta property="fb:app_id" content="${fbAppId}" />` : ""}
     <style>
       :root { color-scheme: light; }

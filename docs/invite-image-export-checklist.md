@@ -12,6 +12,7 @@ Maak altijd 2 versies:
 ## Bestandsnamen
 
 Gebruik versie in de bestandsnaam. Overschrijf niet telkens hetzelfde bestand.
+Bij elke zichtbare update: verander de bestandsnaam.
 
 Voorbeeld:
 
@@ -23,6 +24,12 @@ Waarom:
 - duidelijk welke versie live staat
 - makkelijker rollbacken
 - eenvoudiger cache-busting bij Facebook previews
+
+Belangrijk:
+
+- `v1`, `v2`, `v3` in de bestandsnaam zijn alleen versies voor mensen.
+- Meta kiest niet op basis van bestandsnaam.
+- Welke preview wordt getoond hangt af van de `og:image` tags (volgorde, ratio, context en cache).
 
 ## OG Image URLs
 
@@ -47,6 +54,14 @@ Voor elke invite/share-pagina moet minstens dit gezet worden:
 - `og:image:height`
 - `og:image:alt`
 
+Als je meerdere image-opties wil aanbieden, zet meerdere `og:image` blokken.
+Zet je voorkeursafbeelding altijd als eerste.
+
+Huidige implementatie voor `identity-ai-v1`:
+
+- `https://leaderbot.live/og/identity-ai-v1-invite-v2.png` -> `1536x1024`
+- `https://leaderbot.live/og/identity-ai-v1-invite-v1.png` -> `1024x1536`
+
 Voorbeeld:
 
 ```html
@@ -54,6 +69,10 @@ Voorbeeld:
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta property="og:image:alt" content="Leaderbot invite preview" />
+<meta property="og:image" content="https://leaderbot.live/og/invite-v2-1200x1200.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="1200" />
+<meta property="og:image:alt" content="Leaderbot invite preview (square)" />
 ```
 
 ## Cache-Busting
