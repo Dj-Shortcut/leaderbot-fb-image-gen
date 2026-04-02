@@ -116,6 +116,40 @@ describe("entryIntent parsing", () => {
     expect(result?.localeHint).toBe("en");
   });
 
+  it("maps leaderbot_start refs with query params to identity-ai-v1", () => {
+    const result = parseGameEntryIntent({
+      channel: "messenger",
+      ref: "leaderbot_start?locale=en&campaignId=launch-1",
+      sourceType: "referral",
+      receivedAt: 1710000000002,
+    });
+
+    expect(result).toEqual({
+      sourceChannel: "messenger",
+      sourceType: "referral",
+      targetExperienceType: "identity_game",
+      targetExperienceId: "identity-ai-v1",
+      entryMode: undefined,
+      campaignId: "launch-1",
+      creativeId: undefined,
+      entryVariant: undefined,
+      localeHint: "en",
+      rawRef: "leaderbot_start?locale=en&campaignId=launch-1",
+      receivedAt: 1710000000002,
+    });
+  });
+
+  it("matches leaderbot_start case-insensitively", () => {
+    const result = parseGameEntryIntent({
+      channel: "messenger",
+      ref: "LEADERBOT_START",
+      sourceType: "referral",
+      receivedAt: 1710000000003,
+    });
+
+    expect(result?.targetExperienceId).toBe("identity-ai-v1");
+  });
+
   it("ignores an empty locale query value and falls back to the input locale hint", () => {
     const result = parseGameEntryIntent({
       channel: "messenger",
