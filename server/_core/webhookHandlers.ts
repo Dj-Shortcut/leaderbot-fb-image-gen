@@ -1101,7 +1101,7 @@ export function createWebhookHandlers({
       localeHint: localeLang ?? undefined,
       receivedAt: event.timestamp ?? Date.now(),
     });
-    console.info("[messenger webhook] entry intent parse", {
+    safeLog("entry_intent_parsed", {
       reqId,
       user: toLogUser(userId),
       referralRef: referralRef ?? null,
