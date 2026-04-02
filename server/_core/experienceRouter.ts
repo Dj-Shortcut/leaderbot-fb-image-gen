@@ -35,24 +35,43 @@ type ExperienceRouterInput = {
 /**
  * Normalizes inbound user input while preserving semantic content for answer parsing.
  * Returns `null` for empty/whitespace-only input.
+ *
+ * @param action Raw action input from payload, quick reply, or free text.
+ * @returns Trimmed action text, or `null` when no actionable text is present.
  */
 function normalizeAction(action: string | null | undefined): string | null {
   const normalized = action?.trim();
   return normalized ? normalized : null;
 }
 
+/**
+ * Canonical control commands used by the confirm-first identity game flow.
+ */
 type ControlAction = "START_GAME" | "LATER";
+
+/**
+ * Free-text variants that should start the game.
+ * Values are stored uppercase because matching happens on normalized uppercase input.
+ */
 const START_GAME_TEXT_VARIANTS = new Set([
   "START GAME",
   "START",
   "START SPEL",
   "SPEL STARTEN",
 ]);
+
+/**
+ * Free-text variants that should defer the game and clear active experience.
+ * Values are stored uppercase because matching happens on normalized uppercase input.
+ */
 const LATER_TEXT_VARIANTS = new Set(["LATER", "LATER AAN", "NU NIET"]);
 
 /**
  * Maps human-entered control text to canonical game commands.
  * This keeps confirm-first flows resilient across typed labels and quick-reply payloads.
+ *
+ * @param action Raw action text coming from the active-experience event.
+ * @returns `"START_GAME"` / `"LATER"` when recognized, otherwise `null`.
  */
 function normalizeControlAction(
   action: string | null | undefined
@@ -63,8 +82,11 @@ function normalizeControlAction(
   }
 
   const uppercase = normalized.toUpperCase();
-  if (uppercase === "START_GAME" || uppercase === "LATER") {
-    return uppercase;
+  if (uppercase === "START_GAME") {
+    return "START_GAME";
+  }
+  if (uppercase === "LATER") {
+    return "LATER";
   }
 
   const compact = uppercase.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
@@ -282,7 +304,7 @@ export async function routeActiveExperience(
     entryIntent: input.state.lastEntryIntent,
   });
 
-  if (controlAction === "LATER") {
+  if (controlAction === "LATER" && activeSession.status === "started") {
     const abandonedSession: IdentityGameSession = {
       ...activeSession,
       status: "abandoned",
