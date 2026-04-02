@@ -1,7 +1,7 @@
 import type { IdentityGameSession } from "./activeExperience";
 import type { BotResponse } from "./botResponse";
 import type { EntryIntent } from "./entryIntent";
-import type { Lang } from "./i18n";
+import { t, type Lang } from "./i18n";
 import type { MessengerUserState } from "./messengerState";
 import {
   applyIdentityAiV1Answer,
@@ -49,21 +49,18 @@ export type IdentityGameHandler = {
 };
 
 function buildConfirmFirstResponse(lang: Lang): BotResponse {
+  const prompt = t(lang, "identityGameConfirmFirstPrompt");
+  const startTitle = t(lang, "identityGameConfirmStart");
+  const laterTitle = t(lang, "identityGameConfirmLater");
   return {
     kind: "options_prompt",
-    prompt:
-      lang === "en"
-        ? "This game entry was recognized. Ready to start later?"
-        : "Deze game-entry is herkend. Klaar om later te starten?",
+    prompt,
     options: [
-      { id: "START_GAME", title: lang === "en" ? "Start game" : "Start game" },
-      { id: "LATER", title: lang === "en" ? "Later" : "Later" },
+      { id: "START_GAME", title: startTitle },
+      { id: "LATER", title: laterTitle },
     ],
     selectionMode: "single",
-    fallbackText:
-      lang === "en"
-        ? "Reply with START_GAME or LATER."
-        : "Antwoord met START_GAME of LATER.",
+    fallbackText: [prompt, `${startTitle} / ${laterTitle}`].join("\n"),
   };
 }
 
@@ -72,7 +69,7 @@ const identityAiV1Handler: IdentityGameHandler = {
   isResumable: isIdentityAiV1SessionResumable,
   async startSession(input) {
     const baseSession =
-      input.resumableSession && isIdentityAiV1SessionResumable(input.resumableSession)
+      input.resumableSession
         ? {
             ...input.resumableSession,
             entryIntent: input.entryIntent,
@@ -89,7 +86,7 @@ const identityAiV1Handler: IdentityGameHandler = {
           }
         : baseSession;
 
-    if (!input.isAutoStart) {
+    if (!input.isAutoStart && session.status === "started") {
       return {
         session,
         response: buildConfirmFirstResponse(input.lang),
@@ -102,15 +99,28 @@ const identityAiV1Handler: IdentityGameHandler = {
     };
   },
   async handleAction(input) {
+    if (input.controlAction === "LATER") {
+      const abandonedSession: IdentityGameSession = {
+        ...input.session,
+        status: "abandoned",
+        updatedAt: Date.now(),
+      };
+      return {
+        session: abandonedSession,
+        clearActiveExperience: true,
+        response: {
+          kind: "text",
+          text: t(input.lang, "identityGameDeferred"),
+        },
+      };
+    }
+
     if (input.session.status === "resolving" || input.session.status === "completed") {
       return {
         session: input.session,
         response: {
           kind: "error",
-          text:
-            input.lang === "en"
-              ? "Your identity game session was recognized, but the actual game flow is not enabled in this phase yet."
-              : "Je identity game-sessie is herkend, maar de game flow zelf is nog niet geactiveerd in deze fase.",
+          text: t(input.lang, "identityGameSessionPending"),
         },
       };
     }
@@ -127,15 +137,19 @@ const identityAiV1Handler: IdentityGameHandler = {
       };
     }
 
+    if (input.controlAction === "START_GAME" && input.session.status === "in_progress") {
+      return {
+        session: input.session,
+        response: buildIdentityAiV1QuestionResponse(input.session, input.lang),
+      };
+    }
+
     if (input.session.status === "started") {
       return {
         session: input.session,
         response: {
           kind: "error",
-          text:
-            input.lang === "en"
-              ? "Your identity game session was recognized, but the actual game flow is not enabled in this phase yet."
-              : "Je identity game-sessie is herkend, maar de game flow zelf is nog niet geactiveerd in deze fase.",
+          text: t(input.lang, "identityGameSessionPending"),
         },
       };
     }

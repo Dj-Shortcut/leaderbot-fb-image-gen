@@ -152,6 +152,7 @@ export async function routeEntryIntent(
   const lang = resolveRouterLang(input);
   const gameHandler = getIdentityGameHandler(input.entryIntent.targetExperienceId);
   if (!gameHandler) {
+    await input.setActiveExperience(null);
     return {
       handled: true,
       response: {
@@ -201,23 +202,6 @@ export async function routeActiveExperience(
     ...input,
     entryIntent: input.state.lastEntryIntent,
   });
-
-  if (controlAction === "LATER" && activeSession.status === "started") {
-    const abandonedSession: IdentityGameSession = {
-      ...activeSession,
-      status: "abandoned",
-      updatedAt: Date.now(),
-    };
-    await Promise.resolve(upsertIdentityGameSession(abandonedSession));
-    await input.setActiveExperience(null);
-    return {
-      handled: true,
-      response: {
-        kind: "text",
-        text: t(lang, "identityGameDeferred"),
-      },
-    };
-  }
   const gameHandler = getIdentityGameHandler(activeSession.gameId);
   if (!gameHandler) {
     await input.setActiveExperience(null);
@@ -238,15 +222,19 @@ export async function routeActiveExperience(
   });
 
   if (handlerResult.session) {
-    await Promise.resolve(upsertIdentityGameSession(handlerResult.session));
-    const shouldUpdateActiveExperience =
+    const sessionChanged =
       handlerResult.session.sessionId !== activeSession.sessionId ||
       handlerResult.session.status !== activeSession.status ||
       handlerResult.session.updatedAt !== activeSession.updatedAt;
-    if (shouldUpdateActiveExperience) {
-      await input.setActiveExperience(toActiveExperience(handlerResult.session));
+    if (sessionChanged) {
+      await Promise.resolve(upsertIdentityGameSession(handlerResult.session));
+      if (!handlerResult.clearActiveExperience) {
+        await input.setActiveExperience(toActiveExperience(handlerResult.session));
+      }
     }
-  } else if (handlerResult.clearActiveExperience) {
+  }
+
+  if (handlerResult.clearActiveExperience) {
     await input.setActiveExperience(null);
   }
 
