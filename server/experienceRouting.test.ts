@@ -213,6 +213,78 @@ describe("identity-ai-v1 routing", () => {
     });
   });
 
+  it("confirm-first deep links still resume in-progress sessions immediately", async () => {
+    const userKey = anonymizePsid("identity-ai-v1-confirm-first-resume-user");
+    await upsertIdentityGameSession({
+      sessionId: "confirm-first-resume-session",
+      userId: userKey,
+      gameId: "identity-ai-v1",
+      gameVersion: "v1",
+      entryIntent: {
+        sourceChannel: "messenger",
+        sourceType: "referral",
+        targetExperienceType: "identity_game",
+        targetExperienceId: "identity-ai-v1",
+        entryMode: "confirm_first",
+        receivedAt: 1710000000000,
+      },
+      status: "in_progress",
+      currentQuestionId: "identity-ai-v1-q2",
+      answers: [
+        {
+          questionId: "identity-ai-v1-q1",
+          answerId: "q1_build",
+          recordedAt: 1710000001000,
+        },
+      ],
+      derivedTraits: {},
+      startedAt: 1710000000000,
+      updatedAt: 1710000001000,
+      expiresAt: Date.now() + 60_000,
+    });
+
+    const setLastEntryIntent = vi.fn(async () => undefined);
+    const setActiveExperience = vi.fn(async () => undefined);
+
+    const result = await routeEntryIntent({
+      state: {
+        ...(await Promise.resolve(getOrCreateState(userKey))),
+        psid: userKey,
+        userKey,
+      },
+      entryIntent: parseGameEntryIntent({
+        channel: "messenger",
+        ref: "game:identity-ai-v1?entry=confirm_first&locale=en",
+        receivedAt: 1710000002000,
+      }),
+      setLastEntryIntent,
+      setActiveExperience,
+    });
+
+    expect(result).toEqual({
+      handled: true,
+      response: {
+        kind: "options_prompt",
+        prompt: "What kind of result feels most satisfying to you?",
+        options: [
+          { id: "q2_build", title: "A finished thing I can use now" },
+          { id: "q2_vision", title: "A bold idea no one saw coming" },
+          { id: "q2_analyst", title: "A clean answer that makes sense" },
+          { id: "q2_operate", title: "A process that runs smoothly" },
+        ],
+        selectionMode: "single",
+        fallbackText: [
+          "What kind of result feels most satisfying to you?",
+          "1. A finished thing I can use now",
+          "2. A bold idea no one saw coming",
+          "3. A clean answer that makes sense",
+          "4. A process that runs smoothly",
+          "Reply with one of these exact options:",
+        ].join("\n"),
+      },
+    });
+  });
+
   it("does not resume an expired same-game session and starts from question 1 instead", async () => {
     const userKey = anonymizePsid("identity-ai-v1-expired-resume-user");
     await upsertIdentityGameSession({
@@ -325,6 +397,44 @@ describe("identity-ai-v1 routing", () => {
         sessionId: expect.not.stringMatching(/^old-session-id$/),
       })
     );
+  });
+
+  it("clears stale active experience for unavailable game entry intents", async () => {
+    const userKey = anonymizePsid("identity-ai-v1-unavailable-entry-user");
+    const setLastEntryIntent = vi.fn(async () => undefined);
+    const setActiveExperience = vi.fn(async () => undefined);
+
+    const result = await routeEntryIntent({
+      state: {
+        ...(await Promise.resolve(getOrCreateState(userKey))),
+        psid: userKey,
+        userKey,
+        activeExperience: {
+          type: "identity_game",
+          id: "identity-ai-v1",
+          sessionId: "stale-active-session",
+          status: "in_progress",
+          startedAt: 1710000000000,
+          updatedAt: 1710000000000,
+        },
+      },
+      entryIntent: parseGameEntryIntent({
+        channel: "messenger",
+        ref: "game:unknown-game-v1?locale=en",
+        receivedAt: 1710000010000,
+      }),
+      setLastEntryIntent,
+      setActiveExperience,
+    });
+
+    expect(result).toEqual({
+      handled: true,
+      response: {
+        kind: "error",
+        text: "This game link was recognized, but this game is not available right now.",
+      },
+    });
+    expect(setActiveExperience).toHaveBeenCalledWith(null);
   });
 
   it("re-prompts the same question on invalid input", async () => {
@@ -858,6 +968,92 @@ describe("identity-ai-v1 routing", () => {
       prompt: "When a new AI tool drops, what do you do first?",
     });
     expect(setActiveExperience).toHaveBeenCalledOnce();
+  });
+
+  it("treats START_GAME as a resume control for in-progress sessions", async () => {
+    const userKey = anonymizePsid("identity-ai-v1-start-game-in-progress-user");
+    const setActiveExperience = vi.fn(async () => undefined);
+
+    await upsertIdentityGameSession({
+      sessionId: "in-progress-start-game-session",
+      userId: userKey,
+      gameId: "identity-ai-v1",
+      gameVersion: "v1",
+      entryIntent: {
+        sourceChannel: "messenger",
+        sourceType: "referral",
+        targetExperienceType: "identity_game",
+        targetExperienceId: "identity-ai-v1",
+        localeHint: "en",
+        entryMode: "confirm_first",
+        receivedAt: 1710000000000,
+      },
+      status: "in_progress",
+      currentQuestionId: "identity-ai-v1-q2",
+      answers: [
+        {
+          questionId: "identity-ai-v1-q1",
+          answerId: "q1_vision",
+          recordedAt: 1710000001000,
+        },
+      ],
+      derivedTraits: {},
+      startedAt: 1710000000000,
+      updatedAt: 1710000001000,
+      expiresAt: Date.now() + 60_000,
+    });
+
+    const result = await routeActiveExperience({
+      state: {
+        ...(await Promise.resolve(getOrCreateState(userKey))),
+        psid: userKey,
+        userKey,
+        lastEntryIntent: {
+          sourceChannel: "messenger",
+          sourceType: "referral",
+          targetExperienceType: "identity_game",
+          targetExperienceId: "identity-ai-v1",
+          localeHint: "en",
+          entryMode: "confirm_first",
+          receivedAt: 1710000000000,
+        },
+        activeExperience: {
+          type: "identity_game",
+          id: "identity-ai-v1",
+          sessionId: "in-progress-start-game-session",
+          status: "in_progress",
+          startedAt: 1710000000000,
+          updatedAt: 1710000001000,
+        },
+      },
+      action: "START_GAME",
+      setLastEntryIntent: vi.fn(async () => undefined),
+      setActiveExperience,
+    });
+
+    expect(result).toEqual({
+      handled: true,
+      response: {
+        kind: "options_prompt",
+        prompt: "What kind of result feels most satisfying to you?",
+        options: [
+          { id: "q2_build", title: "A finished thing I can use now" },
+          { id: "q2_vision", title: "A bold idea no one saw coming" },
+          { id: "q2_analyst", title: "A clean answer that makes sense" },
+          { id: "q2_operate", title: "A process that runs smoothly" },
+        ],
+        selectionMode: "single",
+        fallbackText: [
+          "What kind of result feels most satisfying to you?",
+          "1. A finished thing I can use now",
+          "2. A bold idea no one saw coming",
+          "3. A clean answer that makes sense",
+          "4. A process that runs smoothly",
+          "Reply with one of these exact options:",
+        ].join("\n"),
+      },
+    });
+    expect(setActiveExperience).not.toHaveBeenCalled();
   });
 
   it("accepts Dutch 'nu niet' text as the later action", async () => {

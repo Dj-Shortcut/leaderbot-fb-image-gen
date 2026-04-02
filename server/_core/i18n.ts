@@ -11,6 +11,7 @@ type TranslationKey =
   | "identityGameConfirmStart"
   | "identityGameConfirmLater"
   | "identityGameEntryRecognized"
+  | "identityGameUnavailable"
   | "identityGameSessionPending"
   | "identityGameStartConfirmed"
   | "identityGameDeferred"
@@ -55,6 +56,8 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
     identityGameConfirmLater: "Later",
     identityGameEntryRecognized:
       "Deze identity game-entry is herkend. De game flow zelf volgt in de volgende fase.",
+    identityGameUnavailable:
+      "Deze game-link is herkend, maar deze game is momenteel niet beschikbaar.",
     identityGameSessionPending:
       "Je identity game-sessie is herkend, maar de game flow zelf is nog niet geactiveerd in deze fase.",
     identityGameStartConfirmed:
@@ -110,6 +113,8 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
     identityGameConfirmLater: "Later",
     identityGameEntryRecognized:
       "This identity game entry was recognized. The actual game flow will follow in the next phase.",
+    identityGameUnavailable:
+      "This game link was recognized, but this game is not available right now.",
     identityGameSessionPending:
       "Your identity game session was recognized, but the actual game flow is not enabled in this phase yet.",
     identityGameStartConfirmed:
