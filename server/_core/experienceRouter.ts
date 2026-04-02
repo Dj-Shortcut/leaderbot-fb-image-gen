@@ -1,16 +1,8 @@
-import { randomUUID } from "node:crypto";
 import type { ActiveExperience, IdentityGameSession } from "./activeExperience";
 import type { BotResponse } from "./botResponse";
 import type { EntryIntent } from "./entryIntent";
 import { normalizeLang, t } from "./i18n";
-import {
-  applyIdentityAiV1Answer,
-  buildIdentityAiV1QuestionResponse,
-  createIdentityAiV1Session,
-  generateIdentityAiV1ImageResponse,
-  isIdentityAiV1GameId,
-  isIdentityAiV1SessionResumable,
-} from "./identityAiV1";
+import { getIdentityGameHandler, type GameControlAction } from "./gameRegistry";
 import {
   getIdentityGameSessionByActiveExperience,
   getIdentityGameSessionByUserId,
@@ -44,15 +36,6 @@ function normalizeAction(action: string | null | undefined): string | null {
   return normalized ? normalized : null;
 }
 
-/**
- * Canonical control commands used by the confirm-first identity game flow.
- */
-type ControlAction = "START_GAME" | "LATER";
-
-/**
- * Free-text variants that should start the game.
- * Values are stored uppercase because matching happens on normalized uppercase input.
- */
 const START_GAME_TEXT_VARIANTS = new Set([
   "START GAME",
   "START",
@@ -75,7 +58,7 @@ const LATER_TEXT_VARIANTS = new Set(["LATER", "LATER AAN", "NU NIET"]);
  */
 function normalizeControlAction(
   action: string | null | undefined
-): ControlAction | null {
+): GameControlAction | null {
   const normalized = normalizeAction(action);
   if (!normalized) {
     return null;
@@ -106,28 +89,6 @@ function resolveRouterLang(input: ExperienceRouterInput): "nl" | "en" {
       input.state.preferredLang ??
       input.state.lastEntryIntent?.localeHint
   );
-}
-
-function buildPlaceholderSession(
-  state: MessengerUserState,
-  entryIntent: EntryIntent
-): IdentityGameSession {
-  const startedAt = entryIntent.receivedAt;
-  const sessionId = randomUUID();
-
-  return {
-    sessionId,
-    userId: state.userKey,
-    gameId: entryIntent.targetExperienceId,
-    gameVersion: "v1",
-    entryIntent,
-    status: "started",
-    answers: [],
-    derivedTraits: {},
-    startedAt,
-    updatedAt: startedAt,
-    expiresAt: startedAt + 24 * 60 * 60 * 1000,
-  };
 }
 
 function isIdentityGameSessionActive(session: IdentityGameSession): boolean {
@@ -189,95 +150,32 @@ export async function routeEntryIntent(
 
   await input.setLastEntryIntent(input.entryIntent);
   const lang = resolveRouterLang(input);
-
-  const resumableSession = await findResumableSession(input.state, input.entryIntent);
-  const isAutoStart = input.entryIntent.entryMode !== "confirm_first";
-
-  if (isIdentityAiV1GameId(input.entryIntent.targetExperienceId)) {
-    const baseSession =
-      resumableSession && isIdentityAiV1SessionResumable(resumableSession)
-        ? {
-            ...resumableSession,
-            entryIntent: input.entryIntent,
-            updatedAt: input.entryIntent.receivedAt,
-          }
-        : createIdentityAiV1Session(input.state, input.entryIntent);
-
-    const session =
-      isAutoStart && baseSession.status === "started"
-        ? {
-            ...baseSession,
-            status: "in_progress" as const,
-            updatedAt: input.entryIntent.receivedAt,
-          }
-        : baseSession;
-
-    await Promise.resolve(upsertIdentityGameSession(session));
-    await input.setActiveExperience(toActiveExperience(session));
-
-    if (!isAutoStart) {
-      return {
-        handled: true,
-        response: {
-          kind: "options_prompt",
-          prompt: t(lang, "identityGameConfirmFirstPrompt"),
-          options: [
-            { id: "START_GAME", title: t(lang, "identityGameConfirmStart") },
-            { id: "LATER", title: t(lang, "identityGameConfirmLater") },
-          ],
-          selectionMode: "single",
-          fallbackText:
-            lang === "en"
-              ? "Reply with START_GAME or LATER."
-              : "Antwoord met START_GAME of LATER.",
-        },
-      };
-    }
-
-    return {
-      handled: true,
-      response: buildIdentityAiV1QuestionResponse(session, lang),
-    };
-  }
-
-  const session =
-    resumableSession?.gameId === input.entryIntent.targetExperienceId
-      ? {
-          ...resumableSession,
-          entryIntent: input.entryIntent,
-          updatedAt: input.entryIntent.receivedAt,
-        }
-      : buildPlaceholderSession(input.state, input.entryIntent);
-
-  await Promise.resolve(upsertIdentityGameSession(session));
-  await input.setActiveExperience(toActiveExperience(session));
-
-  if (input.entryIntent.entryMode === "confirm_first") {
+  const gameHandler = getIdentityGameHandler(input.entryIntent.targetExperienceId);
+  if (!gameHandler) {
     return {
       handled: true,
       response: {
-        kind: "options_prompt",
-        prompt: t(lang, "identityGameConfirmFirstPrompt"),
-        options: [
-          { id: "START_GAME", title: t(lang, "identityGameConfirmStart") },
-          { id: "LATER", title: t(lang, "identityGameConfirmLater") },
-        ],
-        selectionMode: "single",
-        fallbackText:
-          lang === "en"
-            ? "Reply with START_GAME or LATER."
-            : "Antwoord met START_GAME of LATER.",
+        kind: "error",
+        text: t(lang, "identityGameUnavailable"),
       },
     };
   }
 
-  return {
-    handled: true,
-    response: {
-      kind: "text",
-      text: t(lang, "identityGameEntryRecognized"),
-    },
-  };
+  const resumableSession = await findResumableSession(input.state, input.entryIntent);
+  const isAutoStart = input.entryIntent.entryMode !== "confirm_first";
+  const { session, response } = await gameHandler.startSession({
+    state: input.state,
+    entryIntent: input.entryIntent,
+    resumableSession:
+      resumableSession && gameHandler.isResumable(resumableSession)
+        ? resumableSession
+        : null,
+    lang,
+    isAutoStart,
+  });
+  await Promise.resolve(upsertIdentityGameSession(session));
+  await input.setActiveExperience(toActiveExperience(session));
+  return { handled: true, response };
 }
 
 export async function routeActiveExperience(
@@ -320,119 +218,56 @@ export async function routeActiveExperience(
       },
     };
   }
-
-  if (isIdentityAiV1GameId(activeSession.gameId)) {
-    if (activeSession.status === "resolving" || activeSession.status === "completed") {
-      return {
-        handled: true,
-        response: {
-          kind: "error",
-          text: t(lang, "identityGameSessionPending"),
-        },
-      };
-    }
-
-    if (controlAction === "START_GAME" && activeSession.status === "started") {
-      const inProgressSession: IdentityGameSession = {
-        ...activeSession,
-        status: "in_progress",
-        updatedAt: Date.now(),
-      };
-      await Promise.resolve(upsertIdentityGameSession(inProgressSession));
-      await input.setActiveExperience(toActiveExperience(inProgressSession));
-      return {
-        handled: true,
-        response: buildIdentityAiV1QuestionResponse(inProgressSession, lang),
-      };
-    }
-
-    if (activeSession.status === "started") {
-      return {
-        handled: true,
-        response: {
-          kind: "error",
-          text: t(lang, "identityGameSessionPending"),
-        },
-      };
-    }
-
-    if (!action) {
-      return {
-        handled: true,
-        response: buildIdentityAiV1QuestionResponse(activeSession, lang, true),
-      };
-    }
-
-    const answerResult = applyIdentityAiV1Answer(activeSession, action, Date.now(), lang);
-
-    if (answerResult.kind === "invalid") {
-      return {
-        handled: true,
-        response: answerResult.response,
-      };
-    }
-
-    if (answerResult.kind === "question") {
-      await Promise.resolve(upsertIdentityGameSession(answerResult.session));
-      await input.setActiveExperience(toActiveExperience(answerResult.session));
-      return {
-        handled: true,
-        response: answerResult.response,
-      };
-    }
-
-    const resolvingSession = answerResult.session;
-    await Promise.resolve(upsertIdentityGameSession(resolvingSession));
-    await input.setActiveExperience(toActiveExperience(resolvingSession));
-
+  const gameHandler = getIdentityGameHandler(activeSession.gameId);
+  if (!gameHandler) {
+    await input.setActiveExperience(null);
     return {
       handled: true,
-      response: answerResult.response,
-      afterSend: async () => {
-        const imageResponse = await generateIdentityAiV1ImageResponse({
-          session: resolvingSession,
-          result: answerResult.result,
-        });
-        const completedAt = Date.now();
-        const completedSession: IdentityGameSession = {
-          ...resolvingSession,
-          status: "completed",
-          updatedAt: completedAt,
-          resultRef: answerResult.result.archetype.id,
-        };
-        await Promise.resolve(upsertIdentityGameSession(completedSession));
-        await input.setActiveExperience(null);
-        return imageResponse;
+      response: {
+        kind: "error",
+        text: t(lang, "identityGameUnavailable"),
       },
     };
   }
 
-  if (controlAction === "START_GAME") {
-    const inProgressSession: IdentityGameSession = {
-      ...activeSession,
-      status: "in_progress",
-      updatedAt: Date.now(),
-    };
-    await Promise.resolve(upsertIdentityGameSession(inProgressSession));
-    await input.setActiveExperience({
-      ...activeExperience,
-      status: "in_progress",
-      updatedAt: inProgressSession.updatedAt,
-    });
-    return {
-      handled: true,
-      response: {
-        kind: "text",
-        text: t(lang, "identityGameStartConfirmed"),
-      },
-    };
+  const handlerResult = await gameHandler.handleAction({
+    session: activeSession,
+    action,
+    controlAction,
+    lang,
+  });
+
+  if (handlerResult.session) {
+    await Promise.resolve(upsertIdentityGameSession(handlerResult.session));
+    const shouldUpdateActiveExperience =
+      handlerResult.session.sessionId !== activeSession.sessionId ||
+      handlerResult.session.status !== activeSession.status ||
+      handlerResult.session.updatedAt !== activeSession.updatedAt;
+    if (shouldUpdateActiveExperience) {
+      await input.setActiveExperience(toActiveExperience(handlerResult.session));
+    }
+  } else if (handlerResult.clearActiveExperience) {
+    await input.setActiveExperience(null);
   }
 
   return {
     handled: true,
-    response: {
-      kind: "error",
-      text: t(lang, "identityGameSessionPending"),
-    },
+    response: handlerResult.response,
+    afterSend: handlerResult.afterSend
+      ? async () => {
+          const followUp = await handlerResult.afterSend!();
+          if (handlerResult.session?.status === "resolving") {
+            const completedAt = Date.now();
+            const completedSession: IdentityGameSession = {
+              ...handlerResult.session,
+              status: "completed",
+              updatedAt: completedAt,
+            };
+            await Promise.resolve(upsertIdentityGameSession(completedSession));
+            await input.setActiveExperience(null);
+          }
+          return followUp;
+        }
+      : undefined,
   };
 }
