@@ -99,7 +99,7 @@ const identityAiV1Handler: IdentityGameHandler = {
     };
   },
   async handleAction(input) {
-    if (input.controlAction === "LATER") {
+    if (input.controlAction === "LATER" && input.session.status === "started") {
       const abandonedSession: IdentityGameSession = {
         ...input.session,
         status: "abandoned",
