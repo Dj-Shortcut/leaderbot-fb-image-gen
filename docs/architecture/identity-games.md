@@ -87,7 +87,26 @@ Rules:
 - No webhook handler should contain game-specific routing branches.
 - Active variants MUST be resolved through shared runtime contracts, not per-game runtime branching.
 
-### 3.1 Variant Share Entry Routes
+### 3.1 Registry-Based Handler Dispatch
+Identity-game dispatch MUST be registry-driven.
+
+Current implementation entry points:
+- `server/_core/experienceRouter.ts`
+- `server/_core/gameRegistry.ts`
+
+Handler contract requirements:
+- each game registers one stable `gameId`
+- each game exports `isResumable(session)`
+- each game exports `startSession(input)`
+- each game exports `handleAction(input)`
+
+Rules:
+- `routeEntryIntent` resolves `targetExperienceId` through the registry.
+- `routeActiveExperience` resolves `activeExperience.id` through the same registry.
+- Unknown `gameId` must return a user-safe unavailable response and clear stale active routing state.
+- Core router logic must not reintroduce per-game `if/else` branches as more games are added.
+
+### 3.2 Variant Share Entry Routes
 Shared share entry routes are part of runtime behavior and MUST be treated as a stable contract.
 
 Rules:

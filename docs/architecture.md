@@ -18,7 +18,7 @@ Primary bootstrap is in `server/_core/index.ts`.
 
 The bot runtime now has an explicit boundary in `server/_core/bot/index.ts`, with future feature hooks centralized in `server/_core/bot/features.ts`.
 
-The next planned product layer is a set of mini identity games. That work is intentionally blocked on a foundation-first design documented in `docs/architecture/identity-games.md`, so identity-game logic does not get mixed into the current flat style-state or channel handlers.
+The identity-games layer is now implemented behind a shared router + registry boundary. The normative design remains documented in `docs/architecture/identity-games.md`, and runtime dispatch is handled through `server/_core/gameRegistry.ts` and `server/_core/experienceRouter.ts`.
 
 ## Architecture diagrams
 
@@ -231,21 +231,27 @@ This keeps Messenger and WhatsApp aligned for text without forcing media/image a
 
 ## 5c) Identity-games foundation
 
-The identity-games feature is planned as a separate experience layer, not as an extension of the legacy style flow.
+The identity-games feature is implemented as a separate experience layer, not as an extension of the legacy style flow.
 
-Required foundation before implementation:
+Implemented foundation:
 
 - explicit `EntryIntent` normalization at the channel edge
 - explicit `ActiveExperience` ownership in shared state
 - mandatory routing order: `EntryIntent`, then `ActiveExperience`, then explicit command, then fallback flow
-- richer outbound intents for option-driven and result-driven experiences
-- isolated experience session storage
+- isolated identity-game session storage
+- registry-based dispatch (`gameId` -> handler contract)
 
 Design rule:
 
 - Messenger and WhatsApp differences must be absorbed at the normalization boundary
 - shared logic must not inspect raw provider payloads
 - identity-game state must not be stored in `selectedStyle`, `stage`, `preselectedStyle`, or related legacy style fields
+
+Runtime dispatch rule:
+
+- `routeEntryIntent` and `routeActiveExperience` resolve handlers via `getIdentityGameHandler(...)`
+- each game handler owns `startSession(...)` and `handleAction(...)`
+- unknown game IDs must return `identityGameUnavailable` without leaving stale active experience state
 
 The normative design for that work lives in `docs/architecture/identity-games.md`.
 

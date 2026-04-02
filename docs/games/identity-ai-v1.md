@@ -14,6 +14,18 @@ It does not redefine shared infrastructure such as:
 
 Those remain defined by [`docs/architecture/identity-games.md`](../architecture/identity-games.md).
 
+## Runtime Registration
+`identity-ai-v1` is wired through the shared game registry, not through hard-coded router branches.
+
+Implementation references:
+- `server/_core/gameRegistry.ts` (`identityAiV1Handler`)
+- `server/_core/experienceRouter.ts` (`routeEntryIntent`, `routeActiveExperience`)
+
+Operational behavior:
+- Deep links resolving to `game:identity-ai-v1` are dispatched through the registry.
+- Confirm-first and auto-start behavior are decided by handler + shared router contracts.
+- Unknown game IDs return `identityGameUnavailable` via i18n.
+
 ## Core Concept
 The user answers 3 short questions and is classified into 1 of 4 AI archetypes:
 - `Builder`
