@@ -107,7 +107,9 @@ export function parseGameEntryIntent(input: {
   const normalizedHead = head.trim();
   let gameId = "";
 
-  if (/^game:/i.test(normalizedHead)) {
+  if (rawRef === "leaderbot_start") {
+    gameId = "identity-ai-v1";
+  } else if (/^game:/i.test(normalizedHead)) {
     gameId = normalizedHead.slice("game:".length);
   } else if (/^identity[_-]?game:/i.test(normalizedHead)) {
     gameId = normalizedHead.slice(normalizedHead.indexOf(":") + 1);
