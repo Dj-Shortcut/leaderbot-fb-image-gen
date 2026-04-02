@@ -926,6 +926,86 @@ describe("identity-ai-v1 routing", () => {
     expect(setActiveExperience).toHaveBeenCalledWith(null);
   });
 
+  it("does not abandon an in-progress session when user types a later variant", async () => {
+    const userKey = anonymizePsid("identity-ai-v1-in-progress-later-user");
+    const setActiveExperience = vi.fn(async () => undefined);
+
+    await upsertIdentityGameSession({
+      sessionId: "in-progress-later-session",
+      userId: userKey,
+      gameId: "identity-ai-v1",
+      gameVersion: "v1",
+      entryIntent: {
+        sourceChannel: "messenger",
+        sourceType: "referral",
+        targetExperienceType: "identity_game",
+        targetExperienceId: "identity-ai-v1",
+        localeHint: "en",
+        receivedAt: 1710000000000,
+      },
+      status: "in_progress",
+      currentQuestionId: "identity-ai-v1-q1",
+      answers: [],
+      derivedTraits: {},
+      startedAt: 1710000000000,
+      updatedAt: 1710000000000,
+      expiresAt: Date.now() + 60_000,
+    });
+
+    const result = await routeActiveExperience({
+      state: {
+        ...(await Promise.resolve(getOrCreateState(userKey))),
+        psid: userKey,
+        userKey,
+        lastEntryIntent: {
+          sourceChannel: "messenger",
+          sourceType: "referral",
+          targetExperienceType: "identity_game",
+          targetExperienceId: "identity-ai-v1",
+          localeHint: "en",
+          receivedAt: 1710000000000,
+        },
+        activeExperience: {
+          type: "identity_game",
+          id: "identity-ai-v1",
+          sessionId: "in-progress-later-session",
+          status: "in_progress",
+          startedAt: 1710000000000,
+          updatedAt: 1710000000000,
+        },
+      },
+      action: "later",
+      setLastEntryIntent: vi.fn(async () => undefined),
+      setActiveExperience,
+    });
+
+    expect(result).toEqual({
+      handled: true,
+      response: {
+        kind: "options_prompt",
+        prompt:
+          "That answer does not match one of the 4 choices.\n\nWhen a new AI tool drops, what do you do first?",
+        options: [
+          { id: "q1_build", title: "Open it and start making something" },
+          { id: "q1_vision", title: "Imagine what it could become" },
+          { id: "q1_analyst", title: "Figure out how it actually works" },
+          { id: "q1_operate", title: "See where it fits in a system" },
+        ],
+        selectionMode: "single",
+        fallbackText: [
+          "That answer does not match one of the 4 choices.",
+          "When a new AI tool drops, what do you do first?",
+          "1. Open it and start making something",
+          "2. Imagine what it could become",
+          "3. Figure out how it actually works",
+          "4. See where it fits in a system",
+          "Reply with one of these exact options:",
+        ].join("\n"),
+      },
+    });
+    expect(setActiveExperience).not.toHaveBeenCalled();
+  });
+
   it("falls back to normal thread handling after game completion", async () => {
     const psid = "identity-ai-v1-post-complete-user";
     const generateSpy = vi

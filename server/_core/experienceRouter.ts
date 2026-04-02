@@ -301,7 +301,7 @@ export async function routeActiveExperience(
     entryIntent: input.state.lastEntryIntent,
   });
 
-  if (controlAction === "LATER") {
+  if (controlAction === "LATER" && activeSession.status === "started") {
     const abandonedSession: IdentityGameSession = {
       ...activeSession,
       status: "abandoned",
