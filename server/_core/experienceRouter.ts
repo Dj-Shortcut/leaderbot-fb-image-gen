@@ -82,8 +82,11 @@ function normalizeControlAction(
   }
 
   const uppercase = normalized.toUpperCase();
-  if (uppercase === "START_GAME" || uppercase === "LATER") {
-    return uppercase;
+  if (uppercase === "START_GAME") {
+    return "START_GAME";
+  }
+  if (uppercase === "LATER") {
+    return "LATER";
   }
 
   const compact = uppercase.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
