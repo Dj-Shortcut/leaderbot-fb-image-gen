@@ -1101,6 +1101,19 @@ export function createWebhookHandlers({
       localeHint: localeLang ?? undefined,
       receivedAt: event.timestamp ?? Date.now(),
     });
+    console.info("[messenger webhook] entry intent parse", {
+      reqId,
+      user: toLogUser(userId),
+      referralRef: referralRef ?? null,
+      entryIntent: entryIntent
+        ? {
+            targetExperienceType: entryIntent.targetExperienceType,
+            targetExperienceId: entryIntent.targetExperienceId,
+            sourceType: entryIntent.sourceType,
+            entryMode: entryIntent.entryMode ?? null,
+          }
+        : null,
+    });
     const entryIntentRoute = await routeEntryIntent({
       state,
       entryIntent,
