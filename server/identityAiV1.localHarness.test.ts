@@ -64,7 +64,6 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
       sendQuickRepliesMock,
       sendImageMock,
     });
-    harness.reset();
   });
 
   it("runs the happy path through the production webhook path", async () => {

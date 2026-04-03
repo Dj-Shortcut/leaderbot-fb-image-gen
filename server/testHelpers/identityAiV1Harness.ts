@@ -148,7 +148,7 @@ export class IdentityAiV1Harness {
                 locale: this.deps.locale ?? "en_US",
               },
               message: {
-                mid: `mid-${this.sequence}-${questionId}`,
+                mid: `mid-${this.sequence}-${userId}-${questionId}`,
                 text: answerId,
                 quick_reply: {
                   payload: answerId,
@@ -177,7 +177,7 @@ export class IdentityAiV1Harness {
                 locale: this.deps.locale ?? "en_US",
               },
               message: {
-                mid: `mid-${this.sequence}-text`,
+                mid: `mid-${this.sequence}-${userId}-text`,
                 text,
               },
             },
