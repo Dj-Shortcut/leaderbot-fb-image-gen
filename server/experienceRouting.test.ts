@@ -32,8 +32,12 @@ import { routeActiveExperience, routeEntryIntent } from "./_core/experienceRoute
 import { anonymizePsid, getOrCreateState, getState } from "./_core/messengerState";
 
 describe("identity-ai-v1 routing", () => {
+  let psidSeq = 0;
+  const mkPsid = (base: string) => `${base}-${++psidSeq}`;
+
   beforeEach(() => {
     process.env.PRIVACY_PEPPER = "ci-test-pepper";
+    resetMessengerEventDedupe();
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
@@ -41,7 +45,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("auto-start deep links send question 1 immediately without touching legacy style state", async () => {
-    const psid = "identity-ai-v1-deep-link-user";
+    const psid = mkPsid("identity-ai-v1-deep-link-user");
 
     await processFacebookWebhookPayload({
       entry: [
@@ -96,7 +100,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("starts Identity AI V1 from a bare ref value like the m.me deep-link payload", async () => {
-    const psid = "identity-ai-v1-bare-ref-user";
+    const psid = mkPsid("identity-ai-v1-bare-ref-user");
 
     await processFacebookWebhookPayload({
       entry: [
@@ -140,7 +144,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("resumes the same active non-expired game at the current question", async () => {
-    const userKey = anonymizePsid("identity-ai-v1-resume-user");
+    const userKey = anonymizePsid(mkPsid("identity-ai-v1-resume-user"));
     await upsertIdentityGameSession({
       sessionId: "resume-session",
       userId: userKey,
@@ -211,7 +215,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("confirm-first deep links still resume in-progress sessions immediately", async () => {
-    const userKey = anonymizePsid("identity-ai-v1-confirm-first-resume-user");
+    const userKey = anonymizePsid(mkPsid("identity-ai-v1-confirm-first-resume-user"));
     await upsertIdentityGameSession({
       sessionId: "confirm-first-resume-session",
       userId: userKey,
@@ -283,7 +287,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("does not resume an expired same-game session and starts from question 1 instead", async () => {
-    const userKey = anonymizePsid("identity-ai-v1-expired-resume-user");
+    const userKey = anonymizePsid(mkPsid("identity-ai-v1-expired-resume-user"));
     await upsertIdentityGameSession({
       sessionId: "expired-resume-session",
       userId: userKey,
@@ -360,7 +364,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("does not silently reuse a different game's session", async () => {
-    const userKey = anonymizePsid("identity-ai-v1-replace-user");
+    const userKey = anonymizePsid(mkPsid("identity-ai-v1-replace-user"));
     const setLastEntryIntent = vi.fn(async () => undefined);
     const setActiveExperience = vi.fn(async () => undefined);
 
@@ -397,7 +401,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("clears stale active experience for unavailable game entry intents", async () => {
-    const userKey = anonymizePsid("identity-ai-v1-unavailable-entry-user");
+    const userKey = anonymizePsid(mkPsid("identity-ai-v1-unavailable-entry-user"));
     const setLastEntryIntent = vi.fn(async () => undefined);
     const setActiveExperience = vi.fn(async () => undefined);
 
@@ -435,7 +439,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("re-prompts the same question on invalid input", async () => {
-    const userKey = anonymizePsid("identity-ai-v1-invalid-user");
+    const userKey = anonymizePsid(mkPsid("identity-ai-v1-invalid-user"));
     const setActiveExperience = vi.fn(async () => undefined);
 
     await upsertIdentityGameSession({
@@ -515,7 +519,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("keeps mandatory routing order by letting the active game win over legacy commands", async () => {
-    const psid = "identity-ai-v1-routing-order-user";
+    const psid = mkPsid("identity-ai-v1-routing-order-user");
 
     await processFacebookWebhookPayload({
       entry: [
@@ -563,7 +567,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("completes after three valid answers, resolves one archetype, sends text first, and releases ActiveExperience", async () => {
-    const userKey = anonymizePsid("identity-ai-v1-complete-user");
+    const userKey = anonymizePsid(mkPsid("identity-ai-v1-complete-user"));
     const setActiveExperience = vi.fn(async () => undefined);
     const generateSpy = vi
       .spyOn(OpenAiImageGenerator.prototype, "generate")
@@ -666,7 +670,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("still completes when result image generation fails", async () => {
-    const userKey = anonymizePsid("identity-ai-v1-image-fail-user");
+    const userKey = anonymizePsid(mkPsid("identity-ai-v1-image-fail-user"));
     const setActiveExperience = vi.fn(async () => undefined);
     const generateSpy = vi
       .spyOn(OpenAiImageGenerator.prototype, "generate")
@@ -752,7 +756,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("does not re-enter answer resolution while the session is resolving", async () => {
-    const userKey = anonymizePsid("identity-ai-v1-resolving-user");
+    const userKey = anonymizePsid(mkPsid("identity-ai-v1-resolving-user"));
     const setActiveExperience = vi.fn(async () => undefined);
 
     await upsertIdentityGameSession({
@@ -828,7 +832,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("does not let START_GAME reopen a resolving session", async () => {
-    const userKey = anonymizePsid("identity-ai-v1-resolving-start-user");
+    const userKey = anonymizePsid(mkPsid("identity-ai-v1-resolving-start-user"));
     const setActiveExperience = vi.fn(async () => undefined);
 
     await upsertIdentityGameSession({
@@ -904,7 +908,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("accepts typed 'start game' text when a confirm-first session is waiting", async () => {
-    const userKey = anonymizePsid("identity-ai-v1-start-game-text-user");
+    const userKey = anonymizePsid(mkPsid("identity-ai-v1-start-game-text-user"));
     const setActiveExperience = vi.fn(async () => undefined);
 
     await upsertIdentityGameSession({
@@ -968,7 +972,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("treats START_GAME as a resume control for in-progress sessions", async () => {
-    const userKey = anonymizePsid("identity-ai-v1-start-game-in-progress-user");
+    const userKey = anonymizePsid(mkPsid("identity-ai-v1-start-game-in-progress-user"));
     const setActiveExperience = vi.fn(async () => undefined);
 
     await upsertIdentityGameSession({
@@ -1054,7 +1058,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("accepts Dutch 'nu niet' text as the later action", async () => {
-    const userKey = anonymizePsid("identity-ai-v1-later-text-user");
+    const userKey = anonymizePsid(mkPsid("identity-ai-v1-later-text-user"));
     const setActiveExperience = vi.fn(async () => undefined);
 
     await upsertIdentityGameSession({
@@ -1120,7 +1124,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("does not abandon an in-progress session when user types a later variant", async () => {
-    const userKey = anonymizePsid("identity-ai-v1-in-progress-later-user");
+    const userKey = anonymizePsid(mkPsid("identity-ai-v1-in-progress-later-user"));
     const setActiveExperience = vi.fn(async () => undefined);
 
     await upsertIdentityGameSession({
@@ -1200,7 +1204,7 @@ describe("identity-ai-v1 routing", () => {
   });
 
   it("falls back to normal thread handling after game completion", async () => {
-    const psid = "identity-ai-v1-post-complete-user";
+    const psid = mkPsid("identity-ai-v1-post-complete-user");
     const generateSpy = vi
       .spyOn(OpenAiImageGenerator.prototype, "generate")
       .mockResolvedValue({

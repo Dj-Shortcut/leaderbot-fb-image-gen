@@ -5,7 +5,7 @@ import {
   processFacebookWebhookPayload,
   resetMessengerEventDedupe,
 } from "../_core/messengerWebhook";
-import { anonymizePsid, getState, resetStateStore } from "../_core/messengerState";
+import { anonymizePsid, getState } from "../_core/messengerState";
 
 type MockWithCalls = {
   mock: {
@@ -89,7 +89,6 @@ export class IdentityAiV1Harness {
   ) {}
 
   reset(): void {
-    resetStateStore();
     resetMessengerEventDedupe();
     this.sequence = 0;
     this.step = 0;
