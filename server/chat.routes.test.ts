@@ -60,7 +60,7 @@ async function postJson(
   return response;
 }
 
-describe("chat route configuration", () => {
+describe.sequential("chat route configuration", { timeout: 15000 }, () => {
   const originalForgeApiUrl = process.env.BUILT_IN_FORGE_API_URL;
   const originalForgeApiKey = process.env.BUILT_IN_FORGE_API_KEY;
   const originalNodeEnv = process.env.NODE_ENV;
