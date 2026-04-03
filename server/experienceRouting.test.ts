@@ -25,18 +25,15 @@ import {
 } from "./_core/imageService";
 import {
   processFacebookWebhookPayload,
-  resetMessengerEventDedupe,
 } from "./_core/messengerWebhook";
 import { getIdentityGameSessionByUserId, upsertIdentityGameSession } from "./_core/identityGameSessionState";
 import { parseGameEntryIntent } from "./_core/entryIntent";
 import { routeActiveExperience, routeEntryIntent } from "./_core/experienceRouter";
-import { anonymizePsid, getOrCreateState, getState, resetStateStore } from "./_core/messengerState";
+import { anonymizePsid, getOrCreateState, getState } from "./_core/messengerState";
 
 describe("identity-ai-v1 routing", () => {
   beforeEach(() => {
     process.env.PRIVACY_PEPPER = "ci-test-pepper";
-    resetStateStore();
-    resetMessengerEventDedupe();
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
@@ -1243,7 +1240,7 @@ describe("identity-ai-v1 routing", () => {
               {
                 sender: { id: psid, locale: "en_US" },
                 message: {
-                  mid: "mid-q1",
+                  mid: `${psid}-mid-q1`,
                   quick_reply: { payload: "q1_vision" },
                 },
               },
@@ -1258,7 +1255,7 @@ describe("identity-ai-v1 routing", () => {
               {
                 sender: { id: psid, locale: "en_US" },
                 message: {
-                  mid: "mid-q2",
+                  mid: `${psid}-mid-q2`,
                   quick_reply: { payload: "q2_vision" },
                 },
               },
@@ -1277,7 +1274,7 @@ describe("identity-ai-v1 routing", () => {
               {
                 sender: { id: psid, locale: "en_US" },
                 message: {
-                  mid: "mid-q3",
+                  mid: `${psid}-mid-q3`,
                   quick_reply: { payload: "q3_vision" },
                 },
               },
@@ -1299,7 +1296,7 @@ describe("identity-ai-v1 routing", () => {
               {
                 sender: { id: psid, locale: "en_US" },
                 message: {
-                  mid: "mid-after-complete",
+                  mid: `${psid}-mid-after-complete`,
                   text: "hi",
                 },
               },

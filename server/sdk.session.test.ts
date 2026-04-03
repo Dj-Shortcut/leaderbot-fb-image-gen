@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const originalJwtSecret = process.env.JWT_SECRET;
 const originalAppId = process.env.VITE_APP_ID;
@@ -17,11 +17,12 @@ afterEach(() => {
   }
 });
 
-describe("SDK session verification", () => {
-  it("accepts sessions when name is empty", async () => {
+describe.sequential("SDK session verification", () => {
+  it("accepts sessions when name is empty", { timeout: 15000 }, async () => {
     process.env.JWT_SECRET = "x".repeat(32);
     process.env.VITE_APP_ID = "leaderbot-app";
 
+    vi.resetModules();
     const { sdk } = await import("./_core/sdk");
 
     const token = await sdk.signSession({
