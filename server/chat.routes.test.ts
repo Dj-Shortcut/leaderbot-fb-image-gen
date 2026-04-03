@@ -60,7 +60,7 @@ async function postJson(
   return response;
 }
 
-describe.sequential("chat route configuration", () => {
+describe.sequential("chat route configuration", { timeout: 15000 }, () => {
   const originalForgeApiUrl = process.env.BUILT_IN_FORGE_API_URL;
   const originalForgeApiKey = process.env.BUILT_IN_FORGE_API_KEY;
   const originalNodeEnv = process.env.NODE_ENV;
@@ -87,7 +87,7 @@ describe.sequential("chat route configuration", () => {
     vi.restoreAllMocks();
   });
 
-  it("reports not configured when forge URL/key are missing or blank", { timeout: 15000 }, async () => {
+  it("reports not configured when forge URL/key are missing or blank", async () => {
     process.env.BUILT_IN_FORGE_API_URL = "   ";
     process.env.BUILT_IN_FORGE_API_KEY = "";
 
