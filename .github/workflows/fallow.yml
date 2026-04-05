@@ -1,0 +1,20 @@
+name: Fallow
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codebase-health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Fallow - Codebase Health
+        uses: fallow-rs/fallow@v2.13.0
