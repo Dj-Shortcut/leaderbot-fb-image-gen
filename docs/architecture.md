@@ -357,7 +357,7 @@ This means Cloudflare currently sits behind the storage proxy for durable asset 
 - Generation failures produce user-facing retry options.
 - Health endpoints + version endpoint support simple monitoring.
 
-## 8) Core module boundaries
+## 9) Core module boundaries
 
 To keep `server/_core` from growing into a single flat namespace, domain entrypoints are now grouped by responsibility:
 

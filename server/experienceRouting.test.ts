@@ -23,9 +23,7 @@ import type { IdentityGameSession } from "./_core/activeExperience";
 import {
   OpenAiImageGenerator,
 } from "./_core/imageService";
-import {
-  processFacebookWebhookPayload,
-} from "./_core/messengerWebhook";
+import * as messengerWebhook from "./_core/messengerWebhook";
 import { getIdentityGameSessionByUserId, upsertIdentityGameSession } from "./_core/identityGameSessionState";
 import { parseGameEntryIntent } from "./_core/entryIntent";
 import { routeActiveExperience, routeEntryIntent } from "./_core/experienceRouter";
@@ -37,7 +35,7 @@ describe("identity-ai-v1 routing", () => {
 
   beforeEach(() => {
     process.env.PRIVACY_PEPPER = "ci-test-pepper";
-    resetMessengerEventDedupe();
+    messengerWebhook.resetMessengerEventDedupe();
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
@@ -47,7 +45,7 @@ describe("identity-ai-v1 routing", () => {
   it("auto-start deep links send question 1 immediately without touching legacy style state", async () => {
     const psid = mkPsid("identity-ai-v1-deep-link-user");
 
-    await processFacebookWebhookPayload({
+    await messengerWebhook.processFacebookWebhookPayload({
       entry: [
         {
           messaging: [
@@ -102,7 +100,7 @@ describe("identity-ai-v1 routing", () => {
   it("starts Identity AI V1 from a bare ref value like the m.me deep-link payload", async () => {
     const psid = mkPsid("identity-ai-v1-bare-ref-user");
 
-    await processFacebookWebhookPayload({
+    await messengerWebhook.processFacebookWebhookPayload({
       entry: [
         {
           messaging: [
@@ -521,7 +519,7 @@ describe("identity-ai-v1 routing", () => {
   it("keeps mandatory routing order by letting the active game win over legacy commands", async () => {
     const psid = mkPsid("identity-ai-v1-routing-order-user");
 
-    await processFacebookWebhookPayload({
+    await messengerWebhook.processFacebookWebhookPayload({
       entry: [
         {
           messaging: [
@@ -542,7 +540,7 @@ describe("identity-ai-v1 routing", () => {
     sendTextMock.mockClear();
     sendQuickRepliesMock.mockClear();
 
-    await processFacebookWebhookPayload({
+    await messengerWebhook.processFacebookWebhookPayload({
       entry: [
         {
           messaging: [
@@ -1205,6 +1203,10 @@ describe("identity-ai-v1 routing", () => {
 
   it("falls back to normal thread handling after game completion", async () => {
     const psid = mkPsid("identity-ai-v1-post-complete-user");
+    const q1Mid = `${psid}-mid-q1`;
+    const q2Mid = `${psid}-mid-q2`;
+    const q3Mid = `${psid}-mid-q3`;
+    const afterCompleteMid = `${psid}-mid-after-complete`;
     const generateSpy = vi
       .spyOn(OpenAiImageGenerator.prototype, "generate")
       .mockResolvedValue({
@@ -1219,7 +1221,7 @@ describe("identity-ai-v1 routing", () => {
       });
 
     try {
-      await processFacebookWebhookPayload({
+      await messengerWebhook.processFacebookWebhookPayload({
         entry: [
           {
             messaging: [
@@ -1237,14 +1239,14 @@ describe("identity-ai-v1 routing", () => {
         ],
       });
 
-      await processFacebookWebhookPayload({
+      await messengerWebhook.processFacebookWebhookPayload({
         entry: [
           {
             messaging: [
               {
                 sender: { id: psid, locale: "en_US" },
                 message: {
-                  mid: `${psid}-mid-q1`,
+                  mid: q1Mid,
                   quick_reply: { payload: "q1_vision" },
                 },
               },
@@ -1252,14 +1254,14 @@ describe("identity-ai-v1 routing", () => {
           },
         ],
       });
-      await processFacebookWebhookPayload({
+      await messengerWebhook.processFacebookWebhookPayload({
         entry: [
           {
             messaging: [
               {
                 sender: { id: psid, locale: "en_US" },
                 message: {
-                  mid: `${psid}-mid-q2`,
+                  mid: q2Mid,
                   quick_reply: { payload: "q2_vision" },
                 },
               },
@@ -1271,14 +1273,14 @@ describe("identity-ai-v1 routing", () => {
       sendTextMock.mockClear();
       sendQuickRepliesMock.mockClear();
 
-      await processFacebookWebhookPayload({
+      await messengerWebhook.processFacebookWebhookPayload({
         entry: [
           {
             messaging: [
               {
                 sender: { id: psid, locale: "en_US" },
                 message: {
-                  mid: `${psid}-mid-q3`,
+                  mid: q3Mid,
                   quick_reply: { payload: "q3_vision" },
                 },
               },
@@ -1287,20 +1289,20 @@ describe("identity-ai-v1 routing", () => {
         ],
       });
 
-      const completedState = getState(anonymizePsid(psid));
-      expect(completedState?.activeExperience).toBeNull();
+      const stateAfterCompletion = getState(anonymizePsid(psid));
+      expect(stateAfterCompletion?.activeExperience).toBeNull();
 
       sendTextMock.mockClear();
       sendQuickRepliesMock.mockClear();
 
-      await processFacebookWebhookPayload({
+      await messengerWebhook.processFacebookWebhookPayload({
         entry: [
           {
             messaging: [
               {
                 sender: { id: psid, locale: "en_US" },
                 message: {
-                  mid: `${psid}-mid-after-complete`,
+                  mid: afterCompleteMid,
                   text: "hi",
                 },
               },
@@ -1309,7 +1311,11 @@ describe("identity-ai-v1 routing", () => {
         ],
       });
 
-      expect(getState(anonymizePsid(psid))?.activeExperience).toBeNull();
+      expect(sendQuickRepliesMock).not.toHaveBeenCalledWith(
+        psid,
+        expect.stringContaining("When a new AI tool drops"),
+        expect.any(Array)
+      );
       expect(sendTextMock).not.toHaveBeenCalledWith(
         psid,
         expect.stringContaining("You are:")

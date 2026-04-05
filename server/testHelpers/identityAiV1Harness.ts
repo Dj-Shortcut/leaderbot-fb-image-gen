@@ -12,6 +12,7 @@ type MockWithCalls = {
     calls: unknown[][];
     invocationCallOrder: number[];
   };
+  mockClear?: () => void;
 };
 
 export type LoggedOutboundIntent =
@@ -90,6 +91,9 @@ export class IdentityAiV1Harness {
 
   reset(): void {
     resetMessengerEventDedupe();
+    this.deps.sendTextMock.mockClear?.();
+    this.deps.sendQuickRepliesMock.mockClear?.();
+    this.deps.sendImageMock.mockClear?.();
     this.sequence = 0;
     this.step = 0;
     this.textCursor = 0;
@@ -97,6 +101,10 @@ export class IdentityAiV1Harness {
     this.imageCursor = 0;
   }
 
+  /**
+   * If `ref` already starts with `game:` or `identity_game:`, it is passed through
+   * as-is and `entryMode` is not injected.
+   */
   async sendReferral(
     userId: string,
     ref: string,
