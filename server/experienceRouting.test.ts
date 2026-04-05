@@ -1203,6 +1203,10 @@ describe("identity-ai-v1 routing", () => {
 
   it("falls back to normal thread handling after game completion", async () => {
     const psid = mkPsid("identity-ai-v1-post-complete-user");
+    const q1Mid = `${psid}-mid-q1`;
+    const q2Mid = `${psid}-mid-q2`;
+    const q3Mid = `${psid}-mid-q3`;
+    const afterCompleteMid = `${psid}-mid-after-complete`;
     const generateSpy = vi
       .spyOn(OpenAiImageGenerator.prototype, "generate")
       .mockResolvedValue({
@@ -1242,7 +1246,7 @@ describe("identity-ai-v1 routing", () => {
               {
                 sender: { id: psid, locale: "en_US" },
                 message: {
-                  mid: "mid-q1",
+                  mid: q1Mid,
                   quick_reply: { payload: "q1_vision" },
                 },
               },
@@ -1257,7 +1261,7 @@ describe("identity-ai-v1 routing", () => {
               {
                 sender: { id: psid, locale: "en_US" },
                 message: {
-                  mid: "mid-q2",
+                  mid: q2Mid,
                   quick_reply: { payload: "q2_vision" },
                 },
               },
@@ -1276,7 +1280,7 @@ describe("identity-ai-v1 routing", () => {
               {
                 sender: { id: psid, locale: "en_US" },
                 message: {
-                  mid: "mid-q3",
+                  mid: q3Mid,
                   quick_reply: { payload: "q3_vision" },
                 },
               },
@@ -1300,7 +1304,7 @@ describe("identity-ai-v1 routing", () => {
               {
                 sender: { id: psid, locale: "en_US" },
                 message: {
-                  mid: "mid-after-complete",
+                  mid: afterCompleteMid,
                   text: "hi",
                 },
               },

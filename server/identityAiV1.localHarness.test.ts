@@ -20,13 +20,19 @@ vi.mock("./_core/messengerApi", () => ({
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import { OpenAiImageGenerator } from "./_core/imageService";
-import {
-  getIdentityGameSessionByUserId,
-  upsertIdentityGameSession,
-} from "./_core/identityGameSessionState";
 import { resetMessengerEventDedupe } from "./_core/messengerWebhook";
-import { anonymizePsid, setActiveExperience } from "./_core/messengerState";
 import { IdentityAiV1Harness } from "./testHelpers/identityAiV1Harness";
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, resolve, reject };
+}
 
 describe.sequential("identity-ai-v1 local webhook harness", () => {
   let harness: IdentityAiV1Harness;
@@ -197,38 +203,80 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
   });
 
   it("blocks duplicate resolution while the session is resolving", async () => {
-    await harness.sendReferral("resolving-user", "identity-ai-v1", "auto_start");
-    await harness.sendChoice("resolving-user", "identity-ai-v1-q1", "q1_build");
-    await harness.sendChoice("resolving-user", "identity-ai-v1-q2", "q2_build");
+    const generationStarted = createDeferred<void>();
+    const completionDeferred = createDeferred<{
+      imageUrl: string;
+      proof: {
+        incomingLen: number;
+        incomingSha256: string;
+        openaiInputLen: number;
+        openaiInputSha256: string;
+      };
+      metrics: { totalMs: number };
+    }>();
+    const generateSpy = vi
+      .spyOn(OpenAiImageGenerator.prototype, "generate")
+      .mockImplementation(() => {
+        generationStarted.resolve();
+        return completionDeferred.promise;
+      });
 
-    const userKey = anonymizePsid("resolving-user");
-    const session = await Promise.resolve(getIdentityGameSessionByUserId(userKey));
-    expect(session).not.toBeNull();
+    try {
+      await harness.sendReferral("resolving-user", "identity-ai-v1", "auto_start");
+      await harness.sendChoice("resolving-user", "identity-ai-v1-q1", "q1_build");
+      await harness.sendChoice("resolving-user", "identity-ai-v1-q2", "q2_build");
 
-    await upsertIdentityGameSession({
-      ...session!,
-      status: "resolving",
-      resultRef: session?.resultRef ?? "builder",
-      updatedAt: Date.now(),
-    });
-    await Promise.resolve(
-      setActiveExperience(userKey, {
-        type: "identity_game",
-        id: "identity-ai-v1",
-        sessionId: session!.sessionId,
-        status: "resolving",
-        startedAt: session!.startedAt,
-        updatedAt: Date.now(),
-      })
-    );
+      const completionPromise = harness.sendChoice(
+        "resolving-user",
+        "identity-ai-v1-q3",
+        "q3_build"
+      );
 
-    const extraInput = await harness.sendText("resolving-user", "extra input");
-    expect(extraInput.session?.status).toBe("resolving");
-    expect(extraInput.outboundIntents).toContainEqual({
-      kind: "text",
-      text:
-        "Your identity game session was recognized, but the actual game flow is not enabled in this phase yet.",
-    });
+      await generationStarted.promise;
+
+      const extraInput = await harness.sendText("resolving-user", "extra input");
+
+      completionDeferred.resolve({
+        imageUrl: "https://example.com/identity-builder-resolving.jpg",
+        proof: {
+          incomingLen: 0,
+          incomingSha256: "0",
+          openaiInputLen: 0,
+          openaiInputSha256: "0",
+        },
+        metrics: { totalMs: 25 },
+      });
+
+      const completion = await completionPromise;
+
+      expect(extraInput.session?.status).toBe("resolving");
+      expect(extraInput.outboundIntents).toContainEqual({
+        kind: "text",
+        text:
+          "Your identity game session was recognized, but the actual game flow is not enabled in this phase yet.",
+      });
+      expect(completion.outboundIntents).toEqual([
+        {
+          kind: "text",
+          text: "You are: Builder",
+        },
+        {
+          kind: "image",
+          imageUrl: "https://example.com/identity-builder-resolving.jpg",
+        },
+      ]);
+      expect(
+        [extraInput, completion]
+          .flatMap(step => step.outboundIntents)
+          .filter(
+            intent =>
+              intent.kind === "text" &&
+              intent.text.includes("Your dominant AI instinct is")
+          )
+      ).toHaveLength(1);
+    } finally {
+      generateSpy.mockRestore();
+    }
   });
 
   it("starts a fresh session after completion when the referral is opened again", async () => {
