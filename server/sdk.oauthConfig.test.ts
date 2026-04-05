@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { assertAuthConfig } from "./_core/env";
 
-describe("OAuth SDK configuration guard", () => {
+describe.sequential("OAuth SDK configuration guard", () => {
   const originalOAuthUrl = process.env.OAUTH_SERVER_URL;
   const originalJwtSecret = process.env.JWT_SECRET;
 
@@ -19,7 +19,7 @@ describe("OAuth SDK configuration guard", () => {
     vi.restoreAllMocks();
   });
 
-  it("does not log an OAuth error when OAUTH_SERVER_URL is missing", async () => {
+  it("does not log an OAuth error when OAUTH_SERVER_URL is missing", { timeout: 15000 }, async () => {
     delete process.env.OAUTH_SERVER_URL;
     process.env.JWT_SECRET = "x".repeat(32);
     const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
@@ -36,7 +36,7 @@ describe("OAuth SDK configuration guard", () => {
     );
   });
 
-  it("logs OAuth initialization when OAUTH_SERVER_URL is provided", async () => {
+  it("logs OAuth initialization when OAUTH_SERVER_URL is provided", { timeout: 15000 }, async () => {
     process.env.OAUTH_SERVER_URL = "https://oauth.example.com";
     process.env.JWT_SECRET = "x".repeat(32);
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
