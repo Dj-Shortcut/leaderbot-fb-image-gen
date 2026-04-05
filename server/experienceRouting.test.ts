@@ -1285,8 +1285,10 @@ describe("identity-ai-v1 routing", () => {
         ],
       });
 
-      const completedState = getState(anonymizePsid(psid));
-      expect(completedState?.activeExperience).toBeNull();
+      expect(sendTextMock).toHaveBeenCalledWith(
+        psid,
+        expect.stringContaining("You are:")
+      );
 
       sendTextMock.mockClear();
       sendQuickRepliesMock.mockClear();
@@ -1307,7 +1309,11 @@ describe("identity-ai-v1 routing", () => {
         ],
       });
 
-      expect(getState(anonymizePsid(psid))?.activeExperience).toBeNull();
+      expect(sendQuickRepliesMock).not.toHaveBeenCalledWith(
+        psid,
+        expect.stringContaining("When a new AI tool drops"),
+        expect.any(Array)
+      );
       expect(sendTextMock).not.toHaveBeenCalledWith(
         psid,
         expect.stringContaining("You are:")
