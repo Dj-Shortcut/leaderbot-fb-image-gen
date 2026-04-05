@@ -99,38 +99,7 @@ function isIdentityGameSessionActive(session: IdentityGameSession): boolean {
   return session.status === "started" || session.status === "in_progress";
 }
 
-async function findResumableSession(
-  state: MessengerUserState,
-  entryIntent: EntryIntent
-): Promise<IdentityGameSession | null> {
-  const activeSession = await Promise.resolve(
-    getIdentityGameSessionByActiveExperience(state.activeExperience)
-  );
-
-  if (
-    activeSession &&
-    activeSession.gameId === entryIntent.targetExperienceId &&
-    isIdentityGameSessionActive(activeSession)
-  ) {
-    return activeSession;
-  }
-
-  const existingSession = await Promise.resolve(
-    getIdentityGameSessionByUserId(state.userKey)
-  );
-
-  if (
-    existingSession &&
-    existingSession.gameId === entryIntent.targetExperienceId &&
-    isIdentityGameSessionActive(existingSession)
-  ) {
-    return existingSession;
-  }
-
-  return null;
-}
-
-async function findLatestSessionForGame(
+async function findExistingSessionForGame(
   state: MessengerUserState,
   entryIntent: EntryIntent
 ): Promise<IdentityGameSession | null> {
@@ -193,8 +162,9 @@ export async function routeEntryIntent(
     };
   }
 
-  const latestSession = await findLatestSessionForGame(input.state, input.entryIntent);
-  const resumableSession = latestSession ? await findResumableSession(input.state, input.entryIntent) : null;
+  const latestSession = await findExistingSessionForGame(input.state, input.entryIntent);
+  const resumableSession =
+    latestSession && isIdentityGameSessionActive(latestSession) ? latestSession : null;
   const isAutoStart = input.entryIntent.entryMode !== "confirm_first";
   const { session, response } = await gameHandler.startSession({
     state: input.state,
@@ -270,9 +240,10 @@ export async function routeActiveExperience(
       handlerResult.session.updatedAt !== activeSession.updatedAt;
     if (sessionChanged) {
       await Promise.resolve(upsertIdentityGameSession(handlerResult.session));
-      if (handlerResult.session.status === "resolving") {
-        await input.setActiveExperience(null);
-      } else if (!handlerResult.clearActiveExperience) {
+      if (
+        handlerResult.session.status !== "resolving" &&
+        !handlerResult.clearActiveExperience
+      ) {
         await input.setActiveExperience(toActiveExperience(handlerResult.session));
       }
     }
