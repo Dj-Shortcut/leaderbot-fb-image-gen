@@ -130,6 +130,29 @@ async function findResumableSession(
   return null;
 }
 
+async function findLatestSessionForGame(
+  state: MessengerUserState,
+  entryIntent: EntryIntent
+): Promise<IdentityGameSession | null> {
+  const activeSession = await Promise.resolve(
+    getIdentityGameSessionByActiveExperience(state.activeExperience)
+  );
+
+  if (activeSession && activeSession.gameId === entryIntent.targetExperienceId) {
+    return activeSession;
+  }
+
+  const existingSession = await Promise.resolve(
+    getIdentityGameSessionByUserId(state.userKey)
+  );
+
+  if (existingSession && existingSession.gameId === entryIntent.targetExperienceId) {
+    return existingSession;
+  }
+
+  return null;
+}
+
 function toActiveExperience(session: IdentityGameSession): ActiveExperience {
   return {
     type: "identity_game",
@@ -170,7 +193,8 @@ export async function routeEntryIntent(
     };
   }
 
-  const resumableSession = await findResumableSession(input.state, input.entryIntent);
+  const latestSession = await findLatestSessionForGame(input.state, input.entryIntent);
+  const resumableSession = latestSession ? await findResumableSession(input.state, input.entryIntent) : null;
   const isAutoStart = input.entryIntent.entryMode !== "confirm_first";
   const { session, response } = await gameHandler.startSession({
     state: input.state,
@@ -246,7 +270,9 @@ export async function routeActiveExperience(
       handlerResult.session.updatedAt !== activeSession.updatedAt;
     if (sessionChanged) {
       await Promise.resolve(upsertIdentityGameSession(handlerResult.session));
-      if (!handlerResult.clearActiveExperience) {
+      if (handlerResult.session.status === "resolving") {
+        await input.setActiveExperience(null);
+      } else if (!handlerResult.clearActiveExperience) {
         await input.setActiveExperience(toActiveExperience(handlerResult.session));
       }
     }
