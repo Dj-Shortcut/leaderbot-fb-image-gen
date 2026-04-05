@@ -20,6 +20,7 @@ vi.mock("./_core/messengerApi", () => ({
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import { OpenAiImageGenerator } from "./_core/imageService";
+import { resetMessengerEventDedupe } from "./_core/messengerWebhook";
 import { IdentityAiV1Harness } from "./testHelpers/identityAiV1Harness";
 
 function createDeferred<T>() {
@@ -33,27 +34,12 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
-async function waitFor(
-  predicate: () => Promise<boolean>,
-  timeoutMs = 1_000
-): Promise<void> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    if (await predicate()) {
-      return;
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 5));
-  }
-
-  throw new Error(`Timed out after ${timeoutMs}ms`);
-}
-
 describe.sequential("identity-ai-v1 local webhook harness", () => {
   let harness: IdentityAiV1Harness;
 
   beforeEach(() => {
     process.env.PRIVACY_PEPPER = "ci-test-pepper";
+    resetMessengerEventDedupe();
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
@@ -63,6 +49,7 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
       sendTextMock,
       sendQuickRepliesMock,
       sendImageMock,
+      logger: () => undefined,
     });
   });
 
@@ -216,6 +203,7 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
   });
 
   it("blocks duplicate resolution while the session is resolving", async () => {
+    const generationStarted = createDeferred<void>();
     const deferred = createDeferred<{
       imageUrl: string;
       proof: {
@@ -228,7 +216,10 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
     }>();
     const generateSpy = vi
       .spyOn(OpenAiImageGenerator.prototype, "generate")
-      .mockImplementation(() => deferred.promise);
+      .mockImplementation(() => {
+        generationStarted.resolve();
+        return deferred.promise;
+      });
 
     try {
       await harness.sendReferral("resolving-user", "identity-ai-v1", "auto_start");
@@ -241,10 +232,7 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
         "q3_build"
       );
 
-      await waitFor(async () => {
-        const snapshot = await harness.getSnapshot("resolving-user");
-        return snapshot.session?.status === "resolving";
-      });
+      await generationStarted.promise;
 
       const extraInput = await harness.sendText("resolving-user", "extra input");
 
@@ -309,16 +297,11 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
       await harness.sendReferral("replay-user", "identity-ai-v1", "auto_start");
       await harness.sendChoice("replay-user", "identity-ai-v1-q1", "q1_vision");
       await harness.sendChoice("replay-user", "identity-ai-v1-q2", "q2_vision");
-      await harness.sendChoice(
+      const completed = await harness.sendChoice(
         "replay-user",
         "identity-ai-v1-q3",
         "q3_vision"
       );
-      await waitFor(async () => {
-        const snapshot = await harness.getSnapshot("replay-user");
-        return snapshot.session?.status === "completed";
-      });
-      const completed = await harness.getSnapshot("replay-user");
       const replay = await harness.sendReferral(
         "replay-user",
         "identity-ai-v1",
