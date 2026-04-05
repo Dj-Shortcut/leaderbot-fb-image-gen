@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getGreetingResponse } from "./_core/messengerWebhook";
+import { getGreetingResponse } from "./_core/webhookHelpers";
 
 describe("greeting handling by conversation state", () => {
   it("returns processing text while PROCESSING", () => {

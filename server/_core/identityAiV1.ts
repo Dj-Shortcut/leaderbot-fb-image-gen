@@ -341,7 +341,7 @@ function buildImagePromptHint(archetype: ArchetypeDefinition): string {
   ].join(". ");
 }
 
-export function isIdentityAiV1GameId(gameId: string | null | undefined): boolean {
+function isIdentityAiV1GameId(gameId: string | null | undefined): boolean {
   return gameId === IDENTITY_AI_V1_GAME_ID;
 }
 
@@ -438,7 +438,7 @@ export function resolveIdentityAiV1Archetype(
   return resolved;
 }
 
-export function buildIdentityAiV1Result(
+function buildIdentityAiV1Result(
   answerIds: [string, string, string],
   lang: Lang
 ): IdentityAiV1Result {
@@ -454,7 +454,7 @@ export function buildIdentityAiV1Result(
   };
 }
 
-export function formatIdentityAiV1ResultText(result: IdentityAiV1Result): string {
+function formatIdentityAiV1ResultText(result: IdentityAiV1Result): string {
   return [
     result.title,
     result.identityLine,
@@ -592,7 +592,7 @@ export async function generateIdentityAiV1ImageResponse(
   }
 }
 
-export function getIdentityAiV1QuestionIds(): readonly string[] {
+function getIdentityAiV1QuestionIds(): readonly string[] {
   return QUESTIONS.map(question => question.id);
 }
 

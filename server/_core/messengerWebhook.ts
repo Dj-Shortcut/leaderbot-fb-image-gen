@@ -7,15 +7,12 @@ import { createWebhookHandlers } from "./webhookHandlers";
 import { routeActiveExperience, routeEntryIntent } from "./experienceRouter";
 import { resetWebhookReplayProtection } from "./webhookReplayProtection";
 import {
-  detectAck,
-  getGreetingResponse,
   normalizeStyle,
   parseStyle,
   styleCategoryPayloadToCategory,
   stylePayloadToStyle,
   STYLE_CATEGORY_LABELS,
   STYLE_LABELS,
-  summarizeWebhook,
 } from "./webhookHelpers";
 import { facebookWebhookPayloadSchema } from "./webhookSchemas";
 import {
@@ -92,8 +89,6 @@ const webhookLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-
-export { detectAck, getGreetingResponse, summarizeWebhook };
 
 export function resetMessengerEventDedupe(): void {
   resetWebhookReplayProtection();

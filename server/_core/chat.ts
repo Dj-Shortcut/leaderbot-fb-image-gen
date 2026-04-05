@@ -324,4 +324,4 @@ export function registerChatRoutes(app: Express) {
   });
 }
 
-export { parseChatRequestBody, tools };
+{ parseChatRequestBody, tools };

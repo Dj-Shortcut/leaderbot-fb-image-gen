@@ -1,4 +1,4 @@
-export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
 const getOptionalEnvString = (value: unknown): string | undefined => {
   return typeof value === "string" ? value : undefined;

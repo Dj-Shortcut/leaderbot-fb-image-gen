@@ -1,4 +1,4 @@
-export default function Terms() {
+function Terms() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center px-4">
       <div className="max-w-2xl bg-white rounded-lg border border-slate-200 p-8">
@@ -12,3 +12,5 @@ export default function Terms() {
     </div>
   );
 }
+
+export default Terms;

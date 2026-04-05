@@ -141,6 +141,14 @@ function toActiveExperience(session: IdentityGameSession): ActiveExperience {
   };
 }
 
+function isRouteableIdentityGameSession(session: IdentityGameSession): boolean {
+  return (
+    session.status === "started" ||
+    session.status === "in_progress" ||
+    session.status === "resolving"
+  );
+}
+
 export async function routeEntryIntent(
   input: ExperienceRouterInput
 ): Promise<ExperienceRouteResult> {
@@ -183,17 +191,27 @@ export async function routeActiveExperience(
   input: Omit<ExperienceRouterInput, "entryIntent">
 ): Promise<ExperienceRouteResult> {
   const activeExperience = input.state.activeExperience;
-  if (!activeExperience || activeExperience.type !== "identity_game") {
+  const activeSession = await Promise.resolve(
+    activeExperience?.type === "identity_game"
+      ? getIdentityGameSessionByActiveExperience(activeExperience)
+      : getIdentityGameSessionByUserId(input.state.userKey)
+  );
+
+  if (!activeSession || !isRouteableIdentityGameSession(activeSession)) {
+    if (activeExperience?.type === "identity_game") {
+      await input.setActiveExperience(null);
+    }
     return { handled: false };
   }
 
-  const activeSession = await Promise.resolve(
-    getIdentityGameSessionByActiveExperience(activeExperience)
-  );
-
-  if (!activeSession) {
-    await input.setActiveExperience(null);
-    return { handled: false };
+  if (
+    !activeExperience ||
+    activeExperience.type !== "identity_game" ||
+    activeExperience.sessionId !== activeSession.sessionId ||
+    activeExperience.status !== activeSession.status ||
+    activeExperience.updatedAt !== activeSession.updatedAt
+  ) {
+    await input.setActiveExperience(toActiveExperience(activeSession));
   }
 
   const action = normalizeAction(input.action);

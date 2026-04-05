@@ -1,6 +1,6 @@
 import { Sparkles } from "lucide-react";
 
-export default function Home() {
+function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center px-4">
       <div className="max-w-md text-center">
@@ -27,3 +27,5 @@ export default function Home() {
     </div>
   );
 }
+
+export default Home;

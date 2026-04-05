@@ -41,10 +41,8 @@ vi.mock("./_core/messengerResponsesService", () => ({
 }));
 
 import {
-  detectAck,
   processFacebookWebhookPayload,
   resetMessengerEventDedupe,
-  summarizeWebhook,
 } from "./_core/messengerWebhook";
 import { STYLE_CONFIGS } from "./_core/messengerStyles";
 import {
@@ -53,7 +51,11 @@ import {
   resetStateStore,
   setFlowState,
 } from "./_core/messengerState";
-import { getEventDedupeKey } from "./_core/webhookHelpers";
+import {
+  detectAck,
+  getEventDedupeKey,
+  summarizeWebhook,
+} from "./_core/webhookHelpers";
 import { getBotFeatures } from "./_core/bot/features";
 
 const TEST_PEPPER = "ci-test-pepper";
