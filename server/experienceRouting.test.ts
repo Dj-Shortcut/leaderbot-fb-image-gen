@@ -29,6 +29,22 @@ import { parseGameEntryIntent } from "./_core/entryIntent";
 import { routeActiveExperience, routeEntryIntent } from "./_core/experienceRouter";
 import { anonymizePsid, getOrCreateState, getState } from "./_core/messengerState";
 
+async function waitFor(
+  predicate: () => boolean,
+  timeoutMs = 1_000
+): Promise<void> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (predicate()) {
+      return;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+
+  throw new Error(`Timed out after ${timeoutMs}ms`);
+}
+
 describe("identity-ai-v1 routing", () => {
   let psidSeq = 0;
   const mkPsid = (base: string) => `${base}-${++psidSeq}`;
@@ -1285,6 +1301,7 @@ describe("identity-ai-v1 routing", () => {
         ],
       });
 
+      await waitFor(() => getState(anonymizePsid(psid))?.activeExperience == null);
       const completedState = getState(anonymizePsid(psid));
       expect(completedState?.activeExperience).toBeNull();
 

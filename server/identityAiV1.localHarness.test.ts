@@ -309,11 +309,16 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
       await harness.sendReferral("replay-user", "identity-ai-v1", "auto_start");
       await harness.sendChoice("replay-user", "identity-ai-v1-q1", "q1_vision");
       await harness.sendChoice("replay-user", "identity-ai-v1-q2", "q2_vision");
-      const completed = await harness.sendChoice(
+      await harness.sendChoice(
         "replay-user",
         "identity-ai-v1-q3",
         "q3_vision"
       );
+      await waitFor(async () => {
+        const snapshot = await harness.getSnapshot("replay-user");
+        return snapshot.session?.status === "completed";
+      });
+      const completed = await harness.getSnapshot("replay-user");
       const replay = await harness.sendReferral(
         "replay-user",
         "identity-ai-v1",
