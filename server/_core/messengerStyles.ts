@@ -132,7 +132,7 @@ export const STYLE_CONFIGS: StyleConfig[] = [
   },
 ];
 
-export const STYLE_IDS = new Set<StyleId>(STYLE_CONFIGS.map(style => style.id));
+const STYLE_IDS = new Set<StyleId>(STYLE_CONFIGS.map(style => style.id));
 
 export const STYLE_CATEGORY_CONFIGS: StyleCategoryConfig[] = [
   {

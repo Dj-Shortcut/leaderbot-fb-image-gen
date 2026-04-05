@@ -212,6 +212,3 @@ export function getIdentityGameHandler(
   return handlers.get(gameId) ?? null;
 }
 
-export function listIdentityGameHandlers(): readonly IdentityGameHandler[] {
-  return Array.from(handlers.values());
-}

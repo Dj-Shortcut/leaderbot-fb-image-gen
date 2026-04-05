@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
 
-export const IDENTITY_GAME_CANONICAL_DOMAIN = "leaderbot.live";
+const IDENTITY_GAME_CANONICAL_DOMAIN = "leaderbot.live";
 const DEFAULT_SHARE_TITLE = "Discover your AI archetype";
 const DEFAULT_SHARE_DESCRIPTION =
   "Answer 3 quick questions and reveal your AI identity.";
@@ -419,7 +419,7 @@ export function assertIdentityGameVariantCatalog(
   }
 }
 
-export function getVariantById(
+function getVariantById(
   variantId: string,
   variants: readonly GameVariantDefinition[] = GAME_VARIANTS
 ): GameVariantDefinition | null {

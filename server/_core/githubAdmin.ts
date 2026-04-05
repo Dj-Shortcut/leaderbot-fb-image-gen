@@ -236,7 +236,7 @@ export async function createAdminSessionToken(login: string): Promise<string> {
     .sign(getJwtSecretKey());
 }
 
-export async function verifyAdminSessionToken(
+async function verifyAdminSessionToken(
   token: string
 ): Promise<string | null> {
   try {
@@ -280,7 +280,7 @@ function sendUnauthorizedAdminResponse(req: Request, res: Response): void {
   res.status(401).type("text/plain").send("Admin login required");
 }
 
-export const requireAdmin: RequestHandler = (
+const requireAdmin: RequestHandler = (
   req: Request,
   res: Response,
   next: NextFunction

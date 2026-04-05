@@ -253,7 +253,7 @@ export function getDayKey(now = Date.now()): string {
   return new Date(now).toISOString().slice(0, 10);
 }
 
-export function getMessengerResponseWindowMs(): number {
+function getMessengerResponseWindowMs(): number {
   const configured = Number(process.env.MESSENGER_RESPONSE_WINDOW_MS);
   if (Number.isFinite(configured) && configured >= 0) {
     return Math.floor(configured);
@@ -353,7 +353,7 @@ export function setActiveExperience(
   }
 }
 
-export function clearActiveExperience(
+function clearActiveExperience(
   psid: string,
   now = Date.now()
 ): MaybePromise<void> {
@@ -540,7 +540,7 @@ export function setLastGenerationContext(
   }
 }
 
-export function pruneOldState(): void {}
+function pruneOldState(): void {}
 
 export function resetStateStore(): void {
   clearStateStore();

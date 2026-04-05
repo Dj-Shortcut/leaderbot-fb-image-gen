@@ -73,7 +73,7 @@ export async function ensureStateStoreReady(): Promise<void> {
   await redis.ping();
 }
 
-export function readRawState<T>(storageKey: string): MaybePromise<T | null> {
+function readRawState<T>(storageKey: string): MaybePromise<T | null> {
   if (!isRedisStateStoreEnabled()) {
     const payload = memoryState.get(storageKey);
     return payload ? (JSON.parse(payload) as T) : null;
@@ -85,7 +85,7 @@ export function readRawState<T>(storageKey: string): MaybePromise<T | null> {
   });
 }
 
-export function writeRawState<T>(
+function writeRawState<T>(
   storageKey: string,
   value: T,
   ttlSeconds = STATE_TTL_SECONDS
@@ -104,7 +104,7 @@ export function writeRawState<T>(
   });
 }
 
-export function deleteRawState(storageKey: string): MaybePromise<void> {
+function deleteRawState(storageKey: string): MaybePromise<void> {
   if (!isRedisStateStoreEnabled()) {
     memoryState.delete(storageKey);
     return;
@@ -276,4 +276,4 @@ export async function deleteEphemeralKey(key: string): Promise<void> {
   await redis.del(key);
 }
 
-export { STATE_TTL_SECONDS, isPromiseLike };
+export { isPromiseLike };

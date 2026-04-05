@@ -60,7 +60,7 @@ export function parseOAuthState(state: string): OAuthStatePayload | null {
   }
 }
 
-export function validateOAuthState(
+function validateOAuthState(
   req: Request,
   state: string
 ): OAuthStatePayload | null {

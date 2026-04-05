@@ -88,7 +88,7 @@ export function recordHttpRequestMetric(method: string, path: string, statusCode
   incrementMetric(durationBuckets, durationBucketKey(method, normalizedPath, "+Inf"));
 }
 
-export function renderPrometheusMetrics(): string {
+function renderPrometheusMetrics(): string {
   const lines: string[] = [
     "# HELP http_requests_total Total HTTP requests handled by the server",
     "# TYPE http_requests_total counter",

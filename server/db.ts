@@ -6,7 +6,7 @@ import { ENV } from './_core/env';
 let _db: ReturnType<typeof drizzle> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
-export async function getDb() {
+async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       _db = drizzle(process.env.DATABASE_URL);
@@ -90,7 +90,7 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-export async function getUserById(id: number) {
+async function getUserById(id: number) {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot get user: database not available");
@@ -140,7 +140,7 @@ export async function canUserGenerateImage(userId: number): Promise<boolean> {
 /**
  * Increment user's daily image count
  */
-export async function incrementUserQuota(userId: number): Promise<void> {
+async function incrementUserQuota(userId: number): Promise<void> {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot increment quota: database not available");
@@ -177,7 +177,7 @@ export async function incrementUserQuota(userId: number): Promise<void> {
  * Atomically reserve daily quota for a user.
  * Returns true only when quota is successfully claimed for the current day.
  */
-export async function reserveUserDailyQuota(userId: number): Promise<boolean> {
+async function reserveUserDailyQuota(userId: number): Promise<boolean> {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot reserve quota: database not available");
@@ -229,7 +229,7 @@ export async function reserveUserDailyQuota(userId: number): Promise<boolean> {
 /**
  * Releases one reserved daily quota slot when an operation fails after reservation.
  */
-export async function releaseUserDailyQuota(userId: number): Promise<void> {
+async function releaseUserDailyQuota(userId: number): Promise<void> {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot release quota: database not available");
@@ -250,7 +250,7 @@ export async function releaseUserDailyQuota(userId: number): Promise<void> {
 /**
  * Create an image request record
  */
-export async function createImageRequest(data: InsertImageRequest) {
+async function createImageRequest(data: InsertImageRequest) {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot create image request: database not available");
@@ -264,7 +264,7 @@ export async function createImageRequest(data: InsertImageRequest) {
 /**
  * Update image request with completion details
  */
-export async function updateImageRequest(id: number, updates: { imageUrl?: string; imageKey?: string; status: 'pending' | 'completed' | 'failed'; errorMessage?: string | null; completedAt?: Date }) {
+async function updateImageRequest(id: number, updates: { imageUrl?: string; imageKey?: string; status: 'pending' | 'completed' | 'failed'; errorMessage?: string | null; completedAt?: Date }) {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot update image request: database not available");
@@ -278,7 +278,7 @@ export async function updateImageRequest(id: number, updates: { imageUrl?: strin
 /**
  * Get all image requests for a user
  */
-export async function getUserImageRequests(userId: number, limit = 50, offset = 0) {
+async function getUserImageRequests(userId: number, limit = 50, offset = 0) {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot get image requests: database not available");
@@ -299,7 +299,7 @@ export async function getUserImageRequests(userId: number, limit = 50, offset = 
 /**
  * Get all completed image requests for gallery (public)
  */
-export async function getCompletedImages(limit = 100, offset = 0) {
+async function getCompletedImages(limit = 100, offset = 0) {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot get completed images: database not available");
@@ -328,7 +328,7 @@ export async function getCompletedImages(limit = 100, offset = 0) {
 /**
  * Get today's usage statistics
  */
-export async function getTodayStats() {
+async function getTodayStats() {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot get stats: database not available");
@@ -348,7 +348,7 @@ export async function getTodayStats() {
 /**
  * Update or create today's usage statistics
  */
-export async function updateTodayStats(updates: Partial<InsertUsageStats>) {
+async function updateTodayStats(updates: Partial<InsertUsageStats>) {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot update stats: database not available");
@@ -371,7 +371,7 @@ export async function updateTodayStats(updates: Partial<InsertUsageStats>) {
 /**
  * Log a notification
  */
-export async function logNotification(data: InsertNotificationLog) {
+async function logNotification(data: InsertNotificationLog) {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot log notification: database not available");
@@ -385,7 +385,7 @@ export async function logNotification(data: InsertNotificationLog) {
 /**
  * Get or create messenger state for a PSID
  */
-export async function getOrCreateMessengerState(psid: string, userKey: string) {
+async function getOrCreateMessengerState(psid: string, userKey: string) {
   const db = await getDb();
   if (!db) return null;
 
@@ -410,7 +410,7 @@ export async function getOrCreateMessengerState(psid: string, userKey: string) {
 /**
  * Update messenger state
  */
-export async function updateMessengerState(psid: string, updates: Partial<InsertMessengerState>) {
+async function updateMessengerState(psid: string, updates: Partial<InsertMessengerState>) {
   const db = await getDb();
   if (!db) return;
 
@@ -423,7 +423,7 @@ export async function updateMessengerState(psid: string, updates: Partial<Insert
 /**
  * Check and increment daily quota for a PSID (Messenger specific)
  */
-export async function checkAndIncrementMessengerQuota(psid: string): Promise<boolean> {
+async function checkAndIncrementMessengerQuota(psid: string): Promise<boolean> {
   void psid;
 
   if (!(await getDb())) return true; // Fail open for quota if DB is down
@@ -435,7 +435,7 @@ export async function checkAndIncrementMessengerQuota(psid: string): Promise<boo
 /**
  * Get recent notifications for admin dashboard
  */
-export async function getRecentNotifications(limit = 20) {
+async function getRecentNotifications(limit = 20) {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot get notifications: database not available");

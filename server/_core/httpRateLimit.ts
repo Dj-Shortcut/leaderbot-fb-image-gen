@@ -196,7 +196,7 @@ export async function ensureHttpRateLimiterReady(): Promise<void> {
   await redis.ping();
 }
 
-export function resetHttpRateLimiterRedisClient(): void {
+function resetHttpRateLimiterRedisClient(): void {
   redisClientPromise = null;
 }
 

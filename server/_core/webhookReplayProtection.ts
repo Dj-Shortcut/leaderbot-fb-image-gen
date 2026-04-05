@@ -120,4 +120,3 @@ export function resetWebhookReplayProtection(): void {
   memoryReplayKeys.clear();
 }
 
-export { DEFAULT_REPLAY_TTL_SECONDS, DEFAULT_MAX_REPLAY_KEYS };

@@ -77,6 +77,3 @@ export function getTodayRuntimeStats(now = Date.now()): GenerationStatsSnapshot 
   };
 }
 
-export function resetRuntimeStats(): void {
-  statsByDay.clear();
-}

@@ -38,10 +38,10 @@ export interface ImageGenerator {
   }>;
 }
 
-export class InvalidGenerationInputError extends Error {}
+class InvalidGenerationInputError extends Error {}
 export class MissingOpenAiApiKeyError extends Error {}
 export class GenerationTimeoutError extends Error {}
-export class OpenAiGenerationError extends Error {}
+class OpenAiGenerationError extends Error {}
 export class OpenAiBudgetExceededError extends Error {}
 export class MissingAppBaseUrlError extends Error {}
 export class MissingObjectStorageConfigError extends Error {}
@@ -427,7 +427,7 @@ function isBlockedHostname(hostname: string): boolean {
   return false;
 }
 
-export function validateSourceImageUrlOrThrow(
+function validateSourceImageUrlOrThrow(
   sourceImageUrl: string,
   reqId?: string,
   options?: {
