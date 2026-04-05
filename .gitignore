@@ -103,6 +103,7 @@ jspm_packages/
 tmp/
 temp/
 .playwright-cli/
+.fallow/
 
 # Database
 *.db
