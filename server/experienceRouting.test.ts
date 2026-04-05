@@ -1289,10 +1289,8 @@ describe("identity-ai-v1 routing", () => {
         ],
       });
 
-      expect(sendTextMock).toHaveBeenCalledWith(
-        psid,
-        expect.stringContaining("You are:")
-      );
+      const stateAfterCompletion = getState(anonymizePsid(psid));
+      expect(stateAfterCompletion?.activeExperience).toBeNull();
 
       sendTextMock.mockClear();
       sendQuickRepliesMock.mockClear();
