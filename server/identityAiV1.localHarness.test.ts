@@ -21,6 +21,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import { OpenAiImageGenerator } from "./_core/imageService";
 import { resetMessengerEventDedupe } from "./_core/messengerWebhook";
+import { resetStateStore } from "./_core/messengerState";
 import { IdentityAiV1Harness } from "./testHelpers/identityAiV1Harness";
 
 function createDeferred<T>() {
@@ -39,6 +40,7 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
 
   beforeEach(() => {
     process.env.PRIVACY_PEPPER = "ci-test-pepper";
+    resetStateStore();
     resetMessengerEventDedupe();
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();

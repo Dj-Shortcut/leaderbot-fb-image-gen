@@ -27,7 +27,12 @@ import * as messengerWebhook from "./_core/messengerWebhook";
 import { getIdentityGameSessionByUserId, upsertIdentityGameSession } from "./_core/identityGameSessionState";
 import { parseGameEntryIntent } from "./_core/entryIntent";
 import { routeActiveExperience, routeEntryIntent } from "./_core/experienceRouter";
-import { anonymizePsid, getOrCreateState, getState } from "./_core/messengerState";
+import {
+  anonymizePsid,
+  getOrCreateState,
+  getState,
+  resetStateStore,
+} from "./_core/messengerState";
 
 describe("identity-ai-v1 routing", () => {
   let psidSeq = 0;
@@ -35,6 +40,7 @@ describe("identity-ai-v1 routing", () => {
 
   beforeEach(() => {
     process.env.PRIVACY_PEPPER = "ci-test-pepper";
+    resetStateStore();
     messengerWebhook.resetMessengerEventDedupe();
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
