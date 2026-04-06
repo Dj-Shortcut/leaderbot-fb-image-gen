@@ -205,7 +205,6 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
   });
 
   it("finalizes the session before async follow-up work", async () => {
-    const generationStarted = createDeferred<void>();
     const completionDeferred = createDeferred<{
       imageUrl: string;
       proof: {
@@ -219,7 +218,6 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
     const generateSpy = vi
       .spyOn(OpenAiImageGenerator.prototype, "generate")
       .mockImplementation(() => {
-        generationStarted.resolve();
         return completionDeferred.promise;
       });
 
@@ -234,9 +232,11 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
         "q3_build"
       );
 
-      await generationStarted.promise;
-
-      const extraInput = await harness.sendText("resolving-user", "extra input");
+      await vi.waitFor(async () => {
+        const pendingSnapshot = await harness.getSnapshot("resolving-user");
+        expect(pendingSnapshot.session?.status).toBe("completed");
+        expect(pendingSnapshot.activeExperience).toBeNull();
+      });
 
       completionDeferred.resolve({
         imageUrl: "https://example.com/identity-builder-resolving.jpg",
@@ -251,9 +251,16 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
 
       const completion = await completionPromise;
 
-      expect(extraInput.session?.status).toBe("completed");
-      expect(extraInput.activeExperience).toBeNull();
       expect(completion.outboundIntents).toEqual([
+        {
+          kind: "text",
+          text: [
+            "You are: Builder",
+            "Your dominant AI instinct is to turn momentum into something real.",
+            "Your answers kept leaning toward making, shipping, and moving fast.",
+            "Want another round? Open the game link again.",
+          ].join("\n\n"),
+        },
         {
           kind: "text",
           text: "You are: Builder",
@@ -264,7 +271,7 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
         },
       ]);
       expect(
-        [extraInput, completion]
+        [completion]
           .flatMap(step => step.outboundIntents)
           .filter(
             intent =>
