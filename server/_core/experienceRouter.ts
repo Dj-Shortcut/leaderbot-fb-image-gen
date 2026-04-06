@@ -107,7 +107,11 @@ async function findExistingSessionForGame(
     getIdentityGameSessionByActiveExperience(state.activeExperience)
   );
 
-  if (activeSession && activeSession.gameId === entryIntent.targetExperienceId) {
+  if (
+    activeSession &&
+    activeSession.gameId === entryIntent.targetExperienceId &&
+    isIdentityGameSessionActive(activeSession)
+  ) {
     return activeSession;
   }
 
@@ -115,7 +119,11 @@ async function findExistingSessionForGame(
     getIdentityGameSessionByUserId(state.userKey)
   );
 
-  if (existingSession && existingSession.gameId === entryIntent.targetExperienceId) {
+  if (
+    existingSession &&
+    existingSession.gameId === entryIntent.targetExperienceId &&
+    isIdentityGameSessionActive(existingSession)
+  ) {
     return existingSession;
   }
 
