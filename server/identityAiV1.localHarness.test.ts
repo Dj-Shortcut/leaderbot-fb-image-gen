@@ -21,6 +21,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import { OpenAiImageGenerator } from "./_core/imageService";
 import { resetMessengerEventDedupe } from "./_core/messengerWebhook";
+import { resetStateStore } from "./_core/messengerState";
 import { IdentityAiV1Harness } from "./testHelpers/identityAiV1Harness";
 
 function createDeferred<T>() {
@@ -39,6 +40,7 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
 
   beforeEach(() => {
     process.env.PRIVACY_PEPPER = "ci-test-pepper";
+    resetStateStore();
     resetMessengerEventDedupe();
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
@@ -202,8 +204,7 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
     ]);
   });
 
-  it("blocks duplicate resolution while the session is resolving", async () => {
-    const generationStarted = createDeferred<void>();
+  it("finalizes the session before async follow-up work", async () => {
     const completionDeferred = createDeferred<{
       imageUrl: string;
       proof: {
@@ -217,7 +218,6 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
     const generateSpy = vi
       .spyOn(OpenAiImageGenerator.prototype, "generate")
       .mockImplementation(() => {
-        generationStarted.resolve();
         return completionDeferred.promise;
       });
 
@@ -232,9 +232,11 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
         "q3_build"
       );
 
-      await generationStarted.promise;
-
-      const extraInput = await harness.sendText("resolving-user", "extra input");
+      await vi.waitFor(async () => {
+        const pendingSnapshot = await harness.getSnapshot("resolving-user");
+        expect(pendingSnapshot.session?.status).toBe("completed");
+        expect(pendingSnapshot.activeExperience).toBeNull();
+      });
 
       completionDeferred.resolve({
         imageUrl: "https://example.com/identity-builder-resolving.jpg",
@@ -249,13 +251,16 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
 
       const completion = await completionPromise;
 
-      expect(extraInput.session?.status).toBe("resolving");
-      expect(extraInput.outboundIntents).toContainEqual({
-        kind: "text",
-        text:
-          "Your identity game session was recognized, but the actual game flow is not enabled in this phase yet.",
-      });
       expect(completion.outboundIntents).toEqual([
+        {
+          kind: "text",
+          text: [
+            "You are: Builder",
+            "Your dominant AI instinct is to turn momentum into something real.",
+            "Your answers kept leaning toward making, shipping, and moving fast.",
+            "Want another round? Open the game link again.",
+          ].join("\n\n"),
+        },
         {
           kind: "text",
           text: "You are: Builder",
@@ -266,7 +271,7 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
         },
       ]);
       expect(
-        [extraInput, completion]
+        [completion]
           .flatMap(step => step.outboundIntents)
           .filter(
             intent =>

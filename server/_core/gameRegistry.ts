@@ -186,7 +186,6 @@ const identityAiV1Handler: IdentityGameHandler = {
     return {
       session: resolvingSession,
       response: answerResult.response,
-      clearActiveExperience: false,
       afterSend: async () => {
         const imageResponse = await generateIdentityAiV1ImageResponse({
           session: resolvingSession,
