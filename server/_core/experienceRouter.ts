@@ -233,23 +233,37 @@ export async function routeActiveExperience(
     lang,
   });
 
-  if (handlerResult.session) {
+  const shouldFinalizeBeforeAfterSend =
+    handlerResult.session?.status === "resolving" &&
+    typeof handlerResult.afterSend === "function";
+  const sessionToPersist =
+    shouldFinalizeBeforeAfterSend && handlerResult.session
+      ? ({
+          ...handlerResult.session,
+          status: "completed",
+          updatedAt: Date.now(),
+        } satisfies IdentityGameSession)
+      : handlerResult.session;
+  const shouldClearActiveExperience =
+    handlerResult.clearActiveExperience || shouldFinalizeBeforeAfterSend;
+
+  if (sessionToPersist) {
     const sessionChanged =
-      handlerResult.session.sessionId !== activeSession.sessionId ||
-      handlerResult.session.status !== activeSession.status ||
-      handlerResult.session.updatedAt !== activeSession.updatedAt;
+      sessionToPersist.sessionId !== activeSession.sessionId ||
+      sessionToPersist.status !== activeSession.status ||
+      sessionToPersist.updatedAt !== activeSession.updatedAt;
     if (sessionChanged) {
-      await Promise.resolve(upsertIdentityGameSession(handlerResult.session));
+      await Promise.resolve(upsertIdentityGameSession(sessionToPersist));
       if (
-        handlerResult.session.status !== "resolving" &&
-        !handlerResult.clearActiveExperience
+        sessionToPersist.status !== "resolving" &&
+        !shouldClearActiveExperience
       ) {
-        await input.setActiveExperience(toActiveExperience(handlerResult.session));
+        await input.setActiveExperience(toActiveExperience(sessionToPersist));
       }
     }
   }
 
-  if (handlerResult.clearActiveExperience) {
+  if (shouldClearActiveExperience) {
     await input.setActiveExperience(null);
   }
 
@@ -257,20 +271,7 @@ export async function routeActiveExperience(
     handled: true,
     response: handlerResult.response,
     afterSend: handlerResult.afterSend
-      ? async () => {
-          const followUp = await handlerResult.afterSend!();
-          if (handlerResult.session?.status === "resolving") {
-            const completedAt = Date.now();
-            const completedSession: IdentityGameSession = {
-              ...handlerResult.session,
-              status: "completed",
-              updatedAt: completedAt,
-            };
-            await Promise.resolve(upsertIdentityGameSession(completedSession));
-            await input.setActiveExperience(null);
-          }
-          return followUp;
-        }
+      ? async () => handlerResult.afterSend!()
       : undefined,
   };
 }

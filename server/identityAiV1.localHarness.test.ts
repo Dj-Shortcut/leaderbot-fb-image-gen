@@ -204,7 +204,7 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
     ]);
   });
 
-  it("blocks duplicate resolution while the session is resolving", async () => {
+  it("finalizes the session before async follow-up work", async () => {
     const generationStarted = createDeferred<void>();
     const completionDeferred = createDeferred<{
       imageUrl: string;
@@ -251,12 +251,8 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
 
       const completion = await completionPromise;
 
-      expect(extraInput.session?.status).toBe("resolving");
-      expect(extraInput.outboundIntents).toContainEqual({
-        kind: "text",
-        text:
-          "Your identity game session was recognized, but the actual game flow is not enabled in this phase yet.",
-      });
+      expect(extraInput.session?.status).toBe("completed");
+      expect(extraInput.activeExperience).toBeNull();
       expect(completion.outboundIntents).toEqual([
         {
           kind: "text",
