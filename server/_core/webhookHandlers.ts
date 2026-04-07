@@ -957,10 +957,11 @@ export function createWebhookHandlers({
         }
       }
       logUserState(psid, userId, state, reqId, "image_received");
+      const hadPreviousPhoto = Boolean(state.lastPhotoUrl);
       const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");
       await setPendingImage(psid, imageAttachment.payload.url);
 
-      if (preselectedStyle) {
+      if (preselectedStyle && !hadPreviousPhoto) {
         await setPreselectedStyle(psid, null);
         await setChosenStyle(psid, preselectedStyle);
         await runStyleGeneration(psid, userId, preselectedStyle, reqId, lang);

@@ -49,6 +49,8 @@ import {
   anonymizePsid,
   getState,
   resetStateStore,
+  setPendingImage,
+  setPreselectedStyle,
   setFlowState,
 } from "./_core/messengerState";
 import {
@@ -2329,6 +2331,53 @@ describe("disabled bot features stay out of the runtime flow", () => {
     expect(getState(anonymizePsid("style-preselect-user"))?.selectedStyle).toBe(
       "cyberpunk"
     );
+  });
+
+  it("does not auto-run a stale preselected style when a new photo replaces an older one", async () => {
+    await setPendingImage("stale-preselect-user", "https://img.example/old-source.jpg");
+    await setPreselectedStyle("stale-preselect-user", "cyberpunk");
+
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "stale-preselect-user" },
+              message: {
+                mid: "mid-stale-preselect-photo",
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/new-source.jpg" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendImageMock).not.toHaveBeenCalled();
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      "stale-preselect-user",
+      "Kies eerst een stijlgroep 👇",
+      expect.arrayContaining([
+        expect.objectContaining({ payload: "STYLE_CATEGORY_ILLUSTRATED" }),
+        expect.objectContaining({ payload: "STYLE_CATEGORY_ATMOSPHERE" }),
+        expect.objectContaining({ payload: "STYLE_CATEGORY_BOLD" }),
+      ])
+    );
+    expect(getState(anonymizePsid("stale-preselect-user"))?.lastPhotoUrl).toBe(
+      "https://img.example/new-source.jpg"
+    );
+    expect(
+      getState(anonymizePsid("stale-preselect-user"))?.preselectedStyle
+    ).toBe("cyberpunk");
   });
 
   it("handles /style Afroman and routes the next generation through afroman-americana", async () => {
