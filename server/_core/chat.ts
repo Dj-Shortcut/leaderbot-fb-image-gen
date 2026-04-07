@@ -30,7 +30,7 @@ function getChatConfig() {
   };
 }
 
-export function isChatConfigured(): boolean {
+function isChatConfigured(): boolean {
   const { apiUrl, apiKey } = getChatConfig();
   return apiUrl.length > 0 && apiKey.length > 0;
 }
@@ -324,4 +324,3 @@ export function registerChatRoutes(app: Express) {
   });
 }
 
-export { parseChatRequestBody, tools };
