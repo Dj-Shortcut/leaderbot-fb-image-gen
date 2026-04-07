@@ -138,18 +138,23 @@ describe("styleCommandsFeature", () => {
     const sendText = vi.fn(async () => undefined);
     const preselectStyle = vi.fn(async () => undefined);
     const chooseStyle = vi.fn(async () => undefined);
+    const setFlowState = vi.fn(async () => undefined);
     const context = makeContext({
       messageText: "style: cyberpunk",
       normalizedText: "style: cyberpunk",
       sendText,
       preselectStyle,
+      setFlowState,
       chooseStyle,
     });
 
     await styleCommandsFeature.onText?.(context);
 
     expect(preselectStyle).toHaveBeenCalledWith("cyberpunk");
-    expect(sendText).toHaveBeenCalledWith("✅ Style set to cyberpunk.");
+    expect(setFlowState).toHaveBeenCalledWith("AWAITING_PHOTO");
+    expect(sendText).toHaveBeenCalledWith(
+      "✅ Style set to cyberpunk.\n\nSend a photo first, then I can make that style for you."
+    );
     expect(chooseStyle).not.toHaveBeenCalled();
   });
 

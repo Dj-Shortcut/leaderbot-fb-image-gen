@@ -2280,9 +2280,12 @@ describe("disabled bot features stay out of the runtime flow", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(
       "style-preselect-user",
-      "✅ Stijl ingesteld op cyberpunk."
+      "✅ Stijl ingesteld op cyberpunk.\n\nStuur eerst een foto, dan maak ik die stijl voor je."
     );
     expect(sendImageMock).not.toHaveBeenCalled();
+    expect(getState(anonymizePsid("style-preselect-user"))?.stage).toBe(
+      "AWAITING_PHOTO"
+    );
 
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
