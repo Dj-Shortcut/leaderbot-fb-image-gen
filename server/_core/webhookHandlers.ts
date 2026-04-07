@@ -63,8 +63,6 @@ import {
 import { hasInFlightGeneration, runGuardedGeneration } from "./generationGuard";
 import { canGenerate, increment } from "./messengerQuota";
 import { isDebugLogEnabled } from "./logLevel";
-import { getChatRolloutDecision } from "./chatRollout";
-import { generateMessengerReply } from "./messengerResponsesService";
 import { getBotFeatures } from "./bot/features";
 import { ensureDefaultBotFeaturesRegistered } from "./bot/defaultFeatures";
 import { handleSharedTextMessage } from "./sharedTextHandler";
