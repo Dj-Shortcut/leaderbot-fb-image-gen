@@ -498,6 +498,30 @@ export function createWebhookHandlers({
     };
   }
 
+  function logImageFlowDecision(input: {
+    psid: string;
+    userId: string;
+    reqId: string;
+    stage: string;
+    hadPreviousPhoto: boolean;
+    incomingImageUrl: string;
+    selectedStyle: string | null;
+    preselectedStyle: string | null;
+    action: "show_style_picker" | "auto_run_preselected_style";
+  }): void {
+    safeLog("messenger_image_flow_decision", {
+      reqId: input.reqId,
+      user: toLogUser(input.userId),
+      psidHash: anonymizePsid(input.psid).slice(0, 12),
+      stage: input.stage,
+      hadPreviousPhoto: input.hadPreviousPhoto,
+      incomingImageHost: getAttachmentHostname(input.incomingImageUrl),
+      selectedStyle: input.selectedStyle,
+      preselectedStyle: input.preselectedStyle,
+      action: input.action,
+    });
+  }
+
   async function sendStylePicker(
     psid: string,
     lang: Lang,
@@ -962,12 +986,34 @@ export function createWebhookHandlers({
       await setPendingImage(psid, imageAttachment.payload.url);
 
       if (preselectedStyle && !hadPreviousPhoto) {
+        logImageFlowDecision({
+          psid,
+          userId,
+          reqId,
+          stage: state.stage,
+          hadPreviousPhoto,
+          incomingImageUrl: imageAttachment.payload.url,
+          selectedStyle: state.selectedStyle,
+          preselectedStyle,
+          action: "auto_run_preselected_style",
+        });
         await setPreselectedStyle(psid, null);
         await setChosenStyle(psid, preselectedStyle);
         await runStyleGeneration(psid, userId, preselectedStyle, reqId, lang);
         return;
       }
 
+      logImageFlowDecision({
+        psid,
+        userId,
+        reqId,
+        stage: state.stage,
+        hadPreviousPhoto,
+        incomingImageUrl: imageAttachment.payload.url,
+        selectedStyle: state.selectedStyle,
+        preselectedStyle,
+        action: "show_style_picker",
+      });
       await setFlowState(psid, "AWAITING_STYLE");
       await sendPhotoReceivedPrompt(psid, lang, reqId);
       return;
