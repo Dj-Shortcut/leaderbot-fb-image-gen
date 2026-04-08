@@ -63,6 +63,7 @@ describe("chat request validation", () => {
   afterEach(() => {
     delete process.env.BUILT_IN_FORGE_API_URL;
     delete process.env.BUILT_IN_FORGE_API_KEY;
+    vi.doUnmock("ai");
     vi.restoreAllMocks();
   });
 
