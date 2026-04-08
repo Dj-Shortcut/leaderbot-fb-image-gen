@@ -120,15 +120,7 @@ export class IdentityAiV1Harness {
         this.deps.sendQuickRepliesMock.mock.calls.length > beforeCursors.quickReply ||
         this.deps.sendImageMock.mock.calls.length > beforeCursors.image;
 
-      const sessionChanged =
-        snapshot.session?.sessionId !== before.session?.sessionId ||
-        snapshot.session?.status !== before.session?.status ||
-        snapshot.session?.currentQuestionId !== before.session?.currentQuestionId ||
-        snapshot.session?.answers.length !== before.session?.answers.length ||
-        snapshot.activeExperience?.sessionId !== before.activeExperience?.sessionId ||
-        snapshot.activeExperience?.status !== before.activeExperience?.status;
-
-      if (outboundAdvanced || sessionChanged) {
+      if (outboundAdvanced) {
         return;
       }
 
