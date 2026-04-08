@@ -89,18 +89,6 @@ export class IdentityAiV1Harness {
     }
   ) {}
 
-  reset(): void {
-    resetMessengerEventDedupe();
-    this.deps.sendTextMock.mockClear?.();
-    this.deps.sendQuickRepliesMock.mockClear?.();
-    this.deps.sendImageMock.mockClear?.();
-    this.sequence = 0;
-    this.step = 0;
-    this.textCursor = 0;
-    this.quickReplyCursor = 0;
-    this.imageCursor = 0;
-  }
-
   private async waitForObservedMutation(
     userId: string,
     before: HarnessSnapshot,
