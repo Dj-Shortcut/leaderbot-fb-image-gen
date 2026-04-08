@@ -37,10 +37,12 @@ async function startServer(options?: { forceIp?: string; pathPrefix?: string }) 
     });
   }
 
-  app.get(limitedPath, rateLimiter, (_req, res) => {
+  app.use(rateLimiter);
+
+  app.get(limitedPath, (_req, res) => {
     res.status(200).json({ ok: true });
   });
-  app.get(healthPath, rateLimiter, (_req, res) => {
+  app.get(healthPath, (_req, res) => {
     res.status(200).send("ok");
   });
 
