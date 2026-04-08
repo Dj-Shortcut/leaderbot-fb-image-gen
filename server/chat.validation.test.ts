@@ -15,54 +15,67 @@ async function postJson(
     throw new Error("Failed to bind test server");
   }
 
-  const response = await new Promise<{ status: number; payload: string }>(
-    (resolve, reject) => {
-      const request = http.request(
-        {
-          hostname: "127.0.0.1",
-          port: address.port,
-          path: "/api/chat",
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
+  try {
+    return await new Promise<{ status: number; payload: string }>(
+      (resolve, reject) => {
+        const request = http.request(
+          {
+            hostname: "127.0.0.1",
+            port: address.port,
+            path: "/api/chat",
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+            },
           },
-        },
-        res => {
-          let payload = "";
-          res.on("data", chunk => {
-            payload += chunk;
-          });
-          res.on("end", () => {
-            resolve({
-              status: res.statusCode ?? 0,
-              payload,
+          res => {
+            let payload = "";
+            res.on("data", chunk => {
+              payload += chunk;
             });
-          });
-        }
-      );
+            res.on("end", () => {
+              resolve({
+                status: res.statusCode ?? 0,
+                payload,
+              });
+            });
+          }
+        );
 
-      request.on("error", reject);
-      request.end(JSON.stringify(body));
-    }
-  );
-
-  await new Promise<void>((resolve, reject) => {
-    server.close(error => {
-      if (error) {
-        reject(error);
-        return;
+        request.on("error", reject);
+        request.end(JSON.stringify(body));
       }
-      resolve();
+    );
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close(error => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
     });
-  });
-
-  return response;
+  }
 }
 
 describe("chat request validation", () => {
+  const originalForgeApiUrl = process.env.BUILT_IN_FORGE_API_URL;
+  const originalForgeApiKey = process.env.BUILT_IN_FORGE_API_KEY;
+
   afterEach(() => {
-    delete process.env.BUILT_IN_FORGE_API_URL;
-    delete process.env.BUILT_IN_FORGE_API_KEY;
+    if (originalForgeApiUrl === undefined) {
+      delete process.env.BUILT_IN_FORGE_API_URL;
+    } else {
+      process.env.BUILT_IN_FORGE_API_URL = originalForgeApiUrl;
+    }
+
+    if (originalForgeApiKey === undefined) {
+      delete process.env.BUILT_IN_FORGE_API_KEY;
+    } else {
+      process.env.BUILT_IN_FORGE_API_KEY = originalForgeApiKey;
+    }
+
     vi.doUnmock("ai");
     vi.restoreAllMocks();
   });

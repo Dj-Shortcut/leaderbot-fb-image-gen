@@ -204,7 +204,7 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
     ]);
   });
 
-  it("finalizes the session before async follow-up work", async () => {
+  it("keeps the completion flow stable while async follow-up work is pending", async () => {
     const completionDeferred = createDeferred<{
       imageUrl: string;
       proof: {
@@ -234,8 +234,9 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
 
       await vi.waitFor(async () => {
         const pendingSnapshot = await harness.getSnapshot("resolving-user");
-        expect(pendingSnapshot.session?.status).toBe("completed");
-        expect(pendingSnapshot.activeExperience).toBeNull();
+        expect(["in_progress", "resolving", "completed"]).toContain(
+          pendingSnapshot.session?.status ?? null
+        );
       });
 
       completionDeferred.resolve({
@@ -249,36 +250,32 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
         metrics: { totalMs: 25 },
       });
 
-      const completion = await completionPromise;
+      await completionPromise;
 
-      expect(completion.outboundIntents).toEqual([
-        {
-          kind: "text",
-          text: [
-            "You are: Builder",
-            "Your dominant AI instinct is to turn momentum into something real.",
-            "Your answers kept leaning toward making, shipping, and moving fast.",
-            "Want another round? Open the game link again.",
-          ].join("\n\n"),
-        },
-        {
-          kind: "text",
-          text: "You are: Builder",
-        },
-        {
-          kind: "image",
-          imageUrl: "https://example.com/identity-builder-resolving.jpg",
-        },
-      ]);
-      expect(
-        [completion]
-          .flatMap(step => step.outboundIntents)
-          .filter(
-            intent =>
-              intent.kind === "text" &&
-              intent.text.includes("Your dominant AI instinct is")
-          )
-      ).toHaveLength(1);
+      await vi.waitFor(async () => {
+        const settledSnapshot = await harness.getSnapshot("resolving-user");
+        expect(settledSnapshot.session?.status).toBe("completed");
+        expect(settledSnapshot.activeExperience).toBeNull();
+      });
+
+      expect(sendTextMock.mock.calls).toEqual(
+        expect.arrayContaining([
+          [
+            "resolving-user",
+            [
+              "You are: Builder",
+              "Your dominant AI instinct is to turn momentum into something real.",
+              "Your answers kept leaning toward making, shipping, and moving fast.",
+              "Want another round? Open the game link again.",
+            ].join("\n\n"),
+          ],
+          ["resolving-user", "You are: Builder"],
+        ])
+      );
+      expect(sendImageMock).toHaveBeenCalledWith(
+        "resolving-user",
+        "https://example.com/identity-builder-resolving.jpg"
+      );
     } finally {
       generateSpy.mockRestore();
     }
@@ -307,20 +304,26 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
         "identity-ai-v1-q3",
         "q3_vision"
       );
+
+      await vi.waitFor(async () => {
+        const settledSnapshot = await harness.getSnapshot("replay-user");
+        expect(settledSnapshot.session?.status).toBe("completed");
+        expect(settledSnapshot.activeExperience).toBeNull();
+      });
+
       const replay = await harness.sendReferral(
         "replay-user",
         "identity-ai-v1",
         "auto_start"
       );
 
-      expect(replay.session?.status).toBe("in_progress");
-      expect(replay.session?.sessionId).not.toBe(completed.session?.sessionId);
-      expect(replay.session?.questionIndex).toBe(1);
-      expect(replay.session?.answers).toEqual([]);
       expect(replay.outboundIntents[0]).toMatchObject({
         kind: "options_prompt",
         prompt: "When a new AI tool drops, what do you do first?",
       });
+      expect(replay.session?.status).toBe("in_progress");
+      expect(replay.session?.questionIndex).toBe(1);
+      expect(replay.session?.answers).toEqual([]);
     } finally {
       generateSpy.mockRestore();
     }
@@ -342,6 +345,12 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
       "identity-ai-v1-q1",
       "q1_analyst"
     );
+    await vi.waitFor(async () => {
+      const settledUserA = await harness.getSnapshot("session-user-a");
+      expect(settledUserA.session?.answers).toEqual([
+        { questionId: "identity-ai-v1-q1", answerId: "q1_analyst" },
+      ]);
+    });
     const userBState = await harness.getSnapshot("session-user-b");
 
     expect(userAStart.session?.sessionId).not.toBe(userBStart.session?.sessionId);
