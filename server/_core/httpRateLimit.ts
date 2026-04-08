@@ -183,7 +183,7 @@ async function applyRateLimit(
   }
 }
 
-export function resetGlobalHttpRateLimiter(): void {
+function resetGlobalHttpRateLimiter(): void {
   buckets.clear();
 }
 
