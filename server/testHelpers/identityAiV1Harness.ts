@@ -101,6 +101,41 @@ export class IdentityAiV1Harness {
     this.imageCursor = 0;
   }
 
+  private async waitForObservedMutation(
+    userId: string,
+    before: HarnessSnapshot,
+    beforeCursors = {
+      text: this.textCursor,
+      quickReply: this.quickReplyCursor,
+      image: this.imageCursor,
+    }
+  ): Promise<void> {
+    const deadline = Date.now() + 500;
+
+    while (Date.now() < deadline) {
+      const snapshot = await this.capture(userId, "stabilize", false, false);
+
+      const outboundAdvanced =
+        this.deps.sendTextMock.mock.calls.length > beforeCursors.text ||
+        this.deps.sendQuickRepliesMock.mock.calls.length > beforeCursors.quickReply ||
+        this.deps.sendImageMock.mock.calls.length > beforeCursors.image;
+
+      const sessionChanged =
+        snapshot.session?.sessionId !== before.session?.sessionId ||
+        snapshot.session?.status !== before.session?.status ||
+        snapshot.session?.currentQuestionId !== before.session?.currentQuestionId ||
+        snapshot.session?.answers.length !== before.session?.answers.length ||
+        snapshot.activeExperience?.sessionId !== before.activeExperience?.sessionId ||
+        snapshot.activeExperience?.status !== before.activeExperience?.status;
+
+      if (outboundAdvanced || sessionChanged) {
+        return;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+  }
+
   /**
    * If `ref` already starts with `game:` or `identity_game:`, it is passed through
    * as-is and `entryMode` is not injected.
@@ -110,6 +145,17 @@ export class IdentityAiV1Harness {
     ref: string,
     entryMode = "auto_start"
   ): Promise<HarnessSnapshot> {
+    const before = await this.capture(
+      userId,
+      `before sendReferral(${userId}, ${ref}, ${entryMode})`,
+      false,
+      false
+    );
+    const beforeCursors = {
+      text: this.textCursor,
+      quickReply: this.quickReplyCursor,
+      image: this.imageCursor,
+    };
     const timestamp = this.nextTimestamp();
     await processFacebookWebhookPayload({
       entry: [
@@ -134,6 +180,7 @@ export class IdentityAiV1Harness {
       ],
     });
 
+    await this.waitForObservedMutation(userId, before, beforeCursors);
     return this.capture(userId, `sendReferral(${userId}, ${ref}, ${entryMode})`);
   }
 
@@ -142,6 +189,17 @@ export class IdentityAiV1Harness {
     questionId: string,
     answerId: string
   ): Promise<HarnessSnapshot> {
+    const before = await this.capture(
+      userId,
+      `before sendChoice(${userId}, ${questionId}, ${answerId})`,
+      false,
+      false
+    );
+    const beforeCursors = {
+      text: this.textCursor,
+      quickReply: this.quickReplyCursor,
+      image: this.imageCursor,
+    };
     const timestamp = this.nextTimestamp();
     await processFacebookWebhookPayload({
       entry: [
@@ -167,10 +225,22 @@ export class IdentityAiV1Harness {
       ],
     });
 
+    await this.waitForObservedMutation(userId, before, beforeCursors);
     return this.capture(userId, `sendChoice(${userId}, ${questionId}, ${answerId})`);
   }
 
   async sendText(userId: string, text: string): Promise<HarnessSnapshot> {
+    const before = await this.capture(
+      userId,
+      `before sendText(${userId}, ${text})`,
+      false,
+      false
+    );
+    const beforeCursors = {
+      text: this.textCursor,
+      quickReply: this.quickReplyCursor,
+      image: this.imageCursor,
+    };
     const timestamp = this.nextTimestamp();
     await processFacebookWebhookPayload({
       entry: [
@@ -193,6 +263,7 @@ export class IdentityAiV1Harness {
       ],
     });
 
+    await this.waitForObservedMutation(userId, before, beforeCursors);
     return this.capture(userId, `sendText(${userId}, ${text})`);
   }
 
