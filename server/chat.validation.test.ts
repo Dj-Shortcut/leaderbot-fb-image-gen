@@ -60,9 +60,22 @@ async function postJson(
 }
 
 describe("chat request validation", () => {
+  const originalForgeApiUrl = process.env.BUILT_IN_FORGE_API_URL;
+  const originalForgeApiKey = process.env.BUILT_IN_FORGE_API_KEY;
+
   afterEach(() => {
-    delete process.env.BUILT_IN_FORGE_API_URL;
-    delete process.env.BUILT_IN_FORGE_API_KEY;
+    if (originalForgeApiUrl === undefined) {
+      delete process.env.BUILT_IN_FORGE_API_URL;
+    } else {
+      process.env.BUILT_IN_FORGE_API_URL = originalForgeApiUrl;
+    }
+
+    if (originalForgeApiKey === undefined) {
+      delete process.env.BUILT_IN_FORGE_API_KEY;
+    } else {
+      process.env.BUILT_IN_FORGE_API_KEY = originalForgeApiKey;
+    }
+
     vi.doUnmock("ai");
     vi.restoreAllMocks();
   });

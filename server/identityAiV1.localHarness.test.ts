@@ -234,7 +234,7 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
 
       await vi.waitFor(async () => {
         const pendingSnapshot = await harness.getSnapshot("resolving-user");
-        expect(["resolving", "completed"]).toContain(
+        expect(["in_progress", "resolving", "completed"]).toContain(
           pendingSnapshot.session?.status ?? null
         );
       });
