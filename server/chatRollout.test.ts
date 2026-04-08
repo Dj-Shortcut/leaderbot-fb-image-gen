@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  getChatRolloutDecision,
-  getMessengerChatCanaryPercent,
-  getMessengerChatEngine,
-} from "./_core/chatRollout";
+import { getChatRolloutDecision } from "./_core/chatRollout";
 
 const originalEngine = process.env.MESSENGER_CHAT_ENGINE;
 const originalCanary = process.env.MESSENGER_CHAT_CANARY_PERCENT;
@@ -27,9 +23,10 @@ describe("chat rollout", () => {
     delete process.env.MESSENGER_CHAT_ENGINE;
     delete process.env.MESSENGER_CHAT_CANARY_PERCENT;
 
-    expect(getMessengerChatEngine()).toBe("legacy");
-    expect(getMessengerChatCanaryPercent()).toBe(0);
-    expect(getChatRolloutDecision("user-key-1").useResponses).toBe(false);
+    const decision = getChatRolloutDecision("user-key-1");
+    expect(decision.engine).toBe("legacy");
+    expect(decision.canaryPercent).toBe(0);
+    expect(decision.useResponses).toBe(false);
   });
 
   it("enables all users when responses engine is set with 100% canary", () => {

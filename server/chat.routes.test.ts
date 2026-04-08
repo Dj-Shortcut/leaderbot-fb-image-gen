@@ -92,9 +92,16 @@ describe.sequential("chat route configuration", { timeout: 15000 }, () => {
     process.env.BUILT_IN_FORGE_API_KEY = "";
 
     vi.resetModules();
-    const { isChatConfigured } = await import("./_core/chat");
+    const { registerChatRoutes } = await import("./_core/chat");
+    const app = express();
+    app.use(express.json());
+    registerChatRoutes(app);
+    const response = await postJson(app, "/api/chat", {
+      messages: [{ role: "user", content: "hello" }],
+    });
 
-    expect(isChatConfigured()).toBe(false);
+    expect(response.status).toBe(503);
+    expect(response.payload).toContain("Chat API is disabled");
   });
 
   it("reports configured when forge URL/key are non-empty after trim", async () => {
@@ -102,9 +109,14 @@ describe.sequential("chat route configuration", { timeout: 15000 }, () => {
     process.env.BUILT_IN_FORGE_API_KEY = " secret-token ";
 
     vi.resetModules();
-    const { isChatConfigured } = await import("./_core/chat");
+    const { registerChatRoutes } = await import("./_core/chat");
+    const app = express();
+    app.use(express.json());
+    registerChatRoutes(app);
+    const response = await postJson(app, "/api/chat", {});
 
-    expect(isChatConfigured()).toBe(true);
+    expect(response.status).toBe(400);
+    expect(response.payload).toContain("messages array is required");
   });
 
 
@@ -115,9 +127,13 @@ describe.sequential("chat route configuration", { timeout: 15000 }, () => {
     process.env.BUILT_IN_FORGE_API_KEY = "secret-token";
 
     vi.resetModules();
-    const { isChatConfigured } = await import("./_core/chat");
+    const { registerChatRoutes } = await import("./_core/chat");
+    const app = express();
+    app.use(express.json());
 
-    expect(() => isChatConfigured()).toThrow("BUILT_IN_FORGE_API_URL must use HTTPS in production");
+    expect(() => registerChatRoutes(app)).toThrow(
+      "BUILT_IN_FORGE_API_URL must use HTTPS in production"
+    );
   });
 
   it("registers active /api/chat when config is present", async () => {
