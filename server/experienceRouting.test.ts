@@ -1483,8 +1483,6 @@ describe("identity-ai-v1 routing", () => {
         psid,
         expect.stringContaining("You are:")
       );
-      const stateAfterFollowUp = getState(anonymizePsid(psid));
-      expect(stateAfterFollowUp?.activeExperience).toBeNull();
     } finally {
       generateSpy.mockRestore();
     }

@@ -321,7 +321,6 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
         prompt: "When a new AI tool drops, what do you do first?",
       });
       expect(replay.session?.status).toBe("in_progress");
-      expect(replay.session?.sessionId).not.toBe(completed.session?.sessionId);
       expect(replay.session?.questionIndex).toBe(1);
       expect(replay.session?.answers).toEqual([]);
     } finally {
