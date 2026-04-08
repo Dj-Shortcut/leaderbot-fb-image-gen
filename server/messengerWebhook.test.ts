@@ -49,6 +49,8 @@ import {
   anonymizePsid,
   getState,
   resetStateStore,
+  setPendingImage,
+  setPreselectedStyle,
   setFlowState,
 } from "./_core/messengerState";
 import {
@@ -218,12 +220,10 @@ describe("messenger webhook dedupe", () => {
   });
 
   it("registers built-in bot features", () => {
-    expect(getBotFeatures().map(feature => feature.name)).toContain(
-      "rateLimit"
-    );
-    expect(getBotFeatures().map(feature => feature.name)).toContain(
-      "styleCommands"
-    );
+    expect(getBotFeatures().map(feature => feature.name)).toEqual([
+      "rateLimit",
+      "styleCommands",
+    ]);
   });
 
   it("processes a message.mid only once", async () => {
@@ -2077,7 +2077,7 @@ describe("bot rate limit feature", () => {
   });
 });
 
-describe("bot conversational editing feature", () => {
+describe("disabled bot features stay out of the runtime flow", () => {
   beforeEach(() => {
     process.env.GENERATOR_MODE = "openai";
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
@@ -2091,36 +2091,8 @@ describe("bot conversational editing feature", () => {
     resetMessengerEventDedupe();
   });
 
-  it("uses conversational edit text to regenerate the latest image", async () => {
-    const sourceImage = Buffer.alloc(6000, 7);
-    const combinedFetch = vi.fn(async (url: string | URL) => {
-      const resolved = toUrlString(url);
-
-      if (resolved.startsWith("https://img.example/")) {
-        return {
-          ok: true,
-          headers: new Headers({ "content-type": "image/jpeg" }),
-          arrayBuffer: async () => sourceImage,
-        } as Response;
-      }
-
-      if (resolved.includes("/v1/responses")) {
-        return new Response(
-          JSON.stringify({
-            output_text:
-              '{"shouldEdit":true,"style":"gold","promptHint":"make it darker with warm glow"}',
-          }),
-          { status: 200 }
-        );
-      }
-
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
-    });
-
-    vi.stubGlobal("fetch", combinedFetch);
+  it("does not treat free text as a conversational edit after a generation", async () => {
+    installOpenAiSuccessFetchMock();
 
     await processFacebookWebhookPayload({
       entry: [
@@ -2172,80 +2144,62 @@ describe("bot conversational editing feature", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(
       "edit-text-user",
-      "Ik maak nu je Gold-stijl."
+      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis."
     );
-    expect(sendImageMock).toHaveBeenCalledWith(
-      "edit-text-user",
-      expect.stringMatching(
-        /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
-      )
-    );
-    expect(
-      combinedFetch.mock.calls.some(([url]) =>
-        toUrlString(url as string | URL).includes("/v1/responses")
-      )
-    ).toBe(true);
+    expect(sendImageMock).not.toHaveBeenCalled();
+    expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
 
-  it("uses user-facing style labels for the surprise command", async () => {
+  it("does not auto-run the disabled surprise command", async () => {
     installOpenAiSuccessFetchMock();
-    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
 
-    try {
-      await processFacebookWebhookPayload({
-        entry: [
-          {
-            messaging: [
-              {
-                sender: { id: "surprise-style-user" },
-                message: {
-                  mid: "mid-surprise-photo",
-                  attachments: [
-                    {
-                      type: "image",
-                      payload: { url: "https://img.example/source.jpg" },
-                    },
-                  ],
-                },
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "surprise-style-user" },
+              message: {
+                mid: "mid-surprise-photo",
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/source.jpg" },
+                  },
+                ],
               },
-            ],
-          },
-        ],
-      });
+            },
+          ],
+        },
+      ],
+    });
 
-      sendImageMock.mockClear();
-      sendQuickRepliesMock.mockClear();
-      sendTextMock.mockClear();
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
 
-      await processFacebookWebhookPayload({
-        entry: [
-          {
-            messaging: [
-              {
-                sender: { id: "surprise-style-user" },
-                message: {
-                  mid: "mid-surprise-command",
-                  text: "surprise me",
-                },
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "surprise-style-user" },
+              message: {
+                mid: "mid-surprise-command",
+                text: "surprise me",
               },
-            ],
-          },
-        ],
-      });
+            },
+          ],
+        },
+      ],
+    });
 
-      expect(sendTextMock).toHaveBeenCalledWith(
-        "surprise-style-user",
-        "🎲 Mooie keuze — ik ga voor Caricature."
-      );
-      expect(sendImageMock).toHaveBeenCalledWith(
-        "surprise-style-user",
-        expect.stringMatching(
-          /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
-        )
-      );
-    } finally {
-      randomSpy.mockRestore();
-    }
+    expect(sendTextMock).toHaveBeenCalledWith(
+      "surprise-style-user",
+      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis."
+    );
+    expect(sendImageMock).not.toHaveBeenCalled();
+    expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
 
   it("handles /style cyberpunk as a first-class style selection", async () => {
@@ -2328,9 +2282,12 @@ describe("bot conversational editing feature", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(
       "style-preselect-user",
-      "✅ Stijl ingesteld op cyberpunk."
+      "✅ Stijl ingesteld op cyberpunk.\n\nStuur eerst een foto, dan maak ik die stijl voor je."
     );
     expect(sendImageMock).not.toHaveBeenCalled();
+    expect(getState(anonymizePsid("style-preselect-user"))?.stage).toBe(
+      "AWAITING_PHOTO"
+    );
 
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
@@ -2374,6 +2331,53 @@ describe("bot conversational editing feature", () => {
     expect(getState(anonymizePsid("style-preselect-user"))?.selectedStyle).toBe(
       "cyberpunk"
     );
+  });
+
+  it("does not auto-run a stale preselected style when a new photo replaces an older one", async () => {
+    await setPendingImage("stale-preselect-user", "https://img.example/old-source.jpg");
+    await setPreselectedStyle("stale-preselect-user", "cyberpunk");
+
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "stale-preselect-user" },
+              message: {
+                mid: "mid-stale-preselect-photo",
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/new-source.jpg" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendImageMock).not.toHaveBeenCalled();
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      "stale-preselect-user",
+      "Kies eerst een stijlgroep 👇",
+      expect.arrayContaining([
+        expect.objectContaining({ payload: "STYLE_CATEGORY_ILLUSTRATED" }),
+        expect.objectContaining({ payload: "STYLE_CATEGORY_ATMOSPHERE" }),
+        expect.objectContaining({ payload: "STYLE_CATEGORY_BOLD" }),
+      ])
+    );
+    expect(getState(anonymizePsid("stale-preselect-user"))?.lastPhotoUrl).toBe(
+      "https://img.example/new-source.jpg"
+    );
+    expect(
+      getState(anonymizePsid("stale-preselect-user"))?.preselectedStyle
+    ).toBe("cyberpunk");
   });
 
   it("handles /style Afroman and routes the next generation through afroman-americana", async () => {

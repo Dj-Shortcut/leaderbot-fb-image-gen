@@ -2,17 +2,12 @@ import http from "node:http";
 import express from "express";
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  createGlobalHttpRateLimiter,
-  resetGlobalHttpRateLimiter,
-} from "./_core/httpRateLimit";
+import { createGlobalHttpRateLimiter } from "./_core/httpRateLimit";
 
 const originalWindowMs = process.env.HTTP_RATE_LIMIT_WINDOW_MS;
 const originalMaxRequests = process.env.HTTP_RATE_LIMIT_MAX_REQUESTS;
 
 afterEach(() => {
-  resetGlobalHttpRateLimiter();
-
   if (originalWindowMs === undefined) {
     delete process.env.HTTP_RATE_LIMIT_WINDOW_MS;
   } else {
@@ -26,8 +21,10 @@ afterEach(() => {
   }
 });
 
-async function startServer(options?: { forceIp?: string }) {
+async function startServer(options?: { forceIp?: string; pathPrefix?: string }) {
   const app = express();
+  const limitedPath = `${options?.pathPrefix ?? ""}/limited`;
+  const healthPath = "/healthz";
 
   if (options?.forceIp) {
     app.use((req, _res, next) => {
@@ -40,10 +37,10 @@ async function startServer(options?: { forceIp?: string }) {
   }
 
   app.use(createGlobalHttpRateLimiter());
-  app.get("/limited", (_req, res) => {
+  app.get(limitedPath, (_req, res) => {
     res.status(200).json({ ok: true });
   });
-  app.get("/healthz", (_req, res) => {
+  app.get(healthPath, (_req, res) => {
     res.status(200).send("ok");
   });
 
@@ -58,6 +55,8 @@ async function startServer(options?: { forceIp?: string }) {
 
   return {
     baseUrl: `http://127.0.0.1:${address.port}`,
+    limitedPath,
+    healthPath,
     close: () =>
       new Promise<void>((resolve, reject) => {
         server.close(error => {
@@ -77,12 +76,15 @@ describe("global http rate limiter", () => {
     process.env.HTTP_RATE_LIMIT_WINDOW_MS = "60000";
     process.env.HTTP_RATE_LIMIT_MAX_REQUESTS = "2";
 
-    const server = await startServer();
+    const server = await startServer({
+      forceIp: "203.0.113.11",
+      pathPrefix: "/budget-a",
+    });
 
     try {
-      const first = await fetch(`${server.baseUrl}/limited`);
-      const second = await fetch(`${server.baseUrl}/limited`);
-      const third = await fetch(`${server.baseUrl}/limited`);
+      const first = await fetch(`${server.baseUrl}${server.limitedPath}`);
+      const second = await fetch(`${server.baseUrl}${server.limitedPath}`);
+      const third = await fetch(`${server.baseUrl}${server.limitedPath}`);
 
       expect(first.status).toBe(200);
       expect(second.status).toBe(200);
@@ -101,12 +103,12 @@ describe("global http rate limiter", () => {
     process.env.HTTP_RATE_LIMIT_WINDOW_MS = "60000";
     process.env.HTTP_RATE_LIMIT_MAX_REQUESTS = "1";
 
-    const server = await startServer();
+    const server = await startServer({ forceIp: "203.0.113.12" });
 
     try {
-      const first = await fetch(`${server.baseUrl}/healthz`);
-      const second = await fetch(`${server.baseUrl}/healthz`);
-      const third = await fetch(`${server.baseUrl}/healthz`);
+      const first = await fetch(`${server.baseUrl}${server.healthPath}`);
+      const second = await fetch(`${server.baseUrl}${server.healthPath}`);
+      const third = await fetch(`${server.baseUrl}${server.healthPath}`);
 
       expect(first.status).toBe(200);
       expect(second.status).toBe(200);
@@ -120,15 +122,18 @@ describe("global http rate limiter", () => {
     process.env.HTTP_RATE_LIMIT_WINDOW_MS = "60000";
     process.env.HTTP_RATE_LIMIT_MAX_REQUESTS = "1";
 
-    const server = await startServer({ forceIp: "203.0.113.10" });
+    const server = await startServer({
+      forceIp: "203.0.113.10",
+      pathPrefix: "/limited-c",
+    });
 
     try {
-      const first = await fetch(`${server.baseUrl}/limited`, {
+      const first = await fetch(`${server.baseUrl}${server.limitedPath}`, {
         headers: {
           "X-Forwarded-For": "198.51.100.1",
         },
       });
-      const second = await fetch(`${server.baseUrl}/limited`, {
+      const second = await fetch(`${server.baseUrl}${server.limitedPath}`, {
         headers: {
           "X-Forwarded-For": "198.51.100.2",
         },
