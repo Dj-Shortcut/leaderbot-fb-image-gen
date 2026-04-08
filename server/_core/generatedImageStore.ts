@@ -91,7 +91,3 @@ export function getGeneratedImage(token: string): { buffer: Buffer; contentType:
 export function buildGeneratedImageUrl(baseUrl: string, token: string): string {
   return `${baseUrl}/generated/${encodeURIComponent(token)}.jpg`;
 }
-
-function clearGeneratedImageStore(): void {
-  generatedImages.clear();
-}
