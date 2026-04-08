@@ -15,7 +15,7 @@ type MockWithCalls = {
   mockClear?: () => void;
 };
 
-export type LoggedOutboundIntent =
+type LoggedOutboundIntent =
   | {
       kind: "text";
       text: string;
@@ -30,7 +30,7 @@ export type LoggedOutboundIntent =
       imageUrl: string;
     };
 
-export type HarnessSnapshot = {
+type HarnessSnapshot = {
   step: number;
   action: string;
   entryIntent: EntryIntent | null;
