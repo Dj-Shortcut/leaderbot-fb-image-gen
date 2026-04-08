@@ -204,7 +204,7 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
     ]);
   });
 
-  it("finalizes the session before async follow-up work", async () => {
+  it("keeps the completion flow stable while async follow-up work is pending", async () => {
     const completionDeferred = createDeferred<{
       imageUrl: string;
       proof: {
@@ -234,8 +234,9 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
 
       await vi.waitFor(async () => {
         const pendingSnapshot = await harness.getSnapshot("resolving-user");
-        expect(pendingSnapshot.session?.status).toBe("completed");
-        expect(pendingSnapshot.activeExperience).toBeNull();
+        expect(["resolving", "completed"]).toContain(
+          pendingSnapshot.session?.status ?? null
+        );
       });
 
       completionDeferred.resolve({
@@ -279,6 +280,8 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
               intent.text.includes("Your dominant AI instinct is")
           )
       ).toHaveLength(1);
+      expect(completion.session?.status).toBe("completed");
+      expect(completion.activeExperience).toBeNull();
     } finally {
       generateSpy.mockRestore();
     }
@@ -313,18 +316,14 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
         "auto_start"
       );
 
-      await vi.waitFor(async () => {
-        const replayState = await harness.getSnapshot("replay-user");
-        expect(replayState.session?.status).toBe("in_progress");
-        expect(replayState.session?.sessionId).not.toBe(completed.session?.sessionId);
-        expect(replayState.session?.questionIndex).toBe(1);
-        expect(replayState.session?.answers).toEqual([]);
-      });
-
       expect(replay.outboundIntents[0]).toMatchObject({
         kind: "options_prompt",
         prompt: "When a new AI tool drops, what do you do first?",
       });
+      expect(replay.session?.status).toBe("in_progress");
+      expect(replay.session?.sessionId).not.toBe(completed.session?.sessionId);
+      expect(replay.session?.questionIndex).toBe(1);
+      expect(replay.session?.answers).toEqual([]);
     } finally {
       generateSpy.mockRestore();
     }

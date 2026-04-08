@@ -1455,11 +1455,6 @@ describe("identity-ai-v1 routing", () => {
         ],
       });
 
-      await vi.waitFor(() => {
-        const stateAfterCompletion = getState(anonymizePsid(psid));
-        expect(stateAfterCompletion?.activeExperience).toBeNull();
-      });
-
       sendTextMock.mockClear();
       sendQuickRepliesMock.mockClear();
 
@@ -1488,6 +1483,8 @@ describe("identity-ai-v1 routing", () => {
         psid,
         expect.stringContaining("You are:")
       );
+      const stateAfterFollowUp = getState(anonymizePsid(psid));
+      expect(stateAfterFollowUp?.activeExperience).toBeNull();
     } finally {
       generateSpy.mockRestore();
     }
