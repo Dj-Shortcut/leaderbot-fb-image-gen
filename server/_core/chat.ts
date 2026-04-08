@@ -323,5 +323,3 @@ export function registerChatRoutes(app: Express) {
     }
   });
 }
-
-{ parseChatRequestBody, tools };
