@@ -25,6 +25,7 @@ async function startServer(options?: { forceIp?: string; pathPrefix?: string }) 
   const app = express();
   const limitedPath = `${options?.pathPrefix ?? ""}/limited`;
   const healthPath = "/healthz";
+  const rateLimiter = createGlobalHttpRateLimiter();
 
   if (options?.forceIp) {
     app.use((req, _res, next) => {
@@ -36,11 +37,10 @@ async function startServer(options?: { forceIp?: string; pathPrefix?: string }) 
     });
   }
 
-  app.use(createGlobalHttpRateLimiter());
-  app.get(limitedPath, (_req, res) => {
+  app.get(limitedPath, rateLimiter, (_req, res) => {
     res.status(200).json({ ok: true });
   });
-  app.get(healthPath, (_req, res) => {
+  app.get(healthPath, rateLimiter, (_req, res) => {
     res.status(200).send("ok");
   });
 
