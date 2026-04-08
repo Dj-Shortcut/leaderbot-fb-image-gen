@@ -1455,8 +1455,10 @@ describe("identity-ai-v1 routing", () => {
         ],
       });
 
-      const stateAfterCompletion = getState(anonymizePsid(psid));
-      expect(stateAfterCompletion?.activeExperience).toBeNull();
+      await vi.waitFor(() => {
+        const stateAfterCompletion = getState(anonymizePsid(psid));
+        expect(stateAfterCompletion?.activeExperience).toBeNull();
+      });
 
       sendTextMock.mockClear();
       sendQuickRepliesMock.mockClear();

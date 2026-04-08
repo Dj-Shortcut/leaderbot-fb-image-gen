@@ -313,10 +313,14 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
         "auto_start"
       );
 
-      expect(replay.session?.status).toBe("in_progress");
-      expect(replay.session?.sessionId).not.toBe(completed.session?.sessionId);
-      expect(replay.session?.questionIndex).toBe(1);
-      expect(replay.session?.answers).toEqual([]);
+      await vi.waitFor(async () => {
+        const replayState = await harness.getSnapshot("replay-user");
+        expect(replayState.session?.status).toBe("in_progress");
+        expect(replayState.session?.sessionId).not.toBe(completed.session?.sessionId);
+        expect(replayState.session?.questionIndex).toBe(1);
+        expect(replayState.session?.answers).toEqual([]);
+      });
+
       expect(replay.outboundIntents[0]).toMatchObject({
         kind: "options_prompt",
         prompt: "When a new AI tool drops, what do you do first?",
