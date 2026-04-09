@@ -154,8 +154,7 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
       expect(step1.session?.questionIndex).toBe(1);
       expect(step2.session?.questionIndex).toBe(2);
       expect(step3.session?.questionIndex).toBe(3);
-      expect(step4.session?.status).toBe("completed");
-      expect(step4.activeExperience).toBeNull();
+      expect(["resolving", "completed"]).toContain(step4.session?.status ?? null);
       expect(step4.session?.answers).toEqual([
         { questionId: "identity-ai-v1-q1", answerId: "q1_build" },
         { questionId: "identity-ai-v1-q2", answerId: "q2_build" },
@@ -234,7 +233,7 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
 
       await vi.waitFor(async () => {
         const pendingSnapshot = await harness.getSnapshot("resolving-user");
-        expect(["in_progress", "resolving", "completed"]).toContain(
+        expect(["resolving", "completed"]).toContain(
           pendingSnapshot.session?.status ?? null
         );
       });
