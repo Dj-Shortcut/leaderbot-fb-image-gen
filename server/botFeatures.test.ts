@@ -109,7 +109,7 @@ describe("bot features", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(
       psid,
-      expect.stringContaining("Stuur gerust een foto")
+      "Stuur gerust een foto, dan kan ik een stijl voor je maken."
     );
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
@@ -132,7 +132,7 @@ describe("bot features", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(
       psid,
-      expect.stringContaining("Stuur gerust een foto"),
+      "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
     );
     expect(getState(anonymizePsid(psid))?.stage).toBe("AWAITING_PHOTO");
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();

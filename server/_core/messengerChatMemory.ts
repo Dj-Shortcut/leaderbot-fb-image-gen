@@ -73,7 +73,7 @@ function normalizeHistory(
     .filter((item): item is MessengerChatHistoryItem => Boolean(item));
 }
 
-export function getChatHistoryStorageKey(userKey: string): string {
+function getChatHistoryStorageKey(userKey: string): string {
   return `${CHAT_HISTORY_SCOPE}:${userKey}`;
 }
 
@@ -107,7 +107,7 @@ export async function appendMessengerChatHistory(
   return nextHistory;
 }
 
-export async function clearMessengerChatHistory(userKey: string): Promise<void> {
+async function clearMessengerChatHistory(userKey: string): Promise<void> {
   await Promise.resolve(deleteScopedState(CHAT_HISTORY_SCOPE, userKey));
 }
 
