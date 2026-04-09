@@ -5,7 +5,7 @@ import { z } from "zod";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 
-export const OAUTH_STATE_COOKIE_NAME = "lb_oauth_state_nonce";
+const OAUTH_STATE_COOKIE_NAME = "lb_oauth_state_nonce";
 
 type OAuthStatePayload = {
   nonce: string;
@@ -46,7 +46,7 @@ function clearOAuthStateCookie(req: Request, res: Response) {
     sameSite: "lax",
   });
 }
-export function parseOAuthState(state: string): OAuthStatePayload | null {
+function parseOAuthState(state: string): OAuthStatePayload | null {
   try {
     const decoded = Buffer.from(state, "base64").toString("utf8");
     const parsed = oauthStateSchema.safeParse(JSON.parse(decoded));

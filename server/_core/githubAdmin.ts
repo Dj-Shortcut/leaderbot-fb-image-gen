@@ -12,8 +12,8 @@ import { z } from "zod";
 import { getAdminCookieOptions } from "./cookies";
 import { getConfiguredJwtSecret } from "./env";
 
-export const ADMIN_SESSION_COOKIE_NAME = "admin_session";
-export const GITHUB_ADMIN_STATE_COOKIE_NAME = "github_admin_state";
+const ADMIN_SESSION_COOKIE_NAME = "admin_session";
+const GITHUB_ADMIN_STATE_COOKIE_NAME = "github_admin_state";
 
 const ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 const STATE_COOKIE_TTL_MS = 10 * 60 * 1000;
@@ -215,7 +215,7 @@ function clearAdminSessionCookie(req: Request, res: Response): void {
   clearCookie(res, req, ADMIN_SESSION_COOKIE_NAME);
 }
 
-export function parseAdminGithubUsers(
+function parseAdminGithubUsers(
   raw = process.env.ADMIN_GITHUB_USERS ?? ""
 ): Set<string> {
   return new Set(
@@ -226,7 +226,7 @@ export function parseAdminGithubUsers(
   );
 }
 
-export async function createAdminSessionToken(login: string): Promise<string> {
+async function createAdminSessionToken(login: string): Promise<string> {
   return new SignJWT({
     sub: login,
   } satisfies AdminSessionClaims)

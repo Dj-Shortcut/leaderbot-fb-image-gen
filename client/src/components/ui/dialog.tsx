@@ -20,8 +20,7 @@ const DialogCompositionContext = React.createContext<{
   markCompositionEnd: () => {},
 });
 
-export const useDialogComposition = () =>
-  React.useContext(DialogCompositionContext);
+const useDialogComposition = () => React.useContext(DialogCompositionContext);
 
 function Dialog({
   ...props
@@ -199,16 +198,5 @@ function DialogDescription({
   );
 }
 
-export {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogOverlay,
-  DialogPortal,
-  DialogTitle,
-  DialogTrigger
-};
+export { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle };
 
