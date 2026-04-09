@@ -31,5 +31,5 @@ jobs:
       - name: Fallow - Codebase Health
         uses: fallow-rs/fallow@v2.13.0
         with:
-          fail-on-issues: ${{ github.event_name == 'workflow_dispatch' && inputs.fail_on_issues || false }}
+          fail-on-issues: true
           format: json
