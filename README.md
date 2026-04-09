@@ -2,31 +2,16 @@
 
 A Meta messaging bot with a shared bot-core for Messenger and WhatsApp.
 
-Today the product supports photo-to-image styling flows. The next planned product layer is a set of shareable "mini identity games" that will sit on top of a cleaner multi-channel experience foundation rather than being bolted onto the current style flow.
+The active product scope is photo-to-image styling and related bot infrastructure. This repository also contains some experimental or legacy experience modules, but they are not part of the current Leaderbot direction and should not be treated as planned product work.
 
-## Product Direction
+## Product Scope
 
-Current production capability:
+Current repository focus:
 
 - photo-first image generation flows for Messenger and WhatsApp
 - shared text handling across both Meta channels
 - channel-specific media ingress and outbound message rendering
-
-Next planned capability:
-
-- direct-entry identity games launched from Messenger deep links and later WhatsApp entry links
-- short, option-driven chat experiences that resolve to an archetype/result
-- AI-generated shareable result assets built from structured result payloads
-
-Before any identity game implementation starts, the repository will first align around the foundation documented in [`docs/architecture/identity-games.md`](docs/architecture/identity-games.md):
-
-- `EntryIntent` normalization
-- `ActiveExperience` ownership
-- mandatory routing priority
-- richer outbound intents
-- isolated experience state
-
-No shortcuts should route identity games through the legacy flat style-state.
+- operational tooling around state, quota, storage, security, and deployment
 
 ## Architecture
 
@@ -120,9 +105,7 @@ Outbound response intent types and adapter mapping: `server/_core/botResponse.ts
 Bot core boundary and feature entrypoint: `server/_core/bot/index.ts` and `server/_core/bot/features.ts`.
 
 For a deeper explanation, see [`docs/architecture.md`](docs/architecture.md).
-For the identity-games foundation and execution order, see [`docs/architecture/identity-games.md`](docs/architecture/identity-games.md).
-
-For the first concrete game spec, see [`docs/games/identity-ai-v1.md`](docs/games/identity-ai-v1.md).
+Operational and audit notes live under [`docs/`](docs/).
 
 ## State model
 
@@ -160,7 +143,7 @@ The repository is now organized around an explicit bot-core boundary:
 
 The built-in registry now starts with foundational bot middleware-style features such as rate limiting, style handling, conversational editing, and admin stats. Future bot features should prefer registering text/payload/image handlers there via `registerBotFeature(...)` instead of expanding unrelated web or admin codepaths.
 
-The next major extension is expected to be experience-driven rather than command-driven. Identity games should be introduced only after the foundation in [`docs/architecture/identity-games.md`](docs/architecture/identity-games.md) is in place so that direct-entry game starts, richer result intents, and isolated session state do not pollute the current style flow.
+Repository changes should prioritize the current styling product and the supporting multi-channel bot/runtime foundation. Do not treat older experiment scaffolding as the roadmap by default.
 
 ## Multi-channel text flow
 
@@ -172,7 +155,7 @@ Text handling is now split into three layers:
 
 Current scope is intentionally limited to text messages. Media/image handling is still channel-specific and will be moved later once the shared contracts are expanded.
 
-The next expansion of this boundary is not "more style flow logic", but a shared experience router for identity games and other direct-entry experiences. That work should begin with normalized `EntryIntent` and richer outbound intents, not with channel-specific game branches.
+Further boundary work should continue to reduce coupling between channel adapters and shared bot logic without expanding obsolete experiment paths.
 
 ## WhatsApp image flow
 

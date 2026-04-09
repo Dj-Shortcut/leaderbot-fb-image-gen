@@ -1,6 +1,6 @@
 import http from "node:http";
 import express from "express";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   attachRequestTracing,
@@ -8,12 +8,7 @@ import {
   getTraceContext,
   recordHttpRequestMetric,
   registerMetricsRoute,
-  resetObservabilityMetrics,
 } from "./_core/observability";
-
-afterEach(() => {
-  resetObservabilityMetrics();
-});
 
 async function startServer(configure?: (app: express.Express) => void) {
   const app = express();

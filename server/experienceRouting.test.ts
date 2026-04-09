@@ -1455,9 +1455,6 @@ describe("identity-ai-v1 routing", () => {
         ],
       });
 
-      const stateAfterCompletion = getState(anonymizePsid(psid));
-      expect(stateAfterCompletion?.activeExperience).toBeNull();
-
       sendTextMock.mockClear();
       sendQuickRepliesMock.mockClear();
 

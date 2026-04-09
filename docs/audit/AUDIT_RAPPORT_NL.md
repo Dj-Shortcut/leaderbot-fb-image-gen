@@ -4,13 +4,13 @@ Dit rapport biedt een gedetailleerde technische analyse van de `leaderbot-fb-ima
 
 ## 1. Architectuuroverzicht
 
-De applicatie is gebouwd als een **Node.js/TypeScript** server die gebruikmaakt van het **Express** framework. De kernfunctionaliteit is het genereren van AI-gebaseerde afbeeldingen via Facebook Messenger, inclusief een nieuwe "Identity Game" ervaring.
+De applicatie is gebouwd als een **Node.js/TypeScript** server die gebruikmaakt van het **Express** framework. De kernfunctionaliteit is het genereren van AI-gebaseerde afbeeldingen via Meta-kanalen zoals Facebook Messenger en WhatsApp.
 
 ### Kerncomponenten:
 | Component | Beschrijving |
 | :--- | :--- |
 | **Bot Runtime** | Beheert de dialoogstroom, rate limiting en bot-functies. |
-| **Experience Router** | Verwerkt complexe interacties zoals de "Identity Game" en "Confirm-First" flows. |
+| **Experience Router** | Bevat experimentele routering voor extra interactieflows; dit is niet de actieve productrichting. |
 | **Image Service** | Integreert met OpenAI voor beeldgeneratie en beheert opslag via S3 (Forge API). |
 | **State Store** | Een abstractielaag voor statusbeheer met ondersteuning voor Redis of in-memory opslag. |
 | **Storage Proxy** | Een aparte service voor duurzame objectopslag (R2) met bearer-token beveiliging. |
