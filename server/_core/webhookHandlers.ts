@@ -994,7 +994,7 @@ export function createWebhookHandlers({
           hadPreviousPhoto,
           incomingImageUrl: imageAttachment.payload.url,
           selectedStyle: state.selectedStyle,
-          preselectedStyle,
+          preselectedStyle: preselectedStyle ?? null,
           action: "auto_run_preselected_style",
         });
         await setPreselectedStyle(psid, null);
@@ -1011,7 +1011,7 @@ export function createWebhookHandlers({
         hadPreviousPhoto,
         incomingImageUrl: imageAttachment.payload.url,
         selectedStyle: state.selectedStyle,
-        preselectedStyle,
+        preselectedStyle: preselectedStyle ?? null,
         action: "show_style_picker",
       });
       await setFlowState(psid, "AWAITING_STYLE");

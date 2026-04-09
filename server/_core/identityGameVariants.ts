@@ -100,7 +100,7 @@ function buildDeterministicResolutionMap(
   return map;
 }
 
-const IDENTITY_AI_V1_QUESTIONS: readonly [
+const IDENTITY_AI_V1_QUESTIONS: [
   z.infer<typeof questionSchema>,
   z.infer<typeof questionSchema>,
   z.infer<typeof questionSchema>
@@ -137,7 +137,7 @@ const IDENTITY_AI_V1_QUESTIONS: readonly [
   },
 ];
 
-const IDENTITY_AI_V1_ARCHETYPES: readonly [
+const IDENTITY_AI_V1_ARCHETYPES: [
   z.infer<typeof archetypeSchema>,
   z.infer<typeof archetypeSchema>,
   z.infer<typeof archetypeSchema>,
@@ -169,7 +169,7 @@ const IDENTITY_AI_V1_ARCHETYPES: readonly [
   },
 ];
 
-const DJ_V1_QUESTIONS: readonly [
+const DJ_V1_QUESTIONS: [
   z.infer<typeof questionSchema>,
   z.infer<typeof questionSchema>,
   z.infer<typeof questionSchema>
@@ -206,7 +206,7 @@ const DJ_V1_QUESTIONS: readonly [
   },
 ];
 
-const DJ_V1_ARCHETYPES: readonly [
+const DJ_V1_ARCHETYPES: [
   z.infer<typeof archetypeSchema>,
   z.infer<typeof archetypeSchema>,
   z.infer<typeof archetypeSchema>,

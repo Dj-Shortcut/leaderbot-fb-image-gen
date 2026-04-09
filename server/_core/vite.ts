@@ -21,7 +21,11 @@ function getCurrentDir(): string {
   return path.dirname(fileURLToPath(getImportMetaUrl()));
 }
 
-async function setupVite(app: Express, server: Server, createViteServer: ViteCreateServer) {
+export async function setupVite(
+  app: Express,
+  server: Server,
+  createViteServer: ViteCreateServer
+) {
   app.use(createGlobalHttpRateLimiter());
 
   app.use(rateLimit({windowMs:DEFAULT_WINDOW_MS,limit:DEFAULT_MAX_REQUESTS,standardHeaders:true,legacyHeaders:false}));
