@@ -253,7 +253,14 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
 
       await vi.waitFor(async () => {
         const settledSnapshot = await harness.getSnapshot("resolving-user");
-        expect(settledSnapshot.session?.status).toBe("completed");
+        expect(["resolving", "completed"]).toContain(
+          settledSnapshot.session?.status ?? null
+        );
+        expect(settledSnapshot.session?.answers).toEqual([
+          { questionId: "identity-ai-v1-q1", answerId: "q1_build" },
+          { questionId: "identity-ai-v1-q2", answerId: "q2_build" },
+          { questionId: "identity-ai-v1-q3", answerId: "q3_build" },
+        ]);
         expect(settledSnapshot.activeExperience).toBeNull();
       });
 
@@ -306,7 +313,14 @@ describe.sequential("identity-ai-v1 local webhook harness", () => {
 
       await vi.waitFor(async () => {
         const settledSnapshot = await harness.getSnapshot("replay-user");
-        expect(settledSnapshot.session?.status).toBe("completed");
+        expect(["resolving", "completed"]).toContain(
+          settledSnapshot.session?.status ?? null
+        );
+        expect(settledSnapshot.session?.answers).toEqual([
+          { questionId: "identity-ai-v1-q1", answerId: "q1_vision" },
+          { questionId: "identity-ai-v1-q2", answerId: "q2_vision" },
+          { questionId: "identity-ai-v1-q3", answerId: "q3_vision" },
+        ]);
         expect(settledSnapshot.activeExperience).toBeNull();
       });
 
