@@ -15,7 +15,7 @@ on:
         type: boolean
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: fallow-${{ github.ref }}
@@ -32,5 +32,37 @@ jobs:
         uses: fallow-rs/fallow@v2.26.1
         with:
           version: 2.26.1
-          fail-on-issues: true
+          fail-on-issues: false
           format: json
+
+      - name: Generate Fallow report
+        shell: bash
+        run: |
+          mkdir -p .fallow
+          npx --yes fallow@2.26.1 -f json > .fallow/report.json
+
+      - name: Build maintainability badge
+        run: |
+          node scripts/fallow-badge.mjs \
+            .fallow/report.json \
+            public/badges/fallow-maintainability.json \
+            public/badges/fallow-metrics.json
+
+      - name: Commit badge update
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]'
+        shell: bash
+        run: |
+          if git diff --quiet -- public/badges/fallow-maintainability.json public/badges/fallow-metrics.json; then
+            echo "Badge files unchanged"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/badges/fallow-maintainability.json public/badges/fallow-metrics.json
+          git commit -m "chore: update Fallow maintainability badge"
+          git push
+
+      - name: Enforce strict Fallow gate
+        run: |
+          node -e "const fs=require('node:fs'); const report=JSON.parse(fs.readFileSync('.fallow/report.json','utf8')); const issues=Number(report.check?.total_issues ?? report.total_issues ?? 0); if (issues > 0) { console.error('Fallow found ' + issues + ' issues'); process.exit(1); }"

@@ -1,0 +1,40 @@
+{
+  "generatedAt": "2026-04-09T19:39:22.631Z",
+  "fallowVersion": "2.18.3",
+  "totalIssues": 95,
+  "weightedIssues": 140.5,
+  "maintainabilityScore": 42,
+  "formula": "score = round(100 * baseline / (baseline + weightedIssues))",
+  "baseline": 100,
+  "weights": {
+    "unused_files": 3,
+    "unresolved_imports": 5,
+    "circular_dependencies": 6,
+    "boundary_violations": 5,
+    "unused_dependencies": 3,
+    "unlisted_dependencies": 3,
+    "duplicate_exports": 2,
+    "unused_exports": 1,
+    "unused_types": 0.5,
+    "unused_enum_members": 0.5,
+    "unused_class_members": 0.5,
+    "type_only_dependencies": 0.5,
+    "test_only_dependencies": 0.5
+  },
+  "summary": {
+    "total_issues": 95,
+    "unused_files": 31,
+    "unused_exports": 22,
+    "unused_types": 41,
+    "unused_dependencies": 0,
+    "unused_enum_members": 0,
+    "unused_class_members": 0,
+    "unresolved_imports": 1,
+    "unlisted_dependencies": 0,
+    "duplicate_exports": 0,
+    "type_only_dependencies": 0,
+    "test_only_dependencies": 0,
+    "circular_dependencies": 0,
+    "boundary_violations": 0
+  }
+}

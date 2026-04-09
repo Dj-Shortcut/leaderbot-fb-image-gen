@@ -1,4 +1,5 @@
 # Leaderbot AI Image Generator
+[![Fallow Maintainability](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Dj-Shortcut/leaderbot-fb-image-gen/main/public/badges/fallow-maintainability.json)](https://github.com/Dj-Shortcut/leaderbot-fb-image-gen/actions/workflows/fallow.yml)
 
 A Meta messaging bot with a shared bot-core for Messenger and WhatsApp.
 
