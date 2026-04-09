@@ -23,7 +23,7 @@
     "storage-proxy:start": "cross-env NODE_ENV=production tsx storage-proxy/index.ts"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^3.0.41",
+    "@ai-sdk/openai": "^3.0.51",
     "@aws-sdk/client-s3": "^3.1023.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -81,7 +81,7 @@
     "recharts": "^2.15.2",
     "sonner": "^2.0.7",
     "superjson": "^1.13.3",
-    "tailwind-merge": "^3.3.1",
+    "tailwind-merge": "^3.5.0",
     "vaul": "^1.1.2",
     "wouter": "3.7.1",
     "zod": "^4.3.6"
@@ -102,7 +102,7 @@
     "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.10",
     "esbuild": "^0.25.0",
-    "eslint": "^10.1.0",
+    "eslint": "^10.2.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
     "typescript-eslint": "^8.58.0",
