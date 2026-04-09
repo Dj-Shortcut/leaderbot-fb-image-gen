@@ -18,7 +18,7 @@ Primary bootstrap is in `server/_core/index.ts`.
 
 The bot runtime now has an explicit boundary in `server/_core/bot/index.ts`, with future feature hooks centralized in `server/_core/bot/features.ts`.
 
-The identity-games layer is now implemented behind a shared router + registry boundary. The normative design remains documented in `docs/architecture/identity-games.md`, and runtime dispatch is handled through `server/_core/gameRegistry.ts` and `server/_core/experienceRouter.ts`.
+The repository still contains some experimental experience-routing modules behind a shared router + registry boundary, but that path is not the active product direction for Leaderbot.
 
 ## Architecture diagrams
 
@@ -229,38 +229,15 @@ The current bot boundary is intentionally incremental:
 
 This keeps Messenger and WhatsApp aligned for text without forcing media/image abstractions before the contracts are ready.
 
-## 5c) Identity-games foundation
+## 5c) Experimental experience routing
 
-The identity-games feature is implemented as a separate experience layer, not as an extension of the legacy style flow.
+The codebase still contains some experimental experience-routing modules that were built separately from the legacy style flow.
 
-Implemented foundation:
+Important repository rule:
 
-- explicit `EntryIntent` normalization at the channel edge
-- explicit `ActiveExperience` ownership in shared state
-- mandatory routing order: `EntryIntent`, then `ActiveExperience`, then explicit command, then fallback flow
-- isolated identity-game session storage
-- registry-based dispatch (`gameId` -> handler contract)
-
-Design rule:
-
-- Messenger and WhatsApp differences must be absorbed at the normalization boundary
-- shared logic must not inspect raw provider payloads
-- identity-game state must not be stored in `selectedStyle`, `stage`, `preselectedStyle`, or related legacy style fields
-
-Runtime dispatch rule:
-
-- `routeEntryIntent` and `routeActiveExperience` resolve handlers via `getIdentityGameHandler(...)`
-- each game handler owns `startSession(...)` and `handleAction(...)`
-- unknown game IDs must return `identityGameUnavailable` without leaving stale active experience state
-
-The normative design for that work lives in `docs/architecture/identity-games.md`.
-
-Identity-game documentation is split into two layers:
-
-- Shared foundation and mandatory infrastructure rules live in [`docs/architecture/identity-games.md`](./architecture/identity-games.md)
-- Concrete game content and player-flow specs live under [`docs/games/`](./games)
-
-The first game spec is [`docs/games/identity-ai-v1.md`](./games/identity-ai-v1.md).
+- these modules are not the active Leaderbot roadmap
+- current documentation and maintenance should prioritize the production styling flow
+- any future cleanup of those modules should be handled as a dedicated code-removal/refactor task
 
 ## 6) Deployment model
 

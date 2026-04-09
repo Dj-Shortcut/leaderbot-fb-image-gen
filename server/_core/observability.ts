@@ -122,7 +122,7 @@ export function registerMetricsRoute(app: express.Express): void {
   });
 }
 
-export function resetObservabilityMetrics(): void {
+function resetObservabilityMetrics(): void {
   requestCounters.clear();
   durationSums.clear();
   durationCounts.clear();

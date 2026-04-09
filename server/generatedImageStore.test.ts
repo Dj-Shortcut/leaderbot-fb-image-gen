@@ -1,13 +1,8 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { buildGeneratedImageUrl, clearGeneratedImageStore, getGeneratedImage, putGeneratedImage } from "./_core/generatedImageStore";
+import { buildGeneratedImageUrl, getGeneratedImage, putGeneratedImage } from "./_core/generatedImageStore";
 
 describe("generatedImageStore", () => {
-  afterEach(() => {
-    clearGeneratedImageStore();
-    delete process.env.GENERATED_IMAGE_TTL_MS;
-  });
-
   it("stores generated images in memory and retrieves them by token", () => {
     const token = putGeneratedImage(Buffer.from([1, 2, 3]), "image/jpeg");
     const stored = getGeneratedImage(token);
@@ -24,6 +19,7 @@ describe("generatedImageStore", () => {
     await new Promise(resolve => setTimeout(resolve, 10));
 
     expect(getGeneratedImage(token)).toBeNull();
+    delete process.env.GENERATED_IMAGE_TTL_MS;
   });
 
   it("builds generated URL with token", () => {

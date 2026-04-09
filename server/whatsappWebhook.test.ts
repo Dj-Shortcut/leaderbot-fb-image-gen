@@ -22,7 +22,6 @@ vi.mock("./_core/whatsappApi", () => ({
   sendWhatsAppText: sendWhatsAppTextMock,
 }));
 
-import { clearGeneratedImageStore } from "./_core/generatedImageStore";
 import {
   InvalidSourceImageUrlError,
   OpenAiImageGenerator,
@@ -93,7 +92,6 @@ afterAll(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  clearGeneratedImageStore();
 });
 
 describe("whatsapp webhook flow", () => {
@@ -473,7 +471,7 @@ describe("whatsapp webhook flow", () => {
 
     expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
       "wa-user-5",
-      "✅ Stijl ingesteld op cyberpunk."
+      "✅ Stijl ingesteld op cyberpunk.\n\nStuur eerst een foto, dan maak ik die stijl voor je."
     );
     expect(getState(anonymizePsid("wa-user-5"))?.preselectedStyle).toBe(
       "cyberpunk"
@@ -535,11 +533,7 @@ describe("whatsapp webhook flow", () => {
 
     expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
       "wa-user-6",
-      expect.stringContaining("Snelle acties")
-    );
-    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
-      "wa-user-6",
-      expect.stringContaining("1. ")
+      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis."
     );
   });
 
@@ -555,10 +549,7 @@ describe("whatsapp webhook flow", () => {
 
     expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
       "wa-user-8",
-      [
-        "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
-        "Tip: typ 'verras me' nadat je een foto hebt gestuurd voor meteen een willekeurige stijl.",
-      ].join("\n\n")
+      "Stuur gerust een foto, dan kan ik een stijl voor je maken."
     );
   });
 
