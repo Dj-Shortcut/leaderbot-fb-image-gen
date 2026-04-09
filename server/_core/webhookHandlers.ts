@@ -63,8 +63,6 @@ import {
 import { hasInFlightGeneration, runGuardedGeneration } from "./generationGuard";
 import { canGenerate, increment } from "./messengerQuota";
 import { isDebugLogEnabled } from "./logLevel";
-import { getChatRolloutDecision } from "./chatRollout";
-import { generateMessengerReply } from "./messengerResponsesService";
 import { getBotFeatures } from "./bot/features";
 import { ensureDefaultBotFeaturesRegistered } from "./bot/defaultFeatures";
 import { handleSharedTextMessage } from "./sharedTextHandler";
@@ -498,6 +496,30 @@ export function createWebhookHandlers({
       getRuntimeStats: () => getTodayRuntimeStats(),
       logger: createFeatureLogger(userId),
     };
+  }
+
+  function logImageFlowDecision(input: {
+    psid: string;
+    userId: string;
+    reqId: string;
+    stage: string;
+    hadPreviousPhoto: boolean;
+    incomingImageUrl: string;
+    selectedStyle: string | null;
+    preselectedStyle: string | null;
+    action: "show_style_picker" | "auto_run_preselected_style";
+  }): void {
+    safeLog("messenger_image_flow_decision", {
+      reqId: input.reqId,
+      user: toLogUser(input.userId),
+      psidHash: anonymizePsid(input.psid).slice(0, 12),
+      stage: input.stage,
+      hadPreviousPhoto: input.hadPreviousPhoto,
+      incomingImageHost: getAttachmentHostname(input.incomingImageUrl),
+      selectedStyle: input.selectedStyle,
+      preselectedStyle: input.preselectedStyle,
+      action: input.action,
+    });
   }
 
   async function sendStylePicker(
@@ -959,16 +981,39 @@ export function createWebhookHandlers({
         }
       }
       logUserState(psid, userId, state, reqId, "image_received");
+      const hadPreviousPhoto = Boolean(state.lastPhotoUrl);
       const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");
       await setPendingImage(psid, imageAttachment.payload.url);
 
-      if (preselectedStyle) {
+      if (preselectedStyle && !hadPreviousPhoto) {
+        logImageFlowDecision({
+          psid,
+          userId,
+          reqId,
+          stage: state.stage,
+          hadPreviousPhoto,
+          incomingImageUrl: imageAttachment.payload.url,
+          selectedStyle: state.selectedStyle,
+          preselectedStyle,
+          action: "auto_run_preselected_style",
+        });
         await setPreselectedStyle(psid, null);
         await setChosenStyle(psid, preselectedStyle);
         await runStyleGeneration(psid, userId, preselectedStyle, reqId, lang);
         return;
       }
 
+      logImageFlowDecision({
+        psid,
+        userId,
+        reqId,
+        stage: state.stage,
+        hadPreviousPhoto,
+        incomingImageUrl: imageAttachment.payload.url,
+        selectedStyle: state.selectedStyle,
+        preselectedStyle,
+        action: "show_style_picker",
+      });
       await setFlowState(psid, "AWAITING_STYLE");
       await sendPhotoReceivedPrompt(psid, lang, reqId);
       return;

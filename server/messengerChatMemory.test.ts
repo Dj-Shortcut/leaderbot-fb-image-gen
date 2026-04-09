@@ -2,8 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resetStateStore } from "./_core/messengerState";
 import {
   appendMessengerChatHistory,
-  clearMessengerChatHistory,
-  getChatHistoryStorageKey,
   getMessengerChatHistory,
 } from "./_core/messengerChatMemory";
 
@@ -39,12 +37,6 @@ describe("messenger chat memory", () => {
     }
   });
 
-  it("stores history under chat:history key namespace", () => {
-    expect(getChatHistoryStorageKey("user-key-123")).toBe(
-      "chat:history:user-key-123"
-    );
-  });
-
   it("trims history to configured limit and keeps latest messages", async () => {
     const userKey = "abc123userkey";
     await appendMessengerChatHistory(userKey, "user", "first");
@@ -57,13 +49,16 @@ describe("messenger chat memory", () => {
     expect(history[1]?.text).toBe("third");
   });
 
-  it("clears chat history independently from messenger state", async () => {
-    const userKey = "abc123userkey-clear";
-    await appendMessengerChatHistory(userKey, "user", "hello");
+  it("keeps histories isolated per user", async () => {
+    await appendMessengerChatHistory("user-a", "user", "hello");
+    await appendMessengerChatHistory("user-b", "assistant", "world");
 
-    await clearMessengerChatHistory(userKey);
-
-    expect(await getMessengerChatHistory(userKey)).toEqual([]);
+    expect(await getMessengerChatHistory("user-a")).toEqual([
+      expect.objectContaining({ role: "user", text: "hello" }),
+    ]);
+    expect(await getMessengerChatHistory("user-b")).toEqual([
+      expect.objectContaining({ role: "assistant", text: "world" }),
+    ]);
   });
 });
 

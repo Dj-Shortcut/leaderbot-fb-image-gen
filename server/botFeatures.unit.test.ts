@@ -4,6 +4,7 @@ import { assistantCommandsFeature } from "./_core/bot/features/assistantCommands
 import { rateLimitFeature } from "./_core/bot/features/rateLimitFeature";
 import { statsFeature } from "./_core/bot/features/statsFeature";
 import { styleCommandsFeature } from "./_core/bot/features/styleCommandsFeature";
+import { getBotFeatures } from "./_core/bot/features";
 import type { BotTextContext } from "./_core/botContext";
 import type { MessengerUserState } from "./_core/messengerState";
 import { resetStateStore } from "./_core/messengerState";
@@ -65,11 +66,16 @@ function makeContext(overrides: Partial<BotTextContext> = {}): BotTextContext {
 }
 
 describe("default feature registration", () => {
-  it("is idempotent across repeated calls", () => {
+  it("only registers the slim runtime feature set once", () => {
     expect(() => {
       ensureDefaultBotFeaturesRegistered();
       ensureDefaultBotFeaturesRegistered();
     }).not.toThrow();
+
+    expect(getBotFeatures().map(feature => feature.name)).toEqual([
+      "rateLimit",
+      "styleCommands",
+    ]);
   });
 });
 
@@ -132,18 +138,23 @@ describe("styleCommandsFeature", () => {
     const sendText = vi.fn(async () => undefined);
     const preselectStyle = vi.fn(async () => undefined);
     const chooseStyle = vi.fn(async () => undefined);
+    const setFlowState = vi.fn(async () => undefined);
     const context = makeContext({
       messageText: "style: cyberpunk",
       normalizedText: "style: cyberpunk",
       sendText,
       preselectStyle,
+      setFlowState,
       chooseStyle,
     });
 
     await styleCommandsFeature.onText?.(context);
 
     expect(preselectStyle).toHaveBeenCalledWith("cyberpunk");
-    expect(sendText).toHaveBeenCalledWith("✅ Style set to cyberpunk.");
+    expect(setFlowState).toHaveBeenCalledWith("AWAITING_PHOTO");
+    expect(sendText).toHaveBeenCalledWith(
+      "✅ Style set to cyberpunk.\n\nSend a photo first, then I can make that style for you."
+    );
     expect(chooseStyle).not.toHaveBeenCalled();
   });
 

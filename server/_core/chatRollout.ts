@@ -33,11 +33,11 @@ function bucketForUserKey(userKey: string): number {
   return Math.abs(raw) % 100;
 }
 
-export function getMessengerChatEngine(): MessengerChatEngine {
+function getMessengerChatEngine(): MessengerChatEngine {
   return normalizeEngine(process.env.MESSENGER_CHAT_ENGINE);
 }
 
-export function getMessengerChatCanaryPercent(): number {
+function getMessengerChatCanaryPercent(): number {
   return parseCanaryPercent(process.env.MESSENGER_CHAT_CANARY_PERCENT);
 }
 
