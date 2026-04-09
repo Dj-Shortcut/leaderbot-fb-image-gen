@@ -23,8 +23,13 @@
     "storage-proxy:start": "cross-env NODE_ENV=production tsx storage-proxy/index.ts"
   },
   "dependencies": {
+
+    
+    "@aws-sdk/client-s3": "^3.1025.0",
+
     "@ai-sdk/openai": "^3.0.51",
-    "@aws-sdk/client-s3": "^3.1023.0",
+    
+
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-aspect-ratio": "^1.1.7",

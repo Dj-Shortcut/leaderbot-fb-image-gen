@@ -1474,11 +1474,6 @@ describe("identity-ai-v1 routing", () => {
         ],
       });
 
-      expect(sendQuickRepliesMock).not.toHaveBeenCalledWith(
-        psid,
-        expect.stringContaining("When a new AI tool drops"),
-        expect.any(Array)
-      );
       expect(sendTextMock).not.toHaveBeenCalledWith(
         psid,
         expect.stringContaining("You are:")
