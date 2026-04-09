@@ -4,10 +4,22 @@ on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
   workflow_dispatch:
+    inputs:
+      fail_on_issues:
+        description: "Fail the workflow when Fallow finds issues"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
+
+concurrency:
+  group: fallow-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   codebase-health:
@@ -19,5 +31,5 @@ jobs:
       - name: Fallow - Codebase Health
         uses: fallow-rs/fallow@v2.13.0
         with:
-          fail-on-issues: false
+          fail-on-issues: ${{ github.event_name == 'workflow_dispatch' && inputs.fail_on_issues || false }}
           format: json
