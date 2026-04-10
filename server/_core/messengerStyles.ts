@@ -167,7 +167,7 @@ export function isStyleCategoryPayload(value: string): value is StyleCategoryId 
   return STYLE_CATEGORY_IDS.has(value as StyleCategoryId);
 }
 
-function getStyleById(styleId: StyleId): StyleConfig {
+export function getStyleById(styleId: StyleId): StyleConfig {
   const style = STYLE_CONFIGS.find(item => item.id === styleId);
 
   if (!style) {
@@ -177,7 +177,7 @@ function getStyleById(styleId: StyleId): StyleConfig {
   return style;
 }
 
-function getStyleCategoryById(
+export function getStyleCategoryById(
   styleCategoryId: StyleCategoryId
 ): StyleCategoryConfig {
   const category = STYLE_CATEGORY_CONFIGS.find(item => item.id === styleCategoryId);
