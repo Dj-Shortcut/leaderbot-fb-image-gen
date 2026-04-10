@@ -25,7 +25,7 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
-          <div className="min-h-screen flex flex-col">
+          <div className="min-h-screen flex flex-col bg-background text-foreground">
             <Toaster />
             <div className="grow">
               <Router />
