@@ -641,7 +641,7 @@ export function createWebhookHandlers({
           action: "check",
           psidHash: anonymizePsid(psid).slice(0, 12),
           count: quotaState.quota.count,
-          limit: 2,
+          limit: 3,
           bypassApplied,
           allowed,
         })
