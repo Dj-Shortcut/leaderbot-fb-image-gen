@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-04-10T10:40:44.020Z",
+  "generatedAt": "2026-04-10T14:09:51.292Z",
   "fallowVersion": "2.26.1",
-  "totalIssues": 91,
-  "weightedIssues": 134.5,
+  "totalIssues": 90,
+  "weightedIssues": 131.5,
   "maintainabilityScore": 43,
   "formula": "score = round(100 * baseline / (baseline + weightedIssues))",
   "baseline": 100,
@@ -22,8 +22,8 @@
     "test_only_dependencies": 0.5
   },
   "summary": {
-    "total_issues": 91,
-    "unused_files": 30,
+    "total_issues": 90,
+    "unused_files": 29,
     "unused_exports": 19,
     "unused_types": 41,
     "unused_dependencies": 0,
