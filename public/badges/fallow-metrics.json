@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-04-10T10:06:12.826Z",
+  "generatedAt": "2026-04-10T10:40:44.020Z",
   "fallowVersion": "2.26.1",
-  "totalIssues": 98,
-  "weightedIssues": 145.5,
-  "maintainabilityScore": 41,
+  "totalIssues": 91,
+  "weightedIssues": 134.5,
+  "maintainabilityScore": 43,
   "formula": "score = round(100 * baseline / (baseline + weightedIssues))",
   "baseline": 100,
   "weights": {
@@ -22,9 +22,9 @@
     "test_only_dependencies": 0.5
   },
   "summary": {
-    "total_issues": 98,
-    "unused_files": 32,
-    "unused_exports": 24,
+    "total_issues": 91,
+    "unused_files": 30,
+    "unused_exports": 19,
     "unused_types": 41,
     "unused_dependencies": 0,
     "unused_enum_members": 0,
