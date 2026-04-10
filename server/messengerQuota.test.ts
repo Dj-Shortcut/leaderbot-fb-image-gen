@@ -45,10 +45,14 @@ describe("messenger quota dayKey", () => {
 
     await increment(userId);
 
+    expect(await canGenerate(userId)).toBe(true);
+
+    await increment(userId);
+
     expect(await canGenerate(userId)).toBe(false);
     expect((await Promise.resolve(getOrCreateState(userId))).quota).toEqual({
       dayKey: initialDayKey,
-      count: 2,
+      count: 3,
     });
   });
 

@@ -4,6 +4,7 @@ import { InsertUser, users, imageRequests, dailyQuota, usageStats, notificationL
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+const FREE_DAILY_LIMIT = 3;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 async function getDb() {
@@ -134,7 +135,7 @@ export async function canUserGenerateImage(userId: number): Promise<boolean> {
     return true; // No quota record yet, user can generate
   }
 
-  return quota[0].imagesGenerated < 1; // Only 1 image per day allowed
+  return quota[0].imagesGenerated < FREE_DAILY_LIMIT;
 }
 
 /**
@@ -206,7 +207,7 @@ async function reserveUserDailyQuota(userId: number): Promise<boolean> {
         updatedAt = NOW()
     WHERE userId = ${userId}
       AND date = ${today}
-      AND imagesGenerated < 1
+      AND imagesGenerated < ${FREE_DAILY_LIMIT}
   `);
 
   const getAffectedRows = (value: unknown): number => {
