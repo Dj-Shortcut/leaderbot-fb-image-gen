@@ -2,7 +2,7 @@ import { Sparkles } from "lucide-react";
 
 function Home() {
   return (
-    <div className="flex-grow flex items-center justify-center px-4 bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="grow flex items-center justify-center px-4 bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-md text-center">
         <div className="mb-6">
           <Sparkles className="w-16 h-16 text-blue-600 mx-auto" />
