@@ -37,7 +37,6 @@ ASCII version:
                     | Routes:                          |
                     | - /webhook/facebook              |
                     | - /api/trpc                      |
-                    | - /auth/github/*                 |
                     | - /healthz, /__version          |
                     | - /metrics, /generated/*        |
                     +----+---------------+-------------+
@@ -46,10 +45,10 @@ ASCII version:
                          v               v
         +--------------------------+   +----------------------+
         | Webhook Handlers         |   | Supporting Services  |
-        | - signature verification |   | - GitHub OAuth       |
-        | - dedupe + i18n          |   | - static file serve  |
-        | - state transitions      |   | - health/debug       |
-        | - quota checks           |   +----------------------+
+        | - signature verification |   | - static file serve  |
+        | - dedupe + i18n          |   | - health/debug       |
+        | - state transitions      |   +----------------------+
+        | - quota checks           |
         +------------+-------------+
                      |
                      v
@@ -80,12 +79,11 @@ Mermaid version:
 ```mermaid
 flowchart TD
     mm["Meta Messenger<br/>Webhook + Send API"]
-    ua["Admin / Browser / Monitoring"]
+    ua["Browser / Monitoring"]
 
     subgraph lb["Leaderbot Server"]
         wh["/webhook/facebook"]
         trpc["/api/trpc"]
-        auth["/auth/github/*"]
         ops["/healthz, /__version, /metrics, /generated/*"]
         handlers["Webhook handlers<br/>signature check, dedupe, i18n,<br/>state transitions, quota checks"]
         img["Image service"]
@@ -93,7 +91,6 @@ flowchart TD
 
     redis["Redis / state store"]
     openai["OpenAI Images API"]
-    github["GitHub OAuth"]
     proxy["Storage proxy<br/>Fly app"]
     r2["Cloudflare R2<br/>Public asset URL"]
 
@@ -108,9 +105,7 @@ flowchart TD
     img --> mm
 
     ua --> trpc
-    ua --> auth
     ua --> ops
-    auth --> github
 ```
 
 ## 2) Request flow (Meta messaging)

@@ -16,7 +16,7 @@ Current repository focus:
 
 ## Architecture
 
-The runtime is a single Node/Express process that handles Meta webhook traffic, channel-specific outbound messaging API calls, shared bot/conversation logic, AI image generation orchestration, static asset serving, admin auth, and operational endpoints.
+The runtime is a single Node/Express process that handles Meta webhook traffic, channel-specific outbound messaging API calls, shared bot/conversation logic, AI image generation orchestration, static asset serving, and operational endpoints.
 
 ASCII version:
 
@@ -33,7 +33,6 @@ ASCII version:
                     | Routes:                          |
                     | - /webhook/facebook              |
                     | - /api/trpc                      |
-                    | - /auth/github/*                 |
                     | - /healthz, /__version, /metrics|
                     | - /generated/*         |
                     +----+---------------+-------------+
@@ -42,10 +41,10 @@ ASCII version:
                          v               v
         +--------------------------+   +----------------------+
         | Webhook Handlers         |   | Supporting Services  |
-        | - signature verification |   | - GitHub OAuth       |
-        | - dedupe + i18n          |   | - static file serve  |
-        | - state transitions      |   | - health/debug       |
-        | - quota checks           |   +----------------------+
+        | - signature verification |   | - static file serve  |
+        | - dedupe + i18n          |   | - health/debug       |
+        | - state transitions      |   +----------------------+
+        | - quota checks           |
         +------------+-------------+
                      |
                      v
@@ -69,12 +68,11 @@ Mermaid version:
 ```mermaid
 flowchart TD
     mm["Meta Messenger<br/>Webhook + Send API"]
-    ua["Admin / Browser / Monitoring"]
+    ua["Browser / Monitoring"]
 
     subgraph lb["Leaderbot Server (Node/Express)"]
         wh["/webhook/facebook"]
         trpc["/api/trpc"]
-        auth["/auth/github/*"]
         ops["/healthz, /__version, /metrics, /generated/*"]
         handlers["Webhook handlers<br/>signature check, dedupe, i18n,<br/>state transitions, quota checks"]
         img["Image service<br/>OpenAI"]
@@ -82,8 +80,6 @@ flowchart TD
 
     redis[("Redis / state store")]
     openai["OpenAI Images API"]
-    github["GitHub OAuth"]
-
     mm --> wh
     wh --> handlers
     handlers --> img
@@ -92,9 +88,7 @@ flowchart TD
     img --> mm
 
     ua --> trpc
-    ua --> auth
     ua --> ops
-    auth --> github
 ```
 
 Key server entrypoint: `server/_core/index.ts`.
@@ -229,8 +223,6 @@ Related files:
 - `OPENAI_TEXT_MAX_RETRIES` (retry attempts for retryable Responses failures, default `1`)
 - `ADMIN_TOKEN` (protects `/debug/build`)
 - `NODE_ENV` (set to `production` to enforce production-only checks such as required `REDIS_URL`)
-- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL` (enable GitHub admin login)
-- `ADMIN_GITHUB_USERS` (comma-separated GitHub usernames allowed into `/admin`)
 - `OAUTH_SERVER_URL` (enables OAuth route initialization)
 - `LOG_LEVEL`, `DEBUG_STATE_DUMP`, `DEBUG_IMAGE_PROOF` (diagnostics)
 - `MESSENGER_QUOTA_BYPASS_IDS` (comma-separated PSIDs or hashed user keys that skip Messenger daily quota; intended for internal testing/admin)
@@ -314,32 +306,6 @@ Multi-channel text routing now also has a small adapter-level test in `server/bo
 
 When adding or updating image styles, use [`docs/style-guide.md`](docs/style-guide.md) as the quality and consistency checklist for prompts, previews, naming, and review.
 For Facebook/Messenger share assets, use [`docs/invite-image-export-checklist.md`](docs/invite-image-export-checklist.md) as the required export, naming, and cache-busting workflow.
-
-## Admin login (GitHub OAuth)
-
-The same server can protect `/admin` using GitHub OAuth and a simple allowlist.
-
-Required environment variables for admin login:
-
-- `GITHUB_CLIENT_ID`
-- `GITHUB_CLIENT_SECRET`
-- `GITHUB_CALLBACK_URL` (example: `https://<app>/auth/github/callback`)
-- `ADMIN_GITHUB_USERS` (comma-separated GitHub usernames, example: `Dj-Shortcut`)
-- `JWT_SECRET` (used to sign the `admin_session` cookie)
-
-GitHub OAuth app setup:
-
-1. Create a GitHub OAuth App.
-2. Set the callback URL to the same value as `GITHUB_CALLBACK_URL`.
-3. Configure the server env vars above.
-4. Visit `/auth/github/start` or `/admin` to begin login.
-
-Behavior:
-
-- `/auth/github/start` redirects to GitHub with `read:user`.
-- `/auth/github/callback` validates the CSRF state cookie, fetches the GitHub user, and only allows usernames from `ADMIN_GITHUB_USERS`.
-- Successful logins receive an `admin_session` JWT cookie valid for 7 days.
-- `POST /auth/logout` clears the admin session.
 
 ## Security: webhook signature verification
 

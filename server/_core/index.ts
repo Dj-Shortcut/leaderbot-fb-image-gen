@@ -18,7 +18,6 @@ import { createContext } from "./context";
 import { serveStatic } from "./vite";
 import { assertPrivacyConfig } from "./privacy";
 import { applySecurityHeaders } from "./securityHeaders";
-import { registerGitHubAdminRoutes } from "./githubAdmin";
 import { getGeneratedImage } from "./generatedImageStore";
 import { isDebugLogEnabled } from "./logLevel";
 import { ensureStateStoreReady } from "./stateStore";
@@ -548,8 +547,6 @@ async function startServer() {
         );
     });
   }
-
-  registerGitHubAdminRoutes(app);
 
   // Register webhook routes AFTER signature verification middleware
   registerBotRoutes(app);

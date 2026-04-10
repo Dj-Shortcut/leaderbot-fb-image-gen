@@ -50,7 +50,7 @@ export type StyleCategoryConfig = {
   label: string;
 };
 
-const STYLE_CONFIGS: StyleConfig[] = [
+export const STYLE_CONFIGS: StyleConfig[] = [
   {
     id: "STYLE_CARICATURE",
     payload: "STYLE_CARICATURE",
@@ -159,11 +159,11 @@ const STYLE_CATEGORY_IDS = new Set<StyleCategoryId>(
   STYLE_CATEGORY_CONFIGS.map(category => category.id)
 );
 
-function isStylePayload(value: string): value is StyleId {
+export function isStylePayload(value: string): value is StyleId {
   return STYLE_IDS.has(value as StyleId);
 }
 
-function isStyleCategoryPayload(value: string): value is StyleCategoryId {
+export function isStyleCategoryPayload(value: string): value is StyleCategoryId {
   return STYLE_CATEGORY_IDS.has(value as StyleCategoryId);
 }
 
