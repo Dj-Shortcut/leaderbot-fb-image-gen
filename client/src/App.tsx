@@ -1,3 +1,4 @@
+import Footer from "./components/Footer";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -22,10 +23,15 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="light">
+      <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
-          <Toaster />
-          <Router />
+          <div className="min-h-screen flex flex-col bg-background text-foreground">
+            <Toaster />
+            <div className="grow">
+              <Router />
+            </div>
+            <Footer />
+          </div>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
