@@ -1,26 +1,13 @@
 {
-  "generatedAt": "2026-04-10T14:09:51.292Z",
-  "fallowVersion": "2.26.1",
+  "generatedAt": "2026-04-10T15:23:12.480Z",
+  "fallowVersion": "2.27.0",
   "totalIssues": 90,
-  "weightedIssues": 131.5,
-  "maintainabilityScore": 43,
-  "formula": "score = round(100 * baseline / (baseline + weightedIssues))",
-  "baseline": 100,
-  "weights": {
-    "unused_files": 3,
-    "unresolved_imports": 5,
-    "circular_dependencies": 6,
-    "boundary_violations": 5,
-    "unused_dependencies": 3,
-    "unlisted_dependencies": 3,
-    "duplicate_exports": 2,
-    "unused_exports": 1,
-    "unused_types": 0.5,
-    "unused_enum_members": 0.5,
-    "unused_class_members": 0.5,
-    "type_only_dependencies": 0.5,
-    "test_only_dependencies": 0.5
-  },
+  "functionsAboveThreshold": 23,
+  "functionsAnalyzed": 1809,
+  "filesScored": 138,
+  "coverageModel": "static_estimated",
+  "maintainabilityScore": 88.5,
+  "formula": "native Fallow average_maintainability",
   "summary": {
     "total_issues": 90,
     "unused_files": 29,
@@ -36,5 +23,15 @@
     "test_only_dependencies": 0,
     "circular_dependencies": 0,
     "boundary_violations": 0
+  },
+  "healthSummary": {
+    "files_analyzed": 159,
+    "functions_analyzed": 1809,
+    "functions_above_threshold": 23,
+    "max_cyclomatic_threshold": 20,
+    "max_cognitive_threshold": 15,
+    "files_scored": 138,
+    "average_maintainability": 88.5,
+    "coverage_model": "static_estimated"
   }
 }
