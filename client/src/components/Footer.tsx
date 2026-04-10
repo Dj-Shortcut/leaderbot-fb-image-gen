@@ -10,7 +10,7 @@ export default function Footer() {
         Privacy Policy
       </a>
 
-      <span className="mx-2">.</span>
+      <span className="mx-2" aria-hidden="true">.</span>
 
       <a
         href="https://leaderbot.live/terms"
@@ -19,7 +19,7 @@ export default function Footer() {
         Terms of Service
       </a>
 
-      <span className="mx-2">.</span>
+      <span className="mx-2" aria-hidden="true">.</span>
 
       <a
         href="https://leaderbot.live/data-deletion"
