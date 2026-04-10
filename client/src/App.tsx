@@ -27,7 +27,7 @@ function App() {
         <TooltipProvider>
           <div className="min-h-screen flex flex-col">
             <Toaster />
-            <div className="flex-grow">
+            <div className="grow">
               <Router />
             </div>
             <Footer />
