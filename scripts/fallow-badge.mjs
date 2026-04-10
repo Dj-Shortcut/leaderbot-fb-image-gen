@@ -13,40 +13,21 @@ if (!inputPath || !badgePath || !metricsPath) {
 const raw = fs.readFileSync(inputPath, "utf8").replace(/^\uFEFF/, "");
 const report = JSON.parse(raw);
 const summary = report.check?.summary ?? report.summary;
+const healthSummary = report.health?.summary;
 
 if (!summary) {
   console.error("Fallow summary not found in report JSON");
   process.exit(1);
 }
 
-const weights = {
-  unused_files: 3,
-  unresolved_imports: 5,
-  circular_dependencies: 6,
-  boundary_violations: 5,
-  unused_dependencies: 3,
-  unlisted_dependencies: 3,
-  duplicate_exports: 2,
-  unused_exports: 1,
-  unused_types: 0.5,
-  unused_enum_members: 0.5,
-  unused_class_members: 0.5,
-  type_only_dependencies: 0.5,
-  test_only_dependencies: 0.5,
-};
+const averageMaintainability = Number(healthSummary?.average_maintainability);
 
-const weightedIssues = Object.entries(weights).reduce((total, [key, weight]) => {
-  return total + (Number(summary[key] ?? 0) * weight);
-}, 0);
+if (!Number.isFinite(averageMaintainability)) {
+  console.error("Fallow native maintainability not found in report JSON");
+  process.exit(1);
+}
 
-// The baseline keeps the score stable and prevents it from collapsing to zero
-// as soon as a repo becomes non-trivial. Lower weighted issue totals push the
-// score upward; higher totals compress it toward zero.
-const baseline = 100;
-const score = Math.max(
-  0,
-  Math.min(100, Math.round((baseline / (baseline + weightedIssues)) * 100))
-);
+const score = Number(averageMaintainability.toFixed(1));
 
 function getColor(value) {
   if (value >= 85) return "brightgreen";
@@ -59,11 +40,17 @@ function getColor(value) {
 
 const totalIssues = Number(report.check?.total_issues ?? report.total_issues ?? 0);
 const version = report.version ?? report.check?.version ?? "unknown";
+const functionsAboveThreshold = Number(
+  healthSummary?.functions_above_threshold ?? 0
+);
+const functionsAnalyzed = Number(healthSummary?.functions_analyzed ?? 0);
+const filesScored = Number(healthSummary?.files_scored ?? 0);
+const coverageModel = healthSummary?.coverage_model ?? "unknown";
 
 const badge = {
   schemaVersion: 1,
   label: "fallow maintainability",
-  message: `${score}%`,
+  message: score.toFixed(1),
   color: getColor(score),
 };
 
@@ -71,12 +58,14 @@ const metrics = {
   generatedAt: new Date().toISOString(),
   fallowVersion: version,
   totalIssues,
-  weightedIssues: Number(weightedIssues.toFixed(1)),
+  functionsAboveThreshold,
+  functionsAnalyzed,
+  filesScored,
+  coverageModel,
   maintainabilityScore: score,
-  formula: "score = round(100 * baseline / (baseline + weightedIssues))",
-  baseline,
-  weights,
+  formula: "native Fallow average_maintainability",
   summary,
+  healthSummary,
 };
 
 fs.mkdirSync(path.dirname(badgePath), { recursive: true });
@@ -90,7 +79,7 @@ console.log(
       badge,
       metrics: {
         totalIssues,
-        weightedIssues: metrics.weightedIssues,
+        functionsAboveThreshold,
         maintainabilityScore: score,
       },
     },
