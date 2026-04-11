@@ -61,6 +61,16 @@ const variantSchema = z.object({
 
 export type GameVariantDefinition = z.infer<typeof variantSchema>;
 
+type VariantValidationContext = {
+  variant: GameVariantDefinition;
+  normalizedId: string;
+  mapKeys: string[];
+  mapKeySet: Set<string>;
+  expectedTriples: Set<string>;
+  archetypeIds: Set<(typeof V1_ARCHETYPE_IDS)[number]>;
+  missingArchetypes: (typeof V1_ARCHETYPE_IDS)[number][];
+};
+
 function resolveFamilies(
   first: (typeof V1_ARCHETYPE_IDS)[number],
   second: (typeof V1_ARCHETYPE_IDS)[number],
@@ -323,6 +333,146 @@ function isLikelyPublicImageUrl(rawUrl: string): boolean {
   return true;
 }
 
+function validateVariantShape(
+  rawVariant: GameVariantDefinition,
+  errors: string[]
+): GameVariantDefinition | null {
+  const parsed = variantSchema.safeParse(rawVariant);
+  if (!parsed.success) {
+    errors.push(
+      `Invalid variant definition: ${parsed.error.issues
+        .map(issue => issue.path.join("."))
+        .join(", ")}`
+    );
+    return null;
+  }
+
+  return parsed.data;
+}
+
+function buildExpectedTriples(
+  variant: GameVariantDefinition
+): Set<string> {
+  const expectedTriples = new Set<string>();
+  for (const option1 of variant.questions[0].options) {
+    for (const option2 of variant.questions[1].options) {
+      for (const option3 of variant.questions[2].options) {
+        expectedTriples.add(`${option1.id}|${option2.id}|${option3.id}`);
+      }
+    }
+  }
+  return expectedTriples;
+}
+
+function buildVariantValidationContext(
+  variant: GameVariantDefinition
+): VariantValidationContext {
+  const mapKeys = Object.keys(variant.resolutionMap);
+  const archetypeIds = new Set(variant.archetypes.map(archetype => archetype.id));
+
+  return {
+    variant,
+    normalizedId: normalizeVariantId(variant.variantId),
+    mapKeys,
+    mapKeySet: new Set(mapKeys),
+    expectedTriples: buildExpectedTriples(variant),
+    archetypeIds,
+    missingArchetypes: V1_ARCHETYPE_IDS.filter(id => !archetypeIds.has(id)),
+  };
+}
+
+function validateVariantIdentity(
+  context: VariantValidationContext,
+  seenIds: Set<string>,
+  errors: string[]
+): void {
+  if (seenIds.has(context.normalizedId)) {
+    errors.push(`Duplicate variantId: ${context.variant.variantId}`);
+  }
+  seenIds.add(context.normalizedId);
+}
+
+function validateVariantShareMeta(
+  context: VariantValidationContext,
+  errors: string[]
+): void {
+  const { variant } = context;
+  if (variant.status !== "active") {
+    return;
+  }
+
+  if (!variant.share) {
+    errors.push(`Active variant ${variant.variantId} must define share metadata`);
+    return;
+  }
+
+  if (!isLikelyPublicImageUrl(variant.share.imageUrl)) {
+    errors.push(
+      `Active variant ${variant.variantId} has non-public or non-cache-safe share.imageUrl`
+    );
+  }
+}
+
+function validateVariantQuestionOptions(
+  context: VariantValidationContext,
+  errors: string[]
+): void {
+  for (const question of context.variant.questions) {
+    const seenOptionIds = new Set<string>();
+    for (const option of question.options) {
+      if (seenOptionIds.has(option.id)) {
+        errors.push(
+          `Variant ${context.variant.variantId} question ${question.id} has duplicate option id: ${option.id}`
+        );
+      }
+      seenOptionIds.add(option.id);
+    }
+  }
+}
+
+function validateVariantArchetypes(
+  context: VariantValidationContext,
+  errors: string[]
+): void {
+  if (context.missingArchetypes.length > 0) {
+    errors.push(
+      `Variant ${context.variant.variantId} is missing archetypes: ${context.missingArchetypes.join(", ")}`
+    );
+  }
+
+  if (context.archetypeIds.size < context.variant.archetypes.length) {
+    errors.push(`Variant ${context.variant.variantId} has duplicate archetype ids`);
+  }
+}
+
+function validateVariantResolutionMap(
+  context: VariantValidationContext,
+  errors: string[]
+): void {
+  for (const tripleKey of context.expectedTriples) {
+    if (!context.mapKeySet.has(tripleKey)) {
+      errors.push(
+        `Variant ${context.variant.variantId} is missing resolutionMap key: ${tripleKey}`
+      );
+    }
+  }
+
+  for (const tripleKey of context.mapKeys) {
+    if (!context.expectedTriples.has(tripleKey)) {
+      errors.push(
+        `Variant ${context.variant.variantId} has unknown resolutionMap key: ${tripleKey}`
+      );
+    }
+
+    const mappedArchetypeId = context.variant.resolutionMap[tripleKey];
+    if (!context.archetypeIds.has(mappedArchetypeId)) {
+      errors.push(
+        `Variant ${context.variant.variantId} maps ${tripleKey} to unknown archetype: ${mappedArchetypeId}`
+      );
+    }
+  }
+}
+
 export function assertIdentityGameVariantCatalog(
   variants: readonly GameVariantDefinition[] = GAME_VARIANTS
 ): void {
@@ -330,88 +480,17 @@ export function assertIdentityGameVariantCatalog(
   const seenIds = new Set<string>();
 
   for (const rawVariant of variants) {
-    const parsed = variantSchema.safeParse(rawVariant);
-    if (!parsed.success) {
-      errors.push(
-        `Invalid variant definition: ${parsed.error.issues
-          .map(issue => issue.path.join("."))
-          .join(", ")}`
-      );
+    const variant = validateVariantShape(rawVariant, errors);
+    if (!variant) {
       continue;
     }
 
-    const variant = parsed.data;
-    const normalizedId = normalizeVariantId(variant.variantId);
-    if (seenIds.has(normalizedId)) {
-      errors.push(`Duplicate variantId: ${variant.variantId}`);
-    }
-    seenIds.add(normalizedId);
-
-    if (variant.status === "active") {
-      if (!variant.share) {
-        errors.push(
-          `Active variant ${variant.variantId} must define share metadata`
-        );
-      } else if (!isLikelyPublicImageUrl(variant.share.imageUrl)) {
-        errors.push(
-          `Active variant ${variant.variantId} has non-public or non-cache-safe share.imageUrl`
-        );
-      }
-    }
-
-    const expectedTriples = new Set<string>();
-    for (const option1 of variant.questions[0].options) {
-      for (const option2 of variant.questions[1].options) {
-        for (const option3 of variant.questions[2].options) {
-          expectedTriples.add(`${option1.id}|${option2.id}|${option3.id}`);
-        }
-      }
-    }
-
-    const mapKeys = Object.keys(variant.resolutionMap);
-    const mapKeySet = new Set(mapKeys);
-    const archetypeIds = new Set(variant.archetypes.map(archetype => archetype.id));
-    const missingArchetypes = V1_ARCHETYPE_IDS.filter(id => !archetypeIds.has(id));
-    for (const question of variant.questions) {
-      const seenOptionIds = new Set<string>();
-      for (const option of question.options) {
-        if (seenOptionIds.has(option.id)) {
-          errors.push(
-            `Variant ${variant.variantId} question ${question.id} has duplicate option id: ${option.id}`
-          );
-        }
-        seenOptionIds.add(option.id);
-      }
-    }
-
-    if (missingArchetypes.length > 0) {
-      errors.push(
-        `Variant ${variant.variantId} is missing archetypes: ${missingArchetypes.join(", ")}`
-      );
-    }
-
-    if (archetypeIds.size < variant.archetypes.length) {
-      errors.push(`Variant ${variant.variantId} has duplicate archetype ids`);
-    }
-
-    for (const tripleKey of expectedTriples) {
-      if (!mapKeySet.has(tripleKey)) {
-        errors.push(`Variant ${variant.variantId} is missing resolutionMap key: ${tripleKey}`);
-      }
-    }
-
-    for (const tripleKey of mapKeys) {
-      if (!expectedTriples.has(tripleKey)) {
-        errors.push(`Variant ${variant.variantId} has unknown resolutionMap key: ${tripleKey}`);
-      }
-
-      const mappedArchetypeId = variant.resolutionMap[tripleKey];
-      if (!archetypeIds.has(mappedArchetypeId)) {
-        errors.push(
-          `Variant ${variant.variantId} maps ${tripleKey} to unknown archetype: ${mappedArchetypeId}`
-        );
-      }
-    }
+    const context = buildVariantValidationContext(variant);
+    validateVariantIdentity(context, seenIds, errors);
+    validateVariantShareMeta(context, errors);
+    validateVariantQuestionOptions(context, errors);
+    validateVariantArchetypes(context, errors);
+    validateVariantResolutionMap(context, errors);
   }
 
   if (errors.length > 0) {

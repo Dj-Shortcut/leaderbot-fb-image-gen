@@ -9,7 +9,7 @@ import {
   buildGeneratedImageUrl,
   putGeneratedImage,
 } from "./generatedImageStore";
-
+import { storagePut } from "../storage";
 
 export type GeneratorMode = "openai";
 
@@ -83,6 +83,41 @@ type DownloadedSourceImage = SourceImageData & {
   incomingLen: number;
   incomingSha256: string;
   fbImageFetchMs: number;
+};
+
+type GeneratorInput = {
+  style: Style;
+  sourceImageUrl?: string;
+  trustedSourceImageUrl?: boolean;
+  sourceImageProvenance?: "storeInbound";
+  sourceImageData?: {
+    buffer: Buffer;
+    contentType: string;
+  };
+  promptHint?: string;
+  userKey: string;
+  reqId: string;
+};
+
+type OpenAiRequestContext = {
+  endpoint: URL;
+  requestInit: RequestInit;
+};
+
+type PreparedGenerationInput = {
+  hasSourceImage: boolean;
+  prompt: string;
+  sourceImage: DownloadedSourceImage;
+};
+
+type SourceImageDownloadOptions = {
+  trustedSourceImageUrl?: boolean;
+  sourceImageProvenance?: "storeInbound";
+};
+
+type SourceImageFetchAttemptResult = {
+  response: Response;
+  contentType: string;
 };
 
 const MIN_INPUT_IMAGE_BYTES = 5 * 1024;
@@ -427,57 +462,53 @@ function isBlockedHostname(hostname: string): boolean {
   return false;
 }
 
+function blockSourceImageUrl(
+  reqId: string | undefined,
+  reason: string,
+  details: Record<string, unknown> = {}
+): never {
+  console.warn("SOURCE_IMAGE_URL_BLOCKED", {
+    reqId,
+    reason,
+    ...details,
+  });
+  throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+}
+
 function validateSourceImageUrlOrThrow(
   sourceImageUrl: string,
   reqId?: string,
-  options?: {
-    trustedSourceImageUrl?: boolean;
-    sourceImageProvenance?: "storeInbound";
-  }
+  options?: SourceImageDownloadOptions
 ): URL {
   let parsedUrl: URL;
 
   try {
     parsedUrl = new URL(sourceImageUrl);
   } catch {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "invalid_url" });
-    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+    return blockSourceImageUrl(reqId, "invalid_url");
   }
 
   const hostname = parsedUrl.hostname.toLowerCase();
   if (parsedUrl.protocol !== "https:") {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-      reqId,
-      reason: "non_https",
+    return blockSourceImageUrl(reqId, "non_https", {
       protocol: parsedUrl.protocol,
     });
-    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
   if (parsedUrl.username || parsedUrl.password) {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-      reqId,
-      reason: "credentials_in_url",
-    });
-    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+    return blockSourceImageUrl(reqId, "credentials_in_url");
   }
 
   if (parsedUrl.port && parsedUrl.port !== "443") {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-      reqId,
-      reason: "non_standard_port",
+    return blockSourceImageUrl(reqId, "non_standard_port", {
       port: parsedUrl.port,
     });
-    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
   if (isBlockedHostname(hostname)) {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-      reqId,
-      reason: "blocked_hostname",
+    return blockSourceImageUrl(reqId, "blocked_hostname", {
       hostname,
     });
-    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
   const allowTrustedSourceBypass =
@@ -487,11 +518,7 @@ function validateSourceImageUrlOrThrow(
   if (!allowTrustedSourceBypass) {
     const allowedHosts = parseAllowedHostsFromEnv();
     if (allowedHosts.length === 0) {
-      console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-        reqId,
-        reason: "allowlist_not_configured",
-      });
-      throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+      return blockSourceImageUrl(reqId, "allowlist_not_configured");
     }
 
     if (
@@ -499,12 +526,9 @@ function validateSourceImageUrlOrThrow(
         hostnameMatchesAllowedHost(hostname, allowedHost)
       )
     ) {
-      console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-        reqId,
-        reason: "host_not_allowed",
+      return blockSourceImageUrl(reqId, "host_not_allowed", {
         hostname,
       });
-      throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
     }
   }
 
@@ -532,13 +556,179 @@ async function fetchWithTimeout(
   }
 }
 
+async function fetchSourceImageAttempt(
+  sourceImageUrl: URL,
+  timeoutMs: number
+): Promise<SourceImageFetchAttemptResult> {
+  const response = await fetchWithTimeout(
+    sourceImageUrl,
+    { redirect: "manual" },
+    timeoutMs
+  );
+
+  return {
+    response,
+    contentType:
+      response.headers.get("content-type") ?? "application/octet-stream",
+  };
+}
+
+function assertNoRedirectResponse(
+  response: Response,
+  reqId: string
+): void {
+  if (!isRedirectStatus(response.status)) {
+    return;
+  }
+
+  blockSourceImageUrl(reqId, "redirect_not_allowed", {
+    status: response.status,
+    location: response.headers.get("location") ?? undefined,
+  });
+}
+
+function shouldRetrySourceImageStatus(
+  attempt: number,
+  response: Response,
+  reqId: string
+): boolean {
+  if (
+    attempt < FB_IMAGE_FETCH_RETRY_LIMIT &&
+    isRetryableResponseStatus(response.status)
+  ) {
+    console.debug("FB_IMAGE_FETCH_RETRY", {
+      reqId,
+      attempt: attempt + 1,
+      status: response.status,
+    });
+    return true;
+  }
+
+  return false;
+}
+
+function throwMissingInputDownloadFailed(
+  reqId: string,
+  status: number
+): never {
+  console.error("MISSING_INPUT_IMAGE", {
+    reqId,
+    reason: "download_failed",
+    status,
+  });
+  throw new MissingInputImageError(
+    `Failed to download source image (${status})`
+  );
+}
+
+async function maybeWriteDebugImageProof(
+  reqId: string,
+  contentType: string,
+  imageBuffer: Buffer
+): Promise<void> {
+  if (process.env.DEBUG_IMAGE_PROOF !== "1") {
+    return;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    console.warn("DEBUG_IMAGE_PROOF is ignored in production", { reqId });
+    return;
+  }
+
+  const ext = contentType.includes("png") ? "png" : "jpg";
+  const debugDir = path.join(os.tmpdir(), "leaderbot-debug");
+  const savedPath = path.join(
+    debugDir,
+    `leaderbot_incoming_${reqId}_${Date.now()}_${randomUUID()}.${ext}`
+  );
+  await fs.mkdir(debugDir, { recursive: true });
+  await fs.writeFile(savedPath, imageBuffer);
+  console.log("DEBUG_IMAGE_PROOF", { reqId, saved_path: savedPath });
+}
+
+function assertSourceImageSizeOrThrow(
+  reqId: string,
+  incomingByteLen: number
+): void {
+  if (incomingByteLen >= MIN_INPUT_IMAGE_BYTES) {
+    return;
+  }
+
+  console.error("MISSING_INPUT_IMAGE", {
+    reqId,
+    reason: "too_small",
+    byte_len: incomingByteLen,
+  });
+  throw new MissingInputImageError(
+    `Source image too small (${incomingByteLen} bytes)`
+  );
+}
+
+async function buildDownloadedSourceImage(
+  reqId: string,
+  contentType: string,
+  response: Response,
+  totalFetchMs: number
+): Promise<DownloadedSourceImage> {
+  const imageBuffer = Buffer.from(await response.arrayBuffer());
+  const incomingByteLen = safeLen(imageBuffer);
+  const incomingHash = sha256(imageBuffer);
+
+  await maybeWriteDebugImageProof(reqId, contentType, imageBuffer);
+  assertSourceImageSizeOrThrow(reqId, incomingByteLen);
+
+  return {
+    buffer: imageBuffer,
+    contentType,
+    incomingLen: incomingByteLen,
+    incomingSha256: incomingHash,
+    fbImageFetchMs: totalFetchMs,
+  };
+}
+
+function shouldRetrySourceImageError(
+  attempt: number,
+  error: unknown,
+  reqId: string
+): boolean {
+  if (attempt < FB_IMAGE_FETCH_RETRY_LIMIT && isTransientNetworkError(error)) {
+    console.debug("FB_IMAGE_FETCH_RETRY", {
+      reqId,
+      attempt: attempt + 1,
+      reason: error instanceof Error ? error.name : "UnknownError",
+    });
+    return true;
+  }
+
+  return false;
+}
+
+function rethrowSourceImageError(error: unknown, reqId: string): never {
+  if (
+    error instanceof MissingInputImageError ||
+    error instanceof InvalidSourceImageUrlError
+  ) {
+    throw error;
+  }
+
+  if (isTransientNetworkError(error)) {
+    console.error("MISSING_INPUT_IMAGE", {
+      reqId,
+      reason:
+        error instanceof Error && error.name === "AbortError"
+          ? "download_timeout"
+          : "download_network_error",
+    });
+    throw new MissingInputImageError("Failed to download source image");
+  }
+
+  throw error;
+}
+
 async function downloadSourceImageOrThrow(
   sourceImageUrl: string,
   reqId: string,
-  options?: {
-    trustedSourceImageUrl?: boolean;
-    sourceImageProvenance?: "storeInbound";
-  }
+  options?: SourceImageDownloadOptions
 ): Promise<DownloadedSourceImage> {
   const validatedSourceImageUrl = validateSourceImageUrlOrThrow(
     sourceImageUrl,
@@ -552,122 +742,33 @@ async function downloadSourceImageOrThrow(
     const attemptStartedAt = Date.now();
 
     try {
-      const response = await fetchWithTimeout(
+      const { response, contentType } = await fetchSourceImageAttempt(
         validatedSourceImageUrl,
-        { redirect: "manual" },
         timeoutMs
       );
-      const contentType =
-        response.headers.get("content-type") ?? "application/octet-stream";
-
-      if (isRedirectStatus(response.status)) {
-        console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-          reqId,
-          reason: "redirect_not_allowed",
-          status: response.status,
-          location: response.headers.get("location") ?? undefined,
-        });
-        throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
-      }
+      assertNoRedirectResponse(response, reqId);
 
       if (!response.ok) {
         totalFetchMs += Date.now() - attemptStartedAt;
-
-        if (
-          attempt < FB_IMAGE_FETCH_RETRY_LIMIT &&
-          isRetryableResponseStatus(response.status)
-        ) {
-          console.debug("FB_IMAGE_FETCH_RETRY", {
-            reqId,
-            attempt: attempt + 1,
-            status: response.status,
-          });
+        if (shouldRetrySourceImageStatus(attempt, response, reqId)) {
           continue;
         }
-
-        console.error("MISSING_INPUT_IMAGE", {
-          reqId,
-          reason: "download_failed",
-          status: response.status,
-        });
-        throw new MissingInputImageError(
-          `Failed to download source image (${response.status})`
-        );
+        throwMissingInputDownloadFailed(reqId, response.status);
       }
 
-      const imageBuffer = Buffer.from(await response.arrayBuffer());
       totalFetchMs += Date.now() - attemptStartedAt;
-      const incomingByteLen = safeLen(imageBuffer);
-      const incomingHash = sha256(imageBuffer);
-
-      if (process.env.DEBUG_IMAGE_PROOF === "1") {
-        if (process.env.NODE_ENV === "production") {
-          console.warn("DEBUG_IMAGE_PROOF is ignored in production", { reqId });
-        } else {
-          const ext = contentType.includes("png") ? "png" : "jpg";
-          const debugDir = path.join(os.tmpdir(), "leaderbot-debug");
-          const savedPath = path.join(
-            debugDir,
-            `leaderbot_incoming_${reqId}_${Date.now()}_${randomUUID()}.${ext}`
-          );
-          await fs.mkdir(debugDir, { recursive: true });
-          await fs.writeFile(savedPath, imageBuffer);
-          console.log("DEBUG_IMAGE_PROOF", { reqId, saved_path: savedPath });
-        }
-      }
-
-      if (incomingByteLen < MIN_INPUT_IMAGE_BYTES) {
-        console.error("MISSING_INPUT_IMAGE", {
-          reqId,
-          reason: "too_small",
-          byte_len: incomingByteLen,
-        });
-        throw new MissingInputImageError(
-          `Source image too small (${incomingByteLen} bytes)`
-        );
-      }
-
-      return {
-        buffer: imageBuffer,
+      return buildDownloadedSourceImage(
+        reqId,
         contentType,
-        incomingLen: incomingByteLen,
-        incomingSha256: incomingHash,
-        fbImageFetchMs: totalFetchMs,
-      };
+        response,
+        totalFetchMs
+      );
     } catch (error) {
-      if (
-        error instanceof MissingInputImageError ||
-        error instanceof InvalidSourceImageUrlError
-      ) {
-        throw error;
-      }
-
       totalFetchMs += Date.now() - attemptStartedAt;
-
-      if (
-        attempt < FB_IMAGE_FETCH_RETRY_LIMIT &&
-        isTransientNetworkError(error)
-      ) {
-        console.debug("FB_IMAGE_FETCH_RETRY", {
-          reqId,
-          attempt: attempt + 1,
-          reason: error instanceof Error ? error.name : "UnknownError",
-        });
+      if (shouldRetrySourceImageError(attempt, error, reqId)) {
         continue;
       }
-
-      if (isTransientNetworkError(error)) {
-        console.error("MISSING_INPUT_IMAGE", {
-          reqId,
-          reason:
-            error instanceof Error && error.name === "AbortError"
-              ? "download_timeout"
-              : "download_network_error",
-        });
-        throw new MissingInputImageError("Failed to download source image");
-      }
-
-      throw error;
+      rethrowSourceImageError(error, reqId);
     }
   }
 
@@ -686,20 +787,195 @@ function normalizeProvidedSourceImage(
   };
 }
 
-export class OpenAiImageGenerator implements ImageGenerator {
-  async generate(input: {
-    style: Style;
-    sourceImageUrl?: string;
-    trustedSourceImageUrl?: boolean;
-    sourceImageProvenance?: "storeInbound";
-    sourceImageData?: {
-      buffer: Buffer;
-      contentType: string;
+function logSourceImageFetchStart(input: GeneratorInput): void {
+  if (!input.sourceImageUrl) {
+    return;
+  }
+
+  console.info("SOURCE_IMAGE_FETCH_START", {
+    reqId: input.reqId,
+    trustedSourceImageUrl: Boolean(input.trustedSourceImageUrl),
+    sourceImageProvenance: input.sourceImageProvenance,
+    ...getSourceUrlDiagnostics(input.sourceImageUrl),
+  });
+}
+
+async function resolveSourceImage(
+  input: GeneratorInput
+): Promise<DownloadedSourceImage> {
+  if (input.sourceImageData) {
+    return normalizeProvidedSourceImage(input.sourceImageData);
+  }
+
+  if (!input.sourceImageUrl) {
+    return normalizeProvidedSourceImage({
+      buffer: Buffer.from([]),
+      contentType: "image/jpeg",
+    });
+  }
+
+  return downloadSourceImageOrThrow(input.sourceImageUrl, input.reqId, {
+    trustedSourceImageUrl: input.trustedSourceImageUrl,
+    sourceImageProvenance: input.sourceImageProvenance,
+  });
+}
+
+async function prepareGenerationInput(
+  input: GeneratorInput
+): Promise<PreparedGenerationInput> {
+  logSourceImageFetchStart(input);
+
+  return {
+    hasSourceImage: Boolean(input.sourceImageUrl || input.sourceImageData),
+    prompt: buildStylePrompt(input.style, input.promptHint),
+    sourceImage: await resolveSourceImage(input),
+  };
+}
+
+function buildOpenAiRequest(
+  prompt: string,
+  sourceImage: DownloadedSourceImage,
+  hasSourceImage: boolean
+): OpenAiRequestContext {
+  if (hasSourceImage) {
+    const formData = new FormData();
+    formData.set("model", "gpt-image-1");
+    formData.set("prompt", prompt);
+    formData.set("size", "1024x1024");
+    formData.set("output_format", "jpeg");
+    formData.set(
+      "image",
+      new Blob([new Uint8Array(sourceImage.buffer)], {
+        type: sourceImage.contentType,
+      }),
+      "source-image"
+    );
+
+    return {
+      endpoint: new URL("https://api.openai.com/v1/images/edits"),
+      requestInit: {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: formData,
+      },
     };
-    promptHint?: string;
-    userKey: string;
-    reqId: string;
-  }): Promise<{
+  }
+
+  return {
+    endpoint: new URL("https://api.openai.com/v1/images/generations"),
+    requestInit: {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-image-1",
+        prompt,
+        size: "1024x1024",
+        output_format: "jpeg",
+      }),
+    },
+  };
+}
+
+async function fetchOpenAiImageResponse(
+  requestContext: OpenAiRequestContext,
+  input: GeneratorInput,
+  startedAt: number,
+  partialMetrics: Omit<GenerationMetrics, "totalMs">
+): Promise<Response> {
+  const openAiRetryLimit = getOpenAiRetryLimit();
+  const openAiRetryBaseMs = getOpenAiRetryBaseMs();
+  const openAiTimeoutMs = getOpenAiTimeoutMs();
+
+  for (let attempt = 0; attempt <= openAiRetryLimit; attempt += 1) {
+    const openAiStartedAt = Date.now();
+    let response: Response | undefined;
+
+    try {
+      response = await fetchWithTimeout(
+        requestContext.endpoint,
+        requestContext.requestInit,
+        openAiTimeoutMs
+      );
+    } catch (error) {
+      partialMetrics.openAiMs =
+        (partialMetrics.openAiMs ?? 0) + (Date.now() - openAiStartedAt);
+
+      if (attempt < openAiRetryLimit && isTransientNetworkError(error)) {
+        const waitMs = openAiRetryBaseMs * 2 ** attempt;
+        console.warn("OPENAI_GENERATION_RETRY", {
+          reqId: input.reqId,
+          attempt: attempt + 1,
+          waitMs,
+          reason: (error as Error).name,
+        });
+        await wait(waitMs);
+        continue;
+      }
+
+      throw error;
+    }
+
+    partialMetrics.openAiMs =
+      (partialMetrics.openAiMs ?? 0) + (Date.now() - openAiStartedAt);
+
+    if (response.ok) {
+      return response;
+    }
+
+    const errorBody = await readErrorBody(response);
+    if (isBudgetExceededErrorResponse(response.status, errorBody)) {
+      console.error("OPENAI_BUDGET_EXCEEDED", {
+        reqId: input.reqId,
+        status: response.status,
+        statusText: response.statusText,
+        body: errorBody.slice(0, 1000),
+      });
+      throw attachGenerationMetrics(
+        new OpenAiBudgetExceededError(
+          `OpenAI budget exceeded (${response.status} ${response.statusText})`
+        ),
+        finalizeMetrics(startedAt, partialMetrics)
+      );
+    }
+
+    if (attempt < openAiRetryLimit && isRetryableResponseStatus(response.status)) {
+      const waitMs = openAiRetryBaseMs * 2 ** attempt;
+      console.warn("OPENAI_GENERATION_RETRY", {
+        reqId: input.reqId,
+        attempt: attempt + 1,
+        waitMs,
+        status: response.status,
+      });
+      await wait(waitMs);
+      continue;
+    }
+
+    console.error("OPENAI_ERROR_RESPONSE", {
+      reqId: input.reqId,
+      status: response.status,
+      statusText: response.statusText,
+      body: errorBody.slice(0, 1000),
+    });
+    throw attachGenerationMetrics(
+      new OpenAiGenerationError(
+        `OpenAI request failed (${response.status} ${response.statusText})`
+      ),
+      finalizeMetrics(startedAt, partialMetrics)
+    );
+  }
+
+  throw new OpenAiGenerationError(
+    "OpenAI request failed before receiving a response"
+  );
+}
+
+export class OpenAiImageGenerator implements ImageGenerator {
+  async generate(input: GeneratorInput): Promise<{
     imageUrl: string;
     proof: {
       incomingLen: number;
@@ -720,175 +996,31 @@ export class OpenAiImageGenerator implements ImageGenerator {
     }
 
     try {
-      const prompt = buildStylePrompt(input.style, input.promptHint);
-      const hasSourceImage = Boolean(input.sourceImageUrl || input.sourceImageData);
-      let imageBuffer: Buffer = Buffer.from([]);
-      let contentType = "image/jpeg";
-      let incomingLen = 0;
-      let incomingSha256 = sha256(imageBuffer);
-      let openAiInputHash = incomingSha256;
-      let openAiInputByteLen = 0;
+      const preparedInput = await prepareGenerationInput(input);
+      const sourceImage = preparedInput.sourceImage;
+      partialMetrics.fbImageFetchMs = sourceImage.fbImageFetchMs;
 
-      if (input.sourceImageUrl) {
-        console.info("SOURCE_IMAGE_FETCH_START", {
-          reqId: input.reqId,
-          trustedSourceImageUrl: Boolean(input.trustedSourceImageUrl),
-          sourceImageProvenance: input.sourceImageProvenance,
-          ...getSourceUrlDiagnostics(input.sourceImageUrl),
-        });
-      }
-      if (hasSourceImage) {
-        const sourceImage = input.sourceImageData
-          ? normalizeProvidedSourceImage(input.sourceImageData)
-          : await downloadSourceImageOrThrow(input.sourceImageUrl!, input.reqId, {
-              trustedSourceImageUrl: input.trustedSourceImageUrl,
-              sourceImageProvenance: input.sourceImageProvenance,
-            });
-        imageBuffer = sourceImage.buffer;
-        contentType = sourceImage.contentType;
-        incomingLen = sourceImage.incomingLen;
-        incomingSha256 = sourceImage.incomingSha256;
-        partialMetrics.fbImageFetchMs = sourceImage.fbImageFetchMs;
-        openAiInputHash = sha256(imageBuffer);
-        openAiInputByteLen = safeLen(imageBuffer);
-      }
+      const incomingLen = preparedInput.hasSourceImage ? sourceImage.incomingLen : 0;
+      const incomingSha256 = preparedInput.hasSourceImage
+        ? sourceImage.incomingSha256
+        : sha256(Buffer.from([]));
+      const openAiInputHash = preparedInput.hasSourceImage
+        ? sha256(sourceImage.buffer)
+        : incomingSha256;
+      const openAiInputByteLen = preparedInput.hasSourceImage
+        ? safeLen(sourceImage.buffer)
+        : 0;
 
-      const openAiRetryLimit = getOpenAiRetryLimit();
-      const openAiRetryBaseMs = getOpenAiRetryBaseMs();
-      const openAiTimeoutMs = getOpenAiTimeoutMs();
-
-      let response: Response | undefined;
-      for (let attempt = 0; attempt <= openAiRetryLimit; attempt += 1) {
-        const openAiStartedAt = Date.now();
-        try {
-          response = await fetchWithTimeout(
-            new URL(
-              hasSourceImage
-                ? "https://api.openai.com/v1/images/edits"
-                : "https://api.openai.com/v1/images/generations"
-            ),
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-                ...(hasSourceImage ? {} : { "Content-Type": "application/json" }),
-              },
-              body: hasSourceImage
-                ? (() => {
-                    const formData = new FormData();
-                    formData.set("model", "gpt-image-1");
-                    formData.set("prompt", prompt);
-                    formData.set("size", "1024x1024");
-                    formData.set("output_format", "jpeg");
-                    formData.set(
-                      "image",
-                      new Blob([new Uint8Array(imageBuffer)], { type: contentType }),
-                      "source-image"
-                    );
-                    return formData;
-                  })()
-                : JSON.stringify({
-                    model: "gpt-image-1",
-                    prompt,
-                    size: "1024x1024",
-                    output_format: "jpeg",
-                  }),
-            },
-            openAiTimeoutMs
-          );
-        } catch (error) {
-          partialMetrics.openAiMs =
-            (partialMetrics.openAiMs ?? 0) + (Date.now() - openAiStartedAt);
-          if (attempt < openAiRetryLimit && isTransientNetworkError(error)) {
-            const waitMs = openAiRetryBaseMs * 2 ** attempt;
-            console.warn("OPENAI_GENERATION_RETRY", {
-              reqId: input.reqId,
-              attempt: attempt + 1,
-              waitMs,
-              reason: (error as Error).name,
-            });
-            await wait(waitMs);
-            continue;
-          }
-
-          throw error;
-        }
-
-        partialMetrics.openAiMs =
-          (partialMetrics.openAiMs ?? 0) + (Date.now() - openAiStartedAt);
-        if (response.ok) {
-          break;
-        }
-
-        if (!response.ok) {
-          const errorBody = await readErrorBody(response);
-          if (isBudgetExceededErrorResponse(response.status, errorBody)) {
-            console.error("OPENAI_BUDGET_EXCEEDED", {
-              reqId: input.reqId,
-              status: response.status,
-              statusText: response.statusText,
-              body: errorBody.slice(0, 1000),
-            });
-            throw attachGenerationMetrics(
-              new OpenAiBudgetExceededError(
-                `OpenAI budget exceeded (${response.status} ${response.statusText})`
-              ),
-              finalizeMetrics(startedAt, partialMetrics)
-            );
-          }
-
-          if (
-            attempt < openAiRetryLimit &&
-            isRetryableResponseStatus(response.status)
-          ) {
-            const waitMs = openAiRetryBaseMs * 2 ** attempt;
-            console.warn("OPENAI_GENERATION_RETRY", {
-              reqId: input.reqId,
-              attempt: attempt + 1,
-              waitMs,
-              status: response.status,
-            });
-            await wait(waitMs);
-            continue;
-          }
-
-          console.error("OPENAI_ERROR_RESPONSE", {
-            reqId: input.reqId,
-            status: response.status,
-            statusText: response.statusText,
-            body: errorBody.slice(0, 1000),
-          });
-          throw attachGenerationMetrics(
-            new OpenAiGenerationError(
-              `OpenAI request failed (${response.status} ${response.statusText})`
-            ),
-            finalizeMetrics(startedAt, partialMetrics)
-          );
-        }
-
-        if (
-          attempt < openAiRetryLimit &&
-          isRetryableResponseStatus(response.status)
-        ) {
-          const waitMs = openAiRetryBaseMs * 2 ** attempt;
-          console.warn("OPENAI_GENERATION_RETRY", {
-            reqId: input.reqId,
-            attempt: attempt + 1,
-            waitMs,
-            status: response.status,
-          });
-          await wait(waitMs);
-          continue;
-        }
-
-        break;
-      }
-
-      if (!response) {
-        throw new OpenAiGenerationError(
-          "OpenAI request failed before receiving a response"
-        );
-      }
+      const response = await fetchOpenAiImageResponse(
+        buildOpenAiRequest(
+          preparedInput.prompt,
+          sourceImage,
+          preparedInput.hasSourceImage
+        ),
+        input,
+        startedAt,
+        partialMetrics
+      );
 
       const result = (await response.json()) as {
         data?: Array<{ b64_json?: string }>;
