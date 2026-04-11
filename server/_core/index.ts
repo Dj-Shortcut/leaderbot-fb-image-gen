@@ -320,6 +320,17 @@ async function startServer() {
   );
   app.use(express.urlencoded({ limit: REQUEST_BODY_LIMIT, extended: true }));
 
+  app.use("/webhook", (req, _res, next) => {
+    if (req.method === "POST") {
+      console.info("[meta webhook] inbound post hit", {
+        path: req.path,
+        contentType: req.headers["content-type"],
+        hasSignatureHeader: typeof req.headers["x-hub-signature-256"] === "string",
+      });
+    }
+    next();
+  });
+
   // Verify webhook signature for all Meta webhook deliveries.
   app.use("/webhook", verifyBotWebhookSignature);
 
