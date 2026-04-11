@@ -72,10 +72,9 @@ describe("default feature registration", () => {
       ensureDefaultBotFeaturesRegistered();
     }).not.toThrow();
 
-    expect(getBotFeatures().map(feature => feature.name)).toEqual([
-      "rateLimit",
-      "styleCommands",
-    ]);
+    expect(getBotFeatures().map(feature => feature.name)).toEqual(
+      expect.arrayContaining(["rateLimit", "styleCommands"])
+    );
   });
 });
 

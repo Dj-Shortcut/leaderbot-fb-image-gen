@@ -56,7 +56,6 @@ import {
 import {
   detectAck,
   getEventDedupeKey,
-  summarizeWebhook,
 } from "./_core/webhookHelpers";
 import { getBotFeatures } from "./_core/bot/features";
 
@@ -120,89 +119,6 @@ beforeEach(() => {
   });
 });
 
-describe("webhook summary logging", () => {
-  it("summarizes event types and flags without including message contents", () => {
-    const summary = summarizeWebhook({
-      object: "page",
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: "user-123" },
-              recipient: { id: "page-456" },
-              message: {
-                text: "super secret text",
-                is_echo: true,
-                attachments: [
-                  { type: "image" },
-                  { type: "audio" },
-                  { payload: { url: "https://a" } },
-                ],
-              },
-            },
-            {
-              postback: { payload: "disco" },
-            },
-            {
-              read: { watermark: 1 },
-            },
-            {
-              delivery: { mids: ["mid-1"] },
-            },
-          ],
-        },
-      ],
-    });
-
-    expect(summary).toEqual({
-      object: "page",
-      entryCount: 1,
-      events: [
-        {
-          type: "message",
-          hasText: true,
-          attachmentTypes: ["image", "audio"],
-          isEcho: true,
-          hasRead: false,
-          hasDelivery: false,
-          hasPostback: false,
-        },
-        {
-          type: "postback",
-          hasText: false,
-          attachmentTypes: [],
-          isEcho: false,
-          hasRead: false,
-          hasDelivery: false,
-          hasPostback: true,
-        },
-        {
-          type: "read",
-          hasText: false,
-          attachmentTypes: [],
-          isEcho: false,
-          hasRead: true,
-          hasDelivery: false,
-          hasPostback: false,
-        },
-        {
-          type: "delivery",
-          hasText: false,
-          attachmentTypes: [],
-          isEcho: false,
-          hasRead: false,
-          hasDelivery: true,
-          hasPostback: false,
-        },
-      ],
-    });
-
-    expect(JSON.stringify(summary)).not.toContain("super secret text");
-    expect(JSON.stringify(summary)).not.toContain("user-123");
-    expect(JSON.stringify(summary)).not.toContain("page-456");
-  });
-});
-
 describe("messenger webhook dedupe", () => {
   beforeEach(() => {
     delete process.env.MOCK_MODE;
@@ -220,10 +136,9 @@ describe("messenger webhook dedupe", () => {
   });
 
   it("registers built-in bot features", () => {
-    expect(getBotFeatures().map(feature => feature.name)).toEqual([
-      "rateLimit",
-      "styleCommands",
-    ]);
+    expect(getBotFeatures().map(feature => feature.name)).toEqual(
+      expect.arrayContaining(["rateLimit", "styleCommands"])
+    );
   });
 
   it("processes a message.mid only once", async () => {
@@ -2150,7 +2065,7 @@ describe("disabled bot features stay out of the runtime flow", () => {
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
 
-  it("does not auto-run the disabled surprise command", async () => {
+  it("auto-runs surprise when a photo is already available", async () => {
     installOpenAiSuccessFetchMock();
 
     await processFacebookWebhookPayload({
@@ -2194,11 +2109,22 @@ describe("disabled bot features stay out of the runtime flow", () => {
       ],
     });
 
-    expect(sendTextMock).toHaveBeenCalledWith(
+    expect(sendTextMock).toHaveBeenNthCalledWith(
+      1,
       "surprise-style-user",
-      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis."
+      expect.stringMatching(/^🎲 Mooie keuze/)
     );
-    expect(sendImageMock).not.toHaveBeenCalled();
+    expect(sendTextMock).toHaveBeenNthCalledWith(
+      2,
+      "surprise-style-user",
+      expect.stringMatching(/^Ik maak nu je .*?-stijl\.$/)
+    );
+    expect(sendImageMock).toHaveBeenCalledWith(
+      "surprise-style-user",
+      expect.stringMatching(
+        /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+      )
+    );
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
 

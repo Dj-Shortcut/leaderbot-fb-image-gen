@@ -109,7 +109,7 @@ describe("bot features", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(
       psid,
-      "Stuur gerust een foto, dan kan ik een stijl voor je maken."
+      "Stuur gerust een foto, dan kan ik een stijl voor je maken.\n\nTip: typ 'verras me' nadat je een foto hebt gestuurd voor meteen een willekeurige stijl."
     );
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
