@@ -266,6 +266,8 @@ export async function handleSharedTextMessage(
   }
 
   input.logState?.(state, "text_message");
+  const effectiveState =
+    hasPhoto ? state : { ...state, stage: "AWAITING_PHOTO" as const };
   if (!hasPhoto) {
     await input.setFlowState("AWAITING_PHOTO");
   }
@@ -274,7 +276,11 @@ export async function handleSharedTextMessage(
   logRolloutDecision(input, rolloutDecision);
 
   if (rolloutDecision.useResponses) {
-    return generateResponsesReply(input, { trimmedText, state, hasPhoto });
+    return generateResponsesReply(input, {
+      trimmedText,
+      state: effectiveState,
+      hasPhoto,
+    });
   }
 
   return buildDefaultTextResponse(input.lang, hasPhoto);

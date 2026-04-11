@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import net from "node:net";
 import { z } from "zod";
 
 const IDENTITY_GAME_CANONICAL_DOMAIN = "leaderbot.live";
@@ -95,17 +96,12 @@ function buildDeterministicResolutionMap(
   ]
 ): Record<string, (typeof V1_ARCHETYPE_IDS)[number]> {
   const map: Record<string, (typeof V1_ARCHETYPE_IDS)[number]> = {};
-  for (const option1 of questions[0].options) {
-    for (const option2 of questions[1].options) {
-      for (const option3 of questions[2].options) {
-        const key = `${option1.id}|${option2.id}|${option3.id}`;
-        map[key] = resolveFamilies(
-          option1.archetypeId,
-          option2.archetypeId,
-          option3.archetypeId
-        );
-      }
-    }
+  for (const triple of enumerateQuestionTriples(questions)) {
+    map[triple.key] = resolveFamilies(
+      triple.option1.archetypeId,
+      triple.option2.archetypeId,
+      triple.option3.archetypeId
+    );
   }
   return map;
 }
@@ -302,6 +298,35 @@ function normalizeVariantId(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function isPrivateOrReservedIpLiteral(hostname: string): boolean {
+  const ipVersion = net.isIP(hostname);
+  if (ipVersion === 4) {
+    const [a, b] = hostname.split(".").map(part => Number(part));
+    return (
+      a === 10 ||
+      a === 127 ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168)
+    );
+  }
+
+  if (ipVersion === 6) {
+    const normalized = hostname.toLowerCase();
+    return (
+      normalized === "::1" ||
+      normalized.startsWith("fc") ||
+      normalized.startsWith("fd") ||
+      normalized.startsWith("fe8") ||
+      normalized.startsWith("fe9") ||
+      normalized.startsWith("fea") ||
+      normalized.startsWith("feb")
+    );
+  }
+
+  return false;
+}
+
 function isLikelyPublicImageUrl(rawUrl: string): boolean {
   let parsed: URL;
   try {
@@ -315,6 +340,10 @@ function isLikelyPublicImageUrl(rawUrl: string): boolean {
   }
 
   if (!parsed.hostname || parsed.hostname === "localhost") {
+    return false;
+  }
+
+  if (isPrivateOrReservedIpLiteral(parsed.hostname)) {
     return false;
   }
 
@@ -350,16 +379,38 @@ function validateVariantShape(
   return parsed.data;
 }
 
-function buildExpectedTriples(
-  variant: GameVariantDefinition
-): Set<string> {
-  const expectedTriples = new Set<string>();
-  for (const option1 of variant.questions[0].options) {
-    for (const option2 of variant.questions[1].options) {
-      for (const option3 of variant.questions[2].options) {
-        expectedTriples.add(`${option1.id}|${option2.id}|${option3.id}`);
+function enumerateQuestionTriples(
+  questions: readonly [
+    z.infer<typeof questionSchema>,
+    z.infer<typeof questionSchema>,
+    z.infer<typeof questionSchema>
+  ]
+): Array<{
+  key: string;
+  option1: GameVariantDefinition["questions"][0]["options"][number];
+  option2: GameVariantDefinition["questions"][1]["options"][number];
+  option3: GameVariantDefinition["questions"][2]["options"][number];
+}> {
+  const triples = [];
+  for (const option1 of questions[0].options) {
+    for (const option2 of questions[1].options) {
+      for (const option3 of questions[2].options) {
+        triples.push({
+          key: `${option1.id}|${option2.id}|${option3.id}`,
+          option1,
+          option2,
+          option3,
+        });
       }
     }
+  }
+  return triples;
+}
+
+function buildExpectedTriples(variant: GameVariantDefinition): Set<string> {
+  const expectedTriples = new Set<string>();
+  for (const triple of enumerateQuestionTriples(variant.questions)) {
+    expectedTriples.add(triple.key);
   }
   return expectedTriples;
 }

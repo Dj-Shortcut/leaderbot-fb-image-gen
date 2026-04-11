@@ -228,4 +228,42 @@ describe("sharedTextHandler", () => {
       },
     });
   });
+
+  it("passes the post-transition stage into the responses engine after awaiting a photo", async () => {
+    process.env.MESSENGER_CHAT_ENGINE = "responses";
+    process.env.MESSENGER_CHAT_CANARY_PERCENT = "100";
+    generateMessengerReplyMock.mockResolvedValue({
+      text: "Generated response",
+      source: "responses",
+    });
+
+    const setFlowState = vi.fn(async () => {});
+
+    await handleSharedTextMessage({
+      message: {
+        channel: "messenger",
+        senderId: "psid-4",
+        userId: "user-key-4",
+        messageType: "text",
+        textBody: "Help me pick a style",
+      },
+      reqId: "req-stage-transition",
+      lang: "en",
+      getState: async () =>
+        createState({
+          psid: "psid-4",
+          userKey: "user-key-4",
+          hasSeenIntro: true,
+        }),
+      setFlowState,
+    });
+
+    expect(setFlowState).toHaveBeenCalledWith("AWAITING_PHOTO");
+    expect(generateMessengerReplyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stage: "AWAITING_PHOTO",
+        hasPhoto: false,
+      })
+    );
+  });
 });
