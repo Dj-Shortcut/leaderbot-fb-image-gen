@@ -698,7 +698,12 @@ async function readResponseBufferWithinLimit(
   const contentLengthHeader = response.headers.get("content-length");
   const contentLength = Number.parseInt(contentLengthHeader ?? "", 10);
   if (Number.isFinite(contentLength) && contentLength > 0) {
-    assertInboundImageWithinLimit(reqId, contentLength);
+    try {
+      assertInboundImageWithinLimit(reqId, contentLength);
+    } catch (error) {
+      await response.body?.cancel();
+      throw error;
+    }
   }
 
   if (!response.body) {
@@ -722,7 +727,12 @@ async function readResponseBufferWithinLimit(
     }
 
     totalBytes += value.byteLength;
-    assertInboundImageWithinLimit(reqId, totalBytes);
+    try {
+      assertInboundImageWithinLimit(reqId, totalBytes);
+    } catch (error) {
+      await reader.cancel();
+      throw error;
+    }
     chunks.push(value);
   }
 

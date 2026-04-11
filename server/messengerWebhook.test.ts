@@ -2119,12 +2119,14 @@ describe("disabled bot features stay out of the runtime flow", () => {
       "surprise-style-user",
       expect.stringMatching(/^Ik maak nu je .*?-stijl\.$/)
     );
+    expect(sendTextMock).toHaveBeenCalledTimes(2);
     expect(sendImageMock).toHaveBeenCalledWith(
       "surprise-style-user",
       expect.stringMatching(
         /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
       )
     );
+    expect(sendImageMock).toHaveBeenCalledTimes(1);
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
 

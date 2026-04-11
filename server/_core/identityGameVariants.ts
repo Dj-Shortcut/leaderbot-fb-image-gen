@@ -299,9 +299,28 @@ function normalizeVariantId(value: string): string {
 }
 
 function isPrivateOrReservedIpLiteral(hostname: string): boolean {
-  const ipVersion = net.isIP(hostname);
+  const normalizedHostname = hostname.toLowerCase().replace(/^\[(.*)\]$/, "$1");
+  const v4MappedMatch = normalizedHostname.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (v4MappedMatch) {
+    return isPrivateOrReservedIpLiteral(v4MappedMatch[1]);
+  }
+
+  const mappedHexMatch = normalizedHostname.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mappedHexMatch) {
+    const high = Number.parseInt(mappedHexMatch[1], 16);
+    const low = Number.parseInt(mappedHexMatch[2], 16);
+    const ipv4 = [
+      (high >> 8) & 0xff,
+      high & 0xff,
+      (low >> 8) & 0xff,
+      low & 0xff,
+    ].join(".");
+    return isPrivateOrReservedIpLiteral(ipv4);
+  }
+
+  const ipVersion = net.isIP(normalizedHostname);
   if (ipVersion === 4) {
-    const [a, b] = hostname.split(".").map(part => Number(part));
+    const [a, b] = normalizedHostname.split(".").map(part => Number(part));
     return (
       a === 10 ||
       a === 127 ||
@@ -312,15 +331,14 @@ function isPrivateOrReservedIpLiteral(hostname: string): boolean {
   }
 
   if (ipVersion === 6) {
-    const normalized = hostname.toLowerCase();
     return (
-      normalized === "::1" ||
-      normalized.startsWith("fc") ||
-      normalized.startsWith("fd") ||
-      normalized.startsWith("fe8") ||
-      normalized.startsWith("fe9") ||
-      normalized.startsWith("fea") ||
-      normalized.startsWith("feb")
+      normalizedHostname === "::1" ||
+      normalizedHostname.startsWith("fc") ||
+      normalizedHostname.startsWith("fd") ||
+      normalizedHostname.startsWith("fe8") ||
+      normalizedHostname.startsWith("fe9") ||
+      normalizedHostname.startsWith("fea") ||
+      normalizedHostname.startsWith("feb")
     );
   }
 

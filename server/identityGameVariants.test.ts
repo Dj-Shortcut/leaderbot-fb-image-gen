@@ -229,6 +229,25 @@ describe("identity game variants catalog and share routes", () => {
     );
   });
 
+  it("rejects active share image urls on IPv4-mapped IPv6 private literals", () => {
+    const variants: GameVariantDefinition[] = [
+      createVariant({
+        variantId: "identity-private-mapped-ip-share",
+        status: "active",
+        entryRefs: ["identity-private-mapped-ip-share"],
+        share: {
+          title: "Test",
+          description: "Test",
+          imageUrl: "https://[::ffff:127.0.0.1]/og/private.png",
+        },
+      }),
+    ];
+
+    expect(() => assertIdentityGameVariantCatalog(variants)).toThrow(
+      "non-public or non-cache-safe share.imageUrl"
+    );
+  });
+
   it("serves OG tags and Messenger redirect for canonical share URLs", async () => {
     const app = express();
     registerIdentityGameShareRoutes(app, { pageId: "61587343141159", nodeEnv: "development" });

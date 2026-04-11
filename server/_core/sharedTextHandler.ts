@@ -72,7 +72,7 @@ function prepareSharedTextMessage(
 }
 
 function logSharedTextExecution(input: SharedTextHandlerInput): void {
-  console.log("[shared text] executing", {
+  safeLog("shared_text_executing", {
     channel: input.message.channel,
     reqId: input.reqId,
     user: toLogUser(input.message.userId),
