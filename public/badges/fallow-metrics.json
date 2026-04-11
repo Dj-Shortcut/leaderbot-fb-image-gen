@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-04-10T20:41:33.966Z",
+  "generatedAt": "2026-04-11T19:46:56.847Z",
   "fallowVersion": "2.27.0",
   "totalIssues": 84,
-  "functionsAboveThreshold": 22,
-  "functionsAnalyzed": 1792,
+  "functionsAboveThreshold": 19,
+  "functionsAnalyzed": 1834,
   "filesScored": 134,
   "coverageModel": "static_estimated",
   "maintainabilityScore": 88.9,
@@ -26,8 +26,8 @@
   },
   "healthSummary": {
     "files_analyzed": 153,
-    "functions_analyzed": 1792,
-    "functions_above_threshold": 22,
+    "functions_analyzed": 1834,
+    "functions_above_threshold": 19,
     "max_cyclomatic_threshold": 20,
     "max_cognitive_threshold": 15,
     "files_scored": 134,
