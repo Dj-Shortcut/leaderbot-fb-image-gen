@@ -533,7 +533,7 @@ describe("whatsapp webhook flow", () => {
 
     expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
       "wa-user-6",
-      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis."
+      "⚡ Snelle acties: kies een stijl, typ 'remix', of typ 'verras me' voor een willekeurige look.\n\n1. 🎨 Illustrated\n2. 🌤️ Atmosphere\n3. ⚡ Bold"
     );
   });
 
@@ -549,7 +549,7 @@ describe("whatsapp webhook flow", () => {
 
     expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
       "wa-user-8",
-      "Stuur gerust een foto, dan kan ik een stijl voor je maken."
+      "Stuur gerust een foto, dan kan ik een stijl voor je maken.\n\nTip: typ 'verras me' nadat je een foto hebt gestuurd voor meteen een willekeurige stijl."
     );
   });
 
