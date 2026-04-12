@@ -30,6 +30,7 @@ import {
   processWhatsAppWebhookPayload,
   resetMessengerEventDedupe,
 } from "./_core/messengerWebhook";
+import { t } from "./_core/i18n";
 import {
   anonymizePsid,
   getState,
@@ -533,7 +534,7 @@ describe("whatsapp webhook flow", () => {
 
     expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
       "wa-user-6",
-      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis."
+      t("nl", "flowExplanation")
     );
   });
 
@@ -549,7 +550,7 @@ describe("whatsapp webhook flow", () => {
 
     expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
       "wa-user-8",
-      "Stuur gerust een foto, dan kan ik een stijl voor je maken."
+      [t("nl", "textWithoutPhoto"), t("nl", "assistantPhotoTip")].join("\n\n")
     );
   });
 
@@ -590,3 +591,4 @@ describe("whatsapp webhook flow", () => {
     expect(downloadWhatsAppMediaMock).not.toHaveBeenCalled();
   });
 });
+
