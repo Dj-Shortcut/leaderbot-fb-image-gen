@@ -8,19 +8,17 @@ import { createGlobalHttpRateLimiter, DEFAULT_MAX_REQUESTS, DEFAULT_WINDOW_MS } 
 import rateLimit from "express-rate-limit";
 
 type ViteCreateServer = (typeof import("vite"))["createServer"];
-
-function getImportMetaUrl(): string {
-  return Function("return import.meta.url;")() as string;
-}
+const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 function getCurrentDir(): string {
   if (typeof __dirname === "string") {
     return __dirname;
   }
 
-  return path.dirname(fileURLToPath(getImportMetaUrl()));
+  return CURRENT_DIR;
 }
 
+// fallow-ignore-next-line unused-export
 export async function setupVite(
   app: Express,
   server: Server,

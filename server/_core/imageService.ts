@@ -11,9 +11,9 @@ import {
 } from "./generatedImageStore";
 import { storagePut } from "../storage";
 
-export type GeneratorMode = "openai";
+type GeneratorMode = "openai";
 
-export interface ImageGenerator {
+interface ImageGenerator {
   generate(input: {
     style: Style;
     sourceImageUrl?: string;
@@ -48,7 +48,7 @@ export class MissingObjectStorageConfigError extends Error {}
 export class MissingInputImageError extends Error {}
 export class InvalidSourceImageUrlError extends Error {}
 
-export type GenerationMetrics = {
+type GenerationMetrics = {
   fbImageFetchMs?: number;
   openAiMs?: number;
   uploadOrServeMs?: number;
@@ -108,6 +108,16 @@ type PreparedGenerationInput = {
   hasSourceImage: boolean;
   prompt: string;
   sourceImage: DownloadedSourceImage;
+};
+
+type SourceImageDownloadOptions = {
+  trustedSourceImageUrl?: boolean;
+  sourceImageProvenance?: "storeInbound";
+};
+
+type SourceImageFetchAttemptResult = {
+  response: Response;
+  contentType: string;
 };
 
 const MIN_INPUT_IMAGE_BYTES = 5 * 1024;
@@ -452,57 +462,53 @@ function isBlockedHostname(hostname: string): boolean {
   return false;
 }
 
+function blockSourceImageUrl(
+  reqId: string | undefined,
+  reason: string,
+  details: Record<string, unknown> = {}
+): never {
+  console.warn("SOURCE_IMAGE_URL_BLOCKED", {
+    reqId,
+    reason,
+    ...details,
+  });
+  throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+}
+
 function validateSourceImageUrlOrThrow(
   sourceImageUrl: string,
   reqId?: string,
-  options?: {
-    trustedSourceImageUrl?: boolean;
-    sourceImageProvenance?: "storeInbound";
-  }
+  options?: SourceImageDownloadOptions
 ): URL {
   let parsedUrl: URL;
 
   try {
     parsedUrl = new URL(sourceImageUrl);
   } catch {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", { reqId, reason: "invalid_url" });
-    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+    return blockSourceImageUrl(reqId, "invalid_url");
   }
 
   const hostname = parsedUrl.hostname.toLowerCase();
   if (parsedUrl.protocol !== "https:") {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-      reqId,
-      reason: "non_https",
+    return blockSourceImageUrl(reqId, "non_https", {
       protocol: parsedUrl.protocol,
     });
-    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
   if (parsedUrl.username || parsedUrl.password) {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-      reqId,
-      reason: "credentials_in_url",
-    });
-    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+    return blockSourceImageUrl(reqId, "credentials_in_url");
   }
 
   if (parsedUrl.port && parsedUrl.port !== "443") {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-      reqId,
-      reason: "non_standard_port",
+    return blockSourceImageUrl(reqId, "non_standard_port", {
       port: parsedUrl.port,
     });
-    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
   if (isBlockedHostname(hostname)) {
-    console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-      reqId,
-      reason: "blocked_hostname",
+    return blockSourceImageUrl(reqId, "blocked_hostname", {
       hostname,
     });
-    throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
   }
 
   const allowTrustedSourceBypass =
@@ -512,11 +518,7 @@ function validateSourceImageUrlOrThrow(
   if (!allowTrustedSourceBypass) {
     const allowedHosts = parseAllowedHostsFromEnv();
     if (allowedHosts.length === 0) {
-      console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-        reqId,
-        reason: "allowlist_not_configured",
-      });
-      throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
+      return blockSourceImageUrl(reqId, "allowlist_not_configured");
     }
 
     if (
@@ -524,12 +526,9 @@ function validateSourceImageUrlOrThrow(
         hostnameMatchesAllowedHost(hostname, allowedHost)
       )
     ) {
-      console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-        reqId,
-        reason: "host_not_allowed",
+      return blockSourceImageUrl(reqId, "host_not_allowed", {
         hostname,
       });
-      throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
     }
   }
 
@@ -557,13 +556,179 @@ async function fetchWithTimeout(
   }
 }
 
+async function fetchSourceImageAttempt(
+  sourceImageUrl: URL,
+  timeoutMs: number
+): Promise<SourceImageFetchAttemptResult> {
+  const response = await fetchWithTimeout(
+    sourceImageUrl,
+    { redirect: "manual" },
+    timeoutMs
+  );
+
+  return {
+    response,
+    contentType:
+      response.headers.get("content-type") ?? "application/octet-stream",
+  };
+}
+
+function assertNoRedirectResponse(
+  response: Response,
+  reqId: string
+): void {
+  if (!isRedirectStatus(response.status)) {
+    return;
+  }
+
+  blockSourceImageUrl(reqId, "redirect_not_allowed", {
+    status: response.status,
+    location: response.headers.get("location") ?? undefined,
+  });
+}
+
+function shouldRetrySourceImageStatus(
+  attempt: number,
+  response: Response,
+  reqId: string
+): boolean {
+  if (
+    attempt < FB_IMAGE_FETCH_RETRY_LIMIT &&
+    isRetryableResponseStatus(response.status)
+  ) {
+    console.debug("FB_IMAGE_FETCH_RETRY", {
+      reqId,
+      attempt: attempt + 1,
+      status: response.status,
+    });
+    return true;
+  }
+
+  return false;
+}
+
+function throwMissingInputDownloadFailed(
+  reqId: string,
+  status: number
+): never {
+  console.error("MISSING_INPUT_IMAGE", {
+    reqId,
+    reason: "download_failed",
+    status,
+  });
+  throw new MissingInputImageError(
+    `Failed to download source image (${status})`
+  );
+}
+
+async function maybeWriteDebugImageProof(
+  reqId: string,
+  contentType: string,
+  imageBuffer: Buffer
+): Promise<void> {
+  if (process.env.DEBUG_IMAGE_PROOF !== "1") {
+    return;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    console.warn("DEBUG_IMAGE_PROOF is ignored in production", { reqId });
+    return;
+  }
+
+  const ext = contentType.includes("png") ? "png" : "jpg";
+  const debugDir = path.join(os.tmpdir(), "leaderbot-debug");
+  const savedPath = path.join(
+    debugDir,
+    `leaderbot_incoming_${reqId}_${Date.now()}_${randomUUID()}.${ext}`
+  );
+  await fs.mkdir(debugDir, { recursive: true });
+  await fs.writeFile(savedPath, imageBuffer);
+  console.log("DEBUG_IMAGE_PROOF", { reqId, saved_path: savedPath });
+}
+
+function assertSourceImageSizeOrThrow(
+  reqId: string,
+  incomingByteLen: number
+): void {
+  if (incomingByteLen >= MIN_INPUT_IMAGE_BYTES) {
+    return;
+  }
+
+  console.error("MISSING_INPUT_IMAGE", {
+    reqId,
+    reason: "too_small",
+    byte_len: incomingByteLen,
+  });
+  throw new MissingInputImageError(
+    `Source image too small (${incomingByteLen} bytes)`
+  );
+}
+
+async function buildDownloadedSourceImage(
+  reqId: string,
+  contentType: string,
+  response: Response,
+  totalFetchMs: number
+): Promise<DownloadedSourceImage> {
+  const imageBuffer = Buffer.from(await response.arrayBuffer());
+  const incomingByteLen = safeLen(imageBuffer);
+  const incomingHash = sha256(imageBuffer);
+
+  await maybeWriteDebugImageProof(reqId, contentType, imageBuffer);
+  assertSourceImageSizeOrThrow(reqId, incomingByteLen);
+
+  return {
+    buffer: imageBuffer,
+    contentType,
+    incomingLen: incomingByteLen,
+    incomingSha256: incomingHash,
+    fbImageFetchMs: totalFetchMs,
+  };
+}
+
+function shouldRetrySourceImageError(
+  attempt: number,
+  error: unknown,
+  reqId: string
+): boolean {
+  if (attempt < FB_IMAGE_FETCH_RETRY_LIMIT && isTransientNetworkError(error)) {
+    console.debug("FB_IMAGE_FETCH_RETRY", {
+      reqId,
+      attempt: attempt + 1,
+      reason: error instanceof Error ? error.name : "UnknownError",
+    });
+    return true;
+  }
+
+  return false;
+}
+
+function rethrowSourceImageError(error: unknown, reqId: string): never {
+  if (
+    error instanceof MissingInputImageError ||
+    error instanceof InvalidSourceImageUrlError
+  ) {
+    throw error;
+  }
+
+  if (isTransientNetworkError(error)) {
+    console.error("MISSING_INPUT_IMAGE", {
+      reqId,
+      reason:
+        error instanceof Error && error.name === "AbortError"
+          ? "download_timeout"
+          : "download_network_error",
+    });
+    throw new MissingInputImageError("Failed to download source image");
+  }
+
+  throw error;
+}
+
 async function downloadSourceImageOrThrow(
   sourceImageUrl: string,
   reqId: string,
-  options?: {
-    trustedSourceImageUrl?: boolean;
-    sourceImageProvenance?: "storeInbound";
-  }
+  options?: SourceImageDownloadOptions
 ): Promise<DownloadedSourceImage> {
   const validatedSourceImageUrl = validateSourceImageUrlOrThrow(
     sourceImageUrl,
@@ -577,122 +742,33 @@ async function downloadSourceImageOrThrow(
     const attemptStartedAt = Date.now();
 
     try {
-      const response = await fetchWithTimeout(
+      const { response, contentType } = await fetchSourceImageAttempt(
         validatedSourceImageUrl,
-        { redirect: "manual" },
         timeoutMs
       );
-      const contentType =
-        response.headers.get("content-type") ?? "application/octet-stream";
-
-      if (isRedirectStatus(response.status)) {
-        console.warn("SOURCE_IMAGE_URL_BLOCKED", {
-          reqId,
-          reason: "redirect_not_allowed",
-          status: response.status,
-          location: response.headers.get("location") ?? undefined,
-        });
-        throw new InvalidSourceImageUrlError("sourceImageUrl is not allowed");
-      }
+      assertNoRedirectResponse(response, reqId);
 
       if (!response.ok) {
         totalFetchMs += Date.now() - attemptStartedAt;
-
-        if (
-          attempt < FB_IMAGE_FETCH_RETRY_LIMIT &&
-          isRetryableResponseStatus(response.status)
-        ) {
-          console.debug("FB_IMAGE_FETCH_RETRY", {
-            reqId,
-            attempt: attempt + 1,
-            status: response.status,
-          });
+        if (shouldRetrySourceImageStatus(attempt, response, reqId)) {
           continue;
         }
-
-        console.error("MISSING_INPUT_IMAGE", {
-          reqId,
-          reason: "download_failed",
-          status: response.status,
-        });
-        throw new MissingInputImageError(
-          `Failed to download source image (${response.status})`
-        );
+        throwMissingInputDownloadFailed(reqId, response.status);
       }
 
-      const imageBuffer = Buffer.from(await response.arrayBuffer());
       totalFetchMs += Date.now() - attemptStartedAt;
-      const incomingByteLen = safeLen(imageBuffer);
-      const incomingHash = sha256(imageBuffer);
-
-      if (process.env.DEBUG_IMAGE_PROOF === "1") {
-        if (process.env.NODE_ENV === "production") {
-          console.warn("DEBUG_IMAGE_PROOF is ignored in production", { reqId });
-        } else {
-          const ext = contentType.includes("png") ? "png" : "jpg";
-          const debugDir = path.join(os.tmpdir(), "leaderbot-debug");
-          const savedPath = path.join(
-            debugDir,
-            `leaderbot_incoming_${reqId}_${Date.now()}_${randomUUID()}.${ext}`
-          );
-          await fs.mkdir(debugDir, { recursive: true });
-          await fs.writeFile(savedPath, imageBuffer);
-          console.log("DEBUG_IMAGE_PROOF", { reqId, saved_path: savedPath });
-        }
-      }
-
-      if (incomingByteLen < MIN_INPUT_IMAGE_BYTES) {
-        console.error("MISSING_INPUT_IMAGE", {
-          reqId,
-          reason: "too_small",
-          byte_len: incomingByteLen,
-        });
-        throw new MissingInputImageError(
-          `Source image too small (${incomingByteLen} bytes)`
-        );
-      }
-
-      return {
-        buffer: imageBuffer,
+      return buildDownloadedSourceImage(
+        reqId,
         contentType,
-        incomingLen: incomingByteLen,
-        incomingSha256: incomingHash,
-        fbImageFetchMs: totalFetchMs,
-      };
+        response,
+        totalFetchMs
+      );
     } catch (error) {
-      if (
-        error instanceof MissingInputImageError ||
-        error instanceof InvalidSourceImageUrlError
-      ) {
-        throw error;
-      }
-
       totalFetchMs += Date.now() - attemptStartedAt;
-
-      if (
-        attempt < FB_IMAGE_FETCH_RETRY_LIMIT &&
-        isTransientNetworkError(error)
-      ) {
-        console.debug("FB_IMAGE_FETCH_RETRY", {
-          reqId,
-          attempt: attempt + 1,
-          reason: error instanceof Error ? error.name : "UnknownError",
-        });
+      if (shouldRetrySourceImageError(attempt, error, reqId)) {
         continue;
       }
-
-      if (isTransientNetworkError(error)) {
-        console.error("MISSING_INPUT_IMAGE", {
-          reqId,
-          reason:
-            error instanceof Error && error.name === "AbortError"
-              ? "download_timeout"
-              : "download_network_error",
-        });
-        throw new MissingInputImageError("Failed to download source image");
-      }
-
-      throw error;
+      rethrowSourceImageError(error, reqId);
     }
   }
 
