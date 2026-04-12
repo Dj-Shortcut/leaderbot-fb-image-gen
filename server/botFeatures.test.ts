@@ -28,7 +28,11 @@ vi.mock("./_core/messengerResponsesService", () => ({
   generateMessengerReply: generateMessengerReplyMock,
 }));
 
-import { processFacebookWebhookPayload, resetMessengerEventDedupe } from "./_core/messengerWebhook";
+import { t } from "./_core/i18n";
+import {
+  processFacebookWebhookPayload,
+  resetMessengerEventDedupe,
+} from "./_core/messengerWebhook";
 import { anonymizePsid, getState, resetStateStore } from "./_core/messengerState";
 
 describe("bot features", () => {
@@ -63,7 +67,7 @@ describe("bot features", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(psid, "⏳ Slow down a bit.");
     const chatEngineDecisions = safeLogMock.mock.calls.filter(
-      ([event]) => event === "messenger_chat_engine_decision",
+      ([event]) => event === "messenger_chat_engine_decision"
     );
     expect(chatEngineDecisions).toHaveLength(10);
   });
@@ -84,10 +88,7 @@ describe("bot features", () => {
       ],
     });
 
-    expect(sendTextMock).toHaveBeenCalledWith(
-      psid,
-      "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
-    );
+    expect(sendTextMock).toHaveBeenCalledWith(psid, t("nl", "textWithoutPhoto"));
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
 
@@ -109,7 +110,7 @@ describe("bot features", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(
       psid,
-      "Stuur gerust een foto, dan kan ik een stijl voor je maken."
+      [t("nl", "textWithoutPhoto"), t("nl", "assistantPhotoTip")].join("\n\n")
     );
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
@@ -130,10 +131,7 @@ describe("bot features", () => {
       ],
     });
 
-    expect(sendTextMock).toHaveBeenCalledWith(
-      psid,
-      "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
-    );
+    expect(sendTextMock).toHaveBeenCalledWith(psid, t("nl", "textWithoutPhoto"));
     expect(getState(anonymizePsid(psid))?.stage).toBe("AWAITING_PHOTO");
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
