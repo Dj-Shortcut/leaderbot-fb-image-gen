@@ -850,6 +850,36 @@ async function downloadSourceImageOrThrow(
         continue;
       }
       rethrowSourceImageError(error, reqId);
+    }
+  }
+
+  throw new MissingInputImageError("Failed to download source image");
+}
+
+function normalizeProvidedSourceImage(
+  sourceImageData: SourceImageData
+): DownloadedSourceImage {
+  return {
+    buffer: sourceImageData.buffer,
+    contentType: sourceImageData.contentType,
+    incomingLen: safeLen(sourceImageData.buffer),
+    incomingSha256: sha256(sourceImageData.buffer),
+    fbImageFetchMs: 0,
+  };
+}
+
+function logSourceImageFetchStart(input: GeneratorInput): void {
+  if (!input.sourceImageUrl) {
+    return;
+  }
+
+  console.info("SOURCE_IMAGE_FETCH_START", {
+    reqId: input.reqId,
+    trustedSourceImageUrl: Boolean(input.trustedSourceImageUrl),
+    sourceImageProvenance: input.sourceImageProvenance,
+    ...getSourceUrlDiagnostics(input.sourceImageUrl),
+  });
+}
 
 async function resolveSourceImage(
   input: GeneratorInput

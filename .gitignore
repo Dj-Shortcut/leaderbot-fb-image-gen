@@ -105,6 +105,7 @@ temp/
 .tmp_fallow_*.py
 .playwright-cli/
 .fallow/
+.worktrees/
 
 # Database
 *.db
