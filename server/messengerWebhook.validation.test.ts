@@ -7,7 +7,7 @@ import {
   captureMetaWebhookRawBody,
   verifyMetaWebhookSignature,
 } from "./_core/webhookSignatureVerification";
-import { registerMetaWebhookRoutes } from "./_core/messengerWebhook";
+import { registerMetaWebhookRoutes } from "./_core/meta/webhookRoutes";
 
 function buildSignature(body: string, secret: string): string {
   const digest = createHmac("sha256", secret).update(body).digest("hex");

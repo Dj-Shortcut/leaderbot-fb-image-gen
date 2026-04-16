@@ -63,7 +63,6 @@ import {
   extractWhatsAppEvents,
   logWhatsAppWebhookPayload,
 } from "./inbound/whatsappInbound";
-export { registerMetaWebhookRoutes } from "./meta/webhookRoutes";
 
 const PRIVACY_POLICY_URL = process.env.PRIVACY_POLICY_URL?.trim() || "<link>";
 const DEFAULT_LANG = normalizeLang(process.env.DEFAULT_MESSENGER_LANG);

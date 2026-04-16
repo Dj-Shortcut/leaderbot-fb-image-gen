@@ -7,7 +7,7 @@ vi.mock("express-rate-limit", () => ({
 }));
 
 async function getWebhook(path: string): Promise<{ status: number; payload: string }> {
-  const { registerMetaWebhookRoutes } = await import("./_core/messengerWebhook");
+  const { registerMetaWebhookRoutes } = await import("./_core/meta/webhookRoutes");
   const app = express();
   registerMetaWebhookRoutes(app);
 
