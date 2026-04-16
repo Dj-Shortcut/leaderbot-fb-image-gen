@@ -110,7 +110,7 @@ describe("bot features", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(
       psid,
-      t("nl", "textWithoutPhoto")
+      [t("nl", "textWithoutPhoto"), t("nl", "assistantPhotoTip")].join("\n\n")
     );
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });

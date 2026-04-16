@@ -37,6 +37,7 @@ import {
   resetStateStore,
   setFlowState,
 } from "./_core/messengerState";
+import { buildStateResponseText } from "./_core/stateResponseText";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
@@ -534,7 +535,11 @@ describe("whatsapp webhook flow", () => {
 
     expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
       "wa-user-6",
-      t("nl", "flowExplanation")
+      buildStateResponseText(
+        "AWAITING_STYLE",
+        t("nl", "assistantQuickActions"),
+        "nl"
+      )
     );
   });
 
