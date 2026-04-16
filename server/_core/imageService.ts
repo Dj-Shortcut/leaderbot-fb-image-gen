@@ -121,6 +121,7 @@ type SourceImageFetchAttemptResult = {
 };
 
 const MIN_INPUT_IMAGE_BYTES = 5 * 1024;
+const MAX_INBOUND_IMAGE_BYTES = 20 * 1024 * 1024;
 const FB_IMAGE_FETCH_RETRY_LIMIT = 1;
 const OPENAI_RETRY_LIMIT_DEFAULT = 1;
 const OPENAI_RETRY_BASE_MS_DEFAULT = 500;
@@ -641,9 +642,16 @@ async function maybeWriteDebugImageProof(
     debugDir,
     `leaderbot_incoming_${reqId}_${Date.now()}_${randomUUID()}.${ext}`
   );
-  await fs.mkdir(debugDir, { recursive: true });
-  await fs.writeFile(savedPath, imageBuffer);
-  console.log("DEBUG_IMAGE_PROOF", { reqId, saved_path: savedPath });
+  try {
+    await fs.mkdir(debugDir, { recursive: true });
+    await fs.writeFile(savedPath, imageBuffer);
+    console.log("DEBUG_IMAGE_PROOF", { reqId, saved_path: savedPath });
+  } catch (error) {
+    console.warn("DEBUG_IMAGE_PROOF_WRITE_FAILED", {
+      reqId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 function assertSourceImageSizeOrThrow(
@@ -664,13 +672,83 @@ function assertSourceImageSizeOrThrow(
   );
 }
 
+function assertInboundImageWithinLimit(
+  reqId: string,
+  incomingByteLen: number
+): void {
+  if (incomingByteLen <= MAX_INBOUND_IMAGE_BYTES) {
+    return;
+  }
+
+  console.error("MISSING_INPUT_IMAGE", {
+    reqId,
+    reason: "too_large",
+    byte_len: incomingByteLen,
+    max_byte_len: MAX_INBOUND_IMAGE_BYTES,
+  });
+  throw new MissingInputImageError(
+    `Source image too large (${incomingByteLen} bytes)`
+  );
+}
+
+async function readResponseBufferWithinLimit(
+  reqId: string,
+  response: Response
+): Promise<Buffer> {
+  const contentLengthHeader = response.headers.get("content-length");
+  const contentLength = Number.parseInt(contentLengthHeader ?? "", 10);
+  if (Number.isFinite(contentLength) && contentLength > 0) {
+    try {
+      assertInboundImageWithinLimit(reqId, contentLength);
+    } catch (error) {
+      await response.body?.cancel();
+      throw error;
+    }
+  }
+
+  if (!response.body) {
+    const imageBuffer = Buffer.from(await response.arrayBuffer());
+    assertInboundImageWithinLimit(reqId, safeLen(imageBuffer));
+    return imageBuffer;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    if (!value) {
+      continue;
+    }
+
+    totalBytes += value.byteLength;
+    try {
+      assertInboundImageWithinLimit(reqId, totalBytes);
+    } catch (error) {
+      await reader.cancel();
+      throw error;
+    }
+    chunks.push(value);
+  }
+
+  return Buffer.concat(
+    chunks.map(chunk =>
+      Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength)
+    )
+  );
+}
+
 async function buildDownloadedSourceImage(
   reqId: string,
   contentType: string,
-  response: Response,
-  totalFetchMs: number
+  response: Response
 ): Promise<DownloadedSourceImage> {
-  const imageBuffer = Buffer.from(await response.arrayBuffer());
+  const imageBuffer = await readResponseBufferWithinLimit(reqId, response);
   const incomingByteLen = safeLen(imageBuffer);
   const incomingHash = sha256(imageBuffer);
 
@@ -682,7 +760,7 @@ async function buildDownloadedSourceImage(
     contentType,
     incomingLen: incomingByteLen,
     incomingSha256: incomingHash,
-    fbImageFetchMs: totalFetchMs,
+    fbImageFetchMs: 0,
   };
 }
 
@@ -756,49 +834,22 @@ async function downloadSourceImageOrThrow(
         throwMissingInputDownloadFailed(reqId, response.status);
       }
 
-      totalFetchMs += Date.now() - attemptStartedAt;
-      return buildDownloadedSourceImage(
+      const downloadedImage = await buildDownloadedSourceImage(
         reqId,
         contentType,
-        response,
-        totalFetchMs
+        response
       );
+      totalFetchMs += Date.now() - attemptStartedAt;
+      return {
+        ...downloadedImage,
+        fbImageFetchMs: totalFetchMs,
+      };
     } catch (error) {
       totalFetchMs += Date.now() - attemptStartedAt;
       if (shouldRetrySourceImageError(attempt, error, reqId)) {
         continue;
       }
       rethrowSourceImageError(error, reqId);
-    }
-  }
-
-  throw new MissingInputImageError("Failed to download source image");
-}
-
-function normalizeProvidedSourceImage(
-  sourceImageData: SourceImageData
-): DownloadedSourceImage {
-  return {
-    buffer: sourceImageData.buffer,
-    contentType: sourceImageData.contentType,
-    incomingLen: safeLen(sourceImageData.buffer),
-    incomingSha256: sha256(sourceImageData.buffer),
-    fbImageFetchMs: 0,
-  };
-}
-
-function logSourceImageFetchStart(input: GeneratorInput): void {
-  if (!input.sourceImageUrl) {
-    return;
-  }
-
-  console.info("SOURCE_IMAGE_FETCH_START", {
-    reqId: input.reqId,
-    trustedSourceImageUrl: Boolean(input.trustedSourceImageUrl),
-    sourceImageProvenance: input.sourceImageProvenance,
-    ...getSourceUrlDiagnostics(input.sourceImageUrl),
-  });
-}
 
 async function resolveSourceImage(
   input: GeneratorInput

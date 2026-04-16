@@ -8,7 +8,6 @@
     "build:docker": "vite build && esbuild server/_core/index.ts --platform=node --bundle --format=cjs --external:vite --outfile=dist/index.cjs",
     "check": "tsc --noEmit",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
-    "debug:image-url": "tsx server/_core/debugImageUrl.ts",
     "dev": "cross-env NODE_ENV=development tsx watch server/_core/index.ts",
     "deploy:check-docker": "node scripts/check-docker-host.mjs",
     "fallow": "npx --yes fallow@2.27.0 --root .",

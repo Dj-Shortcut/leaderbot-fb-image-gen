@@ -7,15 +7,9 @@ import {
   safeLog,
 } from "./messengerApi";
 import {
-  createImageGenerator,
-  OpenAiBudgetExceededError,
   getGenerationMetrics,
-  GenerationTimeoutError,
-  MissingInputImageError,
-  MissingAppBaseUrlError,
-  MissingObjectStorageConfigError,
-  MissingOpenAiApiKeyError,
 } from "./imageService";
+import { executeGenerationFlow } from "./generationFlow";
 import {
   clearPendingImageState,
   getOrCreateState,
@@ -628,7 +622,6 @@ export function createWebhookHandlers({
     promptHint?: string
   ): Promise<void> {
     const didRun = await runGuardedGeneration(psid, async () => {
-      const { mode, generator } = createImageGenerator();
       const allowed = await canGenerate(psid);
       const quotaState = await getOrCreateState(psid);
       const bypassRaw = process.env.MESSENGER_QUOTA_BYPASS_IDS ?? "";
@@ -666,23 +659,18 @@ export function createWebhookHandlers({
       );
 
       const state = await getOrCreateState(psid);
-      const lastImageUrl = sourceImageUrl ?? state.lastPhotoUrl;
-      const trustedSourceImageUrl =
-        lastImageUrl !== undefined &&
-        lastImageUrl === state.lastPhotoUrl &&
-        state.lastPhotoSource === "stored";
+      const generationResult = await executeGenerationFlow({
+        style,
+        userId,
+        reqId,
+        promptHint,
+        sourceImageUrl,
+        lastPhotoUrl: state.lastPhotoUrl,
+        lastPhotoSource: state.lastPhotoSource,
+      });
 
-      try {
-        const { imageUrl, proof, metrics } = await generator.generate({
-          style,
-          sourceImageUrl: lastImageUrl ?? undefined,
-          trustedSourceImageUrl,
-          sourceImageProvenance: trustedSourceImageUrl ? "storeInbound" : undefined,
-          promptHint,
-          userKey: userId,
-          reqId,
-        });
-
+      if (generationResult.kind === "success") {
+        const { imageUrl, metrics, mode, proof } = generationResult;
         console.info(
           JSON.stringify({
             level: "info",
@@ -738,69 +726,75 @@ export function createWebhookHandlers({
           reqId
         );
         await setFlowState(psid, "IDLE");
-      } catch (error) {
-        console.error("OPENAI_CALL_ERROR", {
-          psidHash: anonymizePsid(psid).slice(0, 12),
-          error: error instanceof Error ? error.message : undefined,
-        });
-
-        const errorClass =
-          error instanceof Error ? error.constructor.name : "UnknownError";
-        const metrics = getGenerationMetrics(error) ?? { totalMs: 0 };
-
-        console.log(
-          "PROOF_SUMMARY",
-          JSON.stringify({
-            reqId,
-            psidHash: anonymizePsid(psid).slice(0, 12),
-            style,
-            ok: false,
-            errorCode: errorClass,
-            totalMs: metrics.totalMs,
-          })
-        );
-        recordGenerationError();
-
-        let failureText = t(lang, "generationGenericFailure");
-        if (error instanceof MissingInputImageError) {
-          await sendLoggedText(psid, t(lang, "missingInputImage"), reqId);
-          await setFlowState(psid, "AWAITING_PHOTO");
-          return;
-        } else if (
-          error instanceof MissingOpenAiApiKeyError ||
-          error instanceof MissingAppBaseUrlError ||
-          error instanceof MissingObjectStorageConfigError
-        ) {
-          failureText = t(lang, "generationUnavailable");
-        } else if (error instanceof GenerationTimeoutError) {
-          failureText = t(lang, "generationTimeout");
-        } else if (error instanceof OpenAiBudgetExceededError) {
-          await sendLoggedText(psid, t(lang, "generationBudgetReached"), reqId);
-          await setFlowState(psid, "AWAITING_STYLE");
-          return;
-        }
-
-        await sendLoggedText(psid, t(lang, "failure"), reqId);
-        await setFlowState(psid, "FAILURE");
-
-        await sendLoggedQuickReplies(
-          psid,
-          failureText,
-          [
-            {
-              content_type: "text",
-              title: t(lang, "retryThisStyle"),
-              payload: `RETRY_STYLE_${style}`,
-            },
-            {
-              content_type: "text",
-              title: t(lang, "otherStyle"),
-              payload: "CHOOSE_STYLE",
-            },
-          ],
-          reqId
-        );
+        return;
       }
+
+      const error = generationResult.error;
+      console.error("OPENAI_CALL_ERROR", {
+        psidHash: anonymizePsid(psid).slice(0, 12),
+        error: error instanceof Error ? error.message : undefined,
+      });
+
+      const errorClass =
+        error instanceof Error ? error.constructor.name : "UnknownError";
+      const metrics =
+        generationResult.metrics ?? getGenerationMetrics(error) ?? { totalMs: 0 };
+
+      console.log(
+        "PROOF_SUMMARY",
+        JSON.stringify({
+          reqId,
+          psidHash: anonymizePsid(psid).slice(0, 12),
+          style,
+          ok: false,
+          errorCode: errorClass,
+          totalMs: metrics.totalMs,
+        })
+      );
+      recordGenerationError();
+
+      let failureText = t(lang, "generationGenericFailure");
+      if (generationResult.errorKind === "missing_source_image") {
+        await sendLoggedText(psid, t(lang, "styleWithoutPhoto"), reqId);
+        await setFlowState(psid, "AWAITING_PHOTO");
+        return;
+      } else if (
+        generationResult.errorKind === "missing_input_image" ||
+        generationResult.errorKind === "invalid_source_image"
+      ) {
+        await sendLoggedText(psid, t(lang, "missingInputImage"), reqId);
+        await setFlowState(psid, "AWAITING_PHOTO");
+        return;
+      } else if (generationResult.errorKind === "generation_unavailable") {
+        failureText = t(lang, "generationUnavailable");
+      } else if (generationResult.errorKind === "generation_timeout") {
+        failureText = t(lang, "generationTimeout");
+      } else if (generationResult.errorKind === "generation_budget_reached") {
+        await sendLoggedText(psid, t(lang, "generationBudgetReached"), reqId);
+        await setFlowState(psid, "AWAITING_STYLE");
+        return;
+      }
+
+      await sendLoggedText(psid, t(lang, "failure"), reqId);
+      await setFlowState(psid, "FAILURE");
+
+      await sendLoggedQuickReplies(
+        psid,
+        failureText,
+        [
+          {
+            content_type: "text",
+            title: t(lang, "retryThisStyle"),
+            payload: `RETRY_STYLE_${style}`,
+          },
+          {
+            content_type: "text",
+            title: t(lang, "otherStyle"),
+            payload: "CHOOSE_STYLE",
+          },
+        ],
+        reqId
+      );
     });
 
     if (didRun === null) {

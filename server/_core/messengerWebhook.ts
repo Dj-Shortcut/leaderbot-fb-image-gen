@@ -1,7 +1,4 @@
-import express from "express";
-import rateLimit from "express-rate-limit";
 import { createHash } from "node:crypto";
-import { z, ZodError } from "zod";
 import { normalizeLang, t, type Lang } from "./i18n";
 import { createWebhookHandlers } from "./webhookHandlers";
 import { routeActiveExperience, routeEntryIntent } from "./experienceRouter";
@@ -14,7 +11,6 @@ import {
   STYLE_CATEGORY_LABELS,
   STYLE_LABELS,
 } from "./webhookHelpers";
-import { facebookWebhookPayloadSchema } from "./webhookSchemas";
 import {
   downloadWhatsAppMedia,
   sendWhatsAppButtons,
@@ -45,16 +41,9 @@ import type { NormalizedInboundMessage } from "./normalizedInboundMessage";
 import type { BotResponse } from "./botResponse";
 import { sendWhatsAppBotResponse } from "./botResponseAdapters";
 import {
-  createImageGenerator,
-  GenerationTimeoutError,
   getGenerationMetrics,
-  InvalidSourceImageUrlError,
-  MissingAppBaseUrlError,
-  MissingInputImageError,
-  MissingObjectStorageConfigError,
-  MissingOpenAiApiKeyError,
-  OpenAiBudgetExceededError,
 } from "./imageService";
+import { executeGenerationFlow } from "./generationFlow";
 import {
   getStylesForCategory,
   type Style,
@@ -70,26 +59,18 @@ import { getBotFeatures } from "./bot/features";
 import type { BotLogger, BotTextContext } from "./botContext";
 import { getTodayRuntimeStats } from "./botRuntimeStats";
 import type { QuickReply } from "./messengerApi";
+import {
+  extractWhatsAppEvents,
+  logWhatsAppWebhookPayload,
+} from "./inbound/whatsappInbound";
+export { registerMetaWebhookRoutes } from "./meta/webhookRoutes";
 
 const PRIVACY_POLICY_URL = process.env.PRIVACY_POLICY_URL?.trim() || "<link>";
 const DEFAULT_LANG = normalizeLang(process.env.DEFAULT_MESSENGER_LANG);
 
-const webhookVerificationQuerySchema = z.object({
-  "hub.mode": z.literal("subscribe"),
-  "hub.verify_token": z.string().min(1),
-  "hub.challenge": z.string().min(1),
-});
-
 const handlers = createWebhookHandlers({
   defaultLang: DEFAULT_LANG,
   privacyPolicyUrl: PRIVACY_POLICY_URL,
-});
-
-const webhookLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 60,
-  standardHeaders: true,
-  legacyHeaders: false,
 });
 
 export function resetMessengerEventDedupe(): void {
@@ -113,157 +94,6 @@ function summarizeSensitiveUrl(url: string): {
       shortHash,
     };
   }
-}
-
-function getMetaVerifyToken(): string {
-  return (
-    process.env.META_VERIFY_TOKEN?.trim() ||
-    process.env.FB_VERIFY_TOKEN?.trim() ||
-    ""
-  );
-}
-
-function isWhatsAppWebhookPayload(
-  payload: unknown
-): payload is { object: "whatsapp_business_account" } {
-  return (
-    typeof payload === "object" &&
-    payload !== null &&
-    (payload as { object?: unknown }).object === "whatsapp_business_account"
-  );
-}
-
-function logWhatsAppWebhookPayload(payload: unknown): void {
-  const serializedBody = JSON.stringify(payload, null, 2);
-  console.log("[whatsapp webhook] inbound payload");
-  console.log(serializedBody);
-}
-
-function extractWhatsAppEvents(payload: unknown): NormalizedInboundMessage[] {
-  if (typeof payload !== "object" || payload === null) {
-    return [];
-  }
-
-  const entries = Array.isArray((payload as { entry?: unknown[] }).entry)
-    ? (payload as { entry: unknown[] }).entry
-    : [];
-
-  return entries.flatMap(entry => {
-    const changes = Array.isArray(
-      (entry as { changes?: unknown[] } | null)?.changes
-    )
-      ? ((entry as { changes: unknown[] }).changes ?? [])
-      : [];
-
-    return changes.flatMap(change => {
-      const value =
-        typeof change === "object" && change !== null
-          ? ((change as { value?: unknown }).value ?? null)
-          : null;
-      const messages = Array.isArray(
-        (value as { messages?: unknown[] } | null)?.messages
-      )
-        ? ((value as { messages: unknown[] }).messages ?? [])
-        : [];
-
-      return messages.flatMap(message => {
-        if (typeof message !== "object" || message === null) {
-          return [];
-        }
-
-        const from =
-          typeof (message as { from?: unknown }).from === "string"
-            ? (message as { from: string }).from
-            : "";
-        const messageType =
-          typeof (message as { type?: unknown }).type === "string"
-            ? (message as { type: string }).type
-            : "unknown";
-        const textBody =
-          typeof (message as { text?: { body?: unknown } }).text?.body ===
-          "string"
-            ? (message as { text: { body: string } }).text.body
-            : null;
-        const interactiveReplyId =
-          typeof (message as {
-            interactive?: {
-              button_reply?: { id?: unknown };
-              list_reply?: { id?: unknown };
-            };
-          }).interactive?.button_reply?.id === "string"
-            ? (message as {
-                interactive: { button_reply: { id: string } };
-              }).interactive.button_reply.id
-            : typeof (message as {
-                  interactive?: { list_reply?: { id?: unknown } };
-                }).interactive?.list_reply?.id === "string"
-              ? (message as {
-                  interactive: { list_reply: { id: string } };
-                }).interactive.list_reply.id
-              : null;
-        const interactiveReplyTitle =
-          typeof (message as {
-            interactive?: {
-              button_reply?: { title?: unknown };
-              list_reply?: { title?: unknown };
-            };
-          }).interactive?.button_reply?.title === "string"
-            ? (message as {
-                interactive: { button_reply: { title: string } };
-              }).interactive.button_reply.title
-            : typeof (message as {
-                  interactive?: { list_reply?: { title?: unknown } };
-                }).interactive?.list_reply?.title === "string"
-              ? (message as {
-                  interactive: { list_reply: { title: string } };
-                }).interactive.list_reply.title
-              : null;
-        const imageId =
-          typeof (message as { image?: { id?: unknown } }).image?.id ===
-          "string"
-            ? (message as { image: { id: string } }).image.id
-            : null;
-        const timestampRaw =
-          typeof (message as { timestamp?: unknown }).timestamp === "string"
-            ? Number((message as { timestamp: string }).timestamp)
-            : null;
-
-        if (!from) {
-          return [];
-        }
-
-        return [
-          {
-            channel: "whatsapp",
-            senderId: from,
-            userId: toUserKey(from),
-            channelCapabilities: {
-              quickReplies: false,
-              richTemplates: false,
-            },
-            rawMessageType: messageType,
-            messageType:
-              messageType === "text" || messageType === "interactive"
-                ? "text"
-                : messageType === "image"
-                  ? "image"
-                  : "unknown",
-            textBody:
-              interactiveReplyId ??
-              interactiveReplyTitle ??
-              textBody ??
-              undefined,
-            imageId: imageId ?? undefined,
-            timestamp: Number.isFinite(timestampRaw) ? timestampRaw! * 1000 : undefined,
-            rawEventMeta: {
-              interactiveReplyId: interactiveReplyId ?? undefined,
-              interactiveReplyTitle: interactiveReplyTitle ?? undefined,
-            },
-          },
-        ];
-      });
-    });
-  });
 }
 
 const WHATSAPP_CATEGORY_CHOICES = [
@@ -558,17 +388,15 @@ async function runWhatsAppStyleGeneration(
     resolvedSourceImageUrl !== undefined &&
     resolvedSourceImageUrl === state.lastPhotoUrl &&
     state.lastPhotoSource === "stored";
-  if (!resolvedSourceImageUrl) {
-    await setFlowState(senderId, "AWAITING_PHOTO");
-    await sendWhatsAppText(senderId, t(lang, "styleWithoutPhoto"));
-    return;
-  }
 
   console.info("[whatsapp webhook] generation requested", {
     user: toLogUser(userId),
     style,
     hasPromptHint: Boolean(promptHint?.trim()),
     sourceImageUrlHost: (() => {
+      if (!resolvedSourceImageUrl) {
+        return undefined;
+      }
       try {
         return new URL(resolvedSourceImageUrl).hostname.toLowerCase();
       } catch {
@@ -585,19 +413,18 @@ async function runWhatsAppStyleGeneration(
     t(lang, "generatingPrompt", { styleLabel: STYLE_LABELS[style] })
   );
 
-  const { generator } = createImageGenerator();
+  const generationResult = await executeGenerationFlow({
+    style,
+    userId,
+    reqId,
+    promptHint,
+    sourceImageUrl,
+    lastPhotoUrl: state.lastPhotoUrl,
+    lastPhotoSource: state.lastPhotoSource,
+  });
 
-  try {
-    const { imageUrl, metrics } = await generator.generate({
-      style,
-      sourceImageUrl: resolvedSourceImageUrl,
-      trustedSourceImageUrl,
-      sourceImageProvenance: trustedSourceImageUrl ? "storeInbound" : undefined,
-      promptHint,
-      userKey: userId,
-      reqId,
-    });
-
+  if (generationResult.kind === "success") {
+    const { imageUrl, metrics } = generationResult;
     await sendWhatsAppImage(senderId, imageUrl);
     await increment(senderId);
     await setLastGenerated(senderId, imageUrl);
@@ -616,49 +443,62 @@ async function runWhatsAppStyleGeneration(
       totalMs: metrics.totalMs,
       style,
     });
-  } catch (error) {
-    const failureMetrics = getGenerationMetrics(error);
-    console.error("[whatsapp webhook] generation failed", {
-      user: toLogUser(userId),
-      style,
-      totalMs: failureMetrics?.totalMs,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    return;
+  }
 
-    let failureText = t(lang, "generationGenericFailure");
-    if (error instanceof InvalidSourceImageUrlError) {
-      failureText = t(lang, "missingInputImage");
-      if (!sourceImageUrl || resolvedSourceImageUrl === state.lastPhotoUrl) {
-        await clearPendingImageState(senderId);
-      }
-      await setFlowState(senderId, "AWAITING_PHOTO");
+  const error = generationResult.error;
+  const failureMetrics =
+    generationResult.metrics ?? getGenerationMetrics(error);
+  console.error("[whatsapp webhook] generation failed", {
+    user: toLogUser(userId),
+    style,
+    totalMs: failureMetrics?.totalMs,
+    error: error instanceof Error ? error.message : String(error),
+  });
+
+  let failureText = t(lang, "generationGenericFailure");
+  if (generationResult.errorKind === "missing_source_image") {
+    failureText = t(lang, "styleWithoutPhoto");
+    await setFlowState(senderId, "AWAITING_PHOTO");
+  } else if (
+    generationResult.errorKind === "invalid_source_image" ||
+    generationResult.errorKind === "missing_input_image"
+  ) {
+    failureText = t(lang, "missingInputImage");
+    if (
+      generationResult.errorKind === "invalid_source_image" &&
+      (!sourceImageUrl ||
+        generationResult.resolvedSourceImageUrl === state.lastPhotoUrl)
+    ) {
+      await clearPendingImageState(senderId);
+    }
+    await setFlowState(senderId, "AWAITING_PHOTO");
+    if (
+      generationResult.errorKind === "invalid_source_image" &&
+      generationResult.resolvedSourceImageUrl
+    ) {
       console.error("[whatsapp webhook] source image rejected", {
         user: toLogUser(userId),
         style,
-        sourceImageUrl: summarizeSensitiveUrl(resolvedSourceImageUrl),
+        sourceImageUrl: summarizeSensitiveUrl(
+          generationResult.resolvedSourceImageUrl
+        ),
       });
-    } else if (error instanceof MissingInputImageError) {
-      failureText = t(lang, "missingInputImage");
-      await setFlowState(senderId, "AWAITING_PHOTO");
-    } else if (
-      error instanceof MissingOpenAiApiKeyError ||
-      error instanceof MissingAppBaseUrlError ||
-      error instanceof MissingObjectStorageConfigError
-    ) {
-      failureText = t(lang, "generationUnavailable");
-      await setFlowState(senderId, "AWAITING_STYLE");
-    } else if (error instanceof GenerationTimeoutError) {
-      failureText = t(lang, "generationTimeout");
-      await setFlowState(senderId, "AWAITING_STYLE");
-    } else if (error instanceof OpenAiBudgetExceededError) {
-      failureText = t(lang, "generationBudgetReached");
-      await setFlowState(senderId, "AWAITING_STYLE");
-    } else {
-      await setFlowState(senderId, "FAILURE");
     }
-
-    await sendWhatsAppText(senderId, failureText);
+  } else if (generationResult.errorKind === "generation_unavailable") {
+    failureText = t(lang, "generationUnavailable");
+    await setFlowState(senderId, "AWAITING_STYLE");
+  } else if (generationResult.errorKind === "generation_timeout") {
+    failureText = t(lang, "generationTimeout");
+    await setFlowState(senderId, "AWAITING_STYLE");
+  } else if (generationResult.errorKind === "generation_budget_reached") {
+    failureText = t(lang, "generationBudgetReached");
+    await setFlowState(senderId, "AWAITING_STYLE");
+  } else {
+    await setFlowState(senderId, "FAILURE");
   }
+
+  await sendWhatsAppText(senderId, failureText);
 }
 
 async function handleWhatsAppTextEvent(
@@ -990,88 +830,4 @@ export async function processFacebookWebhookPayload(
   payload: unknown
 ): Promise<void> {
   await handlers.processFacebookWebhookPayload(payload);
-}
-
-function processWhatsAppWebhookPayloadSafely(payload: unknown): void {
-  void processWhatsAppWebhookPayload(payload).catch(error => {
-    console.error("[whatsapp webhook] async processing failed", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  });
-}
-
-function processFacebookWebhookPayloadSafely(payload: unknown): void {
-  void processFacebookWebhookPayload(payload).catch(error => {
-    console.error("[messenger webhook] async processing failed", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  });
-}
-
-export function registerMetaWebhookRoutes(app: express.Express): void {
-  const handleVerification: express.RequestHandler = (req, res) => {
-    const configuredToken = getMetaVerifyToken();
-    const parsedQuery = webhookVerificationQuerySchema.safeParse(req.query);
-    const path = req.path;
-
-    console.log("[meta webhook] GET verification request", { path });
-
-    if (
-      !configuredToken ||
-      !parsedQuery.success ||
-      parsedQuery.data["hub.verify_token"] !== configuredToken
-    ) {
-      console.warn("[meta webhook] GET verification rejected", {
-        path,
-        hasConfiguredToken: Boolean(configuredToken),
-        hasMode: typeof req.query["hub.mode"] === "string",
-        hasChallenge: typeof req.query["hub.challenge"] === "string",
-      });
-      return res.sendStatus(403);
-    }
-
-    console.log("[meta webhook] GET verification accepted", { path });
-    return res
-      .status(200)
-      .type("text/plain")
-      .send(parsedQuery.data["hub.challenge"]);
-  };
-
-  app.use("/webhook", webhookLimiter);
-  app.get("/webhook", handleVerification);
-  app.get("/webhook/facebook", handleVerification);
-
-  const handleWebhookPost: express.RequestHandler = (req, res) => {
-    if (isWhatsAppWebhookPayload(req.body)) {
-      console.log("[whatsapp webhook] POST delivery received");
-      res.sendStatus(200);
-      setImmediate(() => {
-        processWhatsAppWebhookPayloadSafely(req.body);
-      });
-      return;
-    }
-
-    try {
-      facebookWebhookPayloadSchema.parse(req.body);
-    } catch (error) {
-      if (error instanceof ZodError) {
-        console.warn(
-          "[messenger webhook] POST rejected: invalid payload shape"
-        );
-        res.status(400).json({ error: "Invalid webhook payload" });
-        return;
-      }
-
-      throw error;
-    }
-
-    console.log("[messenger webhook] POST delivery received");
-    res.sendStatus(200);
-    setImmediate(() => {
-      processFacebookWebhookPayloadSafely(req.body);
-    });
-  };
-
-  app.post("/webhook", handleWebhookPost);
-  app.post("/webhook/facebook", handleWebhookPost);
 }

@@ -176,59 +176,7 @@ export function getEventDedupeKey(
   return undefined;
 }
 
-export function summarizeWebhook(payload: unknown): WebhookSummary {
-  const entries = Array.isArray(
-    (payload as { entry?: unknown[] } | null | undefined)?.entry
-  )
-    ? (payload as { entry: Array<{ messaging?: FacebookWebhookEvent[] }> })
-        .entry
-    : [];
 
-  const events = entries.flatMap(entry => {
-    const messaging = Array.isArray(entry?.messaging) ? entry.messaging : [];
-
-    return messaging.map<WebhookSummaryEvent>(event => {
-      const attachmentTypes = Array.from(
-        new Set(
-          (event.message?.attachments ?? [])
-            .map(attachment => attachment.type?.trim())
-            .filter((type): type is string => Boolean(type))
-        )
-      );
-
-      let type: WebhookSummaryEvent["type"] = "unknown";
-      if (event.message) {
-        type = "message";
-      } else if (event.postback) {
-        type = "postback";
-      } else if ((event as { read?: unknown }).read) {
-        type = "read";
-      } else if ((event as { delivery?: unknown }).delivery) {
-        type = "delivery";
-      }
-
-      return {
-        type,
-        hasText: Boolean(event.message?.text),
-        attachmentTypes,
-        isEcho: Boolean(event.message?.is_echo),
-        hasRead: Boolean((event as { read?: unknown }).read),
-        hasDelivery: Boolean((event as { delivery?: unknown }).delivery),
-        hasPostback: Boolean(event.postback),
-      };
-    });
-  });
-
-  return {
-    object:
-      typeof (payload as { object?: unknown } | null | undefined)?.object ===
-      "string"
-        ? (payload as { object: string }).object
-        : undefined,
-    entryCount: entries.length,
-    events,
-  };
-}
 
 export function getGreetingResponse(
   state: ConversationState,

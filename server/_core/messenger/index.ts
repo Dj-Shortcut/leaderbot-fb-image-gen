@@ -1,4 +1,4 @@
-export { registerMetaWebhookRoutes } from "../messengerWebhook";
+export { registerMetaWebhookRoutes } from "../meta/webhookRoutes";
 export {
   captureMetaWebhookRawBody,
   verifyMetaWebhookSignature,
