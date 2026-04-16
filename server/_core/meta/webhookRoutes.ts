@@ -7,8 +7,8 @@ import {
 } from "../inbound/whatsappInbound";
 import {
   processFacebookWebhookPayload,
-  processWhatsAppWebhookPayload,
 } from "../messengerWebhook";
+import { processWhatsAppWebhookPayload } from "../whatsappWebhook";
 
 const webhookVerificationQuerySchema = z.object({
   "hub.mode": z.literal("subscribe"),
@@ -112,4 +112,3 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
   app.post("/webhook", handleWebhookPost);
   app.post("/webhook/facebook", handleWebhookPost);
 }
-
