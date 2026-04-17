@@ -7,12 +7,6 @@ on:
   schedule:
     - cron: "0 6 * * 1"
   workflow_dispatch:
-    inputs:
-      fail_on_issues:
-        description: "Fail the workflow when Fallow finds issues"
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: write
@@ -39,7 +33,13 @@ jobs:
         shell: bash
         run: |
           mkdir -p .fallow
-          npx --yes fallow@2.27.0 -f json > .fallow/report.json
+          npx --yes fallow@2.27.0 --root . -f json > .fallow/report.json
+
+      - name: Generate production Fallow report
+        shell: bash
+        run: |
+          mkdir -p .fallow
+          npx --yes fallow@2.27.0 --root . --production -f json > .fallow/report-production.json
 
       - name: Build maintainability badge
         run: |
@@ -63,6 +63,11 @@ jobs:
           git commit -m "chore: update Fallow maintainability badge"
           git push
 
-      - name: Enforce strict Fallow gate
+      - name: Enforce maintainability gate
         run: |
-          node -e "const fs=require('node:fs'); const report=JSON.parse(fs.readFileSync('.fallow/report.json','utf8')); const issues=Number(report.check?.total_issues ?? report.total_issues ?? 0); if (issues > 0) { console.error('Fallow found ' + issues + ' issues'); process.exit(1); }"
+          node scripts/check-fallow-gate.mjs .fallow/report.json
+
+      - name: Summarize production-only report
+        shell: bash
+        run: |
+          node -e "const fs=require('node:fs'); const report=JSON.parse(fs.readFileSync('.fallow/report-production.json','utf8')); const maintainability=Number(report.health?.summary?.average_maintainability ?? NaN); const issues=Number(report.check?.total_issues ?? report.total_issues ?? 0); console.log(JSON.stringify({ mode: 'production-informational', maintainability: Number.isFinite(maintainability) ? Number(maintainability.toFixed(1)) : null, issues }, null, 2));"
