@@ -117,10 +117,10 @@ Laat voorlopig nog per kanaal in de handlers:
 
 Bestaande tests die waarschijnlijk geraakt worden:
 
-- [botFeatures.test.ts](C:/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/server/botFeatures.test.ts)
-- [messengerWebhook.test.ts](C:/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/server/messengerWebhook.test.ts)
-- [whatsappWebhook.test.ts](C:/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/server/whatsappWebhook.test.ts)
-- [imageService.proof.test.ts](C:/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/server/imageService.proof.test.ts)
+- [botFeatures.test.ts](../../server/botFeatures.test.ts)
+- [messengerWebhook.test.ts](../../server/messengerWebhook.test.ts)
+- [whatsappWebhook.test.ts](../../server/whatsappWebhook.test.ts)
+- [imageService.proof.test.ts](../../server/imageService.proof.test.ts)
 
 Nieuwe tests toevoegen:
 
@@ -186,9 +186,9 @@ Dat moet uit het gedeelde model volgen.
 
 Belangrijkste bestaande tests:
 
-- [messengerWebhook.test.ts](C:/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/server/messengerWebhook.test.ts)
-- [whatsappWebhook.test.ts](C:/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/server/whatsappWebhook.test.ts)
-- [imageService.proof.test.ts](C:/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/server/imageService.proof.test.ts)
+- [messengerWebhook.test.ts](../../server/messengerWebhook.test.ts)
+- [whatsappWebhook.test.ts](../../server/whatsappWebhook.test.ts)
+- [imageService.proof.test.ts](../../server/imageService.proof.test.ts)
 
 Nieuwe tests toevoegen:
 
@@ -280,10 +280,10 @@ Begin klein:
 
 Bestaande tests:
 
-- [sharedTextHandler.test.ts](C:/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/server/sharedTextHandler.test.ts)
-- [messengerWebhook.test.ts](C:/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/server/messengerWebhook.test.ts)
-- [whatsappWebhook.test.ts](C:/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/server/whatsappWebhook.test.ts)
-- [botFeatures.test.ts](C:/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/server/botFeatures.test.ts)
+- [sharedTextHandler.test.ts](../../server/sharedTextHandler.test.ts)
+- [messengerWebhook.test.ts](../../server/messengerWebhook.test.ts)
+- [whatsappWebhook.test.ts](../../server/whatsappWebhook.test.ts)
+- [botFeatures.test.ts](../../server/botFeatures.test.ts)
 
 Nieuwe tests:
 
@@ -327,7 +327,7 @@ Belangrijk:
 
 ### Testimpact
 
-- [botResponseAdapters.test.ts](C:/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/server/botResponseAdapters.test.ts) als die nog ontbreekt, toevoegen
+- [botResponseAdapters.test.ts](../../server/botResponseAdapters.test.ts) als die nog ontbreekt, toevoegen
 - bestaande webhooktests voor presentatiegedrag updaten waar nodig
 
 ### Risico
@@ -355,24 +355,24 @@ Ingress en kanaaladapter duidelijker scheiden.
 
 Splits bijvoorbeeld naar:
 
-- `server/_core/metaWebhookRoutes.ts`
-- `server/_core/whatsappInbound.ts`
+- `server/_core/meta/webhookRoutes.ts`
+- `server/_core/inbound/whatsappInbound.ts`
 - eventueel later `server/_core/messengerInbound.ts`
 
 ### Te wijzigen bestanden
 
 - nieuw:
-  - `server/_core/metaWebhookRoutes.ts`
-  - `server/_core/whatsappInbound.ts`
+  - `server/_core/meta/webhookRoutes.ts`
+  - `server/_core/inbound/whatsappInbound.ts`
 - bestaand:
   - `server/_core/messengerWebhook.ts`
   - `server/_core/index.ts`
 
 ### Testimpact
 
-- [messengerWebhook.validation.test.ts](C:/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/server/messengerWebhook.validation.test.ts)
-- [messengerWebhook.verification.test.ts](C:/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/server/messengerWebhook.verification.test.ts)
-- [whatsappWebhook.test.ts](C:/Users/Gebruiker/Desktop/projecten/leaderbot-fb-image-gen/server/whatsappWebhook.test.ts)
+- [messengerWebhook.validation.test.ts](../../server/messengerWebhook.validation.test.ts)
+- [messengerWebhook.verification.test.ts](../../server/messengerWebhook.verification.test.ts)
+- [whatsappWebhook.test.ts](../../server/whatsappWebhook.test.ts)
 
 ### Risico
 

@@ -12,9 +12,23 @@ export function isWhatsAppWebhookPayload(
 }
 
 export function logWhatsAppWebhookPayload(payload: unknown): void {
-  const serializedBody = JSON.stringify(payload, null, 2);
-  console.log("[whatsapp webhook] inbound payload");
-  console.log(serializedBody);
+  const entries = Array.isArray((payload as { entry?: unknown[] } | null)?.entry)
+    ? (payload as { entry: unknown[] }).entry.length
+    : 0;
+  const summary =
+    typeof payload === "object" && payload !== null
+      ? {
+          object: (payload as { object?: unknown }).object ?? null,
+          entryCount: entries,
+        }
+      : { object: null, entryCount: 0 };
+
+  if (process.env.WEBHOOK_DEBUG_LOGS === "1") {
+    console.log("[whatsapp webhook] inbound payload", summary);
+    return;
+  }
+
+  console.log("[whatsapp webhook] inbound payload summary", summary);
 }
 
 export function extractWhatsAppEvents(
@@ -135,14 +149,17 @@ export function extractWhatsAppEvents(
               undefined,
             imageId: imageId ?? undefined,
             timestamp: Number.isFinite(timestampRaw) ? timestampRaw! * 1000 : undefined,
-            rawEventMeta: {
-              interactiveReplyId: interactiveReplyId ?? undefined,
-              interactiveReplyTitle: interactiveReplyTitle ?? undefined,
-            },
+            ...(interactiveReplyId || interactiveReplyTitle
+              ? {
+                  rawEventMeta: {
+                    interactiveReplyId: interactiveReplyId ?? undefined,
+                    interactiveReplyTitle: interactiveReplyTitle ?? undefined,
+                  },
+                }
+              : {}),
           },
         ];
       });
     });
   });
 }
-

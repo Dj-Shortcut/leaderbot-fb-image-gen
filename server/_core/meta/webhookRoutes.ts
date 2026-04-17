@@ -76,9 +76,8 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
       .send(parsedQuery.data["hub.challenge"]);
   };
 
-  app.use("/webhook", webhookLimiter);
-  app.get("/webhook", handleVerification);
-  app.get("/webhook/facebook", handleVerification);
+  app.get("/webhook", webhookLimiter, handleVerification);
+  app.get("/webhook/facebook", webhookLimiter, handleVerification);
 
   const handleWebhookPost: express.RequestHandler = (req, res) => {
     if (isWhatsAppWebhookPayload(req.body)) {
