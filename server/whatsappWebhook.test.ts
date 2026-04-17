@@ -141,6 +141,26 @@ describe("whatsapp webhook flow", () => {
     );
   });
 
+  it("recovers with a user-facing retry prompt when WhatsApp media download fails", async () => {
+    downloadWhatsAppMediaMock.mockRejectedValue(new Error("media fetch failed"));
+
+    await processWhatsAppWebhookPayload(
+      createWhatsAppPayload({
+        from: "wa-user-image-fail",
+        timestamp: "1710000000",
+        type: "image",
+        image: { id: "wamid-image-fail" },
+      })
+    );
+
+    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+      "wa-user-image-fail",
+      t("nl", "missingInputImage")
+    );
+    expect(getState(anonymizePsid("wa-user-image-fail"))?.stage).toBe("AWAITING_PHOTO");
+    expect(sendWhatsAppButtonsMock).not.toHaveBeenCalled();
+  });
+
   it("accepts a WhatsApp category reply and sends category-specific style options", async () => {
     downloadWhatsAppMediaMock.mockResolvedValue({
       buffer: Buffer.alloc(6000, 7),
