@@ -3,24 +3,40 @@ import fs from "fs";
 import { type Server } from "http";
 import { nanoid } from "nanoid";
 import path from "path";
-import { fileURLToPath } from "url";
 import { createGlobalHttpRateLimiter, DEFAULT_MAX_REQUESTS, DEFAULT_WINDOW_MS } from "./httpRateLimit";
 import rateLimit from "express-rate-limit";
 
 type ViteCreateServer = (typeof import("vite"))["createServer"];
+const PROJECT_ROOT_MARKERS = ["package.json", "vite.config.ts"] as const;
 
-function getImportMetaUrl(): string {
-  return Function("return import.meta.url;")() as string;
+function looksLikeProjectRoot(candidate: string): boolean {
+  return PROJECT_ROOT_MARKERS.every(marker =>
+    fs.existsSync(path.resolve(candidate, marker))
+  );
 }
 
-function getCurrentDir(): string {
-  if (typeof __dirname === "string") {
-    return __dirname;
+function resolveProjectRoot(): string {
+  const cwd = process.cwd();
+  if (looksLikeProjectRoot(cwd)) {
+    return cwd;
   }
 
-  return path.dirname(fileURLToPath(getImportMetaUrl()));
+  if (typeof __dirname === "string") {
+    const serverDirCandidate = path.resolve(__dirname, "..");
+    if (looksLikeProjectRoot(serverDirCandidate)) {
+      return serverDirCandidate;
+    }
+
+    const distDirCandidate = path.resolve(__dirname, "..", "..");
+    if (looksLikeProjectRoot(distDirCandidate)) {
+      return distDirCandidate;
+    }
+  }
+
+  return cwd;
 }
 
+// fallow-ignore-next-line unused-export
 export async function setupVite(
   app: Express,
   server: Server,
@@ -35,10 +51,10 @@ export async function setupVite(
     hmr: { server },
     allowedHosts: true as const,
   };
-  const currentDir = getCurrentDir();
+  const projectRoot = resolveProjectRoot();
 
   const vite = await createViteServer({
-    configFile: path.resolve(currentDir, "../..", "vite.config.ts"),
+    configFile: path.resolve(projectRoot, "vite.config.ts"),
     server: serverOptions,
     appType: "custom",
   });
@@ -50,8 +66,7 @@ export async function setupVite(
     void (async () => {
       try {
         const clientTemplate = path.resolve(
-          currentDir,
-          "../..",
+          projectRoot,
           "client",
           "index.html"
         );
@@ -76,12 +91,12 @@ export function serveStatic(app: Express, staticRoot?: string) {
   app.use(createGlobalHttpRateLimiter());
 
   app.use(rateLimit({windowMs:DEFAULT_WINDOW_MS,limit:DEFAULT_MAX_REQUESTS,standardHeaders:true,legacyHeaders:false}));
-  const currentDir = getCurrentDir();
+  const projectRoot = resolveProjectRoot();
   const distPathCandidates = staticRoot
     ? [path.resolve(staticRoot)]
     : [
-        path.resolve(currentDir, "public"),
-        path.resolve(currentDir, "..", "public"),
+        path.resolve(projectRoot, "dist", "public"),
+        path.resolve(projectRoot, "public"),
       ];
   const distPath = distPathCandidates.find((candidate) => fs.existsSync(candidate));
 

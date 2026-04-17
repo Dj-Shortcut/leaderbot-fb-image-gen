@@ -4,5 +4,5 @@ export {
 } from "../webhookSignatureVerification";
 export {
   registerMetaWebhookRoutes as registerBotRoutes,
-} from "../messengerWebhook";
+} from "../meta/webhookRoutes";
 export { getGeneratorStartupConfig as getBotStartupConfig } from "../imageService";

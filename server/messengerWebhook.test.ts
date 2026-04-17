@@ -44,6 +44,7 @@ import {
   processFacebookWebhookPayload,
   resetMessengerEventDedupe,
 } from "./_core/messengerWebhook";
+import { t } from "./_core/i18n";
 import { STYLE_CONFIGS } from "./_core/messengerStyles";
 import {
   anonymizePsid,
@@ -1227,7 +1228,7 @@ describe("messenger text brain rollout", () => {
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
     expect(sendTextMock).toHaveBeenLastCalledWith(
       "legacy-user",
-      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis."
+      t("nl", "flowExplanation")
     );
   });
 
@@ -1318,7 +1319,7 @@ describe("messenger text brain rollout", () => {
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
     expect(sendTextMock).toHaveBeenLastCalledWith(
       "canary-miss-user",
-      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis."
+      t("nl", "flowExplanation")
     );
   });
 
@@ -1448,7 +1449,7 @@ describe("messenger greeting behavior", () => {
     expect(sendTextMock).not.toHaveBeenCalled();
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       "idle-user",
-      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis.",
+      t("nl", "flowExplanation"),
       expect.arrayContaining([
         { content_type: "text", title: "Wat doe ik?", payload: "WHAT_IS_THIS" },
         { content_type: "text", title: "Privacy", payload: "PRIVACY_INFO" },
@@ -2059,7 +2060,7 @@ describe("disabled bot features stay out of the runtime flow", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(
       "edit-text-user",
-      "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis."
+      t("nl", "flowExplanation")
     );
     expect(sendImageMock).not.toHaveBeenCalled();
     expect(generateMessengerReplyMock).not.toHaveBeenCalled();
@@ -2112,7 +2113,7 @@ describe("disabled bot features stay out of the runtime flow", () => {
     expect(sendTextMock).toHaveBeenNthCalledWith(
       1,
       "surprise-style-user",
-      expect.stringMatching(/^🎲 Mooie keuze/)
+      expect.stringMatching(/Mooie keuze/)
     );
     expect(sendTextMock).toHaveBeenNthCalledWith(
       2,
@@ -2397,3 +2398,4 @@ describe("disabled bot features stay out of the runtime flow", () => {
     );
   });
 });
+

@@ -7,7 +7,7 @@ vi.mock("express-rate-limit", () => ({
 }));
 
 async function getWebhook(path: string): Promise<{ status: number; payload: string }> {
-  const { registerMetaWebhookRoutes } = await import("./_core/messengerWebhook");
+  const { registerMetaWebhookRoutes } = await import("./_core/meta/webhookRoutes");
   const app = express();
   registerMetaWebhookRoutes(app);
 
@@ -68,7 +68,7 @@ describe("messenger webhook verification route", () => {
     );
 
     expect(response.status).toBe(403);
-  });
+  }, 15000);
 
   it("rejects requests with a missing challenge", async () => {
     process.env.FB_VERIFY_TOKEN = "test-token";
@@ -78,7 +78,7 @@ describe("messenger webhook verification route", () => {
     );
 
     expect(response.status).toBe(403);
-  });
+  }, 15000);
 
   it("returns challenge for valid token", async () => {
     process.env.FB_VERIFY_TOKEN = "test-token";

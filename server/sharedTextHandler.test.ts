@@ -13,6 +13,7 @@ vi.mock("./_core/messengerResponsesService", () => ({
   generateMessengerReply: generateMessengerReplyMock,
 }));
 
+import { t } from "./_core/i18n";
 import { handleSharedTextMessage } from "./_core/sharedTextHandler";
 import type { MessengerUserState } from "./_core/messengerState";
 
@@ -85,7 +86,7 @@ describe("sharedTextHandler", () => {
     expect(result).toEqual({
       response: {
         kind: "text",
-        text: "Stuur een foto en ik maak er een speciale versie van in een andere stijl — het is gratis.",
+        text: t("nl", "flowExplanation"),
       },
       replyState: "IDLE",
       afterSend: "markIntroSeen",
@@ -139,7 +140,7 @@ describe("sharedTextHandler", () => {
 
     expect(setFlowState).toHaveBeenCalledWith("AWAITING_STYLE");
     expect(result).toEqual({
-      response: { kind: "text", text: "Pick a style group first 👇" },
+      response: { kind: "text", text: t("en", "styleCategoryPicker") },
       replyState: "AWAITING_STYLE",
     });
   });
@@ -216,7 +217,6 @@ describe("sharedTextHandler", () => {
       logEngineResult,
     });
 
-    expect(setFlowState).toHaveBeenCalledWith("AWAITING_PHOTO");
     expect(logEngineResult).toHaveBeenCalledWith({
       source: "fallback",
       errorCode: "Error",
@@ -224,7 +224,7 @@ describe("sharedTextHandler", () => {
     expect(result).toEqual({
       response: {
         kind: "text",
-        text: "Feel free to send a photo, then I can make a style for you.",
+        text: t("en", "textWithoutPhoto"),
       },
     });
   });

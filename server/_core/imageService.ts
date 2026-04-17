@@ -11,9 +11,9 @@ import {
 } from "./generatedImageStore";
 import { storagePut } from "../storage";
 
-export type GeneratorMode = "openai";
+type GeneratorMode = "openai";
 
-export interface ImageGenerator {
+interface ImageGenerator {
   generate(input: {
     style: Style;
     sourceImageUrl?: string;
@@ -48,7 +48,7 @@ export class MissingObjectStorageConfigError extends Error {}
 export class MissingInputImageError extends Error {}
 export class InvalidSourceImageUrlError extends Error {}
 
-export type GenerationMetrics = {
+type GenerationMetrics = {
   fbImageFetchMs?: number;
   openAiMs?: number;
   uploadOrServeMs?: number;

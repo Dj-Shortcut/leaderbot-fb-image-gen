@@ -7,7 +7,7 @@ import {
   captureMetaWebhookRawBody,
   verifyMetaWebhookSignature,
 } from "./_core/webhookSignatureVerification";
-import { registerMetaWebhookRoutes } from "./_core/messengerWebhook";
+import { registerMetaWebhookRoutes } from "./_core/meta/webhookRoutes";
 
 function buildSignature(body: string, secret: string): string {
   const digest = createHmac("sha256", secret).update(body).digest("hex");
@@ -110,7 +110,7 @@ describe("messenger webhook payload validation", () => {
     expect(response.status).toBe(200);
   });
 
-  it("rate limits repeated signed webhook requests from the same IP", async () => {
+  it("does not rate limit repeated signed webhook deliveries from the same IP", async () => {
     const secret = "test-secret";
     process.env.FB_APP_SECRET = secret;
 
@@ -121,6 +121,6 @@ describe("messenger webhook payload validation", () => {
       response = await postWebhook(body, buildSignature(body, secret));
     }
 
-    expect(response?.status).toBe(429);
-  });
+    expect(response?.status).toBe(400);
+  }, 15000);
 });

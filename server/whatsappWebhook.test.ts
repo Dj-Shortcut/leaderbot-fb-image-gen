@@ -30,12 +30,14 @@ import {
   processWhatsAppWebhookPayload,
   resetMessengerEventDedupe,
 } from "./_core/messengerWebhook";
+import { t } from "./_core/i18n";
 import {
   anonymizePsid,
   getState,
   resetStateStore,
   setFlowState,
 } from "./_core/messengerState";
+import { buildStateResponseText } from "./_core/stateResponseText";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
@@ -137,6 +139,26 @@ describe("whatsapp webhook flow", () => {
         expect.objectContaining({ id: "WA_ILLUSTRATED", title: "Illustrated" }),
       ])
     );
+  });
+
+  it("recovers with a user-facing retry prompt when WhatsApp media download fails", async () => {
+    downloadWhatsAppMediaMock.mockRejectedValue(new Error("media fetch failed"));
+
+    await processWhatsAppWebhookPayload(
+      createWhatsAppPayload({
+        from: "wa-user-image-fail",
+        timestamp: "1710000000",
+        type: "image",
+        image: { id: "wamid-image-fail" },
+      })
+    );
+
+    expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+      "wa-user-image-fail",
+      t("nl", "missingInputImage")
+    );
+    expect(getState(anonymizePsid("wa-user-image-fail"))?.stage).toBe("AWAITING_PHOTO");
+    expect(sendWhatsAppButtonsMock).not.toHaveBeenCalled();
   });
 
   it("accepts a WhatsApp category reply and sends category-specific style options", async () => {
@@ -533,7 +555,11 @@ describe("whatsapp webhook flow", () => {
 
     expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
       "wa-user-6",
-      "⚡ Snelle acties: kies een stijl, typ 'remix', of typ 'verras me' voor een willekeurige look.\n\n1. 🎨 Illustrated\n2. 🌤️ Atmosphere\n3. ⚡ Bold"
+      buildStateResponseText(
+        "AWAITING_STYLE",
+        t("nl", "assistantQuickActions"),
+        "nl"
+      )
     );
   });
 
@@ -549,7 +575,7 @@ describe("whatsapp webhook flow", () => {
 
     expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
       "wa-user-8",
-      "Stuur gerust een foto, dan kan ik een stijl voor je maken.\n\nTip: typ 'verras me' nadat je een foto hebt gestuurd voor meteen een willekeurige stijl."
+      [t("nl", "textWithoutPhoto"), t("nl", "assistantPhotoTip")].join("\n\n")
     );
   });
 
@@ -590,3 +616,4 @@ describe("whatsapp webhook flow", () => {
     expect(downloadWhatsAppMediaMock).not.toHaveBeenCalled();
   });
 });
+
