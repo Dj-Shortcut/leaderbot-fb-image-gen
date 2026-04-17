@@ -5,10 +5,6 @@ import { facebookWebhookPayloadSchema } from "../webhookSchemas";
 import {
   isWhatsAppWebhookPayload,
 } from "../inbound/whatsappInbound";
-import {
-  processFacebookWebhookPayload,
-} from "../messengerWebhook";
-import { processWhatsAppWebhookPayload } from "../whatsappWebhook";
 
 const webhookVerificationQuerySchema = z.object({
   "hub.mode": z.literal("subscribe"),
@@ -32,19 +28,23 @@ function getMetaVerifyToken(): string {
 }
 
 function processWhatsAppWebhookPayloadSafely(payload: unknown): void {
-  void processWhatsAppWebhookPayload(payload).catch(error => {
-    console.error("[whatsapp webhook] async processing failed", {
-      error: error instanceof Error ? error.message : String(error),
+  void import("../whatsappWebhook")
+    .then(module => module.processWhatsAppWebhookPayload(payload))
+    .catch(error => {
+      console.error("[whatsapp webhook] async processing failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
-  });
 }
 
 function processFacebookWebhookPayloadSafely(payload: unknown): void {
-  void processFacebookWebhookPayload(payload).catch(error => {
-    console.error("[messenger webhook] async processing failed", {
-      error: error instanceof Error ? error.message : String(error),
+  void import("../messengerWebhook")
+    .then(module => module.processFacebookWebhookPayload(payload))
+    .catch(error => {
+      console.error("[messenger webhook] async processing failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
-  });
 }
 
 export function registerMetaWebhookRoutes(app: express.Express): void {

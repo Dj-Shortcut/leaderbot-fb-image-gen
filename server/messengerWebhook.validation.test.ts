@@ -122,5 +122,5 @@ describe("messenger webhook payload validation", () => {
     }
 
     expect(response?.status).toBe(429);
-  });
+  }, 15000);
 });

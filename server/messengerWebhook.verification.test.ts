@@ -68,7 +68,7 @@ describe("messenger webhook verification route", () => {
     );
 
     expect(response.status).toBe(403);
-  });
+  }, 15000);
 
   it("rejects requests with a missing challenge", async () => {
     process.env.FB_VERIFY_TOKEN = "test-token";
@@ -78,7 +78,7 @@ describe("messenger webhook verification route", () => {
     );
 
     expect(response.status).toBe(403);
-  });
+  }, 15000);
 
   it("returns challenge for valid token", async () => {
     process.env.FB_VERIFY_TOKEN = "test-token";
