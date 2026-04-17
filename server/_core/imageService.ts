@@ -638,9 +638,10 @@ async function maybeWriteDebugImageProof(
 
   const ext = contentType.includes("png") ? "png" : "jpg";
   const debugDir = path.join(os.tmpdir(), "leaderbot-debug");
+  const safeReqId = reqId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "req";
   const savedPath = path.join(
     debugDir,
-    `leaderbot_incoming_${reqId}_${Date.now()}_${randomUUID()}.${ext}`
+    `leaderbot_incoming_${safeReqId}_${Date.now()}_${randomUUID()}.${ext}`
   );
   try {
     await fs.mkdir(debugDir, { recursive: true });
@@ -746,7 +747,8 @@ async function readResponseBufferWithinLimit(
 async function buildDownloadedSourceImage(
   reqId: string,
   contentType: string,
-  response: Response
+  response: Response,
+  totalFetchMs: number
 ): Promise<DownloadedSourceImage> {
   const imageBuffer = await readResponseBufferWithinLimit(reqId, response);
   const incomingByteLen = safeLen(imageBuffer);
@@ -760,7 +762,7 @@ async function buildDownloadedSourceImage(
     contentType,
     incomingLen: incomingByteLen,
     incomingSha256: incomingHash,
-    fbImageFetchMs: 0,
+    fbImageFetchMs: totalFetchMs,
   };
 }
 
@@ -834,16 +836,13 @@ async function downloadSourceImageOrThrow(
         throwMissingInputDownloadFailed(reqId, response.status);
       }
 
-      const downloadedImage = await buildDownloadedSourceImage(
+      totalFetchMs += Date.now() - attemptStartedAt;
+      return buildDownloadedSourceImage(
         reqId,
         contentType,
-        response
+        response,
+        totalFetchMs
       );
-      totalFetchMs += Date.now() - attemptStartedAt;
-      return {
-        ...downloadedImage,
-        fbImageFetchMs: totalFetchMs,
-      };
     } catch (error) {
       totalFetchMs += Date.now() - attemptStartedAt;
       if (shouldRetrySourceImageError(attempt, error, reqId)) {
