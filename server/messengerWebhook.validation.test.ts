@@ -83,6 +83,27 @@ async function postWebhook(
 }
 
 describe("messenger webhook payload validation", () => {
+  const validMessengerPayload = {
+    object: "page",
+    entry: [
+      {
+        id: "page-123",
+        time: 1_776_447_284_000,
+        messaging: [
+          {
+            sender: { id: "user-123" },
+            recipient: { id: "page-123" },
+            timestamp: 1_776_447_284_000,
+            message: {
+              mid: "mid.123",
+              text: "hello",
+            },
+          },
+        ],
+      },
+    ],
+  };
+
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -140,7 +161,7 @@ describe("messenger webhook payload validation", () => {
     );
     vi.spyOn(webhookIngressQueue, "scheduleWebhookIngressDrain").mockImplementation(() => {});
 
-    const body = JSON.stringify({ object: "page", entry: [] });
+    const body = JSON.stringify(validMessengerPayload);
     const response = await postWebhook(body, buildSignature(body, secret));
 
     expect(response.status).toBe(503);
@@ -159,11 +180,11 @@ describe("messenger webhook payload validation", () => {
       .spyOn(webhookIngressQueue, "scheduleWebhookIngressDrain")
       .mockImplementation(() => {});
 
-    const body = JSON.stringify({ object: "page", entry: [] });
+    const body = JSON.stringify(validMessengerPayload);
     const response = await postWebhook(body, buildSignature(body, secret));
 
     expect(response.status).toBe(200);
-    expect(enqueueSpy).toHaveBeenCalledWith("facebook", { object: "page", entry: [] });
+    expect(enqueueSpy).toHaveBeenCalledWith("facebook", validMessengerPayload);
     expect(drainSpy).toHaveBeenCalled();
   });
 });
