@@ -88,9 +88,14 @@ export async function setupVite(
 }
 
 export function serveStatic(app: Express, staticRoot?: string) {
-  app.use(createGlobalHttpRateLimiter());
+  const staticRateLimiter = rateLimit({
+    windowMs: DEFAULT_WINDOW_MS,
+    limit: DEFAULT_MAX_REQUESTS,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
 
-  app.use(rateLimit({windowMs:DEFAULT_WINDOW_MS,limit:DEFAULT_MAX_REQUESTS,standardHeaders:true,legacyHeaders:false}));
+  app.use(staticRateLimiter);
   const projectRoot = resolveProjectRoot();
   const distPathCandidates = staticRoot
     ? [path.resolve(staticRoot)]
