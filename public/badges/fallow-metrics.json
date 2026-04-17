@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-17T10:51:16.511Z",
+  "generatedAt": "2026-04-17T17:27:26.357Z",
   "fallowVersion": "2.27.0",
   "totalIssues": 86,
   "functionsAboveThreshold": 18,
@@ -25,7 +25,7 @@
     "boundary_violations": 0
   },
   "healthSummary": {
-    "files_analyzed": 168,
+    "files_analyzed": 169,
     "functions_analyzed": 1873,
     "functions_above_threshold": 18,
     "max_cyclomatic_threshold": 20,
