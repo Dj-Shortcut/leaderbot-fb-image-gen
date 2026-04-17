@@ -26,6 +26,10 @@ import {
   ensureWebhookReplayProtectionReady,
   isRedisReplayProtectionEnabled,
 } from "./webhookReplayProtection";
+import {
+  ensureWebhookIngressQueueReady,
+  scheduleWebhookIngressDrain,
+} from "./meta/webhookIngressQueue";
 import { bodyParserErrorHandler } from "./bodyParserErrorHandler";
 import { z } from "zod";
 import {
@@ -301,6 +305,7 @@ async function startServer() {
   assertIdentityGameVariantCatalog();
   await ensureStateStoreReady();
   await ensureWebhookReplayProtectionReady();
+  await ensureWebhookIngressQueueReady();
   await ensureHttpRateLimiterReady();
 
   const app = express();
@@ -561,6 +566,7 @@ async function startServer() {
 
   // Register webhook routes AFTER signature verification middleware
   registerBotRoutes(app);
+  scheduleWebhookIngressDrain();
 
   const oauthServerUrl = process.env.OAUTH_SERVER_URL;
   if (oauthServerUrl) {

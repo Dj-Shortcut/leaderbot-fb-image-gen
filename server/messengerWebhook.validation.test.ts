@@ -1,13 +1,14 @@
 import { createHmac } from "node:crypto";
 import http from "node:http";
 import express from "express";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   captureMetaWebhookRawBody,
   verifyMetaWebhookSignature,
 } from "./_core/webhookSignatureVerification";
 import { registerMetaWebhookRoutes } from "./_core/meta/webhookRoutes";
+import * as webhookIngressQueue from "./_core/meta/webhookIngressQueue";
 
 function buildSignature(body: string, secret: string): string {
   const digest = createHmac("sha256", secret).update(body).digest("hex");
@@ -82,8 +83,13 @@ async function postWebhook(
 }
 
 describe("messenger webhook payload validation", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
   afterEach(() => {
     delete process.env.FB_APP_SECRET;
+    delete process.env.REDIS_URL;
   });
 
   it("rejects schema-invalid signed webhook payloads", async () => {
@@ -123,4 +129,41 @@ describe("messenger webhook payload validation", () => {
 
     expect(response?.status).toBe(400);
   }, 15000);
+
+  it("returns 503 when durable enqueue fails in redis-backed mode", async () => {
+    const secret = "test-secret";
+    process.env.FB_APP_SECRET = secret;
+    process.env.REDIS_URL = "redis://example.test:6379";
+
+    vi.spyOn(webhookIngressQueue, "enqueueWebhookIngressDelivery").mockRejectedValue(
+      new Error("redis unavailable"),
+    );
+    vi.spyOn(webhookIngressQueue, "scheduleWebhookIngressDrain").mockImplementation(() => {});
+
+    const body = JSON.stringify({ object: "page", entry: [] });
+    const response = await postWebhook(body, buildSignature(body, secret));
+
+    expect(response.status).toBe(503);
+    expect(response.payload).toContain("Webhook delivery enqueue failed");
+  });
+
+  it("acks after durable enqueue succeeds in redis-backed mode", async () => {
+    const secret = "test-secret";
+    process.env.FB_APP_SECRET = secret;
+    process.env.REDIS_URL = "redis://example.test:6379";
+
+    const enqueueSpy = vi
+      .spyOn(webhookIngressQueue, "enqueueWebhookIngressDelivery")
+      .mockResolvedValue();
+    const drainSpy = vi
+      .spyOn(webhookIngressQueue, "scheduleWebhookIngressDrain")
+      .mockImplementation(() => {});
+
+    const body = JSON.stringify({ object: "page", entry: [] });
+    const response = await postWebhook(body, buildSignature(body, secret));
+
+    expect(response.status).toBe(200);
+    expect(enqueueSpy).toHaveBeenCalledWith("facebook", { object: "page", entry: [] });
+    expect(drainSpy).toHaveBeenCalled();
+  });
 });

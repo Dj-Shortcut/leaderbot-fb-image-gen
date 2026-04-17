@@ -5,6 +5,12 @@ import { facebookWebhookPayloadSchema } from "../webhookSchemas";
 import {
   isWhatsAppWebhookPayload,
 } from "../inbound/whatsappInbound";
+import {
+  enqueueWebhookIngressDelivery,
+  isWebhookIngressQueueEnabled,
+  processWebhookDeliveryInline,
+  scheduleWebhookIngressDrain,
+} from "./webhookIngressQueue";
 
 const webhookVerificationQuerySchema = z.object({
   "hub.mode": z.literal("subscribe"),
@@ -25,26 +31,6 @@ function getMetaVerifyToken(): string {
     process.env.FB_VERIFY_TOKEN?.trim() ||
     ""
   );
-}
-
-function processWhatsAppWebhookPayloadSafely(payload: unknown): void {
-  void import("../whatsappWebhook")
-    .then(module => module.processWhatsAppWebhookPayload(payload))
-    .catch(error => {
-      console.error("[whatsapp webhook] async processing failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    });
-}
-
-function processFacebookWebhookPayloadSafely(payload: unknown): void {
-  void import("../messengerWebhook")
-    .then(module => module.processFacebookWebhookPayload(payload))
-    .catch(error => {
-      console.error("[messenger webhook] async processing failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    });
 }
 
 export function registerMetaWebhookRoutes(app: express.Express): void {
@@ -79,13 +65,27 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
   app.get("/webhook", webhookLimiter, handleVerification);
   app.get("/webhook/facebook", webhookLimiter, handleVerification);
 
-  const handleWebhookPost: express.RequestHandler = (req, res) => {
+  const handleWebhookPost: express.RequestHandler = async (req, res) => {
     if (isWhatsAppWebhookPayload(req.body)) {
       console.log("[whatsapp webhook] POST delivery received");
+      if (!isWebhookIngressQueueEnabled()) {
+        res.sendStatus(200);
+        processWebhookDeliveryInline("whatsapp", req.body);
+        return;
+      }
+
+      try {
+        await enqueueWebhookIngressDelivery("whatsapp", req.body);
+      } catch (error) {
+        console.error("[whatsapp webhook] failed to durably enqueue delivery", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        res.status(503).json({ error: "Webhook delivery enqueue failed" });
+        return;
+      }
+
       res.sendStatus(200);
-      setImmediate(() => {
-        processWhatsAppWebhookPayloadSafely(req.body);
-      });
+      scheduleWebhookIngressDrain();
       return;
     }
 
@@ -102,10 +102,24 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
     }
 
     console.log("[messenger webhook] POST delivery received");
+    if (!isWebhookIngressQueueEnabled()) {
+      res.sendStatus(200);
+      processWebhookDeliveryInline("facebook", req.body);
+      return;
+    }
+
+    try {
+      await enqueueWebhookIngressDelivery("facebook", req.body);
+    } catch (error) {
+      console.error("[messenger webhook] failed to durably enqueue delivery", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      res.status(503).json({ error: "Webhook delivery enqueue failed" });
+      return;
+    }
+
     res.sendStatus(200);
-    setImmediate(() => {
-      processFacebookWebhookPayloadSafely(req.body);
-    });
+    scheduleWebhookIngressDrain();
   };
 
   app.post("/webhook", handleWebhookPost);
