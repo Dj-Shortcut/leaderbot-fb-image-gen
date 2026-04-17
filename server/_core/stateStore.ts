@@ -18,6 +18,7 @@ type RedisModule = {
 export type MaybePromise<T> = T | Promise<T>;
 
 const memoryState = new Map<string, string>();
+const memoryStateExpiresAt = new Map<string, number>();
 const memoryEphemeral = new Map<string, number>();
 
 let redisClientPromise: Promise<RedisLike> | null = null;
@@ -75,6 +76,7 @@ export async function ensureStateStoreReady(): Promise<void> {
 
 function readRawState<T>(storageKey: string): MaybePromise<T | null> {
   if (!isRedisStateStoreEnabled()) {
+    clearExpiredMemoryState();
     const payload = memoryState.get(storageKey);
     return payload ? (JSON.parse(payload) as T) : null;
   }
@@ -93,7 +95,14 @@ function writeRawState<T>(
   const payload = JSON.stringify(value);
 
   if (!isRedisStateStoreEnabled()) {
+    clearExpiredMemoryState();
+    if (ttlSeconds <= 0) {
+      memoryState.delete(storageKey);
+      memoryStateExpiresAt.delete(storageKey);
+      return;
+    }
     memoryState.set(storageKey, payload);
+    memoryStateExpiresAt.set(storageKey, Date.now() + ttlSeconds * 1000);
     return;
   }
 
@@ -107,6 +116,7 @@ function writeRawState<T>(
 function deleteRawState(storageKey: string): MaybePromise<void> {
   if (!isRedisStateStoreEnabled()) {
     memoryState.delete(storageKey);
+    memoryStateExpiresAt.delete(storageKey);
     return;
   }
 
@@ -199,6 +209,8 @@ export function findInMemoryState<T>(
     return null;
   }
 
+  clearExpiredMemoryState();
+
   for (const payload of memoryState.values()) {
     const value = JSON.parse(payload) as T;
     if (predicate(value)) {
@@ -211,7 +223,17 @@ export function findInMemoryState<T>(
 
 export function clearStateStore(): void {
   memoryState.clear();
+  memoryStateExpiresAt.clear();
   memoryEphemeral.clear();
+}
+
+function clearExpiredMemoryState(now = Date.now()): void {
+  for (const [key, expiresAt] of memoryStateExpiresAt.entries()) {
+    if (expiresAt <= now) {
+      memoryStateExpiresAt.delete(key);
+      memoryState.delete(key);
+    }
+  }
 }
 
 function clearExpiredMemoryEphemeral(now = Date.now()): void {
