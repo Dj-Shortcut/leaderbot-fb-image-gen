@@ -19,7 +19,7 @@ import {
   setLastGenerationContext,
   setLastEntryIntent,
   setLastUserMessageAt,
-  setPendingImage,
+  setPendingStoredImage,
   setPreselectedStyle,
   setPreferredLang,
   setSelectedStyleCategory,
@@ -32,6 +32,10 @@ import { normalizeLang, t, type Lang } from "./i18n";
 import { routeActiveExperience, routeEntryIntent } from "./experienceRouter";
 import { parseGameEntryIntent } from "./entryIntent";
 import { toLogUser, toUserKey } from "./privacy";
+import {
+  getStoredMessengerImageDecision,
+  normalizeMessengerInboundImage,
+} from "./messengerImageIngress";
 import {
   getStylesForCategory,
   type Style,
@@ -949,14 +953,26 @@ export function createWebhookHandlers({
       att => att.type === "image" && att.payload?.url
     );
     if (imageAttachment?.payload?.url) {
+      const inboundImageUrl = imageAttachment.payload.url;
       debugWebhookLog({
         level: "debug",
         msg: "photo_received",
         reqId,
         psidHash: anonymizePsid(psid).slice(0, 12),
         hasAttachments: !!message.attachments,
-        attachmentHostname: getAttachmentHostname(imageAttachment.payload.url),
+        attachmentHostname: getAttachmentHostname(inboundImageUrl),
       });
+
+      const storedSourceImageUrl = await normalizeMessengerInboundImage({
+        inboundImageUrl,
+        psidHash: anonymizePsid(psid).slice(0, 12),
+        reqId,
+      });
+      if (!storedSourceImageUrl) {
+        await setFlowState(psid, "AWAITING_PHOTO");
+        await sendLoggedText(psid, t(lang, "missingInputImage"), reqId);
+        return;
+      }
 
       const state = await getOrCreateState(psid);
       for (const feature of getBotFeatures()) {
@@ -967,7 +983,7 @@ export function createWebhookHandlers({
             reqId,
             lang,
             state,
-            imageAttachment.payload.url
+            storedSourceImageUrl
           )
         );
         if (result?.handled) {
@@ -975,25 +991,34 @@ export function createWebhookHandlers({
         }
       }
       logUserState(psid, userId, state, reqId, "image_received");
-      const hadPreviousPhoto = Boolean(state.lastPhotoUrl);
-      const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");
-      await setPendingImage(psid, imageAttachment.payload.url);
+      const imageDecision = getStoredMessengerImageDecision({
+        lastPhotoUrl: state.lastPhotoUrl,
+        preselectedStyle: state.preselectedStyle,
+        storedSourceImageUrl,
+      });
+      await setPendingStoredImage(psid, storedSourceImageUrl);
 
-      if (preselectedStyle && !hadPreviousPhoto) {
+      if (imageDecision.action === "auto_run_preselected_style") {
         logImageFlowDecision({
           psid,
           userId,
           reqId,
           stage: state.stage,
-          hadPreviousPhoto,
-          incomingImageUrl: imageAttachment.payload.url,
+          hadPreviousPhoto: imageDecision.hadPreviousPhoto,
+          incomingImageUrl: imageDecision.incomingImageUrl,
           selectedStyle: state.selectedStyle,
-          preselectedStyle: preselectedStyle ?? null,
-          action: "auto_run_preselected_style",
+          preselectedStyle: imageDecision.preselectedStyle,
+          action: imageDecision.action,
         });
         await setPreselectedStyle(psid, null);
-        await setChosenStyle(psid, preselectedStyle);
-        await runStyleGeneration(psid, userId, preselectedStyle, reqId, lang);
+        await setChosenStyle(psid, imageDecision.preselectedStyle);
+        await runStyleGeneration(
+          psid,
+          userId,
+          imageDecision.preselectedStyle,
+          reqId,
+          lang
+        );
         return;
       }
 
@@ -1002,11 +1027,11 @@ export function createWebhookHandlers({
         userId,
         reqId,
         stage: state.stage,
-        hadPreviousPhoto,
-        incomingImageUrl: imageAttachment.payload.url,
+        hadPreviousPhoto: imageDecision.hadPreviousPhoto,
+        incomingImageUrl: imageDecision.incomingImageUrl,
         selectedStyle: state.selectedStyle,
-        preselectedStyle: preselectedStyle ?? null,
-        action: "show_style_picker",
+        preselectedStyle: imageDecision.preselectedStyle,
+        action: imageDecision.action,
       });
       await setFlowState(psid, "AWAITING_STYLE");
       await sendPhotoReceivedPrompt(psid, lang, reqId);
