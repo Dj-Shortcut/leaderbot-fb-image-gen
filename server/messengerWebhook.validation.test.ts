@@ -151,11 +151,14 @@ describe("messenger webhook payload validation", () => {
     expect(response?.status).toBe(400);
   }, 15000);
 
-  it("returns 503 when durable enqueue fails in redis-backed mode", async () => {
+  it("falls back to inline processing when durable enqueue fails in redis-backed mode", async () => {
     const secret = "test-secret";
     process.env.FB_APP_SECRET = secret;
     process.env.REDIS_URL = "redis://example.test:6379";
 
+    const inlineSpy = vi
+      .spyOn(webhookIngressQueue, "processWebhookDeliveryInline")
+      .mockImplementation(() => {});
     vi.spyOn(webhookIngressQueue, "enqueueWebhookIngressDelivery").mockRejectedValue(
       new Error("redis unavailable"),
     );
@@ -164,8 +167,8 @@ describe("messenger webhook payload validation", () => {
     const body = JSON.stringify(validMessengerPayload);
     const response = await postWebhook(body, buildSignature(body, secret));
 
-    expect(response.status).toBe(503);
-    expect(response.payload).toContain("Webhook delivery enqueue failed");
+    expect(response.status).toBe(200);
+    expect(inlineSpy).toHaveBeenCalledWith("facebook", validMessengerPayload);
   });
 
   it("acks after durable enqueue succeeds in redis-backed mode", async () => {
