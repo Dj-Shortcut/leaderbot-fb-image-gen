@@ -113,6 +113,34 @@ function hostnameMatchesAllowedHost(
   return hostname === allowedHost || hostname.endsWith(`.${allowedHost}`);
 }
 
+function extractRawPathname(sourceImageUrl: string): string {
+  const match = sourceImageUrl.match(/^[a-z][a-z0-9+.-]*:\/\/[^/]+([^?#]*)/i);
+  return match?.[1] || "/";
+}
+
+function hasBlockedPathTraversalSegment(rawPathname: string): boolean {
+  const segments = rawPathname.split("/");
+
+  for (const segment of segments) {
+    if (!segment) {
+      continue;
+    }
+
+    let decodedSegment = segment;
+    try {
+      decodedSegment = decodeURIComponent(segment);
+    } catch {
+      // Keep the raw segment if decoding fails; malformed encodings are handled elsewhere.
+    }
+
+    if (decodedSegment === "." || decodedSegment === "..") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function isRedirectStatus(status: number): boolean {
   return status >= 300 && status <= 399 && status !== 304;
 }
@@ -180,6 +208,13 @@ function validateSourceImageUrlOrThrow(
   if (parsedUrl.port && parsedUrl.port !== "443") {
     return blockSourceImageUrl(reqId, "non_standard_port", {
       port: parsedUrl.port,
+    });
+  }
+
+  const rawPathname = extractRawPathname(sourceImageUrl);
+  if (hasBlockedPathTraversalSegment(rawPathname)) {
+    return blockSourceImageUrl(reqId, "path_traversal_segment", {
+      pathname: rawPathname,
     });
   }
 

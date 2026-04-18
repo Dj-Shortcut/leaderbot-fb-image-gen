@@ -665,6 +665,48 @@ describe("OpenAi image-to-image proof", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("rejects source image URLs with path traversal segments before fetch", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example";
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await expect(
+      generator.generate({
+        style: "disco",
+        sourceImageUrl: "https://img.example/inbound/../source.jpg",
+        userKey: "user-1",
+        reqId: "req-path-traversal",
+      })
+    ).rejects.toBeInstanceOf(InvalidSourceImageUrlError);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects encoded path traversal segments before fetch", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example";
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await expect(
+      generator.generate({
+        style: "disco",
+        sourceImageUrl: "https://img.example/inbound/%2e%2e/source.jpg",
+        userKey: "user-1",
+        reqId: "req-encoded-path-traversal",
+      })
+    ).rejects.toBeInstanceOf(InvalidSourceImageUrlError);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("does not require APP_BASE_URL when production uses durable object storage", async () => {
     process.env.NODE_ENV = "production";
     process.env.OPENAI_API_KEY = "dummy-key";
