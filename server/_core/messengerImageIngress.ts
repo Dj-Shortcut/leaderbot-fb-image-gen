@@ -1,3 +1,4 @@
+import { safeLog } from "./messengerApi";
 import type { Style } from "./messengerStyles";
 import { ingestExternalSourceImage } from "./sourceImageStore";
 import { normalizeStyle } from "./webhookHelpers";
@@ -18,11 +19,12 @@ export async function normalizeMessengerInboundImage(
     );
     return storedSourceImage.url;
   } catch (error) {
-    console.error("[messenger webhook] failed to normalize inbound image", {
+    safeLog("messenger_inbound_image_ingest_failed", {
       psidHash: input.psidHash,
       reqId: input.reqId,
       inboundImageUrl: input.inboundImageUrl,
-      error: error instanceof Error ? error.message : String(error),
+      errorCode:
+        error instanceof Error ? error.constructor.name : String(error),
     });
     return null;
   }

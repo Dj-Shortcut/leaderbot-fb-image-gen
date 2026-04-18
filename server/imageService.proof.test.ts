@@ -7,9 +7,26 @@ import { sha256 } from "./_core/imageProof";
 
 const GENERATED_IMAGE_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=";
+const STORED_SOURCE_IMAGE_URL =
+  "https://leaderbot-fb-image-gen.fly.dev/generated/source.jpg";
+const STORED_SOURCE_IMAGE_ALLOWED_HOSTS =
+  "leaderbot-fb-image-gen.fly.dev,fbsbx.com";
 
 function toUrlString(url: string | URL): string {
   return typeof url === "string" ? url : url.toString();
+}
+
+function createStoredSourceImageInput(input: {
+  userKey: string;
+  reqId: string;
+  promptHint?: string;
+}) {
+  return {
+    ...input,
+    sourceImageUrl: STORED_SOURCE_IMAGE_URL,
+    trustedSourceImageUrl: true as const,
+    sourceImageProvenance: "storeInbound" as const,
+  };
 }
 
 type StylePromptCase = {
@@ -168,14 +185,14 @@ describe("OpenAi image-to-image proof", () => {
     async styleCase => {
       process.env.OPENAI_API_KEY = "dummy-key";
       process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-      process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+      process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
 
       const fixture = Buffer.alloc(7000, 9);
       const fixtureHash = sha256(fixture);
       const promptHint = "neon rain";
 
       const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-        if (toUrlString(url) === "https://img.example/source.jpg") {
+        if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
           expect(init?.redirect).toBe("manual");
           return {
             ok: true,
@@ -207,10 +224,11 @@ describe("OpenAi image-to-image proof", () => {
       const generator = new OpenAiImageGenerator();
       const result = await generator.generate({
         style: styleCase.style,
-        sourceImageUrl: "https://img.example/source.jpg",
-        promptHint,
-        userKey: "user-1",
-        reqId: `req-${styleCase.style}-prompt`,
+        ...createStoredSourceImageInput({
+          promptHint,
+          userKey: "user-1",
+          reqId: `req-${styleCase.style}-prompt`,
+        }),
       });
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -226,12 +244,12 @@ describe("OpenAi image-to-image proof", () => {
   it("uses the cyberpunk preset prompt for OpenAI edits", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
 
     const fixture = Buffer.alloc(7000, 9);
 
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -260,9 +278,10 @@ describe("OpenAi image-to-image proof", () => {
     const generator = new OpenAiImageGenerator();
     await generator.generate({
       style: "cyberpunk",
-      sourceImageUrl: "https://img.example/source.jpg",
-      userKey: "user-1",
-      reqId: "req-cyberpunk-prompt",
+      ...createStoredSourceImageInput({
+        userKey: "user-1",
+        reqId: "req-cyberpunk-prompt",
+      }),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -271,12 +290,12 @@ describe("OpenAi image-to-image proof", () => {
   it("uses the Norman Blackwell preset prompt for OpenAI edits", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
 
     const fixture = Buffer.alloc(7000, 9);
 
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -308,9 +327,10 @@ describe("OpenAi image-to-image proof", () => {
     const generator = new OpenAiImageGenerator();
     await generator.generate({
       style: "norman-blackwell",
-      sourceImageUrl: "https://img.example/source.jpg",
-      userKey: "user-1",
-      reqId: "req-norman-blackwell-prompt",
+      ...createStoredSourceImageInput({
+        userKey: "user-1",
+        reqId: "req-norman-blackwell-prompt",
+      }),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -319,12 +339,12 @@ describe("OpenAi image-to-image proof", () => {
   it("uses the oil-paint preset prompt for OpenAI edits", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
 
     const fixture = Buffer.alloc(7000, 9);
 
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -355,9 +375,10 @@ describe("OpenAi image-to-image proof", () => {
     const generator = new OpenAiImageGenerator();
     await generator.generate({
       style: "oil-paint",
-      sourceImageUrl: "https://img.example/source.jpg",
-      userKey: "user-1",
-      reqId: "req-oil-paint-prompt",
+      ...createStoredSourceImageInput({
+        userKey: "user-1",
+        reqId: "req-oil-paint-prompt",
+      }),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -366,11 +387,11 @@ describe("OpenAi image-to-image proof", () => {
   it("hard-fails before OpenAI call when input image is too small", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
 
     const tinyFixture = Buffer.alloc(1024, 1);
     const fetchMock = vi.fn(async (url: string | URL) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -390,9 +411,10 @@ describe("OpenAi image-to-image proof", () => {
     await expect(
       generator.generate({
         style: "disco",
-        sourceImageUrl: "https://img.example/source.jpg",
-        userKey: "user-1",
-        reqId: "req-2",
+        ...createStoredSourceImageInput({
+          userKey: "user-1",
+          reqId: "req-2",
+        }),
       })
     ).rejects.toThrow("Source image too small");
 
@@ -402,10 +424,10 @@ describe("OpenAi image-to-image proof", () => {
   it("hard-fails before OpenAI call when content-length exceeds the inbound size cap", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
 
     const fetchMock = vi.fn(async (url: string | URL) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
         return {
           ok: true,
           headers: new Headers({
@@ -429,9 +451,10 @@ describe("OpenAi image-to-image proof", () => {
     await expect(
       generator.generate({
         style: "disco",
-        sourceImageUrl: "https://img.example/source.jpg",
-        userKey: "user-1",
-        reqId: "req-too-large-header",
+        ...createStoredSourceImageInput({
+          userKey: "user-1",
+          reqId: "req-too-large-header",
+        }),
       })
     ).rejects.toThrow("Source image too large");
 
@@ -441,18 +464,18 @@ describe("OpenAi image-to-image proof", () => {
   it("retries the source image download once on transient network errors", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
 
     const fixture = Buffer.alloc(7000, 9);
     const fetchMock = vi.fn(async (url: string | URL) => {
       if (
-        toUrlString(url) === "https://img.example/source.jpg" &&
+        toUrlString(url) === STORED_SOURCE_IMAGE_URL &&
         fetchMock.mock.calls.length === 1
       ) {
         throw new TypeError("temporary network failure");
       }
 
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -471,9 +494,10 @@ describe("OpenAi image-to-image proof", () => {
     const generator = new OpenAiImageGenerator();
     const result = await generator.generate({
       style: "disco",
-      sourceImageUrl: "https://img.example/source.jpg",
-      userKey: "user-1",
-      reqId: "req-3",
+      ...createStoredSourceImageInput({
+        userKey: "user-1",
+        reqId: "req-3",
+      }),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -507,11 +531,11 @@ describe("OpenAi image-to-image proof", () => {
   it("enforces SOURCE_IMAGE_ALLOWED_HOSTS when configured", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "leaderbot-fb-image-gen.fly.dev";
 
     const fixture = Buffer.alloc(7000, 9);
     const fetchMock = vi.fn(async (url: string | URL) => {
-      if (toUrlString(url) === "https://cdn.img.example/source.jpg") {
+      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -530,9 +554,10 @@ describe("OpenAi image-to-image proof", () => {
     const generator = new OpenAiImageGenerator();
     const result = await generator.generate({
       style: "disco",
-      sourceImageUrl: "https://cdn.img.example/source.jpg",
-      userKey: "user-1",
-      reqId: "req-allowlist",
+      ...createStoredSourceImageInput({
+        userKey: "user-1",
+        reqId: "req-allowlist",
+      }),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -695,13 +720,13 @@ describe("OpenAi image-to-image proof", () => {
     process.env.NODE_ENV = "production";
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "http://leaderbot.example";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "leaderbot-fb-image-gen.fly.dev";
     process.env.BUILT_IN_FORGE_API_URL = "https://forge.example";
     process.env.BUILT_IN_FORGE_API_KEY = "forge-secret";
 
     const fixture = Buffer.alloc(7000, 9);
     const fetchMock = vi.fn(async (url: string | URL) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -733,9 +758,10 @@ describe("OpenAi image-to-image proof", () => {
     const generator = new OpenAiImageGenerator();
     const result = await generator.generate({
       style: "disco",
-      sourceImageUrl: "https://img.example/source.jpg",
-      userKey: "user-1",
-      reqId: "req-insecure-app-base-url",
+      ...createStoredSourceImageInput({
+        userKey: "user-1",
+        reqId: "req-insecure-app-base-url",
+      }),
     });
 
     expect(result.imageUrl).toBe(
@@ -749,12 +775,12 @@ describe("OpenAi image-to-image proof", () => {
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     process.env.OPENAI_IMAGE_MAX_RETRIES = "1";
     process.env.OPENAI_IMAGE_RETRY_BASE_MS = "1";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
 
     const fixture = Buffer.alloc(7000, 9);
     let openAiCallCount = 0;
     const fetchMock = vi.fn(async (url: string | URL) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -782,9 +808,10 @@ describe("OpenAi image-to-image proof", () => {
     const generator = new OpenAiImageGenerator();
     const result = await generator.generate({
       style: "disco",
-      sourceImageUrl: "https://img.example/source.jpg",
-      userKey: "user-1",
-      reqId: "req-openai-retry",
+      ...createStoredSourceImageInput({
+        userKey: "user-1",
+        reqId: "req-openai-retry",
+      }),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -799,11 +826,11 @@ describe("OpenAi image-to-image proof", () => {
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     process.env.OPENAI_IMAGE_MAX_RETRIES = "2";
     process.env.OPENAI_IMAGE_RETRY_BASE_MS = "1";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
 
     const fixture = Buffer.alloc(7000, 9);
     const fetchMock = vi.fn(async (url: string | URL) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -832,9 +859,10 @@ describe("OpenAi image-to-image proof", () => {
     await expect(
       generator.generate({
         style: "disco",
-        sourceImageUrl: "https://img.example/source.jpg",
-        userKey: "user-1",
-        reqId: "req-openai-budget-exceeded",
+        ...createStoredSourceImageInput({
+          userKey: "user-1",
+          reqId: "req-openai-budget-exceeded",
+        }),
       })
     ).rejects.toThrow("OpenAI budget exceeded");
 
@@ -864,10 +892,10 @@ describe("OpenAi image-to-image proof", () => {
   it("blocks redirects for source image fetches", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
 
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
         expect(init?.redirect).toBe("manual");
         return {
           ok: false,
@@ -889,9 +917,10 @@ describe("OpenAi image-to-image proof", () => {
     await expect(
       generator.generate({
         style: "disco",
-        sourceImageUrl: "https://img.example/source.jpg",
-        userKey: "user-1",
-        reqId: "req-redirect-error",
+        ...createStoredSourceImageInput({
+          userKey: "user-1",
+          reqId: "req-redirect-error",
+        }),
       })
     ).rejects.toBeInstanceOf(InvalidSourceImageUrlError);
 
@@ -908,12 +937,12 @@ describe("OpenAi image-to-image proof", () => {
     process.env.OPENAI_IMAGE_MAX_RETRIES = "1";
     process.env.OPENAI_IMAGE_RETRY_BASE_MS = "1";
     process.env.OPENAI_IMAGE_TIMEOUT_MS = "5";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
 
     const fixture = Buffer.alloc(7000, 9);
     let openAiCallCount = 0;
     const fetchMock = vi.fn(async (url: string | URL) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -939,9 +968,10 @@ describe("OpenAi image-to-image proof", () => {
     const generator = new OpenAiImageGenerator();
     const result = await generator.generate({
       style: "disco",
-      sourceImageUrl: "https://img.example/source.jpg",
-      userKey: "user-1",
-      reqId: "req-openai-timeout-retry",
+      ...createStoredSourceImageInput({
+        userKey: "user-1",
+        reqId: "req-openai-timeout-retry",
+      }),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -954,11 +984,11 @@ describe("OpenAi image-to-image proof", () => {
   it("fails when OpenAI base64 payload decodes to an empty image buffer", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
 
     const fixture = Buffer.alloc(7000, 9);
     const fetchMock = vi.fn(async (url: string | URL) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -978,9 +1008,10 @@ describe("OpenAi image-to-image proof", () => {
     await expect(
       generator.generate({
         style: "disco",
-        sourceImageUrl: "https://img.example/source.jpg",
-        userKey: "user-1",
-        reqId: "req-empty-output-buffer",
+        ...createStoredSourceImageInput({
+          userKey: "user-1",
+          reqId: "req-empty-output-buffer",
+        }),
       })
     ).rejects.toThrow(
       "OpenAI response image data was empty after base64 decode"

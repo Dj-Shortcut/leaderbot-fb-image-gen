@@ -568,7 +568,17 @@ export function logSourceImageFetchStart(input: SourceImageResolveInput): void {
   });
 }
 
-export async function resolveSourceImage(
+export async function fetchExternalSourceImageForIngress(
+  input: Pick<SourceImageResolveInput, "sourceImageUrl" | "reqId">
+): Promise<DownloadedSourceImage> {
+  if (!input.sourceImageUrl) {
+    throw new MissingInputImageError("Missing source image");
+  }
+
+  return downloadSourceImageOrThrow(input.sourceImageUrl, input.reqId);
+}
+
+export async function resolveStoredSourceImage(
   input: SourceImageResolveInput
 ): Promise<DownloadedSourceImage> {
   // TODO: combine this with logSourceImageFetchStart into a single fetcher entrypoint once ImageService is thinned further.
@@ -581,6 +591,12 @@ export async function resolveSourceImage(
       buffer: Buffer.from([]),
       contentType: "image/jpeg",
     });
+  }
+
+  if (!input.trustedSourceImageUrl || input.sourceImageProvenance !== "storeInbound") {
+    throw new InvalidSourceImageUrlError(
+      "Only stored source images are allowed in generation"
+    );
   }
 
   return downloadSourceImageOrThrow(input.sourceImageUrl, input.reqId, {

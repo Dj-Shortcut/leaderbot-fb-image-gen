@@ -969,6 +969,7 @@ export function createWebhookHandlers({
         reqId,
       });
       if (!storedSourceImageUrl) {
+        await clearPendingImageState(psid);
         await setFlowState(psid, "AWAITING_PHOTO");
         await sendLoggedText(psid, t(lang, "missingInputImage"), reqId);
         return;
