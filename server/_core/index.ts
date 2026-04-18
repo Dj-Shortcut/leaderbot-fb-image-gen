@@ -20,7 +20,10 @@ import { assertPrivacyConfig } from "./privacy";
 import { applySecurityHeaders } from "./securityHeaders";
 import { getGeneratedImage } from "./generatedImageStore";
 import { isDebugLogEnabled } from "./logLevel";
-import { ensureStateStoreReady } from "./stateStore";
+import {
+  assertProductionStateStoreConfig,
+  ensureStateStoreReady,
+} from "./stateStore";
 import {
   assertProductionWebhookReplayProtectionConfig,
   ensureWebhookReplayProtectionReady,
@@ -301,6 +304,7 @@ async function startServer() {
   assertWhatsAppConfig();
   assertPrivacyConfig();
   assertInviteShareConfig();
+  assertProductionStateStoreConfig();
   assertProductionWebhookReplayProtectionConfig();
   assertIdentityGameVariantCatalog();
   await ensureStateStoreReady();

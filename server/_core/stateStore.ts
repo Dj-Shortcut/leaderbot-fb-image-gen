@@ -65,6 +65,16 @@ export function isRedisStateStoreEnabled(): boolean {
   return Boolean(getRedisUrl());
 }
 
+export function assertProductionStateStoreConfig(): void {
+  if (process.env.NODE_ENV !== "production") {
+    return;
+  }
+
+  if (!isRedisStateStoreEnabled()) {
+    throw new Error("REDIS_URL must be configured in production for state consistency");
+  }
+}
+
 export async function ensureStateStoreReady(): Promise<void> {
   if (!isRedisStateStoreEnabled()) {
     return;
