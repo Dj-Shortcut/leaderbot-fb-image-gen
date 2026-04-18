@@ -68,11 +68,35 @@ function toUrlString(url: string | URL): string {
 }
 
 const GENERATED_IMAGE_BASE64 = Buffer.from("fake-png").toString("base64");
+const GENERATED_SOURCE_IMAGE_URL_PREFIX =
+  "https://leaderbot-fb-image-gen.fly.dev/generated/";
+const DEFAULT_ALLOWED_SOURCE_IMAGE_HOSTS =
+  "img.example,fbsbx.com,leaderbot-fb-image-gen.fly.dev";
+
+function isNormalizedSourceImageUrl(url: string | URL): boolean {
+  return toUrlString(url).startsWith(GENERATED_SOURCE_IMAGE_URL_PREFIX);
+}
+
+function isSourceImageFetchUrl(
+  url: string | URL,
+  exactExternalUrl?: string
+): boolean {
+  const urlString = toUrlString(url);
+  if (isNormalizedSourceImageUrl(urlString)) {
+    return true;
+  }
+
+  if (exactExternalUrl) {
+    return urlString === exactExternalUrl;
+  }
+
+  return urlString.startsWith("https://img.example/");
+}
 
 function installOpenAiSuccessFetchMock() {
   const sourceImage = Buffer.alloc(6000, 7);
   const fetchMock = vi.fn(async (url: string | URL) => {
-    if (toUrlString(url).startsWith("https://img.example/")) {
+    if (isSourceImageFetchUrl(url)) {
       return {
         ok: true,
         headers: new Headers({ "content-type": "image/jpeg" }),
@@ -124,7 +148,7 @@ describe("messenger webhook dedupe", () => {
   beforeEach(() => {
     delete process.env.MOCK_MODE;
     process.env.GENERATOR_MODE = "openai";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = DEFAULT_ALLOWED_SOURCE_IMAGE_HOSTS;
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     sendImageMock.mockClear();
@@ -524,7 +548,7 @@ describe("messenger webhook dedupe", () => {
         ],
       });
 
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
       expect(sendImageMock).toHaveBeenCalledWith(
         `style-user-${style}`,
         expect.stringMatching(
@@ -579,7 +603,7 @@ describe("messenger webhook dedupe", () => {
 
     const sourceImage = Buffer.alloc(6000, 7);
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      if (toUrlString(url).startsWith("https://img.example/")) {
+      if (isSourceImageFetchUrl(url)) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -633,7 +657,7 @@ describe("messenger webhook dedupe", () => {
       ],
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(sendImageMock).toHaveBeenCalledWith(
       "norman-payload-user",
       expect.stringMatching(
@@ -760,7 +784,7 @@ describe("messenger webhook dedupe", () => {
     const sourceImage = Buffer.alloc(6000, 7);
     const generatedImageBytes = Buffer.from("fake-png").toString("base64");
     const fetchMock = vi.fn(async (url: string | URL) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (isSourceImageFetchUrl(url, "https://img.example/source.jpg")) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -808,7 +832,7 @@ describe("messenger webhook dedupe", () => {
       vi.unstubAllGlobals();
     }
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(sendImageMock).toHaveBeenCalledWith(
       "openai-success-user",
       expect.stringMatching(
@@ -853,7 +877,10 @@ describe("messenger webhook dedupe", () => {
 
     const failedState = getState(userId);
     expect(failedState?.stage).toBe("FAILURE");
-    expect(failedState?.lastPhoto).toBe("https://img.example/retry.jpg");
+    expect(failedState?.lastPhoto).toMatch(
+      /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+    );
+    expect(failedState?.lastPhotoSource).toBe("stored");
     expect(failedState?.selectedStyle).toBe("gold");
 
     sendTextMock.mockClear();
@@ -874,7 +901,10 @@ describe("messenger webhook dedupe", () => {
 
     const retriedState = getState(userId);
     expect(retriedState?.stage).toBe("FAILURE");
-    expect(retriedState?.lastPhoto).toBe("https://img.example/retry.jpg");
+    expect(retriedState?.lastPhoto).toMatch(
+      /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+    );
+    expect(retriedState?.lastPhotoSource).toBe("stored");
     expect(retriedState?.selectedStyle).toBe("gold");
     expect(sendQuickRepliesMock).not.toHaveBeenCalledWith(
       psid,
@@ -903,7 +933,7 @@ describe("messenger webhook dedupe", () => {
     timeoutError.name = "AbortError";
     const sourceImage = Buffer.alloc(6000, 7);
     const fetchMock = vi.fn(async (url: string | URL) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (isSourceImageFetchUrl(url, "https://img.example/source.jpg")) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -974,7 +1004,7 @@ describe("messenger webhook dedupe", () => {
       | undefined;
     const sourceImage = Buffer.alloc(6000, 7);
     const fetchMock = vi.fn((url: string | URL) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (isSourceImageFetchUrl(url, "https://img.example/source.jpg")) {
         return Promise.resolve({
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -1030,7 +1060,7 @@ describe("messenger webhook dedupe", () => {
       });
 
       await vi.waitFor(() => {
-        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(fetchMock).toHaveBeenCalledTimes(3);
         expect(resolveFetch).toBeTypeOf("function");
       });
 
@@ -1055,7 +1085,7 @@ describe("messenger webhook dedupe", () => {
         ],
       });
 
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
       expect(sendTextMock).toHaveBeenCalledWith(
         "busy-user",
         "⏳ even geduld, ik ben nog bezig met jouw restyle"
@@ -1084,7 +1114,7 @@ describe("messenger webhook dedupe", () => {
       | undefined;
     const sourceImage = Buffer.alloc(6000, 7);
     const fetchMock = vi.fn((url: string | URL) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (isSourceImageFetchUrl(url, "https://img.example/source.jpg")) {
         return Promise.resolve({
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -1140,7 +1170,7 @@ describe("messenger webhook dedupe", () => {
       });
 
       await vi.waitFor(() => {
-        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(fetchMock).toHaveBeenCalledTimes(3);
         expect(resolveFetch).toBeTypeOf("function");
       });
 
@@ -1185,7 +1215,7 @@ describe("messenger webhook dedupe", () => {
 describe("messenger text brain rollout", () => {
   beforeEach(() => {
     process.env.GENERATOR_MODE = "openai";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = DEFAULT_ALLOWED_SOURCE_IMAGE_HOSTS;
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     sendImageMock.mockClear();
@@ -1421,7 +1451,7 @@ describe("messenger text brain rollout", () => {
 
 describe("messenger greeting behavior", () => {
   beforeEach(() => {
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = DEFAULT_ALLOWED_SOURCE_IMAGE_HOSTS;
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     sendImageMock.mockClear();
@@ -1513,7 +1543,7 @@ describe("messenger greeting behavior", () => {
 
     const sourceImage = Buffer.alloc(6000, 7);
     const fetchMock = vi.fn(async (url: string | URL) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (isSourceImageFetchUrl(url, "https://img.example/source.jpg")) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -1959,7 +1989,7 @@ describe("acknowledgement edgecases", () => {
 
 describe("bot rate limit feature", () => {
   beforeEach(() => {
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = DEFAULT_ALLOWED_SOURCE_IMAGE_HOSTS;
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
@@ -1996,7 +2026,7 @@ describe("bot rate limit feature", () => {
 describe("disabled bot features stay out of the runtime flow", () => {
   beforeEach(() => {
     process.env.GENERATOR_MODE = "openai";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = DEFAULT_ALLOWED_SOURCE_IMAGE_HOSTS;
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     sendImageMock.mockClear();
@@ -2301,18 +2331,60 @@ describe("disabled bot features stay out of the runtime flow", () => {
         expect.objectContaining({ payload: "STYLE_CATEGORY_BOLD" }),
       ])
     );
-    expect(getState(anonymizePsid("stale-preselect-user"))?.lastPhotoUrl).toBe(
-      "https://img.example/new-source.jpg"
+    expect(getState(anonymizePsid("stale-preselect-user"))?.lastPhotoUrl).toMatch(
+      /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
     );
+    expect(getState(anonymizePsid("stale-preselect-user"))?.lastPhotoSource).toBe("stored");
     expect(
       getState(anonymizePsid("stale-preselect-user"))?.preselectedStyle
     ).toBe("cyberpunk");
   });
 
+  it("stores Messenger attachment URLs before downstream generation fetches them again", async () => {
+    const fetchMock = installOpenAiSuccessFetchMock();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: "stored-boundary-user" },
+              message: {
+                mid: "mid-stored-boundary-photo",
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/source.jpg" },
+                  },
+                ],
+              },
+            },
+            {
+              sender: { id: "stored-boundary-user" },
+              message: {
+                mid: "mid-stored-boundary-style",
+                quick_reply: { payload: "gold" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const fetchedUrls = fetchMock.mock.calls.map(([url]) => toUrlString(url));
+    expect(fetchedUrls.filter(url => url === "https://img.example/source.jpg")).toHaveLength(1);
+    expect(
+      fetchedUrls.some(url => url.startsWith(GENERATED_SOURCE_IMAGE_URL_PREFIX))
+    ).toBe(true);
+    expect(getState(anonymizePsid("stored-boundary-user"))?.lastPhotoSource).toBe(
+      "stored"
+    );
+  });
+
   it("handles /style Afroman and routes the next generation through afroman-americana", async () => {
     const sourceImage = Buffer.alloc(6000, 7);
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      if (toUrlString(url).startsWith("https://img.example/")) {
+      if (isSourceImageFetchUrl(url)) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),

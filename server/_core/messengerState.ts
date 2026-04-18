@@ -385,6 +385,14 @@ export function setPendingImage(
   }
 }
 
+export function setPendingStoredImage(
+  psid: string,
+  imageUrl: string,
+  now = Date.now()
+): MaybePromise<void> {
+  return setPendingImage(psid, imageUrl, now, "stored");
+}
+
 export function clearPendingImageState(psid: string, now = Date.now()): MaybePromise<MessengerUserState> {
   return patchState(
     psid,

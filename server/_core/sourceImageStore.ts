@@ -3,7 +3,13 @@ import {
   buildGeneratedImageUrl,
   putGeneratedImage,
 } from "./generatedImageStore";
+import { resolveSourceImage } from "./image-generation/sourceImageFetcher";
 import { storagePut } from "../storage";
+
+export type StoredSourceImage = {
+  url: string;
+  origin: "stored";
+};
 
 function getConfiguredBaseUrl(): string | undefined {
   const configuredBaseUrl =
@@ -62,4 +68,24 @@ export async function storeInboundSourceImage(
 
   const token = putGeneratedImage(buffer, contentType);
   return buildGeneratedImageUrl(publicBaseUrl, token);
+}
+
+export async function ingestExternalSourceImage(
+  sourceImageUrl: string,
+  reqId: string
+): Promise<StoredSourceImage> {
+  const downloadedImage = await resolveSourceImage({
+    sourceImageUrl,
+    reqId,
+  });
+  const storedImageUrl = await storeInboundSourceImage(
+    downloadedImage.buffer,
+    downloadedImage.contentType,
+    reqId
+  );
+
+  return {
+    url: storedImageUrl,
+    origin: "stored",
+  };
 }
