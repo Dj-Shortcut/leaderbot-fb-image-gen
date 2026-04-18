@@ -10,8 +10,8 @@ type QueuedWebhookDelivery = {
 
 type RedisLike = {
   ping(): Promise<string>;
-  lPop(key: string): Promise<string | null>;
-  rPush(key: string, value: string): Promise<number>;
+  lpop(key: string): Promise<string | null>;
+  rpush(key: string, value: string): Promise<number>;
 };
 
 type RedisModule = {
@@ -100,7 +100,7 @@ export async function enqueueWebhookIngressDelivery(
     receivedAt: new Date().toISOString(),
   };
 
-  await redis.rPush(WEBHOOK_INGRESS_QUEUE_KEY, JSON.stringify(delivery));
+  await redis.rpush(WEBHOOK_INGRESS_QUEUE_KEY, JSON.stringify(delivery));
 }
 
 export function scheduleWebhookIngressDrain(): void {
@@ -114,7 +114,7 @@ export function scheduleWebhookIngressDrain(): void {
         const redis = await getRedisClient();
 
         while (true) {
-          const rawDelivery = await redis.lPop(WEBHOOK_INGRESS_QUEUE_KEY);
+          const rawDelivery = await redis.lpop(WEBHOOK_INGRESS_QUEUE_KEY);
           if (!rawDelivery) {
             return;
           }

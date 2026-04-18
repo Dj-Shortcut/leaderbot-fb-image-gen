@@ -65,6 +65,7 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
   app.get("/webhook", webhookLimiter, handleVerification);
   app.get("/webhook/facebook", webhookLimiter, handleVerification);
 
+  // Keep this dispatch branch local for now; it is the narrow seam for a later helper extraction.
   const handleWebhookPost: express.RequestHandler = async (req, res) => {
     if (isWhatsAppWebhookPayload(req.body)) {
       console.log("[whatsapp webhook] POST delivery received");
@@ -77,10 +78,11 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
       try {
         await enqueueWebhookIngressDelivery("whatsapp", req.body);
       } catch (error) {
-        console.error("[whatsapp webhook] failed to durably enqueue delivery", {
+        console.error("[whatsapp webhook] durable enqueue failed, falling back to inline processing", {
           error: error instanceof Error ? error.message : String(error),
         });
-        res.status(503).json({ error: "Webhook delivery enqueue failed" });
+        res.sendStatus(200);
+        processWebhookDeliveryInline("whatsapp", req.body);
         return;
       }
 
@@ -111,10 +113,11 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
     try {
       await enqueueWebhookIngressDelivery("facebook", req.body);
     } catch (error) {
-      console.error("[messenger webhook] failed to durably enqueue delivery", {
+      console.error("[messenger webhook] durable enqueue failed, falling back to inline processing", {
         error: error instanceof Error ? error.message : String(error),
       });
-      res.status(503).json({ error: "Webhook delivery enqueue failed" });
+      res.sendStatus(200);
+      processWebhookDeliveryInline("facebook", req.body);
       return;
     }
 
