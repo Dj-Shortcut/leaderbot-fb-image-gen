@@ -92,7 +92,8 @@ describe("generationFlow", () => {
       style: "cyberpunk",
       userId: "user-1",
       reqId: "req-1",
-      lastPhotoUrl: "https://example.com/photo.jpg",
+      lastPhotoUrl: "https://stored.example/photo.jpg",
+      lastPhotoSource: "stored",
     });
 
     expect(timeoutResult).toMatchObject({
@@ -112,7 +113,8 @@ describe("generationFlow", () => {
       style: "cyberpunk",
       userId: "user-1",
       reqId: "req-1",
-      lastPhotoUrl: "https://example.com/photo.jpg",
+      lastPhotoUrl: "https://stored.example/photo.jpg",
+      lastPhotoSource: "stored",
     });
 
     expect(invalidSourceResult).toMatchObject({
@@ -131,7 +133,8 @@ describe("generationFlow", () => {
       style: "cyberpunk",
       userId: "user-1",
       reqId: "req-1",
-      lastPhotoUrl: "https://example.com/photo.jpg",
+      lastPhotoUrl: "https://stored.example/photo.jpg",
+      lastPhotoSource: "stored",
     });
 
     expect(missingInputResult).toMatchObject({
@@ -150,7 +153,8 @@ describe("generationFlow", () => {
       style: "cyberpunk",
       userId: "user-1",
       reqId: "req-1",
-      lastPhotoUrl: "https://example.com/photo.jpg",
+      lastPhotoUrl: "https://stored.example/photo.jpg",
+      lastPhotoSource: "stored",
     });
 
     expect(budgetResult).toMatchObject({

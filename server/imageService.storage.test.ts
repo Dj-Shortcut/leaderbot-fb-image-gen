@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const GENERATED_IMAGE_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=";
+const STORED_SOURCE_IMAGE_URL =
+  "https://leaderbot-fb-image-gen.fly.dev/generated/source.jpg";
 
 function toUrlString(url: string | URL): string {
   return typeof url === "string" ? url : url.toString();
@@ -20,7 +22,7 @@ describe("OpenAi image delivery via object storage", () => {
 
   it("uploads generated image to storage and returns signed URL", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "leaderbot-fb-image-gen.fly.dev";
     process.env.BUILT_IN_FORGE_API_URL = "https://forge.example";
     process.env.BUILT_IN_FORGE_API_KEY = "forge-secret";
 
@@ -28,7 +30,7 @@ describe("OpenAi image delivery via object storage", () => {
 
     const sourceImage = Buffer.alloc(7000, 8);
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      if (toUrlString(url) === "https://img.example/source.jpg") {
+      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
         return {
           ok: true,
           headers: new Headers({ "content-type": "image/jpeg" }),
@@ -62,7 +64,9 @@ describe("OpenAi image delivery via object storage", () => {
     const generator = new OpenAiImageGenerator();
     const result = await generator.generate({
       style: "disco",
-      sourceImageUrl: "https://img.example/source.jpg",
+      sourceImageUrl: STORED_SOURCE_IMAGE_URL,
+      trustedSourceImageUrl: true,
+      sourceImageProvenance: "storeInbound",
       userKey: "user-1",
       reqId: "req-storage-1",
     });
