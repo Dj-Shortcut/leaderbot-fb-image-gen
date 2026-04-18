@@ -114,6 +114,24 @@ function installOpenAiSuccessFetchMock() {
   return fetchMock;
 }
 
+function installImageIngressFetchMock() {
+  const sourceImage = Buffer.alloc(6000, 7);
+  const fetchMock = vi.fn(async (url: string | URL) => {
+    if (isSourceImageFetchUrl(url)) {
+      return {
+        ok: true,
+        headers: new Headers({ "content-type": "image/jpeg" }),
+        arrayBuffer: async () => sourceImage,
+      } as Response;
+    }
+
+    throw new Error(`Unexpected fetch in messengerWebhook.test: ${toUrlString(url)}`);
+  });
+
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
 beforeAll(() => {
   process.env.PRIVACY_PEPPER = TEST_PEPPER;
 });
@@ -131,6 +149,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env.OPENAI_API_KEY;
   delete process.env.APP_BASE_URL;
+  delete process.env.SOURCE_IMAGE_ALLOWED_HOSTS;
 });
 
 beforeEach(() => {
@@ -151,6 +170,7 @@ describe("messenger webhook dedupe", () => {
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = DEFAULT_ALLOWED_SOURCE_IMAGE_HOSTS;
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    installImageIngressFetchMock();
     sendImageMock.mockClear();
     sendGenericTemplateMock.mockClear();
     sendQuickRepliesMock.mockClear();
@@ -1218,6 +1238,7 @@ describe("messenger text brain rollout", () => {
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = DEFAULT_ALLOWED_SOURCE_IMAGE_HOSTS;
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    installImageIngressFetchMock();
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
@@ -1454,6 +1475,7 @@ describe("messenger greeting behavior", () => {
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = DEFAULT_ALLOWED_SOURCE_IMAGE_HOSTS;
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    installImageIngressFetchMock();
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
@@ -1990,6 +2012,8 @@ describe("acknowledgement edgecases", () => {
 describe("bot rate limit feature", () => {
   beforeEach(() => {
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = DEFAULT_ALLOWED_SOURCE_IMAGE_HOSTS;
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    installImageIngressFetchMock();
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
@@ -2029,6 +2053,7 @@ describe("disabled bot features stay out of the runtime flow", () => {
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = DEFAULT_ALLOWED_SOURCE_IMAGE_HOSTS;
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    installImageIngressFetchMock();
     sendImageMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();

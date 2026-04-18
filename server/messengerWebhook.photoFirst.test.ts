@@ -37,17 +37,40 @@ describe("photo-first onboarding", () => {
   });
 
   beforeEach(() => {
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS =
+      "img.example,fbsbx.com,leaderbot-fb-image-gen.fly.dev";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     sendImageMock.mockClear();
     sendButtonTemplateMock.mockClear();
     sendGenericTemplateMock.mockClear();
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
     safeLogMock.mockClear();
+    const sourceImage = Buffer.alloc(6000, 7);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL) => {
+        const urlString = typeof url === "string" ? url : url.toString();
+        if (
+          urlString.startsWith("https://img.example/") ||
+          urlString.startsWith("https://leaderbot-fb-image-gen.fly.dev/generated/")
+        ) {
+          return {
+            ok: true,
+            headers: new Headers({ "content-type": "image/jpeg" }),
+            arrayBuffer: async () => sourceImage,
+          } as Response;
+        }
+
+        throw new Error(`Unexpected fetch in messengerWebhook.photoFirst.test: ${urlString}`);
+      })
+    );
     resetStateStore();
     resetMessengerEventDedupe();
   });
 
   afterAll(() => {
+    vi.unstubAllGlobals();
     if (originalPrivacyPepper === undefined) {
       delete process.env.PRIVACY_PEPPER;
       return;
@@ -76,7 +99,10 @@ describe("photo-first onboarding", () => {
     });
 
     const userState = getState(anonymizePsid(psid));
-    expect(userState?.lastPhoto).toBe("https://img.example/source.jpg");
+    expect(userState?.lastPhoto).toMatch(
+      /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+    );
+    expect(userState?.lastPhotoSource).toBe("stored");
     expect(userState?.stage).toBe("AWAITING_STYLE");
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
