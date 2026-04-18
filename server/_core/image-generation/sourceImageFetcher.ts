@@ -224,25 +224,19 @@ function validateSourceImageUrlOrThrow(
     });
   }
 
-  const allowTrustedSourceBypass =
-    options?.trustedSourceImageUrl === true &&
-    options.sourceImageProvenance === "storeInbound";
+  const allowedHosts = parseAllowedHostsFromEnv();
+  if (allowedHosts.length === 0) {
+    return blockSourceImageUrl(reqId, "allowlist_not_configured");
+  }
 
-  if (!allowTrustedSourceBypass) {
-    const allowedHosts = parseAllowedHostsFromEnv();
-    if (allowedHosts.length === 0) {
-      return blockSourceImageUrl(reqId, "allowlist_not_configured");
-    }
-
-    if (
-      !allowedHosts.some(allowedHost =>
-        hostnameMatchesAllowedHost(hostname, allowedHost)
-      )
-    ) {
-      return blockSourceImageUrl(reqId, "host_not_allowed", {
-        hostname,
-      });
-    }
+  if (
+    !allowedHosts.some(allowedHost =>
+      hostnameMatchesAllowedHost(hostname, allowedHost)
+    )
+  ) {
+    return blockSourceImageUrl(reqId, "host_not_allowed", {
+      hostname,
+    });
   }
 
   return parsedUrl;

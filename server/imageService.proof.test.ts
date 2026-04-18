@@ -562,43 +562,27 @@ describe("OpenAi image-to-image proof", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("allows trusted internally stored source image URLs outside SOURCE_IMAGE_ALLOWED_HOSTS", async () => {
+  it("requires allowlisted hosts even for trusted internally stored source image URLs", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example";
 
-    const fixture = Buffer.alloc(7000, 9);
-    const fetchMock = vi.fn(async (url: string | URL) => {
-      if (toUrlString(url) === "https://pub-storage.example/inbound-source/test.jpg") {
-        return {
-          ok: true,
-          headers: new Headers({ "content-type": "image/jpeg" }),
-          arrayBuffer: async () => fixture,
-        } as Response;
-      }
-
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
-    });
-
+    const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
     const generator = new OpenAiImageGenerator();
-    const result = await generator.generate({
-      style: "disco",
-      sourceImageUrl: "https://pub-storage.example/inbound-source/test.jpg",
-      trustedSourceImageUrl: true,
-      sourceImageProvenance: "storeInbound",
-      userKey: "user-1",
-      reqId: "req-trusted-stored-source",
-    });
+    await expect(
+      generator.generate({
+        style: "disco",
+        sourceImageUrl: "https://pub-storage.example/inbound-source/test.jpg",
+        trustedSourceImageUrl: true,
+        sourceImageProvenance: "storeInbound",
+        userKey: "user-1",
+        reqId: "req-trusted-stored-source",
+      })
+    ).rejects.toBeInstanceOf(InvalidSourceImageUrlError);
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(result.imageUrl).toMatch(
-      /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
-    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("does not bypass SOURCE_IMAGE_ALLOWED_HOSTS without stored-source provenance", async () => {
