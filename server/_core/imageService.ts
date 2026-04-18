@@ -8,7 +8,6 @@ import {
   finalizeGenerationMetrics,
   getGenerationMetrics,
   OpenAiBudgetExceededError,
-  OpenAiGenerationError,
   parseOpenAiImageResponse,
   type GenerationMetrics,
 } from "./image-generation/openAiImageClient";
@@ -330,5 +329,10 @@ export function createImageGenerator(mode: GeneratorMode = "openai"): {
   return { mode, generator: new OpenAiImageGenerator() };
 }
 
-export { getGenerationMetrics, OpenAiBudgetExceededError };
-export { InvalidSourceImageUrlError, MissingInputImageError };
+// TEMP: backward-compatibility re-exports during caller migration away from imageService.ts.
+export {
+  getGenerationMetrics,
+  InvalidSourceImageUrlError,
+  MissingInputImageError,
+  OpenAiBudgetExceededError,
+};

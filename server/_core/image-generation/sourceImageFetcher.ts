@@ -511,6 +511,7 @@ async function downloadSourceImageOrThrow(
   const timeoutMs = getInboundImageTimeoutMs();
   let totalFetchMs = 0;
 
+  // TODO: unify this retry loop with openAiImageClient retries once both paths can depend on the same typed retry helper.
   for (let attempt = 0; attempt <= FB_IMAGE_FETCH_RETRY_LIMIT; attempt += 1) {
     const attemptStartedAt = Date.now();
 

@@ -1,4 +1,4 @@
-export class OpenAiGenerationError extends Error {}
+class OpenAiGenerationError extends Error {}
 export class OpenAiBudgetExceededError extends Error {}
 
 export type GenerationMetrics = {
@@ -12,12 +12,12 @@ type ErrorWithGenerationMetrics = Error & {
   generationMetrics?: GenerationMetrics;
 };
 
-export type OpenAiSourceImage = {
+type OpenAiSourceImage = {
   buffer: Buffer;
   contentType: string;
 };
 
-export type OpenAiRequestContext = {
+type OpenAiRequestContext = {
   endpoint: URL;
   requestInit: RequestInit;
 };
@@ -223,6 +223,7 @@ export async function fetchOpenAiImageResponse(
   const openAiRetryBaseMs = getOpenAiRetryBaseMs();
   const openAiTimeoutMs = getOpenAiTimeoutMs();
 
+  // TODO: unify this retry loop with sourceImageFetcher download retries once both flows can share a typed retry helper.
   for (let attempt = 0; attempt <= openAiRetryLimit; attempt += 1) {
     const openAiStartedAt = Date.now();
 
