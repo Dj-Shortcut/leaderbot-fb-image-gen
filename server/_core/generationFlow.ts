@@ -114,6 +114,18 @@ export async function executeGenerationFlow(
     };
   }
 
+  if (!trustedSourceImageUrl) {
+    return {
+      kind: "error",
+      errorKind: "invalid_source_image",
+      error: new InvalidSourceImageUrlError(
+        "Only stored source images are allowed in generation flow"
+      ),
+      resolvedSourceImageUrl,
+      trustedSourceImageUrl,
+    };
+  }
+
   const { mode, generator } = createImageGenerator();
 
   try {

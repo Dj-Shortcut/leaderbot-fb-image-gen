@@ -17,7 +17,7 @@ import {
   InvalidSourceImageUrlError,
   logSourceImageFetchStart,
   MissingInputImageError,
-  resolveSourceImage,
+  resolveStoredSourceImage,
   type SourceImageData,
 } from "./image-generation/sourceImageFetcher";
 import {
@@ -230,7 +230,7 @@ async function prepareGenerationInput(
   return {
     hasSourceImage: Boolean(input.sourceImageUrl || input.sourceImageData),
     prompt: buildStylePrompt(input.style, input.promptHint),
-    sourceImage: await resolveSourceImage(input),
+    sourceImage: await resolveStoredSourceImage(input),
   };
 }
 

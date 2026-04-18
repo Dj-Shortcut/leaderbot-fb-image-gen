@@ -158,5 +158,29 @@ describe("generationFlow", () => {
       errorKind: "generation_budget_reached",
     });
   });
+
+  it("rejects non-stored source image URLs before calling the generator", async () => {
+    const generateMock = vi.fn();
+    createImageGeneratorMock.mockReturnValue({
+      mode: "openai",
+      generator: { generate: generateMock },
+    });
+
+    const result = await executeGenerationFlow({
+      style: "cyberpunk",
+      userId: "user-1",
+      reqId: "req-1",
+      lastPhotoUrl: "https://example.com/photo.jpg",
+      lastPhotoSource: "external",
+    });
+
+    expect(result).toMatchObject({
+      kind: "error",
+      errorKind: "invalid_source_image",
+      resolvedSourceImageUrl: "https://example.com/photo.jpg",
+      trustedSourceImageUrl: false,
+    });
+    expect(generateMock).not.toHaveBeenCalled();
+  });
 });
 

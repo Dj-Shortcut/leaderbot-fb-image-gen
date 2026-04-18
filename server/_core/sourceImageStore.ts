@@ -3,7 +3,7 @@ import {
   buildGeneratedImageUrl,
   putGeneratedImage,
 } from "./generatedImageStore";
-import { resolveSourceImage } from "./image-generation/sourceImageFetcher";
+import { fetchExternalSourceImageForIngress } from "./image-generation/sourceImageFetcher";
 import { storagePut } from "../storage";
 
 export type StoredSourceImage = {
@@ -74,7 +74,7 @@ export async function ingestExternalSourceImage(
   sourceImageUrl: string,
   reqId: string
 ): Promise<StoredSourceImage> {
-  const downloadedImage = await resolveSourceImage({
+  const downloadedImage = await fetchExternalSourceImageForIngress({
     sourceImageUrl,
     reqId,
   });
