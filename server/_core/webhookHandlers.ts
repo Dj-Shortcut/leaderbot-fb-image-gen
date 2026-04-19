@@ -86,6 +86,8 @@ type HandlerDeps = {
   privacyPolicyUrl: string;
 };
 
+type FacebookWebhookMessage = NonNullable<FacebookWebhookEvent["message"]>;
+
 const IN_FLIGHT_MESSAGE =
   "\u23F3 even geduld, ik ben nog bezig met jouw restyle";
 const inFlightNoticeSent = new Set();
@@ -904,6 +906,191 @@ export function createWebhookHandlers({
     });
   }
 
+  async function tryHandleImageMessage(input: {
+    psid: string;
+    userId: string;
+    reqId: string;
+    lang: Lang;
+    attachments: FacebookWebhookMessage["attachments"];
+  }): Promise<boolean> {
+    const imageAttachment = input.attachments?.find(
+      att => att.type === "image" && att.payload?.url
+    );
+    if (!imageAttachment?.payload?.url) {
+      return false;
+    }
+
+    const inboundImageUrl = imageAttachment.payload.url;
+    debugWebhookLog({
+      level: "debug",
+      msg: "photo_received",
+      reqId: input.reqId,
+      psidHash: anonymizePsid(input.psid).slice(0, 12),
+      hasAttachments: !!input.attachments,
+      attachmentHostname: getAttachmentHostname(inboundImageUrl),
+    });
+
+    const storedSourceImageUrl = await normalizeMessengerInboundImage({
+      inboundImageUrl,
+      psidHash: anonymizePsid(input.psid).slice(0, 12),
+      reqId: input.reqId,
+    });
+    if (!storedSourceImageUrl) {
+      await clearPendingImageState(input.psid);
+      await setFlowState(input.psid, "AWAITING_PHOTO");
+      await sendLoggedText(
+        input.psid,
+        t(input.lang, "missingInputImage"),
+        input.reqId
+      );
+      return true;
+    }
+
+    const state = await getOrCreateState(input.psid);
+    for (const feature of getBotFeatures()) {
+      const result = await feature.onImage?.(
+        createFeatureImageContext(
+          input.psid,
+          input.userId,
+          input.reqId,
+          input.lang,
+          state,
+          storedSourceImageUrl
+        )
+      );
+      if (result?.handled) {
+        return true;
+      }
+    }
+
+    logUserState(input.psid, input.userId, state, input.reqId, "image_received");
+    const imageDecision = getStoredMessengerImageDecision({
+      lastPhotoUrl: state.lastPhotoUrl,
+      preselectedStyle: state.preselectedStyle,
+      storedSourceImageUrl,
+    });
+    await setPendingStoredImage(input.psid, storedSourceImageUrl);
+
+    logImageFlowDecision({
+      psid: input.psid,
+      userId: input.userId,
+      reqId: input.reqId,
+      stage: state.stage,
+      hadPreviousPhoto: imageDecision.hadPreviousPhoto,
+      incomingImageUrl: imageDecision.incomingImageUrl,
+      selectedStyle: state.selectedStyle,
+      preselectedStyle: imageDecision.preselectedStyle,
+      action: imageDecision.action,
+    });
+
+    if (imageDecision.action === "auto_run_preselected_style") {
+      await setPreselectedStyle(input.psid, null);
+      await setChosenStyle(input.psid, imageDecision.preselectedStyle);
+      await runStyleGeneration(
+        input.psid,
+        input.userId,
+        imageDecision.preselectedStyle,
+        input.reqId,
+        input.lang
+      );
+      return true;
+    }
+
+    await setFlowState(input.psid, "AWAITING_STYLE");
+    await sendPhotoReceivedPrompt(input.psid, input.lang, input.reqId);
+    return true;
+  }
+
+  async function handleTextMessage(input: {
+    psid: string;
+    userId: string;
+    reqId: string;
+    lang: Lang;
+    text: string;
+    timestamp?: number;
+  }): Promise<void> {
+    const normalizedMessage: NormalizedInboundMessage = {
+      channel: "messenger",
+      senderId: input.psid,
+      userId: input.userId,
+      messageType: "text",
+      textBody: input.text,
+      timestamp: input.timestamp ?? Date.now(),
+    };
+    console.log("[messenger webhook] normalized event handoff", {
+      channel: normalizedMessage.channel,
+      reqId: input.reqId,
+      user: toLogUser(input.userId),
+      messageType: normalizedMessage.messageType,
+    });
+
+    const result = await handleSharedTextMessage({
+      message: normalizedMessage,
+      reqId: input.reqId,
+      lang: input.lang,
+      getState: () => Promise.resolve(getOrCreateState(input.psid)),
+      setFlowState: nextState =>
+        Promise.resolve(setFlowState(input.psid, nextState)),
+      runTextFeatures: async ({
+        state,
+        messageText,
+        normalizedText,
+        hasPhoto,
+      }) => {
+        for (const feature of getBotFeatures()) {
+          const result = await feature.onText?.(
+            createFeatureTextContext(
+              input.psid,
+              input.userId,
+              input.reqId,
+              input.lang,
+              state,
+              messageText,
+              normalizedText,
+              hasPhoto
+            )
+          );
+          if (result?.handled) {
+            return true;
+          }
+        }
+
+        return false;
+      },
+      logState: (state, context) => {
+        logUserState(input.psid, input.userId, state, input.reqId, context);
+      },
+      logAckIgnored: ack => {
+        safeLog("ack_ignored", { ack });
+      },
+      logRolloutDecision: rolloutDecision => {
+        safeLog("messenger_chat_engine_decision", {
+          user: toLogUser(input.userId),
+          engine: rolloutDecision.engine,
+          canaryPercent: rolloutDecision.canaryPercent,
+          bucket: rolloutDecision.bucket,
+          selected: rolloutDecision.useResponses ? "responses" : "legacy",
+        });
+      },
+      logEngineResult: ({ source, errorCode }) => {
+        safeLog("messenger_chat_engine_result", {
+          user: toLogUser(input.userId),
+          source,
+          ...(errorCode ? { errorCode } : {}),
+        });
+      },
+    });
+    await sendMessengerBotResponse(result.response, {
+      replyState: result.replyState,
+      sendText: text => sendLoggedText(input.psid, text, input.reqId),
+      sendStateText: (stateName, text) =>
+        sendStateQuickReplies(input.psid, stateName, text, input.reqId),
+    });
+    if (result.afterSend === "markIntroSeen") {
+      await Promise.resolve(markIntroSeen(input.psid));
+    }
+  }
+
   async function handleMessage(
     psid: string,
     userId: string,
@@ -925,93 +1112,15 @@ export function createWebhookHandlers({
       return;
     }
 
-    const imageAttachment = message.attachments?.find(
-      att => att.type === "image" && att.payload?.url
-    );
-    if (imageAttachment?.payload?.url) {
-      const inboundImageUrl = imageAttachment.payload.url;
-      debugWebhookLog({
-        level: "debug",
-        msg: "photo_received",
-        reqId,
-        psidHash: anonymizePsid(psid).slice(0, 12),
-        hasAttachments: !!message.attachments,
-        attachmentHostname: getAttachmentHostname(inboundImageUrl),
-      });
-
-      const storedSourceImageUrl = await normalizeMessengerInboundImage({
-        inboundImageUrl,
-        psidHash: anonymizePsid(psid).slice(0, 12),
-        reqId,
-      });
-      if (!storedSourceImageUrl) {
-        await clearPendingImageState(psid);
-        await setFlowState(psid, "AWAITING_PHOTO");
-        await sendLoggedText(psid, t(lang, "missingInputImage"), reqId);
-        return;
-      }
-
-      const state = await getOrCreateState(psid);
-      for (const feature of getBotFeatures()) {
-        const result = await feature.onImage?.(
-          createFeatureImageContext(
-            psid,
-            userId,
-            reqId,
-            lang,
-            state,
-            storedSourceImageUrl
-          )
-        );
-        if (result?.handled) {
-          return;
-        }
-      }
-      logUserState(psid, userId, state, reqId, "image_received");
-      const imageDecision = getStoredMessengerImageDecision({
-        lastPhotoUrl: state.lastPhotoUrl,
-        preselectedStyle: state.preselectedStyle,
-        storedSourceImageUrl,
-      });
-      await setPendingStoredImage(psid, storedSourceImageUrl);
-
-      if (imageDecision.action === "auto_run_preselected_style") {
-        logImageFlowDecision({
-          psid,
-          userId,
-          reqId,
-          stage: state.stage,
-          hadPreviousPhoto: imageDecision.hadPreviousPhoto,
-          incomingImageUrl: imageDecision.incomingImageUrl,
-          selectedStyle: state.selectedStyle,
-          preselectedStyle: imageDecision.preselectedStyle,
-          action: imageDecision.action,
-        });
-        await setPreselectedStyle(psid, null);
-        await setChosenStyle(psid, imageDecision.preselectedStyle);
-        await runStyleGeneration(
-          psid,
-          userId,
-          imageDecision.preselectedStyle,
-          reqId,
-          lang
-        );
-        return;
-      }
-
-      logImageFlowDecision({
+    if (
+      await tryHandleImageMessage({
         psid,
         userId,
         reqId,
-        stage: state.stage,
-        hadPreviousPhoto: imageDecision.hadPreviousPhoto,
-        incomingImageUrl: imageDecision.incomingImageUrl,
-        selectedStyle: state.selectedStyle,
-        preselectedStyle: imageDecision.preselectedStyle,
-        action: imageDecision.action,
-      });
-      await setFlowState(psid, "AWAITING_STYLE");
-      await sendPhotoReceivedPrompt(psid, lang, reqId);
+        lang,
+        attachments: message.attachments,
+      })
+    ) {
       return;
     }
 
@@ -1021,85 +1130,14 @@ export function createWebhookHandlers({
       return;
     }
 
-    const normalizedMessage: NormalizedInboundMessage = {
-      channel: "messenger",
-      senderId: psid,
+    await handleTextMessage({
+      psid,
       userId,
-      messageType: "text",
-      textBody: trimmedText,
-      timestamp: event.timestamp ?? Date.now(),
-    };
-    console.log("[messenger webhook] normalized event handoff", {
-      channel: normalizedMessage.channel,
-      reqId,
-      user: toLogUser(userId),
-      messageType: normalizedMessage.messageType,
-    });
-
-    const result = await handleSharedTextMessage({
-      message: normalizedMessage,
       reqId,
       lang,
-      getState: () => Promise.resolve(getOrCreateState(psid)),
-      setFlowState: nextState => Promise.resolve(setFlowState(psid, nextState)),
-      runTextFeatures: async ({
-        state,
-        messageText,
-        normalizedText,
-        hasPhoto,
-      }) => {
-        for (const feature of getBotFeatures()) {
-          const result = await feature.onText?.(
-            createFeatureTextContext(
-              psid,
-              userId,
-              reqId,
-              lang,
-              state,
-              messageText,
-              normalizedText,
-              hasPhoto
-            )
-          );
-          if (result?.handled) {
-            return true;
-          }
-        }
-
-        return false;
-      },
-      logState: (state, context) => {
-        logUserState(psid, userId, state, reqId, context);
-      },
-      logAckIgnored: ack => {
-        safeLog("ack_ignored", { ack });
-      },
-      logRolloutDecision: rolloutDecision => {
-        safeLog("messenger_chat_engine_decision", {
-          user: toLogUser(userId),
-          engine: rolloutDecision.engine,
-          canaryPercent: rolloutDecision.canaryPercent,
-          bucket: rolloutDecision.bucket,
-          selected: rolloutDecision.useResponses ? "responses" : "legacy",
-        });
-      },
-      logEngineResult: ({ source, errorCode }) => {
-        safeLog("messenger_chat_engine_result", {
-          user: toLogUser(userId),
-          source,
-          ...(errorCode ? { errorCode } : {}),
-        });
-      },
+      text: trimmedText,
+      timestamp: event.timestamp ?? Date.now(),
     });
-    await sendMessengerBotResponse(result.response, {
-      replyState: result.replyState,
-      sendText: text => sendLoggedText(psid, text, reqId),
-      sendStateText: (stateName, text) =>
-        sendStateQuickReplies(psid, stateName, text, reqId),
-    });
-    if (result.afterSend === "markIntroSeen") {
-      await Promise.resolve(markIntroSeen(psid));
-    }
   }
 
   async function claimEventReplayOrLog(
