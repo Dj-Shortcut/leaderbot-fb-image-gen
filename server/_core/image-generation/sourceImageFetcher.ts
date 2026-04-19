@@ -276,17 +276,65 @@ function buildCanonicalSourceImageUrlString(sourceImageUrl: URL): string {
   return `https://${sourceImageUrl.host}${sourceImageUrl.pathname}${sourceImageUrl.search}`;
 }
 
+function buildSafeSourceImageFetchUrl(sourceImageUrl: URL, reqId: string): URL {
+  const hostname = sourceImageUrl.hostname.toLowerCase();
+
+  if (sourceImageUrl.protocol !== "https:") {
+    return blockSourceImageUrl(reqId, "sink_non_https", {
+      protocol: sourceImageUrl.protocol,
+    });
+  }
+
+  if (sourceImageUrl.username || sourceImageUrl.password) {
+    return blockSourceImageUrl(reqId, "sink_credentials_in_url");
+  }
+
+  if (sourceImageUrl.port && sourceImageUrl.port !== "443") {
+    return blockSourceImageUrl(reqId, "sink_non_standard_port", {
+      port: sourceImageUrl.port,
+    });
+  }
+
+  if (hasBlockedPathTraversalSegment(sourceImageUrl.pathname)) {
+    return blockSourceImageUrl(reqId, "sink_path_traversal_segment", {
+      pathname: sourceImageUrl.pathname,
+    });
+  }
+
+  if (isBlockedHostname(hostname)) {
+    return blockSourceImageUrl(reqId, "sink_blocked_hostname", {
+      hostname,
+    });
+  }
+
+  const allowedHosts = parseAllowedHostsFromEnv();
+  if (
+    allowedHosts.length === 0 ||
+    !allowedHosts.some(allowedHost =>
+      hostnameMatchesAllowedHost(hostname, allowedHost)
+    )
+  ) {
+    return blockSourceImageUrl(reqId, "sink_host_not_allowed", {
+      hostname,
+    });
+  }
+
+  return new URL(buildCanonicalSourceImageUrlString(sourceImageUrl));
+}
+
 async function fetchSourceImageAttempt(
   sourceImageUrl: URL,
-  timeoutMs: number
+  timeoutMs: number,
+  reqId: string
 ): Promise<SourceImageFetchAttemptResult> {
+  const safeSourceImageUrl = buildSafeSourceImageFetchUrl(sourceImageUrl, reqId);
   const controller = new AbortController();
   const timeout = setTimeout(() => {
     controller.abort();
   }, timeoutMs);
   let response: Response;
   try {
-    response = await fetch(sourceImageUrl, {
+    response = await fetch(safeSourceImageUrl, {
       redirect: "manual",
       signal: controller.signal,
     });
@@ -594,7 +642,8 @@ async function downloadSourceImageOrThrow(
       await assertHostnameResolvesToPublicIpOrThrow(validatedSourceImageUrl, reqId);
       const { response, contentType } = await fetchSourceImageAttempt(
         canonicalSourceImageRequestUrl,
-        timeoutMs
+        timeoutMs,
+        reqId
       );
       assertNoRedirectResponse(response, reqId);
 
