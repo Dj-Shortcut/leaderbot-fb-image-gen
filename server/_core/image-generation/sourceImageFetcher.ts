@@ -30,6 +30,11 @@ type SourceImageFetchAttemptResult = {
   contentType: string;
 };
 
+type SourceImageDnsLookup = (
+  hostname: string,
+  options: { all: true; verbatim: true }
+) => Promise<Array<{ address: string; family: 4 | 6 }>>;
+
 type SourceImageResolveInput = {
   sourceImageUrl?: string;
   trustedSourceImageUrl?: boolean;
@@ -41,7 +46,7 @@ type SourceImageResolveInput = {
 const MIN_INPUT_IMAGE_BYTES = 5 * 1024;
 const MAX_INBOUND_IMAGE_BYTES = 20 * 1024 * 1024;
 const FB_IMAGE_FETCH_RETRY_LIMIT = 1;
-let dnsLookup = lookup;
+let dnsLookup: SourceImageDnsLookup = lookup as SourceImageDnsLookup;
 
 function getSourceUrlDiagnostics(sourceImageUrl: string): {
   hostname?: string;
@@ -272,7 +277,7 @@ function buildCanonicalSourceImageUrlString(sourceImageUrl: URL): string {
 }
 
 async function fetchSourceImageAttempt(
-  sourceImageUrl: string,
+  sourceImageUrl: URL,
   timeoutMs: number
 ): Promise<SourceImageFetchAttemptResult> {
   const controller = new AbortController();
@@ -306,7 +311,7 @@ async function assertHostnameResolvesToPublicIpOrThrow(
     return;
   }
 
-  let addresses: Awaited<ReturnType<typeof lookup>>;
+  let addresses: Array<{ address: string; family: 4 | 6 }>;
   try {
     addresses = await dnsLookup(hostname, { all: true, verbatim: true });
   } catch {
@@ -334,9 +339,9 @@ async function assertHostnameResolvesToPublicIpOrThrow(
 }
 
 export function setSourceImageDnsLookupForTests(
-  override: typeof lookup | null
+  override: SourceImageDnsLookup | null
 ): void {
-  dnsLookup = override ?? lookup;
+  dnsLookup = override ?? (lookup as SourceImageDnsLookup);
 }
 
 function assertNoRedirectResponse(response: Response, reqId: string): void {
@@ -577,6 +582,7 @@ async function downloadSourceImageOrThrow(
   const canonicalSourceImageUrl = buildCanonicalSourceImageUrlString(
     validatedSourceImageUrl
   );
+  const canonicalSourceImageRequestUrl = new URL(canonicalSourceImageUrl);
   const timeoutMs = getInboundImageTimeoutMs();
   let totalFetchMs = 0;
 
@@ -587,7 +593,7 @@ async function downloadSourceImageOrThrow(
     try {
       await assertHostnameResolvesToPublicIpOrThrow(validatedSourceImageUrl, reqId);
       const { response, contentType } = await fetchSourceImageAttempt(
-        canonicalSourceImageUrl,
+        canonicalSourceImageRequestUrl,
         timeoutMs
       );
       assertNoRedirectResponse(response, reqId);
