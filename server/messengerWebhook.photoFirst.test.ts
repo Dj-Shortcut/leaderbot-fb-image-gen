@@ -42,7 +42,7 @@ describe("photo-first onboarding", () => {
       { address: "93.184.216.34", family: 4 },
     ]);
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS =
-      "img.example,fbsbx.com,leaderbot-fb-image-gen.fly.dev";
+      "img.example,lookaside.fbsbx.com,leaderbot-fb-image-gen.fly.dev";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     sendImageMock.mockClear();
     sendButtonTemplateMock.mockClear();
