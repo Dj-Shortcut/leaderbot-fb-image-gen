@@ -27,6 +27,7 @@ import {
   markIntroSeen,
   anonymizePsid,
   type ConversationState,
+  type MessengerUserState,
 } from "./messengerState";
 import { normalizeLang, t, type Lang } from "./i18n";
 import { routeActiveExperience, routeEntryIntent } from "./experienceRouter";
@@ -78,6 +79,11 @@ import type {
   BotTextContext,
   BotImageContext,
 } from "./botContext";
+
+type MessengerBotResponseOptions = Parameters<
+  typeof sendMessengerBotResponse
+>[1];
+type MessengerRouteResult = Awaited<ReturnType<typeof routeEntryIntent>>;
 
 type HandlerDeps = {
   defaultLang: Lang;
@@ -1126,6 +1132,196 @@ export function createWebhookHandlers({
     }
   }
 
+  function createMessengerResponseOptions(
+    psid: string,
+    userId: string,
+    reqId: string,
+    optionsFallbackLogName?: string
+  ): MessengerBotResponseOptions {
+    return {
+      sendText: text => sendLoggedText(psid, text, reqId),
+      sendStateText: (stateName, text) =>
+        sendStateQuickReplies(psid, stateName, text, reqId),
+      sendOptionsPrompt: async (prompt, options, fallbackText) => {
+        await sendLoggedQuickReplies(
+          psid,
+          prompt,
+          options.map(option => ({
+            content_type: "text",
+            title: option.title,
+            payload: option.id,
+          })),
+          reqId
+        );
+
+        if (fallbackText && optionsFallbackLogName) {
+          safeLog(optionsFallbackLogName, {
+            user: toLogUser(userId),
+            fallbackText,
+          });
+        }
+      },
+      sendImage: (imageUrl, caption) => {
+        if (caption) {
+          return sendLoggedText(psid, caption, reqId).then(() =>
+            sendLoggedImage(psid, imageUrl, reqId)
+          );
+        }
+
+        return sendLoggedImage(psid, imageUrl, reqId);
+      },
+    };
+  }
+
+  async function sendRouteResponse(
+    route: MessengerRouteResult,
+    options: MessengerBotResponseOptions
+  ): Promise<void> {
+    await sendMessengerBotResponse(route.response ?? null, options);
+    if (route.afterSend) {
+      await sendMessengerBotResponse(await route.afterSend(), options);
+    }
+  }
+
+  function parseEventEntryIntent(
+    event: FacebookWebhookEvent,
+    reqId: string,
+    userId: string,
+    localeLang: Lang
+  ) {
+    const referralRef = event.postback?.referral?.ref ?? event.referral?.ref;
+    const entryIntent = parseGameEntryIntent({
+      channel: "messenger",
+      ref: referralRef,
+      sourceType: event.postback?.payload ? "postback" : "referral",
+      localeHint: localeLang,
+      receivedAt: event.timestamp ?? Date.now(),
+    });
+
+    safeLog("entry_intent_parsed", {
+      reqId,
+      user: toLogUser(userId),
+      referralRef: referralRef ?? null,
+      entryIntent: entryIntent
+        ? {
+            targetExperienceType: entryIntent.targetExperienceType,
+            targetExperienceId: entryIntent.targetExperienceId,
+            sourceType: entryIntent.sourceType,
+            entryMode: entryIntent.entryMode ?? null,
+          }
+        : null,
+    });
+
+    return { referralRef, entryIntent };
+  }
+
+  async function routeEntryIntentEvent(input: {
+    psid: string;
+    userId: string;
+    reqId: string;
+    state: MessengerUserState;
+    entryIntent: ReturnType<typeof parseGameEntryIntent>;
+  }): Promise<boolean> {
+    const entryIntentRoute = await routeEntryIntent({
+      state: input.state,
+      entryIntent: input.entryIntent,
+      setLastEntryIntent: nextEntryIntent =>
+        Promise.resolve(setLastEntryIntent(input.psid, nextEntryIntent)),
+      setActiveExperience: nextActiveExperience =>
+        Promise.resolve(setActiveExperience(input.psid, nextActiveExperience)),
+    });
+    if (!entryIntentRoute.handled) {
+      return false;
+    }
+
+    await sendRouteResponse(
+      entryIntentRoute,
+      createMessengerResponseOptions(
+        input.psid,
+        input.userId,
+        input.reqId,
+        "entry_intent_options_fallback_available"
+      )
+    );
+    return true;
+  }
+
+  async function routeActiveExperienceEvent(input: {
+    psid: string;
+    userId: string;
+    reqId: string;
+    state: MessengerUserState;
+    event: FacebookWebhookEvent;
+  }): Promise<boolean> {
+    const action =
+      input.event.postback?.payload ??
+      input.event.message?.quick_reply?.payload ??
+      input.event.message?.text?.trim() ??
+      null;
+    const activeExperienceRoute = await routeActiveExperience({
+      state: input.state,
+      action,
+      setLastEntryIntent: nextEntryIntent =>
+        Promise.resolve(setLastEntryIntent(input.psid, nextEntryIntent)),
+      setActiveExperience: nextActiveExperience =>
+        Promise.resolve(setActiveExperience(input.psid, nextActiveExperience)),
+    });
+    if (!activeExperienceRoute.handled) {
+      return false;
+    }
+
+    await sendRouteResponse(
+      activeExperienceRoute,
+      createMessengerResponseOptions(
+        input.psid,
+        input.userId,
+        input.reqId,
+        "active_experience_options_fallback_available"
+      )
+    );
+    return true;
+  }
+
+  async function claimEventReplayOrLog(
+    event: FacebookWebhookEvent,
+    entryId: string | undefined,
+    userId: string
+  ): Promise<boolean> {
+    const dedupeKey = getEventDedupeKey(event, userId, entryId);
+    if (!dedupeKey) {
+      return true;
+    }
+
+    const claimed = await claimWebhookReplayKey(dedupeKey);
+    if (claimed) {
+      return true;
+    }
+
+    safeLog("webhook_replay_ignored", {
+      user: toLogUser(userId),
+      eventId: dedupeKey,
+    });
+    return false;
+  }
+
+  async function handleReferralStyleEvent(
+    psid: string,
+    referralRef: string | undefined,
+    lang: Lang,
+    reqId: string
+  ): Promise<boolean> {
+    const referralStyle = parseReferralStyle(referralRef);
+    if (!referralStyle) {
+      return false;
+    }
+
+    await clearPendingImageState(psid);
+    await setPreselectedStyle(psid, referralStyle);
+    await setFlowState(psid, "AWAITING_PHOTO");
+    await sendReferralPhotoPrompt(psid, referralStyle, lang, reqId);
+    return true;
+  }
+
   async function handleEvent(
     event: FacebookWebhookEvent,
     entryId?: string
@@ -1146,193 +1342,30 @@ export function createWebhookHandlers({
       await setPreferredLang(psid, localeLang);
     }
 
-    const dedupeKey = getEventDedupeKey(event, userId, entryId);
-    if (dedupeKey) {
-      const claimed = await claimWebhookReplayKey(dedupeKey);
-      if (!claimed) {
-        safeLog("webhook_replay_ignored", {
-          user: toLogUser(userId),
-          eventId: dedupeKey,
-        });
-        return;
-      }
+    if (!(await claimEventReplayOrLog(event, entryId, userId))) {
+      return;
     }
 
-    const referralRef = event.postback?.referral?.ref ?? event.referral?.ref;
-    const entryIntent = parseGameEntryIntent({
-      channel: "messenger",
-      ref: referralRef,
-      sourceType: event.postback?.payload ? "postback" : "referral",
-      localeHint: localeLang ?? undefined,
-      receivedAt: event.timestamp ?? Date.now(),
-    });
-    safeLog("entry_intent_parsed", {
+    const { referralRef, entryIntent } = parseEventEntryIntent(
+      event,
       reqId,
-      user: toLogUser(userId),
-      referralRef: referralRef ?? null,
-      entryIntent: entryIntent
-        ? {
-            targetExperienceType: entryIntent.targetExperienceType,
-            targetExperienceId: entryIntent.targetExperienceId,
-            sourceType: entryIntent.sourceType,
-            entryMode: entryIntent.entryMode ?? null,
-          }
-        : null,
-    });
-    const entryIntentRoute = await routeEntryIntent({
-      state,
-      entryIntent,
-      setLastEntryIntent: nextEntryIntent =>
-        Promise.resolve(setLastEntryIntent(psid, nextEntryIntent)),
-      setActiveExperience: nextActiveExperience =>
-        Promise.resolve(setActiveExperience(psid, nextActiveExperience)),
-    });
-    if (entryIntentRoute.handled) {
-      await sendMessengerBotResponse(entryIntentRoute.response ?? null, {
-        sendText: text => sendLoggedText(psid, text, reqId),
-        sendStateText: (stateName, text) =>
-          sendStateQuickReplies(psid, stateName, text, reqId),
-        sendOptionsPrompt: async (prompt, options, fallbackText) => {
-          await sendLoggedQuickReplies(
-            psid,
-            prompt,
-            options.map(option => ({
-              content_type: "text",
-              title: option.title,
-              payload: option.id,
-            })),
-            reqId
-          );
-
-          if (fallbackText) {
-            safeLog("entry_intent_options_fallback_available", {
-              user: toLogUser(userId),
-              fallbackText,
-            });
-          }
-        },
-        sendImage: (imageUrl, caption) => {
-          if (caption) {
-            return sendLoggedText(psid, caption, reqId).then(() =>
-              sendLoggedImage(psid, imageUrl, reqId)
-            );
-          }
-
-          return sendLoggedImage(psid, imageUrl, reqId);
-        },
-      });
-      if (entryIntentRoute.afterSend) {
-        const followUpResponse = await entryIntentRoute.afterSend();
-        await sendMessengerBotResponse(followUpResponse, {
-          sendText: text => sendLoggedText(psid, text, reqId),
-          sendStateText: (stateName, text) =>
-            sendStateQuickReplies(psid, stateName, text, reqId),
-          sendImage: (imageUrl, caption) => {
-            if (caption) {
-              return sendLoggedText(psid, caption, reqId).then(() =>
-                sendLoggedImage(psid, imageUrl, reqId)
-              );
-            }
-
-            return sendLoggedImage(psid, imageUrl, reqId);
-          },
-        });
-      }
+      userId,
+      localeLang
+    );
+    if (
+      await routeEntryIntentEvent({ psid, userId, reqId, state, entryIntent })
+    ) {
       return;
     }
 
-    const activeExperienceAction =
-      event.postback?.payload ??
-      event.message?.quick_reply?.payload ??
-      event.message?.text?.trim() ??
-      null;
-    const activeExperienceRoute = await routeActiveExperience({
-      state,
-      action: activeExperienceAction,
-      setLastEntryIntent: nextEntryIntent =>
-        Promise.resolve(setLastEntryIntent(psid, nextEntryIntent)),
-      setActiveExperience: nextActiveExperience =>
-        Promise.resolve(setActiveExperience(psid, nextActiveExperience)),
-    });
-    if (activeExperienceRoute.handled) {
-      await sendMessengerBotResponse(activeExperienceRoute.response ?? null, {
-        sendText: text => sendLoggedText(psid, text, reqId),
-        sendStateText: (stateName, text) =>
-          sendStateQuickReplies(psid, stateName, text, reqId),
-        sendOptionsPrompt: async (prompt, options, fallbackText) => {
-          await sendLoggedQuickReplies(
-            psid,
-            prompt,
-            options.map(option => ({
-              content_type: "text",
-              title: option.title,
-              payload: option.id,
-            })),
-            reqId
-          );
-
-          if (fallbackText) {
-            safeLog("active_experience_options_fallback_available", {
-              user: toLogUser(userId),
-              fallbackText,
-            });
-          }
-        },
-        sendImage: (imageUrl, caption) => {
-          if (caption) {
-            return sendLoggedText(psid, caption, reqId).then(() =>
-              sendLoggedImage(psid, imageUrl, reqId)
-            );
-          }
-
-          return sendLoggedImage(psid, imageUrl, reqId);
-        },
-      });
-      if (activeExperienceRoute.afterSend) {
-        const followUpResponse = await activeExperienceRoute.afterSend();
-        await sendMessengerBotResponse(followUpResponse, {
-          sendText: text => sendLoggedText(psid, text, reqId),
-          sendStateText: (stateName, text) =>
-            sendStateQuickReplies(psid, stateName, text, reqId),
-          sendOptionsPrompt: async (prompt, options, fallbackText) => {
-            await sendLoggedQuickReplies(
-              psid,
-              prompt,
-              options.map(option => ({
-                content_type: "text",
-                title: option.title,
-                payload: option.id,
-              })),
-              reqId
-            );
-
-            if (fallbackText) {
-              safeLog("active_experience_options_fallback_available", {
-                user: toLogUser(userId),
-                fallbackText,
-              });
-            }
-          },
-          sendImage: (imageUrl, caption) => {
-            if (caption) {
-              return sendLoggedText(psid, caption, reqId).then(() =>
-                sendLoggedImage(psid, imageUrl, reqId)
-              );
-            }
-
-            return sendLoggedImage(psid, imageUrl, reqId);
-          },
-        });
-      }
+    if (
+      await routeActiveExperienceEvent({ psid, userId, reqId, state, event })
+    ) {
       return;
     }
 
-    const referralStyle = parseReferralStyle(referralRef);
-    if (referralStyle) {
-      await clearPendingImageState(psid);
-      await setPreselectedStyle(psid, referralStyle);
-      await setFlowState(psid, "AWAITING_PHOTO");
-      return sendReferralPhotoPrompt(psid, referralStyle, lang, reqId);
+    if (await handleReferralStyleEvent(psid, referralRef, lang, reqId)) {
+      return;
     }
 
     if (event.postback?.payload) {
