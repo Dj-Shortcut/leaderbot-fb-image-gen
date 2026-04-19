@@ -72,7 +72,7 @@ const GENERATED_IMAGE_BASE64 = Buffer.from("fake-png").toString("base64");
 const GENERATED_SOURCE_IMAGE_URL_PREFIX =
   "https://leaderbot-fb-image-gen.fly.dev/generated/";
 const DEFAULT_ALLOWED_SOURCE_IMAGE_HOSTS =
-  "img.example,fbsbx.com,leaderbot-fb-image-gen.fly.dev";
+  "img.example,lookaside.fbsbx.com,leaderbot-fb-image-gen.fly.dev";
 
 function isNormalizedSourceImageUrl(url: string | URL): boolean {
   return toUrlString(url).startsWith(GENERATED_SOURCE_IMAGE_URL_PREFIX);

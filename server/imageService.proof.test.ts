@@ -11,7 +11,7 @@ const GENERATED_IMAGE_BASE64 =
 const STORED_SOURCE_IMAGE_URL =
   "https://leaderbot-fb-image-gen.fly.dev/generated/source.jpg";
 const STORED_SOURCE_IMAGE_ALLOWED_HOSTS =
-  "leaderbot-fb-image-gen.fly.dev,fbsbx.com";
+  "leaderbot-fb-image-gen.fly.dev,lookaside.fbsbx.com";
 
 function toUrlString(url: string | URL): string {
   return typeof url === "string" ? url : url.toString();
@@ -519,7 +519,7 @@ describe("OpenAi image-to-image proof", () => {
   it("rejects localhost and private IP source image URLs before fetch", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,fbsbx.com";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example,lookaside.fbsbx.com";
 
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);

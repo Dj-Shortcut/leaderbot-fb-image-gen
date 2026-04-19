@@ -24,7 +24,7 @@ These variables control whether the OpenAI-backed parts of the bot actually run.
 | `MESSENGER_CHAT_ENGINE` | Messenger AI text replies | Set to `responses` to enable the OpenAI text path. `legacy` keeps the old fallback flow. |
 | `MESSENGER_CHAT_CANARY_PERCENT` | Messenger AI text rollout | Use `100` for full enablement during verification. `0` means nobody uses the OpenAI text path. |
 | `OPENAI_TEXT_MODEL` | Messenger AI text replies | Defaults to `gpt-4.1-mini`. Usually not the first thing to debug. |
-| `SOURCE_IMAGE_ALLOWED_HOSTS` | Downloading inbound images before generation | If the host is not allowlisted, generation fails before OpenAI is called. |
+| `SOURCE_IMAGE_ALLOWED_HOSTS` | Downloading inbound images before generation | If the exact host is not allowlisted, generation fails before OpenAI is called. |
 
 ## 3. Optional but easy to confuse
 
