@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { lookup } from "node:dns/promises";
 import net from "node:net";
 import os from "node:os";
 import fs from "fs/promises";
@@ -40,6 +41,7 @@ type SourceImageResolveInput = {
 const MIN_INPUT_IMAGE_BYTES = 5 * 1024;
 const MAX_INBOUND_IMAGE_BYTES = 20 * 1024 * 1024;
 const FB_IMAGE_FETCH_RETRY_LIMIT = 1;
+let dnsLookup = lookup;
 
 function getSourceUrlDiagnostics(sourceImageUrl: string): {
   hostname?: string;
@@ -106,6 +108,42 @@ function isPrivateIPv4(ip: string): boolean {
   return false;
 }
 
+function isBlockedIPv6(ip: string): boolean {
+  const normalized = ip.toLowerCase();
+
+  if (normalized === "::" || normalized === "::1") {
+    return true;
+  }
+
+  if (normalized.startsWith("fc") || normalized.startsWith("fd")) {
+    return true;
+  }
+
+  if (normalized.startsWith("fe8") || normalized.startsWith("fe9")) {
+    return true;
+  }
+
+  if (normalized.startsWith("fea") || normalized.startsWith("feb")) {
+    return true;
+  }
+
+  return false;
+}
+
+function isBlockedIpAddress(ip: string): boolean {
+  const ipType = net.isIP(ip);
+
+  if (ipType === 4) {
+    return isPrivateIPv4(ip);
+  }
+
+  if (ipType === 6) {
+    return isBlockedIPv6(ip);
+  }
+
+  return true;
+}
+
 function hostnameMatchesAllowedHost(
   hostname: string,
   allowedHost: string
@@ -150,20 +188,7 @@ function isBlockedHostname(hostname: string): boolean {
 
   if (h === "localhost" || h.endsWith(".localhost")) return true;
 
-  const ipType = net.isIP(h);
-  if (ipType === 4) return isPrivateIPv4(h);
-  if (ipType === 6) {
-    if (h === "::1") return true;
-    if (h.startsWith("fc") || h.startsWith("fd")) return true;
-    if (
-      h.startsWith("fe8") ||
-      h.startsWith("fe9") ||
-      h.startsWith("fea") ||
-      h.startsWith("feb")
-    )
-      return true;
-    return true;
-  }
+  if (net.isIP(h)) return isBlockedIpAddress(h);
 
   return false;
 }
@@ -242,8 +267,12 @@ function validateSourceImageUrlOrThrow(
   return parsedUrl;
 }
 
+function buildCanonicalSourceImageUrlString(sourceImageUrl: URL): string {
+  return `https://${sourceImageUrl.host}${sourceImageUrl.pathname}${sourceImageUrl.search}`;
+}
+
 async function fetchSourceImageAttempt(
-  sourceImageUrl: URL,
+  sourceImageUrl: string,
   timeoutMs: number
 ): Promise<SourceImageFetchAttemptResult> {
   const controller = new AbortController();
@@ -265,6 +294,49 @@ async function fetchSourceImageAttempt(
     contentType:
       response.headers.get("content-type") ?? "application/octet-stream",
   };
+}
+
+async function assertHostnameResolvesToPublicIpOrThrow(
+  sourceImageUrl: URL,
+  reqId: string
+): Promise<void> {
+  const hostname = sourceImageUrl.hostname.toLowerCase();
+
+  if (net.isIP(hostname)) {
+    return;
+  }
+
+  let addresses: Awaited<ReturnType<typeof lookup>>;
+  try {
+    addresses = await dnsLookup(hostname, { all: true, verbatim: true });
+  } catch {
+    return blockSourceImageUrl(reqId, "dns_lookup_failed", {
+      hostname,
+    });
+  }
+
+  if (!Array.isArray(addresses) || addresses.length === 0) {
+    return blockSourceImageUrl(reqId, "dns_lookup_empty", {
+      hostname,
+    });
+  }
+
+  const blockedAddress = addresses.find(result =>
+    isBlockedIpAddress(result.address)
+  );
+  if (blockedAddress) {
+    return blockSourceImageUrl(reqId, "dns_resolved_private_ip", {
+      hostname,
+      address: blockedAddress.address,
+      family: blockedAddress.family,
+    });
+  }
+}
+
+export function setSourceImageDnsLookupForTests(
+  override: typeof lookup | null
+): void {
+  dnsLookup = override ?? lookup;
 }
 
 function assertNoRedirectResponse(response: Response, reqId: string): void {
@@ -502,6 +574,9 @@ async function downloadSourceImageOrThrow(
     reqId,
     options
   );
+  const canonicalSourceImageUrl = buildCanonicalSourceImageUrlString(
+    validatedSourceImageUrl
+  );
   const timeoutMs = getInboundImageTimeoutMs();
   let totalFetchMs = 0;
 
@@ -510,8 +585,9 @@ async function downloadSourceImageOrThrow(
     const attemptStartedAt = Date.now();
 
     try {
+      await assertHostnameResolvesToPublicIpOrThrow(validatedSourceImageUrl, reqId);
       const { response, contentType } = await fetchSourceImageAttempt(
-        validatedSourceImageUrl,
+        canonicalSourceImageUrl,
         timeoutMs
       );
       assertNoRedirectResponse(response, reqId);

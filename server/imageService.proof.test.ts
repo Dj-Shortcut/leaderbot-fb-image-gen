@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   InvalidSourceImageUrlError,
   OpenAiImageGenerator,
 } from "./_core/imageService";
 import { sha256 } from "./_core/imageProof";
+import { setSourceImageDnsLookupForTests } from "./_core/image-generation/sourceImageFetcher";
 
 const GENERATED_IMAGE_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=";
@@ -167,8 +168,16 @@ function expectDistinctivePrompt(
 }
 
 describe("OpenAi image-to-image proof", () => {
+  beforeEach(() => {
+    setSourceImageDnsLookupForTests(async () => [
+      { address: "93.184.216.34", family: 4 },
+    ]);
+  });
+
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    setSourceImageDnsLookupForTests(null);
     delete process.env.NODE_ENV;
     delete process.env.OPENAI_API_KEY;
     delete process.env.APP_BASE_URL;
@@ -587,6 +596,31 @@ describe("OpenAi image-to-image proof", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("rejects allowlisted hosts that resolve to private IPs before fetch", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example";
+
+    setSourceImageDnsLookupForTests(async () => [
+      { address: "127.0.0.1", family: 4 },
+    ]);
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await expect(
+      generator.generate({
+        style: "disco",
+        sourceImageUrl: "https://img.example/source.jpg",
+        userKey: "user-1",
+        reqId: "req-private-dns-resolution",
+      })
+    ).rejects.toBeInstanceOf(InvalidSourceImageUrlError);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("requires allowlisted hosts even for trusted internally stored source image URLs", async () => {
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
@@ -926,7 +960,7 @@ describe("OpenAi image-to-image proof", () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      expect.any(URL),
+      STORED_SOURCE_IMAGE_URL,
       expect.objectContaining({ redirect: "manual" })
     );
   });

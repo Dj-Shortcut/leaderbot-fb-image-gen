@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   sendButtonTemplateMock,
@@ -27,6 +27,7 @@ vi.mock("./_core/messengerApi", () => ({
 
 import { processFacebookWebhookPayload, resetMessengerEventDedupe } from "./_core/messengerWebhook";
 import { anonymizePsid, getState, resetStateStore } from "./_core/messengerState";
+import { setSourceImageDnsLookupForTests } from "./_core/image-generation/sourceImageFetcher";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
@@ -37,6 +38,9 @@ describe("photo-first onboarding", () => {
   });
 
   beforeEach(() => {
+    setSourceImageDnsLookupForTests(async () => [
+      { address: "93.184.216.34", family: 4 },
+    ]);
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS =
       "img.example,fbsbx.com,leaderbot-fb-image-gen.fly.dev";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
@@ -69,8 +73,12 @@ describe("photo-first onboarding", () => {
     resetMessengerEventDedupe();
   });
 
-  afterAll(() => {
+  afterEach(() => {
+    setSourceImageDnsLookupForTests(null);
     vi.unstubAllGlobals();
+  });
+
+  afterAll(() => {
     if (originalPrivacyPepper === undefined) {
       delete process.env.PRIVACY_PEPPER;
       return;
@@ -99,7 +107,7 @@ describe("photo-first onboarding", () => {
     });
 
     const userState = getState(anonymizePsid(psid));
-    expect(userState?.lastPhoto).toMatch(
+    expect(userState?.lastPhotoUrl).toMatch(
       /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
     );
     expect(userState?.lastPhotoSource).toBe("stored");
