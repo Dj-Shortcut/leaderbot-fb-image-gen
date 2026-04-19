@@ -29,8 +29,6 @@ import {
   type ConversationState,
 } from "./messengerState";
 import { normalizeLang, t, type Lang } from "./i18n";
-import { routeActiveExperience, routeEntryIntent } from "./experienceRouter";
-import { parseGameEntryIntent } from "./entryIntent";
 import { toLogUser, toUserKey } from "./privacy";
 import {
   getStoredMessengerImageDecision,
@@ -48,13 +46,9 @@ import {
   FacebookWebhookEvent,
   getEventDedupeKey,
   getGreetingResponse,
-  normalizeStyle,
   parseReferralStyle,
-  parseStyle,
   STYLE_CATEGORY_LABELS,
   STYLE_LABELS,
-  styleCategoryPayloadToCategory,
-  stylePayloadToStyle,
   toMessengerReplies,
   toMessengerStyleReplies,
 } from "./webhookHelpers";
@@ -66,6 +60,14 @@ import { ensureDefaultBotFeaturesRegistered } from "./bot/defaultFeatures";
 import { handleSharedTextMessage } from "./sharedTextHandler";
 import type { NormalizedInboundMessage } from "./normalizedInboundMessage";
 import { sendMessengerBotResponse } from "./botResponseAdapters";
+import {
+  parseMessengerEntryIntent,
+  routeMessengerActiveExperience,
+  routeMessengerEntryIntent,
+} from "./messengerExperienceRouting";
+import { handleMessengerPayload } from "./messengerPayloadRouting";
+import type { EntryIntent } from "./entryIntent";
+import type { ActiveExperience } from "./activeExperience";
 import {
   getTodayRuntimeStats,
   recordActiveUserToday,
@@ -83,6 +85,12 @@ type HandlerDeps = {
   defaultLang: Lang;
   privacyPolicyUrl: string;
 };
+
+type FacebookWebhookMessage = NonNullable<FacebookWebhookEvent["message"]>;
+type FeatureContextBase = Omit<
+  BotPayloadContext,
+  "payload"
+>;
 
 const IN_FLIGHT_MESSAGE =
   "\u23F3 even geduld, ik ben nog bezig met jouw restyle";
@@ -354,14 +362,13 @@ export function createWebhookHandlers({
     };
   }
 
-  function createFeaturePayloadContext(
+  function createFeatureContextBase(
     psid: string,
     userId: string,
     reqId: string,
     lang: Lang,
-    state: Awaited<ReturnType<typeof getOrCreateState>>,
-    payload: string
-  ): BotPayloadContext {
+    state: Awaited<ReturnType<typeof getOrCreateState>>
+  ): FeatureContextBase {
     return {
       channel: "messenger",
       capabilities: MESSENGER_CAPABILITIES,
@@ -370,7 +377,6 @@ export function createWebhookHandlers({
       reqId,
       lang,
       state,
-      payload,
       sendText: text => sendLoggedText(psid, text, reqId),
       sendImage: imageUrl => sendLoggedImage(psid, imageUrl, reqId),
       sendQuickReplies: (text, replies) =>
@@ -400,6 +406,20 @@ export function createWebhookHandlers({
     };
   }
 
+  function createFeaturePayloadContext(
+    psid: string,
+    userId: string,
+    reqId: string,
+    lang: Lang,
+    state: Awaited<ReturnType<typeof getOrCreateState>>,
+    payload: string
+  ): BotPayloadContext {
+    return {
+      ...createFeatureContextBase(psid, userId, reqId, lang, state),
+      payload,
+    };
+  }
+
   function createFeatureImageContext(
     psid: string,
     userId: string,
@@ -409,40 +429,8 @@ export function createWebhookHandlers({
     imageUrl: string
   ): BotImageContext {
     return {
-      channel: "messenger",
-      capabilities: MESSENGER_CAPABILITIES,
-      senderId: psid,
-      userId,
-      reqId,
-      lang,
-      state,
+      ...createFeatureContextBase(psid, userId, reqId, lang, state),
       imageUrl,
-      sendText: text => sendLoggedText(psid, text, reqId),
-      sendImage: nextImageUrl => sendLoggedImage(psid, nextImageUrl, reqId),
-      sendQuickReplies: (text, replies) =>
-        sendLoggedQuickReplies(psid, text, replies, reqId),
-      sendStateQuickReplies: (nextState, text) =>
-        sendStateQuickReplies(psid, nextState, text, reqId),
-      setFlowState: async nextState => {
-        await setFlowState(psid, nextState);
-      },
-      preselectStyle: async style => {
-        await setPreselectedStyle(psid, style);
-      },
-      chooseStyle: style =>
-        handleStyleSelection(psid, userId, style, reqId, lang),
-      runStyleGeneration: (style, sourceImageUrl, promptHint) =>
-        runStyleGeneration(
-          psid,
-          userId,
-          style,
-          reqId,
-          lang,
-          sourceImageUrl,
-          promptHint
-        ),
-      getRuntimeStats: () => getTodayRuntimeStats(),
-      logger: createFeatureLogger(userId),
     };
   }
 
@@ -457,42 +445,10 @@ export function createWebhookHandlers({
     hasPhoto: boolean
   ): BotTextContext {
     return {
-      channel: "messenger",
-      capabilities: MESSENGER_CAPABILITIES,
-      senderId: psid,
-      userId,
-      reqId,
-      lang,
-      state,
+      ...createFeatureContextBase(psid, userId, reqId, lang, state),
       messageText,
       normalizedText,
       hasPhoto,
-      sendText: text => sendLoggedText(psid, text, reqId),
-      sendImage: imageUrl => sendLoggedImage(psid, imageUrl, reqId),
-      sendQuickReplies: (text, replies) =>
-        sendLoggedQuickReplies(psid, text, replies, reqId),
-      sendStateQuickReplies: (nextState, text) =>
-        sendStateQuickReplies(psid, nextState, text, reqId),
-      setFlowState: async nextState => {
-        await setFlowState(psid, nextState);
-      },
-      preselectStyle: async style => {
-        await setPreselectedStyle(psid, style);
-      },
-      chooseStyle: style =>
-        handleStyleSelection(psid, userId, style, reqId, lang),
-      runStyleGeneration: (style, sourceImageUrl, promptHint) =>
-        runStyleGeneration(
-          psid,
-          userId,
-          style,
-          reqId,
-          lang,
-          sourceImageUrl,
-          promptHint
-        ),
-      getRuntimeStats: () => getTodayRuntimeStats(),
-      logger: createFeatureLogger(userId),
     };
   }
 
@@ -831,6 +787,33 @@ export function createWebhookHandlers({
     await runStyleGeneration(psid, userId, selectedStyle, reqId, lang);
   }
 
+  async function sendPrivacyInfo(
+    psid: string,
+    lang: Lang,
+    reqId: string
+  ): Promise<void> {
+    const resolvedPrivacyUrl = resolvePrivacyPolicyUrl();
+    const privacyText = t(lang, "privacy", { link: resolvedPrivacyUrl });
+
+    if (!resolvedPrivacyUrl) {
+      await sendLoggedText(psid, privacyText, reqId);
+      return;
+    }
+
+    await sendLoggedButtonTemplate(
+      psid,
+      privacyText,
+      [
+        {
+          type: "web_url",
+          title: t(lang, "privacyButtonLabel"),
+          url: resolvedPrivacyUrl,
+        },
+      ],
+      reqId
+    );
+  }
+
   async function handlePayload(
     psid: string,
     userId: string,
@@ -838,94 +821,226 @@ export function createWebhookHandlers({
     reqId: string,
     lang: Lang
   ): Promise<void> {
-    if (await maybeSendInFlightMessage(psid, reqId)) {
-      return;
+    await handleMessengerPayload({
+      psid,
+      userId,
+      payload,
+      reqId,
+      lang,
+      maybeSendInFlightMessage,
+      getState: userPsid => Promise.resolve(getOrCreateState(userPsid)),
+      getFeatures: getBotFeatures,
+      createFeaturePayloadContext,
+      runStyleGeneration,
+      handleStyleSelection,
+      showStylePicker: async (userPsid, userLang, requestId) => {
+        await setPreselectedStyle(userPsid, null);
+        await setSelectedStyleCategory(userPsid, null);
+        await setFlowState(userPsid, "AWAITING_STYLE");
+        await sendStylePicker(userPsid, userLang, requestId);
+      },
+      showStyleCategory: async (userPsid, category, userLang, requestId) => {
+        await setSelectedStyleCategory(userPsid, category);
+        await setFlowState(userPsid, "AWAITING_STYLE");
+        await sendStyleOptionsForCategory(
+          userPsid,
+          category,
+          userLang,
+          requestId
+        );
+      },
+      sendFlowExplanation: (userPsid, userLang, requestId) =>
+        sendLoggedText(userPsid, t(userLang, "flowExplanation"), requestId),
+      sendPrivacyInfo,
+      sendUnknownPayloadLog: unknownUserId => {
+        safeLog("unknown_payload", { user: toLogUser(unknownUserId) });
+      },
+    });
+  }
+
+  async function tryHandleImageMessage(input: {
+    psid: string;
+    userId: string;
+    reqId: string;
+    lang: Lang;
+    attachments: FacebookWebhookMessage["attachments"];
+  }): Promise<boolean> {
+    const imageAttachment = input.attachments?.find(
+      att => att.type === "image" && att.payload?.url
+    );
+    if (!imageAttachment?.payload?.url) {
+      return false;
     }
 
-    const state = await getOrCreateState(psid);
+    const inboundImageUrl = imageAttachment.payload.url;
+    debugWebhookLog({
+      level: "debug",
+      msg: "photo_received",
+      reqId: input.reqId,
+      psidHash: anonymizePsid(input.psid).slice(0, 12),
+      hasAttachments: !!input.attachments,
+      attachmentHostname: getAttachmentHostname(inboundImageUrl),
+    });
+
+    const storedSourceImageUrl = await normalizeMessengerInboundImage({
+      inboundImageUrl,
+      psidHash: anonymizePsid(input.psid).slice(0, 12),
+      reqId: input.reqId,
+    });
+    if (!storedSourceImageUrl) {
+      await clearPendingImageState(input.psid);
+      await setFlowState(input.psid, "AWAITING_PHOTO");
+      await sendLoggedText(
+        input.psid,
+        t(input.lang, "missingInputImage"),
+        input.reqId
+      );
+      return true;
+    }
+
+    const state = await getOrCreateState(input.psid);
     for (const feature of getBotFeatures()) {
-      const result = await feature.onPayload?.(
-        createFeaturePayloadContext(psid, userId, reqId, lang, state, payload)
+      const result = await feature.onImage?.(
+        createFeatureImageContext(
+          input.psid,
+          input.userId,
+          input.reqId,
+          input.lang,
+          state,
+          storedSourceImageUrl
+        )
       );
       if (result?.handled) {
-        return;
+        return true;
       }
     }
 
-    if (payload.startsWith("RETRY_STYLE_")) {
-      const retryStyle = normalizeStyle(payload.slice("RETRY_STYLE_".length));
-      if (retryStyle) {
-        await runStyleGeneration(psid, userId, retryStyle, reqId, lang);
-        return;
-      }
+    logUserState(input.psid, input.userId, state, input.reqId, "image_received");
+    const imageDecision = getStoredMessengerImageDecision({
+      lastPhotoUrl: state.lastPhotoUrl,
+      preselectedStyle: state.preselectedStyle,
+      storedSourceImageUrl,
+    });
+    await setPendingStoredImage(input.psid, storedSourceImageUrl);
+
+    logImageFlowDecision({
+      psid: input.psid,
+      userId: input.userId,
+      reqId: input.reqId,
+      stage: state.stage,
+      hadPreviousPhoto: imageDecision.hadPreviousPhoto,
+      incomingImageUrl: imageDecision.incomingImageUrl,
+      selectedStyle: state.selectedStyle,
+      preselectedStyle: imageDecision.preselectedStyle,
+      action: imageDecision.action,
+    });
+
+    if (imageDecision.action === "auto_run_preselected_style") {
+      await setPreselectedStyle(input.psid, null);
+      await setChosenStyle(input.psid, imageDecision.preselectedStyle);
+      await runStyleGeneration(
+        input.psid,
+        input.userId,
+        imageDecision.preselectedStyle,
+        input.reqId,
+        input.lang
+      );
+      return true;
     }
 
-    const selectedStyle = stylePayloadToStyle(payload);
-    if (selectedStyle) {
-      await handleStyleSelection(psid, userId, selectedStyle, reqId, lang);
-      return;
+    await setFlowState(input.psid, "AWAITING_STYLE");
+    await sendPhotoReceivedPrompt(input.psid, input.lang, input.reqId);
+    return true;
+  }
+
+  async function handleTextMessage(input: {
+    psid: string;
+    userId: string;
+    reqId: string;
+    lang: Lang;
+    text: string;
+    timestamp?: number;
+  }): Promise<void> {
+    const normalizedMessage: NormalizedInboundMessage = {
+      channel: "messenger",
+      senderId: input.psid,
+      userId: input.userId,
+      messageType: "text",
+      textBody: input.text,
+      timestamp: input.timestamp ?? Date.now(),
+    };
+    console.log("[messenger webhook] normalized event handoff", {
+      channel: normalizedMessage.channel,
+      reqId: input.reqId,
+      user: toLogUser(input.userId),
+      messageType: normalizedMessage.messageType,
+    });
+
+    const result = await handleSharedTextMessage({
+      message: normalizedMessage,
+      reqId: input.reqId,
+      lang: input.lang,
+      getState: () => Promise.resolve(getOrCreateState(input.psid)),
+      setFlowState: nextState =>
+        Promise.resolve(setFlowState(input.psid, nextState)),
+      runTextFeatures: async ({
+        state,
+        messageText,
+        normalizedText,
+        hasPhoto,
+      }) => {
+        for (const feature of getBotFeatures()) {
+          const result = await feature.onText?.(
+            createFeatureTextContext(
+              input.psid,
+              input.userId,
+              input.reqId,
+              input.lang,
+              state,
+              messageText,
+              normalizedText,
+              hasPhoto
+            )
+          );
+          if (result?.handled) {
+            return true;
+          }
+        }
+
+        return false;
+      },
+      logState: (state, context) => {
+        logUserState(input.psid, input.userId, state, input.reqId, context);
+      },
+      logAckIgnored: ack => {
+        safeLog("ack_ignored", { ack });
+      },
+      logRolloutDecision: rolloutDecision => {
+        safeLog("messenger_chat_engine_decision", {
+          user: toLogUser(input.userId),
+          engine: rolloutDecision.engine,
+          canaryPercent: rolloutDecision.canaryPercent,
+          bucket: rolloutDecision.bucket,
+          selected: rolloutDecision.useResponses ? "responses" : "legacy",
+        });
+      },
+      logEngineResult: ({ source, errorCode }) => {
+        safeLog("messenger_chat_engine_result", {
+          user: toLogUser(input.userId),
+          source,
+          ...(errorCode ? { errorCode } : {}),
+        });
+      },
+    });
+    await sendMessengerBotResponse(result.response, {
+      replyState: result.replyState,
+      sendText: text => sendLoggedText(input.psid, text, input.reqId),
+      sendStateText: (stateName, text) =>
+        sendStateQuickReplies(input.psid, stateName, text, input.reqId),
+    });
+    if (result.afterSend === "markIntroSeen") {
+      await Promise.resolve(markIntroSeen(input.psid));
     }
-
-    const selectedCategory = styleCategoryPayloadToCategory(payload);
-    if (selectedCategory) {
-      await setSelectedStyleCategory(psid, selectedCategory);
-      await setFlowState(psid, "AWAITING_STYLE");
-      await sendStyleOptionsForCategory(psid, selectedCategory, lang, reqId);
-      return;
-    }
-
-    if (payload === "CHOOSE_STYLE") {
-      await setPreselectedStyle(psid, null);
-      await setSelectedStyleCategory(psid, null);
-      await setFlowState(psid, "AWAITING_STYLE");
-      await sendStylePicker(psid, lang, reqId);
-      return;
-    }
-
-    if (payload === "RETRY_STYLE") {
-      const chosenStyle = (await getOrCreateState(psid)).selectedStyle;
-      const retryStyle = chosenStyle ? parseStyle(chosenStyle) : undefined;
-
-      if (retryStyle) {
-        await handleStyleSelection(psid, userId, retryStyle, reqId, lang);
-        return;
-      }
-
-      await setFlowState(psid, "AWAITING_STYLE");
-      await sendStylePicker(psid, lang, reqId);
-      return;
-    }
-
-    if (payload === "WHAT_IS_THIS") {
-      await sendLoggedText(psid, t(lang, "flowExplanation"), reqId);
-      return;
-    }
-
-    if (payload === "PRIVACY_INFO") {
-      const resolvedPrivacyUrl = resolvePrivacyPolicyUrl();
-      const privacyText = t(lang, "privacy", { link: resolvedPrivacyUrl });
-
-      if (resolvedPrivacyUrl) {
-        await sendLoggedButtonTemplate(
-          psid,
-          privacyText,
-          [
-            {
-              type: "web_url",
-              title: t(lang, "privacyButtonLabel"),
-              url: resolvedPrivacyUrl,
-            },
-          ],
-          reqId
-        );
-        return;
-      }
-
-      await sendLoggedText(psid, privacyText, reqId);
-      return;
-    }
-
-    safeLog("unknown_payload", { user: toLogUser(userId) });
   }
 
   async function handleMessage(
@@ -949,93 +1064,15 @@ export function createWebhookHandlers({
       return;
     }
 
-    const imageAttachment = message.attachments?.find(
-      att => att.type === "image" && att.payload?.url
-    );
-    if (imageAttachment?.payload?.url) {
-      const inboundImageUrl = imageAttachment.payload.url;
-      debugWebhookLog({
-        level: "debug",
-        msg: "photo_received",
-        reqId,
-        psidHash: anonymizePsid(psid).slice(0, 12),
-        hasAttachments: !!message.attachments,
-        attachmentHostname: getAttachmentHostname(inboundImageUrl),
-      });
-
-      const storedSourceImageUrl = await normalizeMessengerInboundImage({
-        inboundImageUrl,
-        psidHash: anonymizePsid(psid).slice(0, 12),
-        reqId,
-      });
-      if (!storedSourceImageUrl) {
-        await clearPendingImageState(psid);
-        await setFlowState(psid, "AWAITING_PHOTO");
-        await sendLoggedText(psid, t(lang, "missingInputImage"), reqId);
-        return;
-      }
-
-      const state = await getOrCreateState(psid);
-      for (const feature of getBotFeatures()) {
-        const result = await feature.onImage?.(
-          createFeatureImageContext(
-            psid,
-            userId,
-            reqId,
-            lang,
-            state,
-            storedSourceImageUrl
-          )
-        );
-        if (result?.handled) {
-          return;
-        }
-      }
-      logUserState(psid, userId, state, reqId, "image_received");
-      const imageDecision = getStoredMessengerImageDecision({
-        lastPhotoUrl: state.lastPhotoUrl,
-        preselectedStyle: state.preselectedStyle,
-        storedSourceImageUrl,
-      });
-      await setPendingStoredImage(psid, storedSourceImageUrl);
-
-      if (imageDecision.action === "auto_run_preselected_style") {
-        logImageFlowDecision({
-          psid,
-          userId,
-          reqId,
-          stage: state.stage,
-          hadPreviousPhoto: imageDecision.hadPreviousPhoto,
-          incomingImageUrl: imageDecision.incomingImageUrl,
-          selectedStyle: state.selectedStyle,
-          preselectedStyle: imageDecision.preselectedStyle,
-          action: imageDecision.action,
-        });
-        await setPreselectedStyle(psid, null);
-        await setChosenStyle(psid, imageDecision.preselectedStyle);
-        await runStyleGeneration(
-          psid,
-          userId,
-          imageDecision.preselectedStyle,
-          reqId,
-          lang
-        );
-        return;
-      }
-
-      logImageFlowDecision({
+    if (
+      await tryHandleImageMessage({
         psid,
         userId,
         reqId,
-        stage: state.stage,
-        hadPreviousPhoto: imageDecision.hadPreviousPhoto,
-        incomingImageUrl: imageDecision.incomingImageUrl,
-        selectedStyle: state.selectedStyle,
-        preselectedStyle: imageDecision.preselectedStyle,
-        action: imageDecision.action,
-      });
-      await setFlowState(psid, "AWAITING_STYLE");
-      await sendPhotoReceivedPrompt(psid, lang, reqId);
+        lang,
+        attachments: message.attachments,
+      })
+    ) {
       return;
     }
 
@@ -1045,85 +1082,54 @@ export function createWebhookHandlers({
       return;
     }
 
-    const normalizedMessage: NormalizedInboundMessage = {
-      channel: "messenger",
-      senderId: psid,
+    await handleTextMessage({
+      psid,
       userId,
-      messageType: "text",
-      textBody: trimmedText,
-      timestamp: event.timestamp ?? Date.now(),
-    };
-    console.log("[messenger webhook] normalized event handoff", {
-      channel: normalizedMessage.channel,
-      reqId,
-      user: toLogUser(userId),
-      messageType: normalizedMessage.messageType,
-    });
-
-    const result = await handleSharedTextMessage({
-      message: normalizedMessage,
       reqId,
       lang,
-      getState: () => Promise.resolve(getOrCreateState(psid)),
-      setFlowState: nextState => Promise.resolve(setFlowState(psid, nextState)),
-      runTextFeatures: async ({
-        state,
-        messageText,
-        normalizedText,
-        hasPhoto,
-      }) => {
-        for (const feature of getBotFeatures()) {
-          const result = await feature.onText?.(
-            createFeatureTextContext(
-              psid,
-              userId,
-              reqId,
-              lang,
-              state,
-              messageText,
-              normalizedText,
-              hasPhoto
-            )
-          );
-          if (result?.handled) {
-            return true;
-          }
-        }
+      text: trimmedText,
+      timestamp: event.timestamp ?? Date.now(),
+    });
+  }
 
-        return false;
-      },
-      logState: (state, context) => {
-        logUserState(psid, userId, state, reqId, context);
-      },
-      logAckIgnored: ack => {
-        safeLog("ack_ignored", { ack });
-      },
-      logRolloutDecision: rolloutDecision => {
-        safeLog("messenger_chat_engine_decision", {
-          user: toLogUser(userId),
-          engine: rolloutDecision.engine,
-          canaryPercent: rolloutDecision.canaryPercent,
-          bucket: rolloutDecision.bucket,
-          selected: rolloutDecision.useResponses ? "responses" : "legacy",
-        });
-      },
-      logEngineResult: ({ source, errorCode }) => {
-        safeLog("messenger_chat_engine_result", {
-          user: toLogUser(userId),
-          source,
-          ...(errorCode ? { errorCode } : {}),
-        });
-      },
-    });
-    await sendMessengerBotResponse(result.response, {
-      replyState: result.replyState,
-      sendText: text => sendLoggedText(psid, text, reqId),
-      sendStateText: (stateName, text) =>
-        sendStateQuickReplies(psid, stateName, text, reqId),
-    });
-    if (result.afterSend === "markIntroSeen") {
-      await Promise.resolve(markIntroSeen(psid));
+  async function claimEventReplayOrLog(
+    event: FacebookWebhookEvent,
+    entryId: string | undefined,
+    userId: string
+  ): Promise<boolean> {
+    const dedupeKey = getEventDedupeKey(event, userId, entryId);
+    if (!dedupeKey) {
+      return true;
     }
+
+    const claimed = await claimWebhookReplayKey(dedupeKey);
+    if (claimed) {
+      return true;
+    }
+
+    safeLog("webhook_replay_ignored", {
+      user: toLogUser(userId),
+      eventId: dedupeKey,
+    });
+    return false;
+  }
+
+  async function handleReferralStyleEvent(
+    psid: string,
+    referralRef: string | undefined,
+    lang: Lang,
+    reqId: string
+  ): Promise<boolean> {
+    const referralStyle = parseReferralStyle(referralRef);
+    if (!referralStyle) {
+      return false;
+    }
+
+    await clearPendingImageState(psid);
+    await setPreselectedStyle(psid, referralStyle);
+    await setFlowState(psid, "AWAITING_PHOTO");
+    await sendReferralPhotoPrompt(psid, referralStyle, lang, reqId);
+    return true;
   }
 
   async function handleEvent(
@@ -1134,205 +1140,84 @@ export function createWebhookHandlers({
     if (!psid) return;
 
     const userId = toUserKey(psid);
-    recordActiveUserToday(userId);
     const reqId = `${psid}-${Date.now()}`;
-    const localeLang = normalizeLang(event.sender?.locale);
+
+    if (!(await claimEventReplayOrLog(event, entryId, userId))) {
+      return;
+    }
+
+    recordActiveUserToday(userId);
+    const senderLocale = event.sender?.locale?.trim();
+    const localeLang = senderLocale ? normalizeLang(senderLocale) : defaultLang;
     const state = await getOrCreateState(psid);
     logIncomingMessage(psid, userId, event, reqId);
     logUserState(psid, userId, state, reqId, "handle_event");
     const lang = state.preferredLang || localeLang || defaultLang;
 
-    if (localeLang && localeLang !== state.preferredLang) {
+    if (senderLocale && localeLang !== state.preferredLang) {
       await setPreferredLang(psid, localeLang);
     }
 
-    const dedupeKey = getEventDedupeKey(event, userId, entryId);
-    if (dedupeKey) {
-      const claimed = await claimWebhookReplayKey(dedupeKey);
-      if (!claimed) {
-        safeLog("webhook_replay_ignored", {
-          user: toLogUser(userId),
-          eventId: dedupeKey,
-        });
-        return;
-      }
-    }
-
-    const referralRef = event.postback?.referral?.ref ?? event.referral?.ref;
-    const entryIntent = parseGameEntryIntent({
-      channel: "messenger",
-      ref: referralRef,
-      sourceType: event.postback?.payload ? "postback" : "referral",
-      localeHint: localeLang ?? undefined,
-      receivedAt: event.timestamp ?? Date.now(),
-    });
-    safeLog("entry_intent_parsed", {
+    const routeDeps = {
+      psid,
+      userId,
       reqId,
-      user: toLogUser(userId),
-      referralRef: referralRef ?? null,
-      entryIntent: entryIntent
-        ? {
-            targetExperienceType: entryIntent.targetExperienceType,
-            targetExperienceId: entryIntent.targetExperienceId,
-            sourceType: entryIntent.sourceType,
-            entryMode: entryIntent.entryMode ?? null,
-          }
-        : null,
-    });
-    const entryIntentRoute = await routeEntryIntent({
-      state,
-      entryIntent,
-      setLastEntryIntent: nextEntryIntent =>
+      sendText: (text: string) => sendLoggedText(psid, text, reqId),
+      sendStateText: (stateName: ConversationState, text: string) =>
+        sendStateQuickReplies(psid, stateName, text, reqId),
+      sendOptionsPrompt: async (
+        prompt: string,
+        options: Array<{ id: string; title: string }>,
+        _fallbackLogName: string | undefined,
+        _fallbackText: string | undefined
+      ) => {
+        await sendLoggedQuickReplies(
+          psid,
+          prompt,
+          options.map(option => ({
+            content_type: "text",
+            title: option.title,
+            payload: option.id,
+          })),
+          reqId
+        );
+      },
+      sendImage: (imageUrl: string) => sendLoggedImage(psid, imageUrl, reqId),
+      safeLog,
+      setLastEntryIntent: (nextEntryIntent: EntryIntent | null) =>
         Promise.resolve(setLastEntryIntent(psid, nextEntryIntent)),
-      setActiveExperience: nextActiveExperience =>
+      setActiveExperience: (nextActiveExperience: ActiveExperience | null) =>
         Promise.resolve(setActiveExperience(psid, nextActiveExperience)),
+    };
+    const { referralRef, entryIntent } = parseMessengerEntryIntent({
+      event,
+      reqId,
+      userId,
+      localeLang,
+      safeLog,
     });
-    if (entryIntentRoute.handled) {
-      await sendMessengerBotResponse(entryIntentRoute.response ?? null, {
-        sendText: text => sendLoggedText(psid, text, reqId),
-        sendStateText: (stateName, text) =>
-          sendStateQuickReplies(psid, stateName, text, reqId),
-        sendOptionsPrompt: async (prompt, options, fallbackText) => {
-          await sendLoggedQuickReplies(
-            psid,
-            prompt,
-            options.map(option => ({
-              content_type: "text",
-              title: option.title,
-              payload: option.id,
-            })),
-            reqId
-          );
-
-          if (fallbackText) {
-            safeLog("entry_intent_options_fallback_available", {
-              user: toLogUser(userId),
-              fallbackText,
-            });
-          }
-        },
-        sendImage: (imageUrl, caption) => {
-          if (caption) {
-            return sendLoggedText(psid, caption, reqId).then(() =>
-              sendLoggedImage(psid, imageUrl, reqId)
-            );
-          }
-
-          return sendLoggedImage(psid, imageUrl, reqId);
-        },
-      });
-      if (entryIntentRoute.afterSend) {
-        const followUpResponse = await entryIntentRoute.afterSend();
-        await sendMessengerBotResponse(followUpResponse, {
-          sendText: text => sendLoggedText(psid, text, reqId),
-          sendStateText: (stateName, text) =>
-            sendStateQuickReplies(psid, stateName, text, reqId),
-          sendImage: (imageUrl, caption) => {
-            if (caption) {
-              return sendLoggedText(psid, caption, reqId).then(() =>
-                sendLoggedImage(psid, imageUrl, reqId)
-              );
-            }
-
-            return sendLoggedImage(psid, imageUrl, reqId);
-          },
-        });
-      }
+    if (
+      await routeMessengerEntryIntent({
+        deps: routeDeps,
+        state,
+        entryIntent,
+      })
+    ) {
       return;
     }
 
-    const activeExperienceAction =
-      event.postback?.payload ??
-      event.message?.quick_reply?.payload ??
-      event.message?.text?.trim() ??
-      null;
-    const activeExperienceRoute = await routeActiveExperience({
-      state,
-      action: activeExperienceAction,
-      setLastEntryIntent: nextEntryIntent =>
-        Promise.resolve(setLastEntryIntent(psid, nextEntryIntent)),
-      setActiveExperience: nextActiveExperience =>
-        Promise.resolve(setActiveExperience(psid, nextActiveExperience)),
-    });
-    if (activeExperienceRoute.handled) {
-      await sendMessengerBotResponse(activeExperienceRoute.response ?? null, {
-        sendText: text => sendLoggedText(psid, text, reqId),
-        sendStateText: (stateName, text) =>
-          sendStateQuickReplies(psid, stateName, text, reqId),
-        sendOptionsPrompt: async (prompt, options, fallbackText) => {
-          await sendLoggedQuickReplies(
-            psid,
-            prompt,
-            options.map(option => ({
-              content_type: "text",
-              title: option.title,
-              payload: option.id,
-            })),
-            reqId
-          );
-
-          if (fallbackText) {
-            safeLog("active_experience_options_fallback_available", {
-              user: toLogUser(userId),
-              fallbackText,
-            });
-          }
-        },
-        sendImage: (imageUrl, caption) => {
-          if (caption) {
-            return sendLoggedText(psid, caption, reqId).then(() =>
-              sendLoggedImage(psid, imageUrl, reqId)
-            );
-          }
-
-          return sendLoggedImage(psid, imageUrl, reqId);
-        },
-      });
-      if (activeExperienceRoute.afterSend) {
-        const followUpResponse = await activeExperienceRoute.afterSend();
-        await sendMessengerBotResponse(followUpResponse, {
-          sendText: text => sendLoggedText(psid, text, reqId),
-          sendStateText: (stateName, text) =>
-            sendStateQuickReplies(psid, stateName, text, reqId),
-          sendOptionsPrompt: async (prompt, options, fallbackText) => {
-            await sendLoggedQuickReplies(
-              psid,
-              prompt,
-              options.map(option => ({
-                content_type: "text",
-                title: option.title,
-                payload: option.id,
-              })),
-              reqId
-            );
-
-            if (fallbackText) {
-              safeLog("active_experience_options_fallback_available", {
-                user: toLogUser(userId),
-                fallbackText,
-              });
-            }
-          },
-          sendImage: (imageUrl, caption) => {
-            if (caption) {
-              return sendLoggedText(psid, caption, reqId).then(() =>
-                sendLoggedImage(psid, imageUrl, reqId)
-              );
-            }
-
-            return sendLoggedImage(psid, imageUrl, reqId);
-          },
-        });
-      }
+    if (
+      await routeMessengerActiveExperience({
+        deps: routeDeps,
+        state,
+        event,
+      })
+    ) {
       return;
     }
 
-    const referralStyle = parseReferralStyle(referralRef);
-    if (referralStyle) {
-      await clearPendingImageState(psid);
-      await setPreselectedStyle(psid, referralStyle);
-      await setFlowState(psid, "AWAITING_PHOTO");
-      return sendReferralPhotoPrompt(psid, referralStyle, lang, reqId);
+    if (await handleReferralStyleEvent(psid, referralRef, lang, reqId)) {
+      return;
     }
 
     if (event.postback?.payload) {
