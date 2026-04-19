@@ -46,13 +46,9 @@ import {
   FacebookWebhookEvent,
   getEventDedupeKey,
   getGreetingResponse,
-  normalizeStyle,
   parseReferralStyle,
-  parseStyle,
   STYLE_CATEGORY_LABELS,
   STYLE_LABELS,
-  styleCategoryPayloadToCategory,
-  stylePayloadToStyle,
   toMessengerReplies,
   toMessengerStyleReplies,
 } from "./webhookHelpers";
@@ -69,6 +65,7 @@ import {
   routeMessengerActiveExperience,
   routeMessengerEntryIntent,
 } from "./messengerExperienceRouting";
+import { handleMessengerPayload } from "./messengerPayloadRouting";
 import type { EntryIntent } from "./entryIntent";
 import type { ActiveExperience } from "./activeExperience";
 import {
@@ -836,6 +833,33 @@ export function createWebhookHandlers({
     await runStyleGeneration(psid, userId, selectedStyle, reqId, lang);
   }
 
+  async function sendPrivacyInfo(
+    psid: string,
+    lang: Lang,
+    reqId: string
+  ): Promise<void> {
+    const resolvedPrivacyUrl = resolvePrivacyPolicyUrl();
+    const privacyText = t(lang, "privacy", { link: resolvedPrivacyUrl });
+
+    if (!resolvedPrivacyUrl) {
+      await sendLoggedText(psid, privacyText, reqId);
+      return;
+    }
+
+    await sendLoggedButtonTemplate(
+      psid,
+      privacyText,
+      [
+        {
+          type: "web_url",
+          title: t(lang, "privacyButtonLabel"),
+          url: resolvedPrivacyUrl,
+        },
+      ],
+      reqId
+    );
+  }
+
   async function handlePayload(
     psid: string,
     userId: string,
@@ -843,94 +867,41 @@ export function createWebhookHandlers({
     reqId: string,
     lang: Lang
   ): Promise<void> {
-    if (await maybeSendInFlightMessage(psid, reqId)) {
-      return;
-    }
-
-    const state = await getOrCreateState(psid);
-    for (const feature of getBotFeatures()) {
-      const result = await feature.onPayload?.(
-        createFeaturePayloadContext(psid, userId, reqId, lang, state, payload)
-      );
-      if (result?.handled) {
-        return;
-      }
-    }
-
-    if (payload.startsWith("RETRY_STYLE_")) {
-      const retryStyle = normalizeStyle(payload.slice("RETRY_STYLE_".length));
-      if (retryStyle) {
-        await runStyleGeneration(psid, userId, retryStyle, reqId, lang);
-        return;
-      }
-    }
-
-    const selectedStyle = stylePayloadToStyle(payload);
-    if (selectedStyle) {
-      await handleStyleSelection(psid, userId, selectedStyle, reqId, lang);
-      return;
-    }
-
-    const selectedCategory = styleCategoryPayloadToCategory(payload);
-    if (selectedCategory) {
-      await setSelectedStyleCategory(psid, selectedCategory);
-      await setFlowState(psid, "AWAITING_STYLE");
-      await sendStyleOptionsForCategory(psid, selectedCategory, lang, reqId);
-      return;
-    }
-
-    if (payload === "CHOOSE_STYLE") {
-      await setPreselectedStyle(psid, null);
-      await setSelectedStyleCategory(psid, null);
-      await setFlowState(psid, "AWAITING_STYLE");
-      await sendStylePicker(psid, lang, reqId);
-      return;
-    }
-
-    if (payload === "RETRY_STYLE") {
-      const chosenStyle = (await getOrCreateState(psid)).selectedStyle;
-      const retryStyle = chosenStyle ? parseStyle(chosenStyle) : undefined;
-
-      if (retryStyle) {
-        await handleStyleSelection(psid, userId, retryStyle, reqId, lang);
-        return;
-      }
-
-      await setFlowState(psid, "AWAITING_STYLE");
-      await sendStylePicker(psid, lang, reqId);
-      return;
-    }
-
-    if (payload === "WHAT_IS_THIS") {
-      await sendLoggedText(psid, t(lang, "flowExplanation"), reqId);
-      return;
-    }
-
-    if (payload === "PRIVACY_INFO") {
-      const resolvedPrivacyUrl = resolvePrivacyPolicyUrl();
-      const privacyText = t(lang, "privacy", { link: resolvedPrivacyUrl });
-
-      if (resolvedPrivacyUrl) {
-        await sendLoggedButtonTemplate(
-          psid,
-          privacyText,
-          [
-            {
-              type: "web_url",
-              title: t(lang, "privacyButtonLabel"),
-              url: resolvedPrivacyUrl,
-            },
-          ],
-          reqId
+    await handleMessengerPayload({
+      psid,
+      userId,
+      payload,
+      reqId,
+      lang,
+      maybeSendInFlightMessage,
+      getState: userPsid => Promise.resolve(getOrCreateState(userPsid)),
+      getFeatures: getBotFeatures,
+      createFeaturePayloadContext,
+      runStyleGeneration,
+      handleStyleSelection,
+      showStylePicker: async (userPsid, userLang, requestId) => {
+        await setPreselectedStyle(userPsid, null);
+        await setSelectedStyleCategory(userPsid, null);
+        await setFlowState(userPsid, "AWAITING_STYLE");
+        await sendStylePicker(userPsid, userLang, requestId);
+      },
+      showStyleCategory: async (userPsid, category, userLang, requestId) => {
+        await setSelectedStyleCategory(userPsid, category);
+        await setFlowState(userPsid, "AWAITING_STYLE");
+        await sendStyleOptionsForCategory(
+          userPsid,
+          category,
+          userLang,
+          requestId
         );
-        return;
-      }
-
-      await sendLoggedText(psid, privacyText, reqId);
-      return;
-    }
-
-    safeLog("unknown_payload", { user: toLogUser(userId) });
+      },
+      sendFlowExplanation: (userPsid, userLang, requestId) =>
+        sendLoggedText(userPsid, t(userLang, "flowExplanation"), requestId),
+      sendPrivacyInfo,
+      sendUnknownPayloadLog: unknownUserId => {
+        safeLog("unknown_payload", { user: toLogUser(unknownUserId) });
+      },
+    });
   }
 
   async function handleMessage(
