@@ -960,7 +960,7 @@ describe("OpenAi image-to-image proof", () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      expect.any(URL),
+      "https://img.example/source.jpg",
       expect.objectContaining({ redirect: "manual" })
     );
   });

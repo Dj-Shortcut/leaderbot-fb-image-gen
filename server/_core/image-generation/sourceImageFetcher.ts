@@ -267,8 +267,12 @@ function validateSourceImageUrlOrThrow(
   return parsedUrl;
 }
 
+function buildCanonicalSourceImageUrlString(sourceImageUrl: URL): string {
+  return `https://${sourceImageUrl.host}${sourceImageUrl.pathname}${sourceImageUrl.search}`;
+}
+
 async function fetchSourceImageAttempt(
-  sourceImageUrl: URL,
+  sourceImageUrl: string,
   timeoutMs: number
 ): Promise<SourceImageFetchAttemptResult> {
   const controller = new AbortController();
@@ -570,6 +574,9 @@ async function downloadSourceImageOrThrow(
     reqId,
     options
   );
+  const canonicalSourceImageUrl = buildCanonicalSourceImageUrlString(
+    validatedSourceImageUrl
+  );
   const timeoutMs = getInboundImageTimeoutMs();
   let totalFetchMs = 0;
 
@@ -580,7 +587,7 @@ async function downloadSourceImageOrThrow(
     try {
       await assertHostnameResolvesToPublicIpOrThrow(validatedSourceImageUrl, reqId);
       const { response, contentType } = await fetchSourceImageAttempt(
-        validatedSourceImageUrl,
+        canonicalSourceImageUrl,
         timeoutMs
       );
       assertNoRedirectResponse(response, reqId);
