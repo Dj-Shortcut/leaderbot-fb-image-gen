@@ -59,6 +59,13 @@ export type MessengerUserState = {
   hasSeenIntro: boolean;
   pendingImageUrl?: string;
   pendingImageAt?: number;
+  faceMemoryConsent?: {
+    given: boolean;
+    timestamp: number;
+    version: string;
+  } | null;
+  lastSourceImageUrl?: string | null;
+  lastSourceImageUpdatedAt?: number | null;
   lastImageUrl?: string;
   lastGeneratedUrl?: string | null;
   lastStyle?: Style;
@@ -120,6 +127,9 @@ function createDefaultState(psid: string, now = Date.now()): MessengerUserState 
     hasSeenIntro: false,
     pendingImageUrl: undefined,
     pendingImageAt: undefined,
+    faceMemoryConsent: null,
+    lastSourceImageUrl: null,
+    lastSourceImageUpdatedAt: null,
     lastImageUrl: undefined,
     lastGeneratedUrl: null,
     lastStyle: undefined,
@@ -162,6 +172,10 @@ function normalizeState(psid: string, value: PartialState | null | undefined): M
       value?.selectedStyleCategory ?? fallback.selectedStyleCategory,
     lastImageUrl: value?.lastImageUrl ?? lastGeneratedUrl ?? fallback.lastImageUrl,
     lastGeneratedUrl,
+    faceMemoryConsent: value?.faceMemoryConsent ?? fallback.faceMemoryConsent,
+    lastSourceImageUrl: value?.lastSourceImageUrl ?? fallback.lastSourceImageUrl,
+    lastSourceImageUpdatedAt:
+      value?.lastSourceImageUpdatedAt ?? fallback.lastSourceImageUpdatedAt,
     quota: {
       dayKey: value?.quota?.dayKey ?? fallback.quota.dayKey,
       count: value?.quota?.count ?? fallback.quota.count,
@@ -391,6 +405,66 @@ export function setPendingStoredImage(
   now = Date.now()
 ): MaybePromise<void> {
   return setPendingImage(psid, imageUrl, now, "stored");
+}
+
+export function rememberFaceSourceImage(
+  psid: string,
+  imageUrl: string,
+  now = Date.now()
+): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      faceMemoryConsent: { given: true, timestamp: now, version: "v1" },
+      lastSourceImageUrl: imageUrl,
+      lastSourceImageUpdatedAt: now,
+      lastPhotoUrl: imageUrl,
+      lastPhoto: imageUrl,
+      lastPhotoSource: "stored",
+    },
+    now
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
+}
+
+export function declineFaceMemory(psid: string, now = Date.now()): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      faceMemoryConsent: { given: false, timestamp: now, version: "v1" },
+      lastSourceImageUrl: null,
+      lastSourceImageUpdatedAt: null,
+    },
+    now
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
+}
+
+export function clearFaceMemoryState(psid: string, now = Date.now()): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      faceMemoryConsent: null,
+      lastSourceImageUrl: null,
+      lastSourceImageUpdatedAt: null,
+      lastPhotoUrl: null,
+      lastPhoto: null,
+      lastPhotoSource: null,
+      pendingImageUrl: undefined,
+      pendingImageAt: undefined,
+    },
+    now
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
 }
 
 export function clearPendingImageState(psid: string, now = Date.now()): MaybePromise<MessengerUserState> {

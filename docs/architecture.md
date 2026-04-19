@@ -11,6 +11,7 @@ Leaderbot runs as one Node.js process (Express + HTTP server):
 - Executes conversation flow + generation orchestration.
 - Serves static assets (`/generated`, web build output).
 - Exposes health/version/debug endpoints.
+- Exposes an admin face-memory kill switch when `ADMIN_TOKEN` is configured.
 - Exposes Prometheus-style metrics and request tracing hooks.
 - Optionally mounts OAuth and additional chat routes.
 
@@ -39,6 +40,7 @@ ASCII version:
                     | - /api/trpc                      |
                     | - /healthz, /__version          |
                     | - /metrics, /generated/*        |
+                    | - /admin/disable-face-memory    |
                     +----+---------------+-------------+
                          |               |
           inbound events |               | outbound API / auth / storage
@@ -121,11 +123,14 @@ flowchart TD
 7. Shared logic returns channel-agnostic outbound intents (`BotResponse`).
 8. Channel adapters translate those intents into Messenger or WhatsApp sends.
 9. Image/style flow state is still updated directly in channel orchestration (`setFlowState`, `setPendingImage`, `setChosenStyle`, ...), with WhatsApp using plain-text prompts where Messenger uses richer UI affordances.
-10. If generation is triggered:
+10. If Messenger face memory is enabled, the first source-photo upload asks for explicit 30-day reuse consent before showing style options.
+11. If generation is triggered:
    - state -> `PROCESSING`,
    - OpenAI image generator configuration,
    - result sent via Messenger Send API or WhatsApp Cloud API,
    - state -> `RESULT_READY` (or `FAILURE` on error).
+
+Face memory is Messenger-only and disabled by default. See [`face-memory.md`](face-memory.md) for the legal/ops checklist.
 
 ### Source image provenance and trust
 
@@ -169,6 +174,7 @@ Core files:
 - selected style and optional preselected referral style
 - preferred language
 - pending/generated image references
+- optional face-memory consent and retained source-image URL fields
 - quota counters (`dayKey`, `count`)
 - update timestamp
 
@@ -183,6 +189,8 @@ Design intent:
 - Normalize legacy/alias fields during reads.
 - Avoid storing raw PSID in logs; derive `userKey` for correlation.
 - Keep `senderId` channel-specific and `userId` as the internal stabilized identity used by shared logic.
+
+Face-memory state is intentionally limited to consent metadata plus the retained source-image URL. It must not store face embeddings, biometric templates, facial vectors, or identity matching records.
 
 ## 4) Quota model details
 
@@ -210,6 +218,7 @@ Configuration is environment-variable driven.
 - Critical startup checks: privacy, generator, and WhatsApp API config.
 - Route behavior toggled by env presence (e.g. OAuth routes).
 - Debug/observability endpoints guarded via `ADMIN_TOKEN`.
+- `ENABLE_FACE_MEMORY` defaults to off and should only be enabled after consent/privacy/deletion copy is approved.
 - Meta webhook verification accepts `META_VERIFY_TOKEN` when set and falls back to `FB_VERIFY_TOKEN` for existing Messenger deployments.
 
 See README env section for operationally relevant variables.
@@ -328,6 +337,7 @@ This means Cloudflare currently sits behind the storage proxy for durable asset 
 - Inbound dedupe reduces duplicate event processing.
 - Generation failures produce user-facing retry options.
 - Health endpoints + version endpoint support simple monitoring.
+- Face-memory deletion is available through user command, scheduled expiry, and admin kill switch.
 
 ## 9) Core module boundaries
 

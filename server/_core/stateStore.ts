@@ -3,6 +3,10 @@ const STATE_TTL_SECONDS = 172800;
 type RedisLike = {
   ping(): Promise<string>;
   get(key: string): Promise<string | null>;
+  scan(
+    cursor: string,
+    ...args: Array<string | number>
+  ): Promise<[string, string[]]>;
   set(
     key: string,
     value: string,
@@ -155,7 +159,11 @@ export function readState<T>(psid: string): MaybePromise<T | null> {
 }
 
 export function writeState<T>(psid: string, value: T): MaybePromise<void> {
-  return writeRawState(getStateKey(psid), value, STATE_TTL_SECONDS);
+  const ttlSeconds =
+    process.env.ENABLE_FACE_MEMORY === "true"
+      ? 30 * 24 * 60 * 60
+      : STATE_TTL_SECONDS;
+  return writeRawState(getStateKey(psid), value, ttlSeconds);
 }
 
 export function getOrCreateStoredState<T>(
@@ -229,6 +237,41 @@ export function findInMemoryState<T>(
   }
 
   return null;
+}
+
+export async function forEachStoredState<T>(
+  visitor: (psid: string, value: T) => Promise<void> | void
+): Promise<void> {
+  if (!isRedisStateStoreEnabled()) {
+    clearExpiredMemoryState();
+    for (const [storageKey, payload] of memoryState.entries()) {
+      if (!storageKey.startsWith("psid:")) {
+        continue;
+      }
+      await visitor(storageKey.slice("psid:".length), JSON.parse(payload) as T);
+    }
+    return;
+  }
+
+  const redis = await getRedisClient();
+  let cursor = "0";
+  do {
+    const [nextCursor, keys] = await redis.scan(
+      cursor,
+      "MATCH",
+      "psid:*",
+      "COUNT",
+      100
+    );
+    cursor = nextCursor;
+    for (const storageKey of keys) {
+      const payload = await redis.get(storageKey);
+      if (!payload) {
+        continue;
+      }
+      await visitor(storageKey.slice("psid:".length), JSON.parse(payload) as T);
+    }
+  } while (cursor !== "0");
 }
 
 export function clearStateStore(): void {

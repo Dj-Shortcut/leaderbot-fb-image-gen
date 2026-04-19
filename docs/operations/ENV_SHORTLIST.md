@@ -13,6 +13,7 @@ These variables are the first things to verify when the bot does not reply or Me
 | `FB_APP_SECRET` | Webhook signature verification | Required for signed webhook validation. |
 | `MESSENGER_PAGE_ID` | Canonical `m.me` share links | Needed for share/invite flows. |
 | `APP_BASE_URL` | Public links and generated image URLs | Must be `https://` in production. |
+| `ENABLE_FACE_MEMORY` | Optional Messenger 30-day source-photo reuse | Keep `false` until legal approves consent, privacy, and deletion copy. |
 
 ## 2. OpenAI paths
 
@@ -35,6 +36,7 @@ These show up in the repo and can be mistaken for the main OpenAI path.
 | `BUILT_IN_FORGE_API_URL` | Storage proxy, `/api/chat` | Not used by the main Messenger OpenAI text flow. |
 | `BUILT_IN_FORGE_API_KEY` | Storage proxy, `/api/chat` | Separate from `OPENAI_API_KEY`. |
 | `REDIS_URL` | Replay protection, rate limiting, state storage | Required in production for replay protection. |
+| `ADMIN_TOKEN` | Debug/admin endpoints | Required for `/admin/disable-face-memory` and `/debug/build`. |
 
 ## 4. Fast triage
 
@@ -48,6 +50,12 @@ When the bot seems broken, check in this order:
 6. `MESSENGER_CHAT_CANARY_PERCENT`
 7. `SOURCE_IMAGE_ALLOWED_HOSTS`
 
+If face memory is involved, also check:
+
+8. `ENABLE_FACE_MEMORY`
+9. `ADMIN_TOKEN`
+10. Storage proxy delete support: `DELETE /v1/storage/object`
+
 ## 5. Current local-dev gotchas
 
 Based on the current local `.env` in this repo:
@@ -56,6 +64,7 @@ Based on the current local `.env` in this repo:
 - `MESSENGER_CHAT_ENGINE=legacy`, so Messenger text does not use the OpenAI response flow.
 - `MESSENGER_CHAT_CANARY_PERCENT=0`, so even if the engine were switched, rollout is effectively off.
 - `BUILT_IN_FORGE_API_URL` and `BUILT_IN_FORGE_API_KEY` are blank, so `/api/chat` stays disabled.
+- `ENABLE_FACE_MEMORY=false`, so the old photo-upload -> style-picker flow remains active without consent prompts.
 
 ## 6. What to ignore at first
 

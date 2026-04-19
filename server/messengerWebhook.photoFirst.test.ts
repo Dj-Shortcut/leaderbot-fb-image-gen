@@ -31,6 +31,7 @@ import { setSourceImageDnsLookupForTests } from "./_core/image-generation/source
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
+const originalEnableFaceMemory = process.env.ENABLE_FACE_MEMORY;
 
 describe("photo-first onboarding", () => {
   beforeAll(() => {
@@ -76,6 +77,11 @@ describe("photo-first onboarding", () => {
   afterEach(() => {
     setSourceImageDnsLookupForTests(null);
     vi.unstubAllGlobals();
+    if (originalEnableFaceMemory === undefined) {
+      delete process.env.ENABLE_FACE_MEMORY;
+    } else {
+      process.env.ENABLE_FACE_MEMORY = originalEnableFaceMemory;
+    }
   });
 
   afterAll(() => {
@@ -121,6 +127,103 @@ describe("photo-first onboarding", () => {
     );
     expect(sendGenericTemplateMock).not.toHaveBeenCalled();
     expect(sendTextMock).not.toHaveBeenCalled();
+  });
+
+  it("asks explicit face-memory consent behind the feature flag and stores consent on yes", async () => {
+    process.env.ENABLE_FACE_MEMORY = "true";
+    const psid = "face-memory-user";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-face-memory-photo",
+                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      psid,
+      expect.stringContaining("Mag ik je foto 30 dagen bewaren?"),
+      expect.arrayContaining([
+        expect.objectContaining({ payload: "CONSENT_FACE_YES" }),
+        expect.objectContaining({ payload: "CONSENT_FACE_NO" }),
+      ])
+    );
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-face-memory-yes",
+                quick_reply: { payload: "CONSENT_FACE_YES" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const userState = getState(anonymizePsid(psid));
+    expect(userState?.faceMemoryConsent).toEqual(
+      expect.objectContaining({ given: true, version: "v1" })
+    );
+    expect(userState?.lastSourceImageUrl).toBe(userState?.lastPhotoUrl);
+    expect(userState?.lastSourceImageUpdatedAt).toEqual(expect.any(Number));
+  });
+
+  it("deletes retained face-memory data via text command", async () => {
+    process.env.ENABLE_FACE_MEMORY = "true";
+    const psid = "face-memory-delete-user";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-face-memory-delete-photo",
+                attachments: [{ type: "image", payload: { url: "https://img.example/source.jpg" } }],
+              },
+            },
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-face-memory-delete-yes",
+                quick_reply: { payload: "CONSENT_FACE_YES" },
+              },
+            },
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-face-memory-delete-command",
+                text: "verwijder mijn data",
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const userState = getState(anonymizePsid(psid));
+    expect(userState?.faceMemoryConsent).toBeNull();
+    expect(userState?.lastSourceImageUrl).toBeNull();
+    expect(userState?.lastPhotoUrl).toBeNull();
+    expect(sendTextMock).toHaveBeenCalledWith(
+      psid,
+      "Je bewaarde foto en face-memory data zijn gewist."
+    );
   });
 
   it("shows intro once and moves user to AWAITING_PHOTO", async () => {

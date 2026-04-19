@@ -1,0 +1,86 @@
+# Face Memory
+
+Face memory is an optional Messenger feature that lets a user reuse one uploaded source photo for up to 30 days without uploading again.
+
+The feature must stay disabled until legal/privacy copy is approved:
+
+```env
+ENABLE_FACE_MEMORY=false
+```
+
+## User Flow
+
+1. User uploads a photo in Messenger.
+2. The bot stores the inbound source image using the normal source-image storage path.
+3. If `ENABLE_FACE_MEMORY=true` and the user has no prior face-memory decision, the bot asks for explicit consent.
+4. If the user chooses `Ja, 30 dagen`, state stores:
+   - `faceMemoryConsent.given=true`
+   - consent timestamp
+   - consent version `v1`
+   - `lastSourceImageUrl`
+   - `lastSourceImageUpdatedAt`
+5. If the user chooses `Nee`, the normal single-session image flow continues, but no reusable face-memory source is retained.
+6. The user can generate styles from the retained source image during the 30-day window.
+7. The user can send `verwijder mijn data` or `delete my data` to delete retained face-memory state.
+8. A daily expiry task clears retained face-memory data older than 30 days.
+
+## Legal Review Checklist
+
+Legal should approve these exact surfaces before enabling the feature:
+
+- Messenger consent copy and quick-reply labels.
+- `/privacy` page text, especially the optional 30-day photo-memory paragraph.
+- `/data-deletion` page text if it claims deletion paths or retained image handling.
+- The technical statement that Leaderbot stores the source photo URL and consent metadata, but does not create face embeddings, face vectors, face templates, or biometric identification profiles.
+- The operational deletion controls: user command, daily expiry, and admin kill switch.
+
+This feature is intended as limited photo retention for user convenience. It must not be used for identity verification, authentication, matching users across contexts, or uniquely identifying a person.
+
+## Data Stored
+
+Stored in Messenger state:
+
+- pseudonymous Messenger state key
+- `faceMemoryConsent`
+- `lastSourceImageUrl`
+- `lastSourceImageUpdatedAt`
+
+Stored in object storage:
+
+- the uploaded source image file referenced by `lastSourceImageUrl`
+
+Not stored:
+
+- face embeddings
+- biometric templates
+- facial geometry vectors
+- identity matching records
+
+## Retention And Deletion
+
+Maximum retention is 30 days from `lastSourceImageUpdatedAt`.
+
+Deletion paths:
+
+- User command: `verwijder mijn data` or `delete my data`.
+- Daily expiry task: clears expired face-memory state and attempts object-storage deletion.
+- Admin kill switch: `POST /admin/disable-face-memory` with `X-Admin-Token`.
+
+Kill-switch example:
+
+```bash
+curl -X POST https://leaderbot.live/admin/disable-face-memory \
+  -H "X-Admin-Token: <ADMIN_TOKEN>"
+```
+
+Before using the kill switch in production, set `ENABLE_FACE_MEMORY=false` and redeploy or restart so no new consent prompts are shown.
+
+## Rollout
+
+Recommended rollout:
+
+1. Keep `ENABLE_FACE_MEMORY=false` while code and legal copy are reviewed.
+2. Enable only for internal/test accounts.
+3. Monitor bot logs, deletion behavior, storage deletion, and Meta dashboard warnings.
+4. Roll out gradually only after the privacy policy is live and approved.
+

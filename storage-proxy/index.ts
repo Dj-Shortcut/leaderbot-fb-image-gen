@@ -1,6 +1,7 @@
 import express from "express";
 import { existsSync, readFileSync } from "node:fs";
 import {
+  DeleteObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -302,6 +303,36 @@ export function createStorageProxyApp(config: ProxyEnv): express.Express {
         error: error instanceof Error ? error.message : String(error),
       });
       res.status(404).json({ error: "Object not found" });
+    }
+  });
+
+  app.delete("/v1/storage/object", async (req, res) => {
+    const objectKey = normalizeObjectKey(String(req.query.path ?? ""));
+    if (!objectKey) {
+      res.status(400).json({ error: "Query param 'path' is required" });
+      return;
+    }
+
+    try {
+      await s3.send(
+        new DeleteObjectCommand({
+          Bucket: config.r2Bucket,
+          Key: objectKey,
+        })
+      );
+
+      logJson("info", {
+        msg: "storage_proxy_delete_success",
+        objectKey,
+      });
+      res.status(204).send();
+    } catch (error) {
+      logJson("error", {
+        msg: "storage_proxy_delete_failed",
+        objectKey,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      res.status(502).json({ error: "Delete failed" });
     }
   });
 
