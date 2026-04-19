@@ -27,11 +27,8 @@ import {
   markIntroSeen,
   anonymizePsid,
   type ConversationState,
-  type MessengerUserState,
 } from "./messengerState";
 import { normalizeLang, t, type Lang } from "./i18n";
-import { routeActiveExperience, routeEntryIntent } from "./experienceRouter";
-import { parseGameEntryIntent } from "./entryIntent";
 import { toLogUser, toUserKey } from "./privacy";
 import {
   getStoredMessengerImageDecision,
@@ -68,6 +65,13 @@ import { handleSharedTextMessage } from "./sharedTextHandler";
 import type { NormalizedInboundMessage } from "./normalizedInboundMessage";
 import { sendMessengerBotResponse } from "./botResponseAdapters";
 import {
+  parseMessengerEntryIntent,
+  routeMessengerActiveExperience,
+  routeMessengerEntryIntent,
+} from "./messengerExperienceRouting";
+import type { EntryIntent } from "./entryIntent";
+import type { ActiveExperience } from "./activeExperience";
+import {
   getTodayRuntimeStats,
   recordActiveUserToday,
   recordGenerationError,
@@ -79,11 +83,6 @@ import type {
   BotTextContext,
   BotImageContext,
 } from "./botContext";
-
-type MessengerBotResponseOptions = Parameters<
-  typeof sendMessengerBotResponse
->[1];
-type MessengerRouteResult = Awaited<ReturnType<typeof routeEntryIntent>>;
 
 type HandlerDeps = {
   defaultLang: Lang;
@@ -1132,156 +1131,6 @@ export function createWebhookHandlers({
     }
   }
 
-  function createMessengerResponseOptions(
-    psid: string,
-    userId: string,
-    reqId: string,
-    optionsFallbackLogName?: string
-  ): MessengerBotResponseOptions {
-    return {
-      sendText: text => sendLoggedText(psid, text, reqId),
-      sendStateText: (stateName, text) =>
-        sendStateQuickReplies(psid, stateName, text, reqId),
-      sendOptionsPrompt: async (prompt, options, fallbackText) => {
-        await sendLoggedQuickReplies(
-          psid,
-          prompt,
-          options.map(option => ({
-            content_type: "text",
-            title: option.title,
-            payload: option.id,
-          })),
-          reqId
-        );
-
-        if (fallbackText && optionsFallbackLogName) {
-          safeLog(optionsFallbackLogName, {
-            user: toLogUser(userId),
-            fallbackText,
-          });
-        }
-      },
-      sendImage: (imageUrl, caption) => {
-        if (caption) {
-          return sendLoggedText(psid, caption, reqId).then(() =>
-            sendLoggedImage(psid, imageUrl, reqId)
-          );
-        }
-
-        return sendLoggedImage(psid, imageUrl, reqId);
-      },
-    };
-  }
-
-  async function sendRouteResponse(
-    route: MessengerRouteResult,
-    options: MessengerBotResponseOptions
-  ): Promise<void> {
-    await sendMessengerBotResponse(route.response ?? null, options);
-    if (route.afterSend) {
-      await sendMessengerBotResponse(await route.afterSend(), options);
-    }
-  }
-
-  function parseEventEntryIntent(
-    event: FacebookWebhookEvent,
-    reqId: string,
-    userId: string,
-    localeLang: Lang
-  ) {
-    const referralRef = event.postback?.referral?.ref ?? event.referral?.ref;
-    const entryIntent = parseGameEntryIntent({
-      channel: "messenger",
-      ref: referralRef,
-      sourceType: event.postback?.payload ? "postback" : "referral",
-      localeHint: localeLang,
-      receivedAt: event.timestamp ?? Date.now(),
-    });
-
-    safeLog("entry_intent_parsed", {
-      reqId,
-      user: toLogUser(userId),
-      referralRef: referralRef ?? null,
-      entryIntent: entryIntent
-        ? {
-            targetExperienceType: entryIntent.targetExperienceType,
-            targetExperienceId: entryIntent.targetExperienceId,
-            sourceType: entryIntent.sourceType,
-            entryMode: entryIntent.entryMode ?? null,
-          }
-        : null,
-    });
-
-    return { referralRef, entryIntent };
-  }
-
-  async function routeEntryIntentEvent(input: {
-    psid: string;
-    userId: string;
-    reqId: string;
-    state: MessengerUserState;
-    entryIntent: ReturnType<typeof parseGameEntryIntent>;
-  }): Promise<boolean> {
-    const entryIntentRoute = await routeEntryIntent({
-      state: input.state,
-      entryIntent: input.entryIntent,
-      setLastEntryIntent: nextEntryIntent =>
-        Promise.resolve(setLastEntryIntent(input.psid, nextEntryIntent)),
-      setActiveExperience: nextActiveExperience =>
-        Promise.resolve(setActiveExperience(input.psid, nextActiveExperience)),
-    });
-    if (!entryIntentRoute.handled) {
-      return false;
-    }
-
-    await sendRouteResponse(
-      entryIntentRoute,
-      createMessengerResponseOptions(
-        input.psid,
-        input.userId,
-        input.reqId,
-        "entry_intent_options_fallback_available"
-      )
-    );
-    return true;
-  }
-
-  async function routeActiveExperienceEvent(input: {
-    psid: string;
-    userId: string;
-    reqId: string;
-    state: MessengerUserState;
-    event: FacebookWebhookEvent;
-  }): Promise<boolean> {
-    const action =
-      input.event.postback?.payload ??
-      input.event.message?.quick_reply?.payload ??
-      input.event.message?.text?.trim() ??
-      null;
-    const activeExperienceRoute = await routeActiveExperience({
-      state: input.state,
-      action,
-      setLastEntryIntent: nextEntryIntent =>
-        Promise.resolve(setLastEntryIntent(input.psid, nextEntryIntent)),
-      setActiveExperience: nextActiveExperience =>
-        Promise.resolve(setActiveExperience(input.psid, nextActiveExperience)),
-    });
-    if (!activeExperienceRoute.handled) {
-      return false;
-    }
-
-    await sendRouteResponse(
-      activeExperienceRoute,
-      createMessengerResponseOptions(
-        input.psid,
-        input.userId,
-        input.reqId,
-        "active_experience_options_fallback_available"
-      )
-    );
-    return true;
-  }
-
   async function claimEventReplayOrLog(
     event: FacebookWebhookEvent,
     entryId: string | undefined,
@@ -1346,20 +1195,60 @@ export function createWebhookHandlers({
       return;
     }
 
-    const { referralRef, entryIntent } = parseEventEntryIntent(
+    const routeDeps = {
+      psid,
+      userId,
+      reqId,
+      sendText: (text: string) => sendLoggedText(psid, text, reqId),
+      sendStateText: (stateName: ConversationState, text: string) =>
+        sendStateQuickReplies(psid, stateName, text, reqId),
+      sendOptionsPrompt: async (
+        prompt: string,
+        options: Array<{ id: string; title: string }>,
+        _fallbackLogName: string | undefined,
+        _fallbackText: string | undefined
+      ) => {
+        await sendLoggedQuickReplies(
+          psid,
+          prompt,
+          options.map(option => ({
+            content_type: "text",
+            title: option.title,
+            payload: option.id,
+          })),
+          reqId
+        );
+      },
+      sendImage: (imageUrl: string) => sendLoggedImage(psid, imageUrl, reqId),
+      safeLog,
+      setLastEntryIntent: (nextEntryIntent: EntryIntent | null) =>
+        Promise.resolve(setLastEntryIntent(psid, nextEntryIntent)),
+      setActiveExperience: (nextActiveExperience: ActiveExperience | null) =>
+        Promise.resolve(setActiveExperience(psid, nextActiveExperience)),
+    };
+    const { referralRef, entryIntent } = parseMessengerEntryIntent({
       event,
       reqId,
       userId,
-      localeLang
-    );
+      localeLang,
+      safeLog,
+    });
     if (
-      await routeEntryIntentEvent({ psid, userId, reqId, state, entryIntent })
+      await routeMessengerEntryIntent({
+        deps: routeDeps,
+        state,
+        entryIntent,
+      })
     ) {
       return;
     }
 
     if (
-      await routeActiveExperienceEvent({ psid, userId, reqId, state, event })
+      await routeMessengerActiveExperience({
+        deps: routeDeps,
+        state,
+        event,
+      })
     ) {
       return;
     }
