@@ -66,6 +66,7 @@ export type MessengerUserState = {
   } | null;
   lastSourceImageUrl?: string | null;
   lastSourceImageUpdatedAt?: number | null;
+  pendingSourceImageDeleteUrl?: string | null;
   lastImageUrl?: string;
   lastGeneratedUrl?: string | null;
   lastStyle?: Style;
@@ -130,6 +131,7 @@ function createDefaultState(psid: string, now = Date.now()): MessengerUserState 
     faceMemoryConsent: null,
     lastSourceImageUrl: null,
     lastSourceImageUpdatedAt: null,
+    pendingSourceImageDeleteUrl: null,
     lastImageUrl: undefined,
     lastGeneratedUrl: null,
     lastStyle: undefined,
@@ -176,6 +178,8 @@ function normalizeState(psid: string, value: PartialState | null | undefined): M
     lastSourceImageUrl: value?.lastSourceImageUrl ?? fallback.lastSourceImageUrl,
     lastSourceImageUpdatedAt:
       value?.lastSourceImageUpdatedAt ?? fallback.lastSourceImageUpdatedAt,
+    pendingSourceImageDeleteUrl:
+      value?.pendingSourceImageDeleteUrl ?? fallback.pendingSourceImageDeleteUrl,
     quota: {
       dayKey: value?.quota?.dayKey ?? fallback.quota.dayKey,
       count: value?.quota?.count ?? fallback.quota.count,
@@ -418,6 +422,7 @@ export function rememberFaceSourceImage(
       faceMemoryConsent: { given: true, timestamp: now, version: "v1" },
       lastSourceImageUrl: imageUrl,
       lastSourceImageUpdatedAt: now,
+      pendingSourceImageDeleteUrl: null,
       lastPhotoUrl: imageUrl,
       lastPhoto: imageUrl,
       lastPhotoSource: "stored",
@@ -446,13 +451,18 @@ export function declineFaceMemory(psid: string, now = Date.now()): MaybePromise<
   }
 }
 
-export function clearFaceMemoryState(psid: string, now = Date.now()): MaybePromise<void> {
+export function clearFaceMemoryState(
+  psid: string,
+  now = Date.now(),
+  pendingDeleteUrl: string | null = null
+): MaybePromise<void> {
   const result = patchState(
     psid,
     {
       faceMemoryConsent: null,
       lastSourceImageUrl: null,
       lastSourceImageUpdatedAt: null,
+      pendingSourceImageDeleteUrl: pendingDeleteUrl,
       lastPhotoUrl: null,
       lastPhoto: null,
       lastPhotoSource: null,

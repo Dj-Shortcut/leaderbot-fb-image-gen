@@ -175,6 +175,7 @@ describe("photo-first onboarding", () => {
     });
 
     const userState = getState(anonymizePsid(psid));
+    expect(userState?.pendingImageUrl).toBe(userState?.lastPhotoUrl);
     expect(userState?.faceMemoryConsent).toEqual(
       expect.objectContaining({ given: true, version: "v1" })
     );
@@ -220,6 +221,9 @@ describe("photo-first onboarding", () => {
     expect(userState?.faceMemoryConsent).toBeNull();
     expect(userState?.lastSourceImageUrl).toBeNull();
     expect(userState?.lastPhotoUrl).toBeNull();
+    expect(userState?.pendingSourceImageDeleteUrl).toMatch(
+      /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+    );
     expect(sendTextMock).toHaveBeenCalledWith(
       psid,
       "Je bewaarde foto en face-memory data zijn gewist."

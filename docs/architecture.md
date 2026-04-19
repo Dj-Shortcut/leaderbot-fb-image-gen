@@ -190,7 +190,7 @@ Design intent:
 - Avoid storing raw PSID in logs; derive `userKey` for correlation.
 - Keep `senderId` channel-specific and `userId` as the internal stabilized identity used by shared logic.
 
-Face-memory state is intentionally limited to consent metadata plus the retained source-image URL. It must not store face embeddings, biometric templates, facial vectors, or identity matching records.
+Face-memory state is intentionally limited to consent metadata plus the retained source-image URL. If object-storage deletion fails, state may keep a non-active retry URL so cleanup can be retried later. It must not store face embeddings, biometric templates, facial vectors, or identity matching records.
 
 ## 4) Quota model details
 

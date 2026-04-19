@@ -169,7 +169,7 @@ Because the persisted source image is fetched again during generation, `SOURCE_I
 
 Messenger face memory is an optional 30-day source-photo reuse feature. It is disabled by default with `ENABLE_FACE_MEMORY=false` and must remain disabled until the consent copy, privacy policy, and deletion language are approved.
 
-When enabled, the first photo upload asks the user whether Leaderbot may keep the uploaded photo for 30 days. A positive answer stores consent metadata and the retained source-image URL. A negative answer keeps the normal one-photo flow without reusable face memory. Users can delete retained face-memory data by sending `verwijder mijn data` or `delete my data`.
+When enabled, the first photo upload asks the user whether Leaderbot may keep the uploaded photo for 30 days. A positive answer stores consent metadata and the retained source-image URL. A negative answer keeps the normal one-photo flow without reusable face memory. Users can delete retained face-memory data by sending `verwijder mijn data` or `delete my data`. Stored source-image URLs are refreshed through the storage proxy before generation when the proxy is configured.
 
 For the full legal/ops checklist, rollout guidance, and kill-switch procedure, see [`docs/face-memory.md`](docs/face-memory.md).
 

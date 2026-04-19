@@ -19,6 +19,7 @@ ENABLE_FACE_MEMORY=false
    - consent version `v1`
    - `lastSourceImageUrl`
    - `lastSourceImageUpdatedAt`
+   - `pendingImageUrl` remains in state before the consent click, so consent still works after a server restart when Redis is configured.
 5. If the user chooses `Nee`, the normal single-session image flow continues, but no reusable face-memory source is retained.
 6. The user can generate styles from the retained source image during the 30-day window.
 7. The user can send `verwijder mijn data` or `delete my data` to delete retained face-memory state.
@@ -44,6 +45,7 @@ Stored in Messenger state:
 - `faceMemoryConsent`
 - `lastSourceImageUrl`
 - `lastSourceImageUpdatedAt`
+- `pendingSourceImageDeleteUrl`, only when object-storage deletion failed and needs a later retry
 
 Stored in object storage:
 
@@ -64,7 +66,10 @@ Deletion paths:
 
 - User command: `verwijder mijn data` or `delete my data`.
 - Daily expiry task: clears expired face-memory state and attempts object-storage deletion.
+- Failed object-storage deletes leave a non-active `pendingSourceImageDeleteUrl` retry marker so later expiry runs can retry cleanup.
 - Admin kill switch: `POST /admin/disable-face-memory` with `X-Admin-Token`.
+
+Generation refreshes stored source-image URLs through the storage proxy download-url endpoint when `BUILT_IN_FORGE_API_URL` is configured. This keeps retained source-photo generation compatible with short-lived signed public URLs.
 
 Kill-switch example:
 
@@ -83,4 +88,3 @@ Recommended rollout:
 2. Enable only for internal/test accounts.
 3. Monitor bot logs, deletion behavior, storage deletion, and Meta dashboard warnings.
 4. Roll out gradually only after the privacy policy is live and approved.
-

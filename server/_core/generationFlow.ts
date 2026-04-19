@@ -11,6 +11,7 @@ import {
 } from "./imageService";
 import type { SourceImageOrigin } from "./messengerState";
 import type { Style } from "./messengerStyles";
+import { storageGet, storageKeyFromPublicUrl } from "../storage";
 
 type GenerationProof = {
   incomingLen: number;
@@ -68,6 +69,54 @@ type ExecuteGenerationFlowInput = {
   lastPhotoSource?: SourceImageOrigin | null;
 };
 
+async function resolveStoredRuntimeSourceUrl(input: {
+  sourceImageUrl?: string;
+  lastPhotoUrl?: string | null;
+  lastPhotoSource?: SourceImageOrigin | null;
+}): Promise<{
+  resolvedSourceImageUrl?: string;
+  trustedSourceImageUrl: boolean;
+}> {
+  const originalSourceImageUrl =
+    input.sourceImageUrl ?? input.lastPhotoUrl ?? undefined;
+  const isStoredLastPhoto =
+    originalSourceImageUrl !== undefined &&
+    originalSourceImageUrl === input.lastPhotoUrl &&
+    input.lastPhotoSource === "stored";
+
+  if (!originalSourceImageUrl || !isStoredLastPhoto) {
+    return {
+      resolvedSourceImageUrl: originalSourceImageUrl,
+      trustedSourceImageUrl: false,
+    };
+  }
+
+  const storageKey = storageKeyFromPublicUrl(originalSourceImageUrl);
+  if (!storageKey || !process.env.BUILT_IN_FORGE_API_URL?.trim()) {
+    return {
+      resolvedSourceImageUrl: originalSourceImageUrl,
+      trustedSourceImageUrl: true,
+    };
+  }
+
+  try {
+    const refreshed = await storageGet(storageKey);
+    return {
+      resolvedSourceImageUrl: refreshed.url,
+      trustedSourceImageUrl: true,
+    };
+  } catch (error) {
+    console.warn("stored_source_image_url_refresh_failed", {
+      storageKey,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return {
+      resolvedSourceImageUrl: originalSourceImageUrl,
+      trustedSourceImageUrl: true,
+    };
+  }
+}
+
 function classifyGenerationError(error: unknown): GenerationFlowFailureKind {
   if (error instanceof InvalidSourceImageUrlError) {
     return "invalid_source_image";
@@ -99,11 +148,8 @@ function classifyGenerationError(error: unknown): GenerationFlowFailureKind {
 export async function executeGenerationFlow(
   input: ExecuteGenerationFlowInput
 ): Promise<GenerationFlowResult> {
-  const resolvedSourceImageUrl = input.sourceImageUrl ?? input.lastPhotoUrl ?? undefined;
-  const trustedSourceImageUrl =
-    resolvedSourceImageUrl !== undefined &&
-    resolvedSourceImageUrl === input.lastPhotoUrl &&
-    input.lastPhotoSource === "stored";
+  const { resolvedSourceImageUrl, trustedSourceImageUrl } =
+    await resolveStoredRuntimeSourceUrl(input);
 
   if (!resolvedSourceImageUrl) {
     return {

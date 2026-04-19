@@ -137,7 +137,7 @@ export function storageKeyFromPublicUrl(publicUrl: string): string | null {
   }
 }
 
-async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
+export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
   const { baseUrl, apiKey } = getStorageConfig();
   const key = normalizeKey(relKey);
   return {
