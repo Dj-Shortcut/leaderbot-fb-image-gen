@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { lookup } from "node:dns/promises";
+import https from "node:https";
 import net from "node:net";
 import os from "node:os";
 import fs from "fs/promises";
 import path from "path";
+import { Readable } from "node:stream";
 import { safeLen, sha256 } from "../imageProof";
 
 export class MissingInputImageError extends Error {}
@@ -20,15 +22,26 @@ export type DownloadedSourceImage = SourceImageData & {
   fbImageFetchMs: number;
 };
 
-type SourceImageDownloadOptions = {
-  trustedSourceImageUrl?: boolean;
-  sourceImageProvenance?: "storeInbound";
-};
-
 type SourceImageFetchAttemptResult = {
   response: Response;
   contentType: string;
 };
+
+type PinnedSourceImageAddress = {
+  address: string;
+  family: 4 | 6;
+};
+
+type SourceImageDnsLookup = (
+  hostname: string,
+  options: { all: true; verbatim: true }
+) => Promise<PinnedSourceImageAddress[]>;
+
+type SourceImageHttpFetch = (
+  sourceImageUrl: string,
+  signal: AbortSignal,
+  pinnedAddress: PinnedSourceImageAddress
+) => Promise<Response>;
 
 type SourceImageResolveInput = {
   sourceImageUrl?: string;
@@ -41,7 +54,22 @@ type SourceImageResolveInput = {
 const MIN_INPUT_IMAGE_BYTES = 5 * 1024;
 const MAX_INBOUND_IMAGE_BYTES = 20 * 1024 * 1024;
 const FB_IMAGE_FETCH_RETRY_LIMIT = 1;
-let dnsLookup = lookup;
+let dnsLookup: SourceImageDnsLookup = lookup as SourceImageDnsLookup;
+let sourceImageHttpFetch: SourceImageHttpFetch = fetchPinnedHttpsSourceImage;
+const blockedIpRanges = new net.BlockList();
+
+blockedIpRanges.addSubnet("10.0.0.0", 8, "ipv4");
+blockedIpRanges.addSubnet("127.0.0.0", 8, "ipv4");
+blockedIpRanges.addSubnet("169.254.0.0", 16, "ipv4");
+blockedIpRanges.addSubnet("172.16.0.0", 12, "ipv4");
+blockedIpRanges.addSubnet("192.168.0.0", 16, "ipv4");
+blockedIpRanges.addAddress("::", "ipv6");
+blockedIpRanges.addAddress("::1", "ipv6");
+blockedIpRanges.addSubnet("fc00::", 7, "ipv6");
+blockedIpRanges.addSubnet("fe80::", 10, "ipv6");
+blockedIpRanges.addSubnet("ff00::", 8, "ipv6");
+blockedIpRanges.addSubnet("64:ff9b::", 96, "ipv6");
+blockedIpRanges.addSubnet("2001:db8::", 32, "ipv6");
 
 function getSourceUrlDiagnostics(sourceImageUrl: string): {
   hostname?: string;
@@ -89,45 +117,57 @@ function parseAllowedHostsFromEnv(): string[] {
 }
 
 function isPrivateIPv4(ip: string): boolean {
-  const parts = ip.split(".").map(x => Number(x));
-  if (
-    parts.length !== 4 ||
-    parts.some(n => !Number.isInteger(n) || n < 0 || n > 255)
-  ) {
+  if (net.isIP(ip) !== 4) {
     return true;
   }
 
-  const [a, b] = parts;
+  return blockedIpRanges.check(ip, "ipv4");
+}
 
-  if (a === 10) return true;
-  if (a === 127) return true;
-  if (a === 169 && b === 254) return true;
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 192 && b === 168) return true;
+function extractIPv4MappedIPv6(ip: string): string | null {
+  const normalized = ip.toLowerCase();
+  const mappedPrefix = "::ffff:";
+  if (!normalized.startsWith(mappedPrefix)) {
+    return null;
+  }
 
-  return false;
+  const mapped = normalized.slice(mappedPrefix.length);
+  if (net.isIP(mapped) === 4) {
+    return mapped;
+  }
+
+  const parts = mapped.split(":");
+  if (parts.length !== 2) {
+    return null;
+  }
+
+  const [high, low] = parts.map(part => Number.parseInt(part, 16));
+  if (
+    !Number.isInteger(high) ||
+    !Number.isInteger(low) ||
+    high < 0 ||
+    high > 0xffff ||
+    low < 0 ||
+    low > 0xffff
+  ) {
+    return null;
+  }
+
+  return [
+    (high >> 8) & 0xff,
+    high & 0xff,
+    (low >> 8) & 0xff,
+    low & 0xff,
+  ].join(".");
 }
 
 function isBlockedIPv6(ip: string): boolean {
-  const normalized = ip.toLowerCase();
-
-  if (normalized === "::" || normalized === "::1") {
-    return true;
+  const mappedIPv4 = extractIPv4MappedIPv6(ip);
+  if (mappedIPv4) {
+    return isPrivateIPv4(mappedIPv4);
   }
 
-  if (normalized.startsWith("fc") || normalized.startsWith("fd")) {
-    return true;
-  }
-
-  if (normalized.startsWith("fe8") || normalized.startsWith("fe9")) {
-    return true;
-  }
-
-  if (normalized.startsWith("fea") || normalized.startsWith("feb")) {
-    return true;
-  }
-
-  return false;
+  return blockedIpRanges.check(ip, "ipv6");
 }
 
 function isBlockedIpAddress(ip: string): boolean {
@@ -208,8 +248,7 @@ function blockSourceImageUrl(
 
 function validateSourceImageUrlOrThrow(
   sourceImageUrl: string,
-  reqId?: string,
-  options?: SourceImageDownloadOptions
+  reqId?: string
 ): URL {
   let parsedUrl: URL;
 
@@ -273,7 +312,8 @@ function buildCanonicalSourceImageUrlString(sourceImageUrl: URL): string {
 
 async function fetchSourceImageAttempt(
   sourceImageUrl: string,
-  timeoutMs: number
+  timeoutMs: number,
+  pinnedAddress: PinnedSourceImageAddress
 ): Promise<SourceImageFetchAttemptResult> {
   const controller = new AbortController();
   const timeout = setTimeout(() => {
@@ -281,10 +321,11 @@ async function fetchSourceImageAttempt(
   }, timeoutMs);
   let response: Response;
   try {
-    response = await fetch(sourceImageUrl, {
-      redirect: "manual",
-      signal: controller.signal,
-    });
+    response = await sourceImageHttpFetch(
+      sourceImageUrl,
+      controller.signal,
+      pinnedAddress
+    );
   } finally {
     clearTimeout(timeout);
   }
@@ -296,17 +337,62 @@ async function fetchSourceImageAttempt(
   };
 }
 
+function buildResponseHeaders(rawHeaders: string[]): Headers {
+  const headers = new Headers();
+  for (let index = 0; index < rawHeaders.length; index += 2) {
+    const name = rawHeaders[index];
+    const value = rawHeaders[index + 1];
+    if (name && value !== undefined) {
+      headers.append(name, value);
+    }
+  }
+  return headers;
+}
+
+async function fetchPinnedHttpsSourceImage(
+  sourceImageUrl: string,
+  signal: AbortSignal,
+  pinnedAddress: PinnedSourceImageAddress
+): Promise<Response> {
+  return new Promise<Response>((resolve, reject) => {
+    const request = https.request(
+      sourceImageUrl,
+      {
+        method: "GET",
+        signal,
+        lookup: (_hostname, _options, callback) => {
+          callback(null, pinnedAddress.address, pinnedAddress.family);
+        },
+      },
+      incoming => {
+        resolve(
+          new Response(Readable.toWeb(incoming) as ReadableStream, {
+            status: incoming.statusCode ?? 500,
+            headers: buildResponseHeaders(incoming.rawHeaders),
+          })
+        );
+      }
+    );
+
+    request.on("error", reject);
+    request.end();
+  });
+}
+
 async function assertHostnameResolvesToPublicIpOrThrow(
   sourceImageUrl: URL,
   reqId: string
-): Promise<void> {
+): Promise<PinnedSourceImageAddress> {
   const hostname = sourceImageUrl.hostname.toLowerCase();
 
   if (net.isIP(hostname)) {
-    return;
+    return {
+      address: hostname,
+      family: net.isIP(hostname) as 4 | 6,
+    };
   }
 
-  let addresses: Awaited<ReturnType<typeof lookup>>;
+  let addresses: PinnedSourceImageAddress[];
   try {
     addresses = await dnsLookup(hostname, { all: true, verbatim: true });
   } catch {
@@ -331,12 +417,24 @@ async function assertHostnameResolvesToPublicIpOrThrow(
       family: blockedAddress.family,
     });
   }
+
+  const pinnedAddress = addresses[0];
+  return {
+    address: pinnedAddress.address,
+    family: pinnedAddress.family as 4 | 6,
+  };
 }
 
 export function setSourceImageDnsLookupForTests(
-  override: typeof lookup | null
+  override: SourceImageDnsLookup | null
 ): void {
-  dnsLookup = override ?? lookup;
+  dnsLookup = override ?? (lookup as SourceImageDnsLookup);
+}
+
+export function setSourceImageHttpFetchForTests(
+  override: SourceImageHttpFetch | null
+): void {
+  sourceImageHttpFetch = override ?? fetchPinnedHttpsSourceImage;
 }
 
 function assertNoRedirectResponse(response: Response, reqId: string): void {
@@ -566,13 +664,11 @@ function rethrowSourceImageError(error: unknown, reqId: string): never {
 
 async function downloadSourceImageOrThrow(
   sourceImageUrl: string,
-  reqId: string,
-  options?: SourceImageDownloadOptions
+  reqId: string
 ): Promise<DownloadedSourceImage> {
   const validatedSourceImageUrl = validateSourceImageUrlOrThrow(
     sourceImageUrl,
-    reqId,
-    options
+    reqId
   );
   const canonicalSourceImageUrl = buildCanonicalSourceImageUrlString(
     validatedSourceImageUrl
@@ -585,10 +681,14 @@ async function downloadSourceImageOrThrow(
     const attemptStartedAt = Date.now();
 
     try {
-      await assertHostnameResolvesToPublicIpOrThrow(validatedSourceImageUrl, reqId);
+      const pinnedAddress = await assertHostnameResolvesToPublicIpOrThrow(
+        validatedSourceImageUrl,
+        reqId
+      );
       const { response, contentType } = await fetchSourceImageAttempt(
         canonicalSourceImageUrl,
-        timeoutMs
+        timeoutMs,
+        pinnedAddress
       );
       assertNoRedirectResponse(response, reqId);
 
@@ -675,8 +775,5 @@ export async function resolveStoredSourceImage(
     );
   }
 
-  return downloadSourceImageOrThrow(input.sourceImageUrl, input.reqId, {
-    trustedSourceImageUrl: input.trustedSourceImageUrl,
-    sourceImageProvenance: input.sourceImageProvenance,
-  });
+  return downloadSourceImageOrThrow(input.sourceImageUrl, input.reqId);
 }

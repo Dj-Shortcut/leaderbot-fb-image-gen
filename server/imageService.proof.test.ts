@@ -4,7 +4,10 @@ import {
   OpenAiImageGenerator,
 } from "./_core/imageService";
 import { sha256 } from "./_core/imageProof";
-import { setSourceImageDnsLookupForTests } from "./_core/image-generation/sourceImageFetcher";
+import {
+  setSourceImageDnsLookupForTests,
+  setSourceImageHttpFetchForTests,
+} from "./_core/image-generation/sourceImageFetcher";
 
 const GENERATED_IMAGE_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=";
@@ -172,12 +175,16 @@ describe("OpenAi image-to-image proof", () => {
     setSourceImageDnsLookupForTests(async () => [
       { address: "93.184.216.34", family: 4 },
     ]);
+    setSourceImageHttpFetchForTests((sourceImageUrl, signal) =>
+      fetch(sourceImageUrl, { redirect: "manual", signal })
+    );
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     setSourceImageDnsLookupForTests(null);
+    setSourceImageHttpFetchForTests(null);
     delete process.env.NODE_ENV;
     delete process.env.OPENAI_API_KEY;
     delete process.env.APP_BASE_URL;
@@ -615,6 +622,31 @@ describe("OpenAi image-to-image proof", () => {
         sourceImageUrl: "https://img.example/source.jpg",
         userKey: "user-1",
         reqId: "req-private-dns-resolution",
+      })
+    ).rejects.toBeInstanceOf(InvalidSourceImageUrlError);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects allowlisted hosts that resolve to IPv4-mapped loopback before fetch", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "img.example";
+
+    setSourceImageDnsLookupForTests(async () => [
+      { address: "::ffff:7f00:1", family: 6 },
+    ]);
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await expect(
+      generator.generate({
+        style: "disco",
+        sourceImageUrl: "https://img.example/source.jpg",
+        userKey: "user-1",
+        reqId: "req-ipv4-mapped-loopback",
       })
     ).rejects.toBeInstanceOf(InvalidSourceImageUrlError);
 

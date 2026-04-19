@@ -27,6 +27,10 @@ import {
   OpenAiImageGenerator,
 } from "./_core/imageService";
 import {
+  setSourceImageDnsLookupForTests,
+  setSourceImageHttpFetchForTests,
+} from "./_core/image-generation/sourceImageFetcher";
+import {
   processWhatsAppWebhookPayload,
   resetMessengerEventDedupe,
 } from "./_core/messengerWebhook";
@@ -94,10 +98,18 @@ afterAll(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  setSourceImageDnsLookupForTests(null);
+  setSourceImageHttpFetchForTests(null);
 });
 
 describe("whatsapp webhook flow", () => {
   beforeEach(() => {
+    setSourceImageDnsLookupForTests(async () => [
+      { address: "93.184.216.34", family: 4 },
+    ]);
+    setSourceImageHttpFetchForTests((sourceImageUrl, signal) =>
+      fetch(sourceImageUrl, { redirect: "manual", signal })
+    );
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = "leaderbot-fb-image-gen.fly.dev";
     process.env.OPENAI_API_KEY = "dummy-key";

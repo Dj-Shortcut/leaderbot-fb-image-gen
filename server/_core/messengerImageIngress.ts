@@ -9,6 +9,14 @@ type NormalizeMessengerInboundImageInput = {
   reqId: string;
 };
 
+function getSafeHostname(url: string): string | null {
+  try {
+    return new URL(url).hostname || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function normalizeMessengerInboundImage(
   input: NormalizeMessengerInboundImageInput
 ): Promise<string | null> {
@@ -22,7 +30,7 @@ export async function normalizeMessengerInboundImage(
     safeLog("messenger_inbound_image_ingest_failed", {
       psidHash: input.psidHash,
       reqId: input.reqId,
-      inboundImageUrl: input.inboundImageUrl,
+      inboundImageHost: getSafeHostname(input.inboundImageUrl),
       errorCode:
         error instanceof Error ? error.constructor.name : String(error),
     });

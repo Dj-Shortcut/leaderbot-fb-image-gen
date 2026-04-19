@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setSourceImageDnsLookupForTests } from "./_core/image-generation/sourceImageFetcher";
+import {
+  setSourceImageDnsLookupForTests,
+  setSourceImageHttpFetchForTests,
+} from "./_core/image-generation/sourceImageFetcher";
 
 const GENERATED_IMAGE_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=";
 const STORED_SOURCE_IMAGE_URL =
@@ -14,12 +17,16 @@ describe("OpenAi image delivery via object storage", () => {
     setSourceImageDnsLookupForTests(async () => [
       { address: "93.184.216.34", family: 4 },
     ]);
+    setSourceImageHttpFetchForTests((sourceImageUrl, signal) =>
+      fetch(sourceImageUrl, { redirect: "manual", signal })
+    );
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.resetModules();
     setSourceImageDnsLookupForTests(null);
+    setSourceImageHttpFetchForTests(null);
     delete process.env.NODE_ENV;
     delete process.env.OPENAI_API_KEY;
     delete process.env.SOURCE_IMAGE_ALLOWED_HOSTS;

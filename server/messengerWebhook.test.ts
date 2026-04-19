@@ -59,7 +59,10 @@ import {
   getEventDedupeKey,
 } from "./_core/webhookHelpers";
 import { getBotFeatures } from "./_core/bot/features";
-import { setSourceImageDnsLookupForTests } from "./_core/image-generation/sourceImageFetcher";
+import {
+  setSourceImageDnsLookupForTests,
+  setSourceImageHttpFetchForTests,
+} from "./_core/image-generation/sourceImageFetcher";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
@@ -149,6 +152,7 @@ afterAll(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   setSourceImageDnsLookupForTests(null);
+  setSourceImageHttpFetchForTests(null);
   delete process.env.OPENAI_API_KEY;
   delete process.env.APP_BASE_URL;
   delete process.env.SOURCE_IMAGE_ALLOWED_HOSTS;
@@ -158,6 +162,9 @@ beforeEach(() => {
   setSourceImageDnsLookupForTests(async () => [
     { address: "93.184.216.34", family: 4 },
   ]);
+  setSourceImageHttpFetchForTests((sourceImageUrl, signal) =>
+    fetch(sourceImageUrl, { redirect: "manual", signal })
+  );
   delete process.env.MESSENGER_CHAT_ENGINE;
   delete process.env.MESSENGER_CHAT_CANARY_PERCENT;
 

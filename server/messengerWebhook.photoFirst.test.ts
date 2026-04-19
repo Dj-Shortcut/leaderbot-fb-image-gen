@@ -27,7 +27,10 @@ vi.mock("./_core/messengerApi", () => ({
 
 import { processFacebookWebhookPayload, resetMessengerEventDedupe } from "./_core/messengerWebhook";
 import { anonymizePsid, getState, resetStateStore } from "./_core/messengerState";
-import { setSourceImageDnsLookupForTests } from "./_core/image-generation/sourceImageFetcher";
+import {
+  setSourceImageDnsLookupForTests,
+  setSourceImageHttpFetchForTests,
+} from "./_core/image-generation/sourceImageFetcher";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
@@ -41,6 +44,9 @@ describe("photo-first onboarding", () => {
     setSourceImageDnsLookupForTests(async () => [
       { address: "93.184.216.34", family: 4 },
     ]);
+    setSourceImageHttpFetchForTests((sourceImageUrl, signal) =>
+      fetch(sourceImageUrl, { redirect: "manual", signal })
+    );
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS =
       "img.example,fbsbx.com,leaderbot-fb-image-gen.fly.dev";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
@@ -75,6 +81,7 @@ describe("photo-first onboarding", () => {
 
   afterEach(() => {
     setSourceImageDnsLookupForTests(null);
+    setSourceImageHttpFetchForTests(null);
     vi.unstubAllGlobals();
   });
 
