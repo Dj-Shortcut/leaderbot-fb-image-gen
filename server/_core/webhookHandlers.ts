@@ -1150,20 +1150,22 @@ export function createWebhookHandlers({
     if (!psid) return;
 
     const userId = toUserKey(psid);
-    recordActiveUserToday(userId);
     const reqId = `${psid}-${Date.now()}`;
-    const localeLang = normalizeLang(event.sender?.locale);
+
+    if (!(await claimEventReplayOrLog(event, entryId, userId))) {
+      return;
+    }
+
+    recordActiveUserToday(userId);
+    const senderLocale = event.sender?.locale?.trim();
+    const localeLang = senderLocale ? normalizeLang(senderLocale) : defaultLang;
     const state = await getOrCreateState(psid);
     logIncomingMessage(psid, userId, event, reqId);
     logUserState(psid, userId, state, reqId, "handle_event");
     const lang = state.preferredLang || localeLang || defaultLang;
 
-    if (localeLang && localeLang !== state.preferredLang) {
+    if (senderLocale && localeLang !== state.preferredLang) {
       await setPreferredLang(psid, localeLang);
-    }
-
-    if (!(await claimEventReplayOrLog(event, entryId, userId))) {
-      return;
     }
 
     const routeDeps = {
