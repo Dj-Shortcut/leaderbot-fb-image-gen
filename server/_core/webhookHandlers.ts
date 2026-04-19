@@ -87,6 +87,10 @@ type HandlerDeps = {
 };
 
 type FacebookWebhookMessage = NonNullable<FacebookWebhookEvent["message"]>;
+type FeatureContextBase = Omit<
+  BotPayloadContext,
+  "payload"
+>;
 
 const IN_FLIGHT_MESSAGE =
   "\u23F3 even geduld, ik ben nog bezig met jouw restyle";
@@ -358,14 +362,13 @@ export function createWebhookHandlers({
     };
   }
 
-  function createFeaturePayloadContext(
+  function createFeatureContextBase(
     psid: string,
     userId: string,
     reqId: string,
     lang: Lang,
-    state: Awaited<ReturnType<typeof getOrCreateState>>,
-    payload: string
-  ): BotPayloadContext {
+    state: Awaited<ReturnType<typeof getOrCreateState>>
+  ): FeatureContextBase {
     return {
       channel: "messenger",
       capabilities: MESSENGER_CAPABILITIES,
@@ -374,7 +377,6 @@ export function createWebhookHandlers({
       reqId,
       lang,
       state,
-      payload,
       sendText: text => sendLoggedText(psid, text, reqId),
       sendImage: imageUrl => sendLoggedImage(psid, imageUrl, reqId),
       sendQuickReplies: (text, replies) =>
@@ -404,6 +406,20 @@ export function createWebhookHandlers({
     };
   }
 
+  function createFeaturePayloadContext(
+    psid: string,
+    userId: string,
+    reqId: string,
+    lang: Lang,
+    state: Awaited<ReturnType<typeof getOrCreateState>>,
+    payload: string
+  ): BotPayloadContext {
+    return {
+      ...createFeatureContextBase(psid, userId, reqId, lang, state),
+      payload,
+    };
+  }
+
   function createFeatureImageContext(
     psid: string,
     userId: string,
@@ -413,40 +429,8 @@ export function createWebhookHandlers({
     imageUrl: string
   ): BotImageContext {
     return {
-      channel: "messenger",
-      capabilities: MESSENGER_CAPABILITIES,
-      senderId: psid,
-      userId,
-      reqId,
-      lang,
-      state,
+      ...createFeatureContextBase(psid, userId, reqId, lang, state),
       imageUrl,
-      sendText: text => sendLoggedText(psid, text, reqId),
-      sendImage: nextImageUrl => sendLoggedImage(psid, nextImageUrl, reqId),
-      sendQuickReplies: (text, replies) =>
-        sendLoggedQuickReplies(psid, text, replies, reqId),
-      sendStateQuickReplies: (nextState, text) =>
-        sendStateQuickReplies(psid, nextState, text, reqId),
-      setFlowState: async nextState => {
-        await setFlowState(psid, nextState);
-      },
-      preselectStyle: async style => {
-        await setPreselectedStyle(psid, style);
-      },
-      chooseStyle: style =>
-        handleStyleSelection(psid, userId, style, reqId, lang),
-      runStyleGeneration: (style, sourceImageUrl, promptHint) =>
-        runStyleGeneration(
-          psid,
-          userId,
-          style,
-          reqId,
-          lang,
-          sourceImageUrl,
-          promptHint
-        ),
-      getRuntimeStats: () => getTodayRuntimeStats(),
-      logger: createFeatureLogger(userId),
     };
   }
 
@@ -461,42 +445,10 @@ export function createWebhookHandlers({
     hasPhoto: boolean
   ): BotTextContext {
     return {
-      channel: "messenger",
-      capabilities: MESSENGER_CAPABILITIES,
-      senderId: psid,
-      userId,
-      reqId,
-      lang,
-      state,
+      ...createFeatureContextBase(psid, userId, reqId, lang, state),
       messageText,
       normalizedText,
       hasPhoto,
-      sendText: text => sendLoggedText(psid, text, reqId),
-      sendImage: imageUrl => sendLoggedImage(psid, imageUrl, reqId),
-      sendQuickReplies: (text, replies) =>
-        sendLoggedQuickReplies(psid, text, replies, reqId),
-      sendStateQuickReplies: (nextState, text) =>
-        sendStateQuickReplies(psid, nextState, text, reqId),
-      setFlowState: async nextState => {
-        await setFlowState(psid, nextState);
-      },
-      preselectStyle: async style => {
-        await setPreselectedStyle(psid, style);
-      },
-      chooseStyle: style =>
-        handleStyleSelection(psid, userId, style, reqId, lang),
-      runStyleGeneration: (style, sourceImageUrl, promptHint) =>
-        runStyleGeneration(
-          psid,
-          userId,
-          style,
-          reqId,
-          lang,
-          sourceImageUrl,
-          promptHint
-        ),
-      getRuntimeStats: () => getTodayRuntimeStats(),
-      logger: createFeatureLogger(userId),
     };
   }
 
