@@ -8,7 +8,7 @@ import {
 } from "./messengerState";
 import { forEachStoredState } from "./stateStore";
 import { storageDelete, storageKeyFromPublicUrl } from "../storage";
-import { verifyAdminToken } from "./adminAuth";
+import { createAdminAuthRateLimiter, verifyAdminToken } from "./adminAuth";
 import { safeLog } from "./messengerApi";
 
 export const FACE_MEMORY_CONSENT_YES = "CONSENT_FACE_YES";
@@ -111,24 +111,30 @@ export async function updateConsentedFaceMemorySource(
 }
 
 export function registerFaceMemoryAdminRoutes(app: express.Express): void {
-  app.post("/admin/disable-face-memory", async (req, res) => {
-    if (
-      !verifyAdminToken({
-        providedToken: req.header("x-admin-token"),
-        eventName: "face_memory_kill_switch_auth_failed",
-      })
-    ) {
-      res.sendStatus(403);
-      return;
-    }
+  app.post(
+    "/admin/disable-face-memory",
+    createAdminAuthRateLimiter({
+      eventName: "face_memory_kill_switch_auth_rate_limited",
+    }),
+    async (req, res) => {
+      if (
+        !verifyAdminToken({
+          providedToken: req.header("x-admin-token"),
+          eventName: "face_memory_kill_switch_auth_failed",
+        })
+      ) {
+        res.sendStatus(403);
+        return;
+      }
 
-    const deleted = await expireFaceMemory(Date.now(), {
-      force: true,
-      matchAll: true,
-    });
-    safeLog("face_memory_kill_switch_success", { deleted });
-    res.status(200).json({ ok: true, deleted });
-  });
+      const deleted = await expireFaceMemory(Date.now(), {
+        force: true,
+        matchAll: true,
+      });
+      safeLog("face_memory_kill_switch_success", { deleted });
+      res.status(200).json({ ok: true, deleted });
+    }
+  );
 }
 
 export function scheduleFaceMemoryExpiry(): void {

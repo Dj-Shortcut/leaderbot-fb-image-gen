@@ -71,7 +71,7 @@ Deletion paths:
 - User command: `verwijder mijn data` or `delete my data`.
 - Daily expiry task: clears expired face-memory state and attempts object-storage deletion.
 - Failed object-storage deletes leave a non-active `pendingSourceImageDeleteUrl` retry marker so later expiry runs can retry cleanup.
-- Admin kill switch: `POST /admin/disable-face-memory` with `X-Admin-Token`. Auth failures and successful kill-switch runs are logged.
+- Admin kill switch: `POST /admin/disable-face-memory` with `X-Admin-Token`. Auth failures, rate-limited attempts, and successful kill-switch runs are logged.
 
 Generation refreshes stored source-image URLs through the storage proxy download-url endpoint when `BUILT_IN_FORGE_API_URL` is configured. This keeps retained source-photo generation compatible with short-lived signed public URLs.
 

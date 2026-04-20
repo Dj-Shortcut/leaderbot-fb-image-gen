@@ -55,7 +55,7 @@ import {
   registerFaceMemoryAdminRoutes,
   scheduleFaceMemoryExpiry,
 } from "./faceMemory";
-import { verifyAdminToken } from "./adminAuth";
+import { createAdminAuthRateLimiter, verifyAdminToken } from "./adminAuth";
 
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
@@ -392,7 +392,10 @@ async function startServer() {
   registerMetricsRoute(app);
   registerFaceMemoryAdminRoutes(app);
 
-  app.get("/debug/build", (req, res) => {
+  app.get(
+    "/debug/build",
+    createAdminAuthRateLimiter({ eventName: "debug_build_auth_rate_limited" }),
+    (req, res) => {
     const parsedHeaders = debugBuildHeadersSchema.safeParse(req.headers);
     const providedToken = parsedHeaders.success
       ? parsedHeaders.data["x-admin-token"]
@@ -407,7 +410,7 @@ async function startServer() {
       return res.sendStatus(403);
     }
 
-    return res.status(200).json({
+      return res.status(200).json({
       name: "leaderbot-images",
       version: gitSha,
       uptime_s: Math.floor(process.uptime()),
@@ -430,8 +433,9 @@ async function startServer() {
         requestTracingEnabled: true,
         traceparentPropagationEnabled: true,
       },
-    });
-  });
+      });
+    }
+  );
 
   app.get("/privacy", (_req, res) => {
     res.type("html").send(`
