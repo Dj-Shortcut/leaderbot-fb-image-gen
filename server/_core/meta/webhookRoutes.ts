@@ -34,15 +34,6 @@ function getMetaVerifyToken(): string {
 }
 
 export function registerMetaWebhookRoutes(app: express.Express): void {
-  app.get('/webhook/whatsapp', (req, res) => {
-    const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = req.query
-    if (mode === 'subscribe' && token === process.env.META_VERIFY_TOKEN) {
-      return res.status(200).type('text/plain').send(challenge as string)
-    }
-    res.sendStatus(403)
-  })
-
-  app.post('/webhook/whatsapp', (_, res) => res.sendStatus(200))
 
   const handleVerification: express.RequestHandler = (req, res) => {
     const configuredToken = getMetaVerifyToken();
