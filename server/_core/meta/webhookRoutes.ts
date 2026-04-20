@@ -64,6 +64,7 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
 
   app.get("/webhook", webhookLimiter, handleVerification);
   app.get("/webhook/facebook", webhookLimiter, handleVerification);
+  app.get("/webhook/whatsapp", webhookLimiter, handleVerification); // NIEUW
 
   // Keep this dispatch branch local for now; it is the narrow seam for a later helper extraction.
   const handleWebhookPost: express.RequestHandler = async (req, res) => {
@@ -127,4 +128,5 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
 
   app.post("/webhook", handleWebhookPost);
   app.post("/webhook/facebook", handleWebhookPost);
+  app.post("/webhook/whatsapp", handleWebhookPost); // NIEUW
 }
