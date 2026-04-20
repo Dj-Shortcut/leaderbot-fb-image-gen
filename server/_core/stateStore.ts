@@ -1,4 +1,5 @@
 const STATE_TTL_SECONDS = 172800;
+const FACE_MEMORY_STATE_TTL_SECONDS = 32 * 24 * 60 * 60;
 
 type RedisLike = {
   ping(): Promise<string>;
@@ -159,9 +160,24 @@ export function readState<T>(psid: string): MaybePromise<T | null> {
 }
 
 export function writeState<T>(psid: string, value: T): MaybePromise<void> {
+  const faceMemoryValue = value as {
+    faceMemoryConsent?: { given?: boolean } | null;
+    lastSourceImageUrl?: string | null;
+    lastSourceImageUpdatedAt?: number | null;
+    pendingSourceImageDeleteUrl?: string | null;
+  } | null;
+  const hasActiveFaceMemory =
+    faceMemoryValue?.faceMemoryConsent?.given === true &&
+    Boolean(
+      faceMemoryValue.lastSourceImageUrl ||
+        faceMemoryValue.lastSourceImageUpdatedAt
+    );
+  const hasPendingSourceDelete = Boolean(
+    faceMemoryValue?.pendingSourceImageDeleteUrl
+  );
   const ttlSeconds =
-    process.env.ENABLE_FACE_MEMORY === "true"
-      ? 30 * 24 * 60 * 60
+    hasActiveFaceMemory || hasPendingSourceDelete
+      ? FACE_MEMORY_STATE_TTL_SECONDS
       : STATE_TTL_SECONDS;
   return writeRawState(getStateKey(psid), value, ttlSeconds);
 }

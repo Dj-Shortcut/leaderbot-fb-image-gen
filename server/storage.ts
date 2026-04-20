@@ -130,7 +130,22 @@ export async function storageDelete(relKey: string): Promise<void> {
 export function storageKeyFromPublicUrl(publicUrl: string): string | null {
   try {
     const parsed = new URL(publicUrl);
-    const key = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
+    let pathname = parsed.pathname;
+    const configuredPublicBaseUrl = process.env.PUBLIC_BASE_URL?.trim();
+    if (configuredPublicBaseUrl) {
+      try {
+        const basePath = new URL(configuredPublicBaseUrl).pathname.replace(
+          /\/+$/,
+          ""
+        );
+        if (basePath && basePath !== "/" && pathname.startsWith(`${basePath}/`)) {
+          pathname = pathname.slice(basePath.length);
+        }
+      } catch {
+        // Ignore invalid local config and fall back to the raw public URL path.
+      }
+    }
+    const key = decodeURIComponent(pathname.replace(/^\/+/, ""));
     return key || null;
   } catch {
     return null;

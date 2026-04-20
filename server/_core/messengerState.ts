@@ -435,6 +435,23 @@ export function rememberFaceSourceImage(
   }
 }
 
+export function setFaceMemoryConsentGiven(
+  psid: string,
+  now = Date.now()
+): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      faceMemoryConsent: { given: true, timestamp: now, version: "v1" },
+    },
+    now
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
+}
+
 export function declineFaceMemory(psid: string, now = Date.now()): MaybePromise<void> {
   const result = patchState(
     psid,

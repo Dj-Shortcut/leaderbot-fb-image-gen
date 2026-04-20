@@ -25,6 +25,8 @@ ENABLE_FACE_MEMORY=false
 7. The user can send `verwijder mijn data` or `delete my data` to delete retained face-memory state.
 8. A daily expiry task clears retained face-memory data older than 30 days.
 
+A declined consent choice is respected and does not trigger repeated prompts on every later photo upload. If product wants users to opt in later, add an explicit opt-in command and have legal approve that copy.
+
 ## Legal Review Checklist
 
 Legal should approve these exact surfaces before enabling the feature:
@@ -62,12 +64,14 @@ Not stored:
 
 Maximum retention is 30 days from `lastSourceImageUpdatedAt`.
 
+Runtime state for active face memory or pending object-storage deletion is kept for 32 days. The extra two-day buffer lets the daily expiry sweep see inactive users after the 30-day retention window and delete object-storage files before Redis metadata expires.
+
 Deletion paths:
 
 - User command: `verwijder mijn data` or `delete my data`.
 - Daily expiry task: clears expired face-memory state and attempts object-storage deletion.
 - Failed object-storage deletes leave a non-active `pendingSourceImageDeleteUrl` retry marker so later expiry runs can retry cleanup.
-- Admin kill switch: `POST /admin/disable-face-memory` with `X-Admin-Token`.
+- Admin kill switch: `POST /admin/disable-face-memory` with `X-Admin-Token`. Auth failures and successful kill-switch runs are logged.
 
 Generation refreshes stored source-image URLs through the storage proxy download-url endpoint when `BUILT_IN_FORGE_API_URL` is configured. This keeps retained source-photo generation compatible with short-lived signed public URLs.
 

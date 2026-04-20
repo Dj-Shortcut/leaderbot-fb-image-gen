@@ -55,6 +55,7 @@ import {
   registerFaceMemoryAdminRoutes,
   scheduleFaceMemoryExpiry,
 } from "./faceMemory";
+import { verifyAdminToken } from "./adminAuth";
 
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
@@ -392,13 +393,17 @@ async function startServer() {
   registerFaceMemoryAdminRoutes(app);
 
   app.get("/debug/build", (req, res) => {
-    const adminToken = process.env.ADMIN_TOKEN;
     const parsedHeaders = debugBuildHeadersSchema.safeParse(req.headers);
     const providedToken = parsedHeaders.success
       ? parsedHeaders.data["x-admin-token"]
       : undefined;
 
-    if (!adminToken || !providedToken || providedToken !== adminToken) {
+    if (
+      !verifyAdminToken({
+        providedToken,
+        eventName: "debug_build_auth_failed",
+      })
+    ) {
       return res.sendStatus(403);
     }
 
@@ -477,7 +482,7 @@ async function startServer() {
 
       <h2>Image handling and retention</h2>
       <p>Images are processed for the purpose of generating the requested transformation.</p>
-      <p><strong>Optional photo memory:</strong> If you give explicit permission, we keep your uploaded photo for a maximum of 30 days so you do not have to upload it again each time. This is optional. You can withdraw consent at any time by sending "verwijder mijn data" or "delete my data" in Messenger. After 30 days or withdrawal, the retained photo is permanently deleted. We use it only to generate new images for you.</p>
+      <p><strong>Optional photo memory:</strong> If you give explicit permission, we keep your uploaded photo for a maximum of 30 days so you do not have to upload it again each time. This is optional. You can withdraw consent at any time by sending "delete my data" in Messenger. Dutch-speaking users may send "verwijder mijn data". After 30 days or withdrawal, the retained photo is permanently deleted. We use it only to generate new images for you.</p>
       <p>We do not sell your images.</p>
       <p>We do not use your images to market to you.</p>
       <p>We do not share your images with third parties except as required to provide the service (e.g., image processing providers).</p>

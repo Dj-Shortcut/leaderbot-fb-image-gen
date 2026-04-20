@@ -35,6 +35,7 @@ These show up in the repo and can be mistaken for the main OpenAI path.
 | --- | --- | --- |
 | `BUILT_IN_FORGE_API_URL` | Storage proxy, `/api/chat` | Not used by the main Messenger OpenAI text flow. |
 | `BUILT_IN_FORGE_API_KEY` | Storage proxy, `/api/chat` | Separate from `OPENAI_API_KEY`. |
+| `PUBLIC_BASE_URL` | Storage delete key derivation | Only needed in the main app when the storage public URL has a path prefix. |
 | `REDIS_URL` | Replay protection, rate limiting, state storage | Required in production for replay protection. |
 | `ADMIN_TOKEN` | Debug/admin endpoints | Required for `/admin/disable-face-memory` and `/debug/build`. |
 

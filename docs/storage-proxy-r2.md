@@ -72,6 +72,7 @@ Point the main app at the proxy:
 
 - `BUILT_IN_FORGE_API_URL=https://<your-storage-proxy-host>`
 - `BUILT_IN_FORGE_API_KEY=<same value as FORGE_API_KEY>`
+- `PUBLIC_BASE_URL=<same public asset base configured on the proxy>` if the public URL includes a path prefix, so the main app can derive object keys for deletion.
 
 ## How public URLs are formed
 

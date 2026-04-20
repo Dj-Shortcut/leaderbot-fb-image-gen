@@ -230,6 +230,33 @@ describe("photo-first onboarding", () => {
     );
   });
 
+  it("records face-memory consent even when the pending image is gone", async () => {
+    process.env.ENABLE_FACE_MEMORY = "true";
+    const psid = "face-memory-consent-without-photo-user";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-face-memory-consent-without-photo",
+                quick_reply: { payload: "CONSENT_FACE_YES" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const userState = getState(anonymizePsid(psid));
+    expect(userState?.faceMemoryConsent).toEqual(
+      expect.objectContaining({ given: true, version: "v1" })
+    );
+    expect(userState?.lastSourceImageUrl).toBeNull();
+  });
+
   it("shows intro once and moves user to AWAITING_PHOTO", async () => {
     const psid = "text-user";
 

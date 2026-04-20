@@ -53,6 +53,31 @@ describe("stateStore memory TTL", () => {
     expect(readState("user-1")).toBeNull();
   });
 
+  it("only extends state TTL for active face-memory or pending delete state", () => {
+    writeState("regular-user", {
+      faceMemoryConsent: { given: false, timestamp: Date.now(), version: "v1" },
+    });
+    writeState("face-memory-user", {
+      faceMemoryConsent: { given: true, timestamp: Date.now(), version: "v1" },
+      lastSourceImageUrl: "https://assets.example/inbound-source/a.jpg",
+      lastSourceImageUpdatedAt: Date.now(),
+    });
+    writeState("pending-delete-user", {
+      pendingSourceImageDeleteUrl: "https://assets.example/inbound-source/b.jpg",
+    });
+
+    vi.advanceTimersByTime(172800_001);
+
+    expect(readState("regular-user")).toBeNull();
+    expect(readState("face-memory-user")).not.toBeNull();
+    expect(readState("pending-delete-user")).not.toBeNull();
+
+    vi.advanceTimersByTime(32 * 24 * 60 * 60 * 1000);
+
+    expect(readState("face-memory-user")).toBeNull();
+    expect(readState("pending-delete-user")).toBeNull();
+  });
+
   it("recreates stored state after expiry", () => {
     const first = getOrCreateStoredState("user-2", () => ({ version: 1 }));
     expect(first).toEqual({ version: 1 });

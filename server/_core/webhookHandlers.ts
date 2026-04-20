@@ -15,6 +15,7 @@ import {
   declineFaceMemory,
   getOrCreateState,
   rememberFaceSourceImage,
+  setFaceMemoryConsentGiven,
   setChosenStyle,
   setFlowState,
   setLastGenerated,
@@ -861,6 +862,8 @@ export function createWebhookHandlers({
       const sourceImageUrl = state.pendingImageUrl ?? state.lastPhotoUrl;
       if (sourceImageUrl) {
         await rememberFaceSourceImage(psid, sourceImageUrl);
+      } else {
+        await setFaceMemoryConsentGiven(psid);
       }
       await sendPhotoReceivedPrompt(psid, lang, reqId);
       return;
