@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { createImageGeneratorMock } = vi.hoisted(() => ({
+const { createImageGeneratorMock, storageGetMock } = vi.hoisted(() => ({
   createImageGeneratorMock: vi.fn(),
+  storageGetMock: vi.fn(),
 }));
 
 vi.mock("./_core/imageService", () => ({
@@ -17,6 +18,18 @@ vi.mock("./_core/imageService", () => ({
   OpenAiBudgetExceededError: class OpenAiBudgetExceededError extends Error {},
 }));
 
+vi.mock("./storage", () => ({
+  storageGet: storageGetMock,
+  storageKeyFromPublicUrl: (publicUrl: string) => {
+    try {
+      const parsed = new URL(publicUrl);
+      return decodeURIComponent(parsed.pathname.replace(/^\/+/, "")) || null;
+    } catch {
+      return null;
+    }
+  },
+}));
+
 import { executeGenerationFlow } from "./_core/generationFlow";
 import {
   GenerationTimeoutError,
@@ -26,6 +39,18 @@ import {
 } from "./_core/imageService";
 
 describe("generationFlow", () => {
+  const originalForgeApiUrl = process.env.BUILT_IN_FORGE_API_URL;
+
+  afterEach(() => {
+    createImageGeneratorMock.mockReset();
+    storageGetMock.mockReset();
+    if (originalForgeApiUrl === undefined) {
+      delete process.env.BUILT_IN_FORGE_API_URL;
+    } else {
+      process.env.BUILT_IN_FORGE_API_URL = originalForgeApiUrl;
+    }
+  });
+
   it("returns missing_source_image when no source image is available", async () => {
     const result = await executeGenerationFlow({
       style: "cyberpunk",
@@ -75,6 +100,73 @@ describe("generationFlow", () => {
         sourceImageProvenance: "storeInbound",
       })
     );
+  });
+
+  it("refreshes stored source image URLs through the storage proxy before generation", async () => {
+    process.env.BUILT_IN_FORGE_API_URL = "https://forge.example";
+    storageGetMock.mockResolvedValue({
+      key: "inbound-source/photo.jpg",
+      url: "https://signed.example/inbound-source/photo.jpg?signature=fresh",
+    });
+    const generateMock = vi.fn().mockResolvedValue({
+      imageUrl: "https://example.com/generated.jpg",
+      proof: {
+        incomingLen: 10,
+        incomingSha256: "in",
+        openaiInputLen: 10,
+        openaiInputSha256: "out",
+      },
+      metrics: { totalMs: 123 },
+    });
+    createImageGeneratorMock.mockReturnValue({
+      mode: "openai",
+      generator: { generate: generateMock },
+    });
+
+    const result = await executeGenerationFlow({
+      style: "cyberpunk",
+      userId: "user-1",
+      reqId: "req-1",
+      lastPhotoUrl: "https://assets.example/inbound-source/photo.jpg?signature=old",
+      lastPhotoSource: "stored",
+    });
+
+    expect(result).toMatchObject({
+      kind: "success",
+      trustedSourceImageUrl: true,
+      resolvedSourceImageUrl:
+        "https://signed.example/inbound-source/photo.jpg?signature=fresh",
+    });
+    expect(storageGetMock).toHaveBeenCalledWith("inbound-source/photo.jpg");
+    expect(generateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceImageUrl:
+          "https://signed.example/inbound-source/photo.jpg?signature=fresh",
+        trustedSourceImageUrl: true,
+        sourceImageProvenance: "storeInbound",
+      })
+    );
+  });
+
+  it("does not trust stored source image URLs when no storage key can be derived", async () => {
+    process.env.BUILT_IN_FORGE_API_URL = "https://forge.example";
+
+    const result = await executeGenerationFlow({
+      style: "cyberpunk",
+      userId: "user-1",
+      reqId: "req-1",
+      lastPhotoUrl: "not-a-valid-url",
+      lastPhotoSource: "stored",
+    });
+
+    expect(result).toMatchObject({
+      kind: "error",
+      errorKind: "invalid_source_image",
+      resolvedSourceImageUrl: "not-a-valid-url",
+      trustedSourceImageUrl: false,
+    });
+    expect(storageGetMock).not.toHaveBeenCalled();
+    expect(createImageGeneratorMock).not.toHaveBeenCalled();
   });
 
   it("classifies mapped generator failures", async () => {

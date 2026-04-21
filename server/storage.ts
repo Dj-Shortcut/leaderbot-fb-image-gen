@@ -35,6 +35,12 @@ function buildUploadUrl(baseUrl: string, relKey: string): URL {
   return url;
 }
 
+function buildDeleteUrl(baseUrl: string, relKey: string): URL {
+  const url = new URL("v1/storage/object", ensureTrailingSlash(baseUrl));
+  url.searchParams.set("path", normalizeKey(relKey));
+  return url;
+}
+
 async function buildDownloadUrl(
   baseUrl: string,
   relKey: string,
@@ -105,7 +111,48 @@ export async function storagePut(
   return { key, url };
 }
 
-async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
+export async function storageDelete(relKey: string): Promise<void> {
+  const { baseUrl, apiKey } = getStorageConfig();
+  const deleteUrl = buildDeleteUrl(baseUrl, relKey);
+  const response = await fetch(deleteUrl, {
+    method: "DELETE",
+    headers: buildAuthHeaders(apiKey),
+  });
+
+  if (!response.ok && response.status !== 404) {
+    const message = await response.text().catch(() => response.statusText);
+    throw new Error(
+      `Storage delete failed (${response.status} ${response.statusText}): ${message}`
+    );
+  }
+}
+
+export function storageKeyFromPublicUrl(publicUrl: string): string | null {
+  try {
+    const parsed = new URL(publicUrl);
+    let pathname = parsed.pathname;
+    const configuredPublicBaseUrl = process.env.PUBLIC_BASE_URL?.trim();
+    if (configuredPublicBaseUrl) {
+      try {
+        const basePath = new URL(configuredPublicBaseUrl).pathname.replace(
+          /\/+$/,
+          ""
+        );
+        if (basePath && basePath !== "/" && pathname.startsWith(`${basePath}/`)) {
+          pathname = pathname.slice(basePath.length);
+        }
+      } catch {
+        // Ignore invalid local config and fall back to the raw public URL path.
+      }
+    }
+    const key = decodeURIComponent(pathname.replace(/^\/+/, ""));
+    return key || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
   const { baseUrl, apiKey } = getStorageConfig();
   const key = normalizeKey(relKey);
   return {

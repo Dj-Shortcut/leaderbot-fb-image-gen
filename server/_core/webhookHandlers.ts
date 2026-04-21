@@ -12,7 +12,10 @@ import {
 import { executeGenerationFlow } from "./generationFlow";
 import {
   clearPendingImageState,
+  declineFaceMemory,
   getOrCreateState,
+  rememberFaceSourceImage,
+  setFaceMemoryConsentGiven,
   setChosenStyle,
   setFlowState,
   setLastGenerated,
@@ -28,6 +31,13 @@ import {
   anonymizePsid,
   type ConversationState,
 } from "./messengerState";
+import {
+  FACE_MEMORY_CONSENT_NO,
+  FACE_MEMORY_CONSENT_YES,
+  deleteFaceMemoryForUser,
+  isFaceMemoryEnabled,
+  updateConsentedFaceMemorySource,
+} from "./faceMemory";
 import { normalizeLang, t, type Lang } from "./i18n";
 import { toLogUser, toUserKey } from "./privacy";
 import {
@@ -545,6 +555,32 @@ export function createWebhookHandlers({
     await sendStylePicker(psid, lang, reqId);
   }
 
+  async function sendFaceMemoryConsentPrompt(
+    psid: string,
+    lang: Lang,
+    reqId: string
+  ): Promise<void> {
+    await sendLoggedQuickReplies(
+      psid,
+      lang === "en"
+        ? "May I keep your photo for 30 days? Then you do not have to upload it again every time. You can delete it any time with \"delete my data\"."
+        : "Mag ik je foto 30 dagen bewaren? Dan hoef je niet steeds opnieuw te uploaden. Je kan dit altijd wissen met \"verwijder mijn data\".",
+      [
+        {
+          content_type: "text",
+          title: lang === "en" ? "Yes, 30 days" : "Ja, 30 dagen",
+          payload: FACE_MEMORY_CONSENT_YES,
+        },
+        {
+          content_type: "text",
+          title: lang === "en" ? "No" : "Nee",
+          payload: FACE_MEMORY_CONSENT_NO,
+        },
+      ],
+      reqId
+    );
+  }
+
   async function sendIntro(
     psid: string,
     lang: Lang,
@@ -821,6 +857,33 @@ export function createWebhookHandlers({
     reqId: string,
     lang: Lang
   ): Promise<void> {
+    if (
+      (payload === FACE_MEMORY_CONSENT_YES ||
+        payload === FACE_MEMORY_CONSENT_NO) &&
+      !isFaceMemoryEnabled()
+    ) {
+      await sendPhotoReceivedPrompt(psid, lang, reqId);
+      return;
+    }
+
+    if (payload === FACE_MEMORY_CONSENT_YES) {
+      const state = await getOrCreateState(psid);
+      const sourceImageUrl = state.pendingImageUrl ?? state.lastPhotoUrl;
+      if (sourceImageUrl) {
+        await rememberFaceSourceImage(psid, sourceImageUrl);
+      } else {
+        await setFaceMemoryConsentGiven(psid);
+      }
+      await sendPhotoReceivedPrompt(psid, lang, reqId);
+      return;
+    }
+
+    if (payload === FACE_MEMORY_CONSENT_NO) {
+      await declineFaceMemory(psid);
+      await sendPhotoReceivedPrompt(psid, lang, reqId);
+      return;
+    }
+
     await handleMessengerPayload({
       psid,
       userId,
@@ -922,6 +985,14 @@ export function createWebhookHandlers({
       storedSourceImageUrl,
     });
     await setPendingStoredImage(input.psid, storedSourceImageUrl);
+    if (isFaceMemoryEnabled()) {
+      if (state.faceMemoryConsent?.given) {
+        await updateConsentedFaceMemorySource(input.psid, storedSourceImageUrl);
+      } else if (!state.faceMemoryConsent) {
+        await sendFaceMemoryConsentPrompt(input.psid, input.lang, input.reqId);
+        return true;
+      }
+    }
 
     logImageFlowDecision({
       psid: input.psid,
@@ -1079,6 +1150,22 @@ export function createWebhookHandlers({
     const text = message.text;
     const trimmedText = text?.trim();
     if (!trimmedText) {
+      return;
+    }
+
+    const normalizedDeleteText = trimmedText.toLocaleLowerCase("nl-BE");
+    if (
+      normalizedDeleteText === "verwijder mijn data" ||
+      normalizedDeleteText === "delete my data"
+    ) {
+      await deleteFaceMemoryForUser(psid);
+      await sendLoggedText(
+        psid,
+        lang === "en"
+          ? "Your retained photo and face-memory data have been deleted."
+          : "Je bewaarde foto en face-memory data zijn gewist.",
+        reqId
+      );
       return;
     }
 

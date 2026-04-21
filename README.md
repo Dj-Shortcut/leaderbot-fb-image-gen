@@ -101,6 +101,7 @@ Bot core boundary and feature entrypoint: `server/_core/bot/index.ts` and `serve
 
 For a deeper explanation, see [`docs/architecture.md`](docs/architecture.md).
 Operational and audit notes live under [`docs/`](docs/).
+Optional face-memory retention is documented in [`docs/face-memory.md`](docs/face-memory.md).
 
 ## State model
 
@@ -163,6 +164,14 @@ WhatsApp now supports the same core customer journey as Messenger:
 - generated images are returned through the WhatsApp Cloud API image send endpoint
 
 Because the persisted source image is fetched again during generation, `SOURCE_IMAGE_ALLOWED_HOSTS` must include the hostname used for those stored source images. In local/dev setups this is usually the `APP_BASE_URL` host. In production it should include the public asset host returned by the storage layer.
+
+## Messenger face memory
+
+Messenger face memory is an optional 30-day source-photo reuse feature. It is disabled by default with `ENABLE_FACE_MEMORY=false` and must remain disabled until the consent copy, privacy policy, and deletion language are approved.
+
+When enabled, the first photo upload asks the user whether Leaderbot may keep the uploaded photo for 30 days. A positive answer stores consent metadata and the retained source-image URL. A negative answer keeps the normal one-photo flow without reusable face memory. Users can delete retained face-memory data by sending `verwijder mijn data` or `delete my data`. Stored source-image URLs are refreshed through the storage proxy before generation when the proxy is configured.
+
+For the full legal/ops checklist, rollout guidance, and kill-switch procedure, see [`docs/face-memory.md`](docs/face-memory.md).
 
 ## Quota model
 
@@ -228,6 +237,7 @@ Operational env shortlist: [`docs/operations/ENV_SHORTLIST.md`](docs/operations/
 - `OAUTH_SERVER_URL` (enables OAuth route initialization)
 - `LOG_LEVEL`, `DEBUG_STATE_DUMP`, `DEBUG_IMAGE_PROOF` (diagnostics)
 - `MESSENGER_QUOTA_BYPASS_IDS` (comma-separated PSIDs or hashed user keys that skip Messenger daily quota; intended for internal testing/admin)
+- `ENABLE_FACE_MEMORY` (`false` by default; enables explicit-consent 30-day Messenger source-photo reuse after legal approval)
 - `PORT` (default `8080`)
 - `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY` (used by the storage proxy contract; in production image generation these should point to the R2-backed proxy so generated Messenger attachment URLs are durable across Fly machines; they also gate `/api/chat`, which stays disabled and returns HTTP 503 when either is missing/blank)
 - `VITE_APP_ID`, `DATABASE_URL`, `OWNER_OPEN_ID`, `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY` (app/data integrations exposed via `server/_core/env.ts`)
@@ -374,6 +384,7 @@ Operational notes:
 - `WHATSAPP_ACCESS_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID` must be set in Fly secrets before deploy; startup now fails when either is missing.
 - Health check endpoint is `/healthz`.
 - `/metrics` exposes Prometheus-style request counters and latency histograms.
+- `/admin/disable-face-memory` is protected by `ADMIN_TOKEN` and clears retained face-memory state for emergency rollback.
 - Each request carries an `X-Request-Id` header for simple request tracing across logs and downstream calls.
 - The server accepts and returns `traceparent` so it can plug into OpenTelemetry-compatible tracing later without changing route behavior.
 - `APP_BASE_URL` must be publicly reachable in OpenAI mode so Messenger can fetch generated images from `/generated/<id>.png`.

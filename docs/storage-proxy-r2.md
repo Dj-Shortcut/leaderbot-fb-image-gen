@@ -38,6 +38,16 @@ Download URL response:
 { "url": "https://assets.example.com/generated/disco/123.jpg" }
 ```
 
+Delete request:
+
+- `DELETE /v1/storage/object?path=<object-key>`
+- Header: `Authorization: Bearer <FORGE_API_KEY>`
+
+Delete response:
+
+- `204 No Content` on success.
+- The main app uses this for retained source-photo deletion, including face-memory user deletion, expiry, and kill-switch cleanup.
+
 ## Proxy env vars
 
 Required:
@@ -62,6 +72,7 @@ Point the main app at the proxy:
 
 - `BUILT_IN_FORGE_API_URL=https://<your-storage-proxy-host>`
 - `BUILT_IN_FORGE_API_KEY=<same value as FORGE_API_KEY>`
+- `PUBLIC_BASE_URL=<same public asset base configured on the proxy>` if the public URL includes a path prefix, so the main app can derive object keys for deletion.
 
 ## How public URLs are formed
 
@@ -102,6 +113,13 @@ curl -X POST "https://storage-proxy.example.com/v1/storage/upload?path=generated
   -F "file=@./example.jpg;type=image/jpeg"
 ```
 
+## Example curl delete
+
+```bash
+curl -X DELETE "https://storage-proxy.example.com/v1/storage/object?path=inbound-source/example.jpg" \
+  -H "Authorization: Bearer $FORGE_API_KEY"
+```
+
 ## Production notes
 
 - Fly deploy target for this project is `leaderbot-storage-proxy`
@@ -110,3 +128,4 @@ curl -X POST "https://storage-proxy.example.com/v1/storage/upload?path=generated
 - The bucket must be readable at `PUBLIC_BASE_URL`.
 - The main app should only talk to the proxy, not directly to R2.
 - This removes Fly machine affinity from Messenger attachment delivery because the returned URL no longer depends on local machine memory or disk.
+- Retained source-image features depend on the delete endpoint for user-initiated deletion and emergency cleanup.
