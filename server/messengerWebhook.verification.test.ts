@@ -1,14 +1,40 @@
 import http from "node:http";
 import express from "express";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import {
+  verifyMetaWebhookSignature,
+} from "./_core/webhookSignatureVerification";
 
 vi.mock("express-rate-limit", () => ({
   default: () => (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
-async function getWebhook(path: string): Promise<{ status: number; payload: string }> {
+async function getWebhook(
+  path: string,
+  options: { includeSignatureMiddleware?: boolean } = {}
+): Promise<{
+  contentType: string;
+  payload: string;
+  signatureMiddlewareCalls: number;
+  status: number;
+}> {
   const { registerMetaWebhookRoutes } = await import("./_core/meta/webhookRoutes");
   const app = express();
+  let signatureMiddlewareCalls = 0;
+
+  if (options.includeSignatureMiddleware) {
+    app.use("/webhook", (req, res, next) => {
+      signatureMiddlewareCalls += 1;
+      verifyMetaWebhookSignature(req, res, next);
+    });
+  }
+
   registerMetaWebhookRoutes(app);
 
   const server = http.createServer(app);
@@ -20,7 +46,7 @@ async function getWebhook(path: string): Promise<{ status: number; payload: stri
     throw new Error("Failed to bind test server");
   }
 
-  const response = await new Promise<{ status: number; payload: string }>((resolve, reject) => {
+  const response = await new Promise<{ contentType: string; payload: string; status: number }>((resolve, reject) => {
     const request = http.request(
       {
         hostname: "127.0.0.1",
@@ -34,7 +60,11 @@ async function getWebhook(path: string): Promise<{ status: number; payload: stri
           payload += chunk;
         });
         res.on("end", () => {
-          resolve({ status: res.statusCode ?? 0, payload });
+          resolve({
+            contentType: String(res.headers["content-type"] ?? ""),
+            payload,
+            status: res.statusCode ?? 0,
+          });
         });
       },
     );
@@ -54,12 +84,13 @@ async function getWebhook(path: string): Promise<{ status: number; payload: stri
     });
   });
 
-  return response;
+  return { ...response, signatureMiddlewareCalls };
 }
 
 describe("messenger webhook verification route", () => {
   afterEach(() => {
     delete process.env.FB_VERIFY_TOKEN;
+    delete process.env.META_VERIFY_TOKEN;
   });
 
   it("fails closed when FB_VERIFY_TOKEN is missing", async () => {
@@ -89,5 +120,40 @@ describe("messenger webhook verification route", () => {
 
     expect(response.status).toBe(200);
     expect(response.payload).toBe("abc123");
+  });
+
+  it("returns the raw WhatsApp verification challenge as plain text", async () => {
+    process.env.META_VERIFY_TOKEN = "test-token";
+
+    const response = await getWebhook(
+      "/webhook/whatsapp?hub.mode=subscribe&hub.verify_token=test-token&hub.challenge=wa-abc123",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.contentType).toContain("text/plain");
+    expect(response.payload).toBe("wa-abc123");
+  });
+
+  it("allows WhatsApp GET verification through signature middleware without a signature header", async () => {
+    process.env.META_VERIFY_TOKEN = "test-token";
+
+    const response = await getWebhook(
+      "/webhook/whatsapp?hub.mode=subscribe&hub.verify_token=test-token&hub.challenge=wa-no-signature",
+      { includeSignatureMiddleware: true },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.payload).toBe("wa-no-signature");
+    expect(response.signatureMiddlewareCalls).toBe(1);
+  });
+
+  it("rejects WhatsApp verification with an invalid token", async () => {
+    process.env.META_VERIFY_TOKEN = "test-token";
+
+    const response = await getWebhook(
+      "/webhook/whatsapp?hub.mode=subscribe&hub.verify_token=wrong-token&hub.challenge=wa-abc123",
+    );
+
+    expect(response.status).toBe(403);
   });
 });

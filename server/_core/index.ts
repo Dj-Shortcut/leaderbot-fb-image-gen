@@ -340,16 +340,6 @@ async function startServer() {
     next();
   });
 
-  app.get('/webhook/whatsapp', (req, res) => {
-    const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = req.query
-    if (mode === 'subscribe' && token === process.env.META_VERIFY_TOKEN) {
-      return res.status(200).type('text/plain').send(challenge as string)
-    }
-    res.sendStatus(403)
-  })
-
-  app.post('/webhook/whatsapp', (_, res) => res.sendStatus(200))
-
   // Verify webhook signature for all Meta webhook deliveries.
   app.use("/webhook", verifyBotWebhookSignature);
 

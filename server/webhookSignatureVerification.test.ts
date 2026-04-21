@@ -12,7 +12,11 @@ function buildSignature(body: string, secret: string): string {
   return `sha256=${digest}`;
 }
 
-async function postWebhook(body: string, signature?: string): Promise<{ status: number; payload: string }> {
+async function postWebhook(
+  body: string,
+  signature?: string,
+  path = "/webhook/facebook"
+): Promise<{ status: number; payload: string }> {
   const app = express();
 
   app.use(
@@ -21,8 +25,12 @@ async function postWebhook(body: string, signature?: string): Promise<{ status: 
     })
   );
 
-  app.post("/webhook/facebook", verifyMetaWebhookSignature, (req: Request, res: Response) => {
-    res.status(200).json({ ok: true, object: (req.body as { object?: string }).object });
+  app.post("/webhook/:channel", verifyMetaWebhookSignature, (req: Request, res: Response) => {
+    res.status(200).json({
+      channel: req.params.channel,
+      ok: true,
+      object: (req.body as { object?: string }).object,
+    });
   });
 
   const server = http.createServer(app);
@@ -48,7 +56,7 @@ async function postWebhook(body: string, signature?: string): Promise<{ status: 
       {
         hostname: "127.0.0.1",
         port: address.port,
-        path: "/webhook/facebook",
+        path,
         method: "POST",
         headers,
       },
@@ -96,6 +104,16 @@ describe("Meta webhook signature verification", () => {
     expect(response.payload).toContain("Signature verification failed");
   });
 
+  it("rejects unsigned WhatsApp webhook requests", async () => {
+    process.env.FB_APP_SECRET = "test-secret";
+
+    const body = JSON.stringify({ object: "whatsapp_business_account", entry: [] });
+    const response = await postWebhook(body, undefined, "/webhook/whatsapp");
+
+    expect(response.status).toBe(403);
+    expect(response.payload).toContain("Signature verification failed");
+  });
+
   it("accepts webhook requests with a valid signature", async () => {
     const secret = "test-secret";
     process.env.FB_APP_SECRET = secret;
@@ -104,6 +122,22 @@ describe("Meta webhook signature verification", () => {
     const response = await postWebhook(body, buildSignature(body, secret));
 
     expect(response.status).toBe(200);
+    expect(response.payload).toContain('"ok":true');
+  });
+
+  it("allows signed WhatsApp webhook requests to reach the registered route", async () => {
+    const secret = "test-secret";
+    process.env.FB_APP_SECRET = secret;
+
+    const body = JSON.stringify({ object: "whatsapp_business_account", entry: [] });
+    const response = await postWebhook(
+      body,
+      buildSignature(body, secret),
+      "/webhook/whatsapp"
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.payload).toContain('"channel":"whatsapp"');
     expect(response.payload).toContain('"ok":true');
   });
 
