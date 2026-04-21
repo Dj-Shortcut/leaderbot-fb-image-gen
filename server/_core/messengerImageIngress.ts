@@ -24,7 +24,7 @@ export async function normalizeMessengerInboundImage(
       reqId: input.reqId,
       inboundImageUrl: input.inboundImageUrl,
       errorCode:
-        error instanceof Error ? error.constructor.name : String(error),
+        error instanceof Error ? error.constructor.name : "UnknownError",
     });
     return null;
   }
