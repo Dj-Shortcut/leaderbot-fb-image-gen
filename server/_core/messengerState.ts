@@ -100,6 +100,18 @@ const QUICK_REPLIES_BY_STATE: Record<ConversationState, StateQuickReply[]> = {
 
 type PartialState = Partial<MessengerUserState>;
 
+type StateNormalizationBase = {
+  resolvedPsid: string;
+  fallback: MessengerUserState;
+};
+
+type LegacyStateFields = {
+  stage: MessengerFlowState;
+  lastPhoto: string | null;
+  selectedStyle: string | null;
+  lastGeneratedUrl: string | null | undefined;
+};
+
 function looksLikeUserKey(value: string): boolean {
   return /^[a-f0-9]{64}$/i.test(value);
 }
@@ -146,13 +158,47 @@ function createDefaultState(psid: string, now = Date.now()): MessengerUserState 
   };
 }
 
-function normalizeState(psid: string, value: PartialState | null | undefined): MessengerUserState {
+function normalizeState(
+  psid: string,
+  value: PartialState | null | undefined
+): MessengerUserState {
+  const base = createStateNormalizationBase(psid, value);
+  const legacyFields = resolveLegacyStateFields(value, base.fallback);
+
+  return applyNormalizedStateShape(value, base, legacyFields);
+}
+
+function createStateNormalizationBase(
+  psid: string,
+  value: PartialState | null | undefined
+): StateNormalizationBase {
   const resolvedPsid = value?.psid ?? psid;
   const fallback = createDefaultState(resolvedPsid);
+  return { resolvedPsid, fallback };
+}
+
+function resolveLegacyStateFields(
+  value: PartialState | null | undefined,
+  fallback: MessengerUserState
+): LegacyStateFields {
   const stage = value?.stage ?? value?.state ?? fallback.stage;
-  const lastPhoto = value?.lastPhotoUrl ?? value?.lastPhoto ?? fallback.lastPhoto;
-  const selectedStyle = value?.selectedStyle ?? value?.chosenStyle ?? fallback.selectedStyle;
-  const lastGeneratedUrl = value?.lastGeneratedUrl ?? value?.lastImageUrl ?? fallback.lastGeneratedUrl;
+  const lastPhoto =
+    value?.lastPhotoUrl ?? value?.lastPhoto ?? fallback.lastPhoto;
+  const selectedStyle =
+    value?.selectedStyle ?? value?.chosenStyle ?? fallback.selectedStyle;
+  const lastGeneratedUrl =
+    value?.lastGeneratedUrl ?? value?.lastImageUrl ?? fallback.lastGeneratedUrl;
+
+  return { stage, lastPhoto, selectedStyle, lastGeneratedUrl };
+}
+
+function applyNormalizedStateShape(
+  value: PartialState | null | undefined,
+  base: StateNormalizationBase,
+  legacyFields: LegacyStateFields
+): MessengerUserState {
+  const { resolvedPsid, fallback } = base;
+  const { stage, lastPhoto, selectedStyle, lastGeneratedUrl } = legacyFields;
 
   return {
     ...fallback,
