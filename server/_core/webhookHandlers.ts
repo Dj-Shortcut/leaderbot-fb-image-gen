@@ -658,7 +658,18 @@ async function handleTextMessage(
   ctx: HandlerContext,
   input: TextMessageInput
 ): Promise<void> {
-  const normalizedMessage: NormalizedInboundMessage = {
+  const normalizedMessage = createNormalizedTextMessage(input);
+  logNormalizedTextHandoff(input, normalizedMessage);
+
+  const result = await handleSharedMessengerText(ctx, input, normalizedMessage);
+  await sendSharedMessengerTextResponse(ctx, input, result);
+  await applyTextAfterSend(result, input);
+}
+
+function createNormalizedTextMessage(
+  input: TextMessageInput
+): NormalizedInboundMessage {
+  return {
     channel: "messenger",
     senderId: input.psid,
     userId: input.userId,
@@ -666,14 +677,26 @@ async function handleTextMessage(
     textBody: input.text,
     timestamp: input.timestamp ?? Date.now(),
   };
+}
+
+function logNormalizedTextHandoff(
+  input: TextMessageInput,
+  normalizedMessage: NormalizedInboundMessage
+): void {
   console.log("[messenger webhook] normalized event handoff", {
     channel: normalizedMessage.channel,
     reqId: input.reqId,
     user: toLogUser(input.userId),
     messageType: normalizedMessage.messageType,
   });
+}
 
-  const result = await handleSharedTextMessage({
+async function handleSharedMessengerText(
+  ctx: HandlerContext,
+  input: TextMessageInput,
+  normalizedMessage: NormalizedInboundMessage
+) {
+  return await handleSharedTextMessage({
     message: normalizedMessage,
     reqId: input.reqId,
     lang: input.lang,
@@ -729,12 +752,25 @@ async function handleTextMessage(
       });
     },
   });
+}
+
+async function sendSharedMessengerTextResponse(
+  ctx: HandlerContext,
+  input: TextMessageInput,
+  result: Awaited<ReturnType<typeof handleSharedMessengerText>>
+): Promise<void> {
   await sendMessengerBotResponse(result.response, {
     replyState: result.replyState,
     sendText: text => ctx.sendLoggedText(input.psid, text, input.reqId),
     sendStateText: (stateName, text) =>
       ctx.sendStateQuickReplies(input.psid, stateName, text, input.reqId),
   });
+}
+
+async function applyTextAfterSend(
+  result: Awaited<ReturnType<typeof handleSharedMessengerText>>,
+  input: TextMessageInput
+): Promise<void> {
   if (result.afterSend === "markIntroSeen") {
     await Promise.resolve(markIntroSeen(input.psid));
   }
