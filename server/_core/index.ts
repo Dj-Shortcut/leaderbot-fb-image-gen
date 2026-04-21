@@ -588,14 +588,8 @@ async function startServer() {
     });
   }
 
-<<<<<<< HEAD
-  // Register webhook routes AFTER signature verification middleware
-  registerBotRoutes(app);
-  scheduleWebhookIngressDrain();
   scheduleFaceMemoryExpiry();
 
-=======
->>>>>>> main
   const oauthServerUrl = process.env.OAUTH_SERVER_URL;
   if (oauthServerUrl) {
     registerOAuthRoutes(app);
