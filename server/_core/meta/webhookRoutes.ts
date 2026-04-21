@@ -25,6 +25,13 @@ const webhookLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const webhookDeliveryLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 1_000,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 function getMetaVerifyToken(): string {
   return (
     process.env.META_VERIFY_TOKEN?.trim() ||
@@ -127,7 +134,7 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
     scheduleWebhookIngressDrain();
   };
 
-  app.post("/webhook", handleWebhookPost);
-  app.post("/webhook/facebook", handleWebhookPost);
-  app.post("/webhook/whatsapp", handleWebhookPost); // NIEUW
+  app.post("/webhook", webhookDeliveryLimiter, handleWebhookPost);
+  app.post("/webhook/facebook", webhookDeliveryLimiter, handleWebhookPost);
+  app.post("/webhook/whatsapp", webhookDeliveryLimiter, handleWebhookPost); // NIEUW
 }
