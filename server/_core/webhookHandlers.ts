@@ -101,6 +101,100 @@ type FeatureContextBase = Omit<
   BotPayloadContext,
   "payload"
 >;
+type MessengerState = Awaited<ReturnType<typeof getOrCreateState>>;
+
+type HandlerContext = {
+  defaultLang: Lang;
+  claimEventReplayOrLog: (
+    event: FacebookWebhookEvent,
+    entryId: string | undefined,
+    userId: string
+  ) => Promise<boolean>;
+  handlePayload: (
+    psid: string,
+    userId: string,
+    payload: string,
+    reqId: string,
+    lang: Lang
+  ) => Promise<void>;
+  handleReferralStyleEvent: (
+    psid: string,
+    referralRef: string | undefined,
+    lang: Lang,
+    reqId: string
+  ) => Promise<boolean>;
+  handleTextMessage: (input: {
+    psid: string;
+    userId: string;
+    reqId: string;
+    lang: Lang;
+    text: string;
+    timestamp: number;
+  }) => Promise<void>;
+  logIncomingMessage: (
+    psid: string,
+    userId: string,
+    event: FacebookWebhookEvent,
+    reqId: string
+  ) => void;
+  logUserState: (
+    psid: string,
+    userId: string,
+    state: MessengerState,
+    reqId: string,
+    context: string
+  ) => void;
+  maybeSendInFlightMessage: (psid: string, reqId: string) => Promise<boolean>;
+  sendLoggedImage: (
+    psid: string,
+    imageUrl: string,
+    reqId: string
+  ) => Promise<void>;
+  sendLoggedQuickReplies: (
+    psid: string,
+    text: string,
+    quickReplies: Array<{
+      content_type: "text";
+      title: string;
+      payload: string;
+    }>,
+    reqId: string
+  ) => Promise<void>;
+  sendLoggedText: (
+    psid: string,
+    text: string,
+    reqId: string
+  ) => Promise<void>;
+  sendStateQuickReplies: (
+    psid: string,
+    stateName: ConversationState,
+    text: string,
+    reqId: string
+  ) => Promise<void>;
+  tryHandleImageMessage: (input: {
+    psid: string;
+    userId: string;
+    reqId: string;
+    lang: Lang;
+    attachments: FacebookWebhookMessage["attachments"];
+  }) => Promise<boolean>;
+};
+
+type MessageEventInput = {
+  psid: string;
+  userId: string;
+  event: FacebookWebhookEvent;
+  reqId: string;
+  lang: Lang;
+};
+
+type PostbackEventInput = {
+  psid: string;
+  userId: string;
+  event: FacebookWebhookEvent;
+  reqId: string;
+  lang: Lang;
+};
 
 const IN_FLIGHT_MESSAGE =
   "\u23F3 even geduld, ik ben nog bezig met jouw restyle";
@@ -109,6 +203,208 @@ const MESSENGER_CAPABILITIES = Object.freeze({
   quickReplies: true,
   richTemplates: true,
 });
+
+async function handleEntry(
+  ctx: HandlerContext,
+  entry: FacebookWebhookEntry
+): Promise<void> {
+  const events = Array.isArray(entry?.messaging) ? entry.messaging : [];
+  for (const event of events) {
+    await handleEvent(ctx, event, entry?.id);
+  }
+}
+
+async function handleEvent(
+  ctx: HandlerContext,
+  event: FacebookWebhookEvent,
+  entryId?: string
+): Promise<void> {
+  const psid = event.sender?.id;
+  if (!psid) return;
+
+  const userId = toUserKey(psid);
+  const reqId = `${psid}-${Date.now()}`;
+
+  if (!(await ctx.claimEventReplayOrLog(event, entryId, userId))) {
+    return;
+  }
+
+  recordActiveUserToday(userId);
+  const senderLocale = event.sender?.locale?.trim();
+  const localeLang = senderLocale
+    ? normalizeLang(senderLocale)
+    : ctx.defaultLang;
+  const state = await getOrCreateState(psid);
+  ctx.logIncomingMessage(psid, userId, event, reqId);
+  ctx.logUserState(psid, userId, state, reqId, "handle_event");
+  const lang = state.preferredLang || localeLang || ctx.defaultLang;
+
+  if (senderLocale && localeLang !== state.preferredLang) {
+    await setPreferredLang(psid, localeLang);
+  }
+
+  const routeDeps = {
+    psid,
+    userId,
+    reqId,
+    sendText: (text: string) => ctx.sendLoggedText(psid, text, reqId),
+    sendStateText: (stateName: ConversationState, text: string) =>
+      ctx.sendStateQuickReplies(psid, stateName, text, reqId),
+    sendOptionsPrompt: async (
+      prompt: string,
+      options: Array<{ id: string; title: string }>,
+      _fallbackLogName: string | undefined,
+      _fallbackText: string | undefined
+    ) => {
+      await ctx.sendLoggedQuickReplies(
+        psid,
+        prompt,
+        options.map(option => ({
+          content_type: "text",
+          title: option.title,
+          payload: option.id,
+        })),
+        reqId
+      );
+    },
+    sendImage: (imageUrl: string) => ctx.sendLoggedImage(psid, imageUrl, reqId),
+    safeLog,
+    setLastEntryIntent: (nextEntryIntent: EntryIntent | null) =>
+      Promise.resolve(setLastEntryIntent(psid, nextEntryIntent)),
+    setActiveExperience: (nextActiveExperience: ActiveExperience | null) =>
+      Promise.resolve(setActiveExperience(psid, nextActiveExperience)),
+  };
+  const { referralRef, entryIntent } = parseMessengerEntryIntent({
+    event,
+    reqId,
+    userId,
+    localeLang,
+    safeLog,
+  });
+  if (
+    await routeMessengerEntryIntent({
+      deps: routeDeps,
+      state,
+      entryIntent,
+    })
+  ) {
+    return;
+  }
+
+  if (
+    await routeMessengerActiveExperience({
+      deps: routeDeps,
+      state,
+      event,
+    })
+  ) {
+    return;
+  }
+
+  if (await ctx.handleReferralStyleEvent(psid, referralRef, lang, reqId)) {
+    return;
+  }
+
+  if (
+    await handlePostbackEvent(ctx, {
+      psid,
+      userId,
+      event,
+      reqId,
+      lang,
+    })
+  ) {
+    return;
+  }
+
+  await handleMessageEvent(ctx, { psid, userId, event, reqId, lang });
+}
+
+async function handleMessageEvent(
+  ctx: HandlerContext,
+  input: MessageEventInput
+): Promise<void> {
+  const message = input.event.message;
+  if (!message || message.is_echo) return;
+  await setLastUserMessageAt(input.psid, input.event.timestamp ?? Date.now());
+
+  if (await ctx.maybeSendInFlightMessage(input.psid, input.reqId)) {
+    return;
+  }
+
+  const quickPayload = message.quick_reply?.payload;
+  if (quickPayload) {
+    await ctx.handlePayload(
+      input.psid,
+      input.userId,
+      quickPayload,
+      input.reqId,
+      input.lang
+    );
+    return;
+  }
+
+  if (
+    await ctx.tryHandleImageMessage({
+      psid: input.psid,
+      userId: input.userId,
+      reqId: input.reqId,
+      lang: input.lang,
+      attachments: message.attachments,
+    })
+  ) {
+    return;
+  }
+
+  const text = message.text;
+  const trimmedText = text?.trim();
+  if (!trimmedText) {
+    return;
+  }
+
+  const normalizedDeleteText = trimmedText.toLocaleLowerCase("nl-BE");
+  if (
+    normalizedDeleteText === "verwijder mijn data" ||
+    normalizedDeleteText === "delete my data"
+  ) {
+    await deleteFaceMemoryForUser(input.psid);
+    await ctx.sendLoggedText(
+      input.psid,
+      input.lang === "en"
+        ? "Your retained photo and face-memory data have been deleted."
+        : "Je bewaarde foto en face-memory data zijn gewist.",
+      input.reqId
+    );
+    return;
+  }
+
+  await ctx.handleTextMessage({
+    psid: input.psid,
+    userId: input.userId,
+    reqId: input.reqId,
+    lang: input.lang,
+    text: trimmedText,
+    timestamp: input.event.timestamp ?? Date.now(),
+  });
+}
+
+async function handlePostbackEvent(
+  ctx: HandlerContext,
+  input: PostbackEventInput
+): Promise<boolean> {
+  if (input.event.postback?.payload) {
+    await ctx.handlePayload(
+      input.psid,
+      input.userId,
+      input.event.postback.payload,
+      input.reqId,
+      input.lang
+    );
+    return true;
+  }
+
+  return false;
+}
 
 export function createWebhookHandlers({
   defaultLang,
@@ -1114,71 +1410,6 @@ export function createWebhookHandlers({
     }
   }
 
-  async function handleMessage(
-    psid: string,
-    userId: string,
-    event: FacebookWebhookEvent,
-    reqId: string,
-    lang: Lang
-  ): Promise<void> {
-    const message = event.message;
-    if (!message || message.is_echo) return;
-    await setLastUserMessageAt(psid, event.timestamp ?? Date.now());
-
-    if (await maybeSendInFlightMessage(psid, reqId)) {
-      return;
-    }
-
-    const quickPayload = message.quick_reply?.payload;
-    if (quickPayload) {
-      await handlePayload(psid, userId, quickPayload, reqId, lang);
-      return;
-    }
-
-    if (
-      await tryHandleImageMessage({
-        psid,
-        userId,
-        reqId,
-        lang,
-        attachments: message.attachments,
-      })
-    ) {
-      return;
-    }
-
-    const text = message.text;
-    const trimmedText = text?.trim();
-    if (!trimmedText) {
-      return;
-    }
-
-    const normalizedDeleteText = trimmedText.toLocaleLowerCase("nl-BE");
-    if (
-      normalizedDeleteText === "verwijder mijn data" ||
-      normalizedDeleteText === "delete my data"
-    ) {
-      await deleteFaceMemoryForUser(psid);
-      await sendLoggedText(
-        psid,
-        lang === "en"
-          ? "Your retained photo and face-memory data have been deleted."
-          : "Je bewaarde foto en face-memory data zijn gewist.",
-        reqId
-      );
-      return;
-    }
-
-    await handleTextMessage({
-      psid,
-      userId,
-      reqId,
-      lang,
-      text: trimmedText,
-      timestamp: event.timestamp ?? Date.now(),
-    });
-  }
-
   async function claimEventReplayOrLog(
     event: FacebookWebhookEvent,
     entryId: string | undefined,
@@ -1219,101 +1450,21 @@ export function createWebhookHandlers({
     return true;
   }
 
-  async function handleEvent(
-    event: FacebookWebhookEvent,
-    entryId?: string
-  ): Promise<void> {
-    const psid = event.sender?.id;
-    if (!psid) return;
-
-    const userId = toUserKey(psid);
-    const reqId = `${psid}-${Date.now()}`;
-
-    if (!(await claimEventReplayOrLog(event, entryId, userId))) {
-      return;
-    }
-
-    recordActiveUserToday(userId);
-    const senderLocale = event.sender?.locale?.trim();
-    const localeLang = senderLocale ? normalizeLang(senderLocale) : defaultLang;
-    const state = await getOrCreateState(psid);
-    logIncomingMessage(psid, userId, event, reqId);
-    logUserState(psid, userId, state, reqId, "handle_event");
-    const lang = state.preferredLang || localeLang || defaultLang;
-
-    if (senderLocale && localeLang !== state.preferredLang) {
-      await setPreferredLang(psid, localeLang);
-    }
-
-    const routeDeps = {
-      psid,
-      userId,
-      reqId,
-      sendText: (text: string) => sendLoggedText(psid, text, reqId),
-      sendStateText: (stateName: ConversationState, text: string) =>
-        sendStateQuickReplies(psid, stateName, text, reqId),
-      sendOptionsPrompt: async (
-        prompt: string,
-        options: Array<{ id: string; title: string }>,
-        _fallbackLogName: string | undefined,
-        _fallbackText: string | undefined
-      ) => {
-        await sendLoggedQuickReplies(
-          psid,
-          prompt,
-          options.map(option => ({
-            content_type: "text",
-            title: option.title,
-            payload: option.id,
-          })),
-          reqId
-        );
-      },
-      sendImage: (imageUrl: string) => sendLoggedImage(psid, imageUrl, reqId),
-      safeLog,
-      setLastEntryIntent: (nextEntryIntent: EntryIntent | null) =>
-        Promise.resolve(setLastEntryIntent(psid, nextEntryIntent)),
-      setActiveExperience: (nextActiveExperience: ActiveExperience | null) =>
-        Promise.resolve(setActiveExperience(psid, nextActiveExperience)),
-    };
-    const { referralRef, entryIntent } = parseMessengerEntryIntent({
-      event,
-      reqId,
-      userId,
-      localeLang,
-      safeLog,
-    });
-    if (
-      await routeMessengerEntryIntent({
-        deps: routeDeps,
-        state,
-        entryIntent,
-      })
-    ) {
-      return;
-    }
-
-    if (
-      await routeMessengerActiveExperience({
-        deps: routeDeps,
-        state,
-        event,
-      })
-    ) {
-      return;
-    }
-
-    if (await handleReferralStyleEvent(psid, referralRef, lang, reqId)) {
-      return;
-    }
-
-    if (event.postback?.payload) {
-      await handlePayload(psid, userId, event.postback.payload, reqId, lang);
-      return;
-    }
-
-    await handleMessage(psid, userId, event, reqId, lang);
-  }
+  const ctx: HandlerContext = {
+    defaultLang,
+    claimEventReplayOrLog,
+    handlePayload,
+    handleReferralStyleEvent,
+    handleTextMessage,
+    logIncomingMessage,
+    logUserState,
+    maybeSendInFlightMessage,
+    sendLoggedImage,
+    sendLoggedQuickReplies,
+    sendLoggedText,
+    sendStateQuickReplies,
+    tryHandleImageMessage,
+  };
 
   async function processFacebookWebhookPayload(
     payload: unknown
@@ -1325,10 +1476,7 @@ export function createWebhookHandlers({
       : [];
 
     for (const entry of entries) {
-      const events = Array.isArray(entry?.messaging) ? entry.messaging : [];
-      for (const event of events) {
-        await handleEvent(event, entry?.id);
-      }
+      await handleEntry(ctx, entry);
     }
   }
 
