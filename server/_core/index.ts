@@ -468,7 +468,7 @@ async function startServer() {
     </head>
     <body>
       <h1>Privacy Policy – Leaderbot</h1>
-      <p><strong>Last updated:</strong> 27 March 2026</p>
+      <p><strong>Last updated:</strong> 21 April 2026</p>
       <p>Leaderbot ("we", "our") is a Messenger-based service that transforms user-submitted images using AI styles.</p>
 
       <h2>What data we collect</h2>
