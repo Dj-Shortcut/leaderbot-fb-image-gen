@@ -110,10 +110,38 @@ type HandlerContext = {
     entryId: string | undefined,
     userId: string
   ) => Promise<boolean>;
-  handlePayload: (
+  createFeatureImageContext: (
     psid: string,
     userId: string,
-    payload: string,
+    reqId: string,
+    lang: Lang,
+    state: MessengerState,
+    imageUrl: string
+  ) => BotImageContext;
+  createFeaturePayloadContext: (
+    psid: string,
+    userId: string,
+    reqId: string,
+    lang: Lang,
+    state: MessengerState,
+    payload: string
+  ) => BotPayloadContext;
+  createFeatureTextContext: (
+    psid: string,
+    userId: string,
+    reqId: string,
+    lang: Lang,
+    state: MessengerState,
+    messageText: string,
+    normalizedText: string,
+    hasPhoto: boolean
+  ) => BotTextContext;
+  debugWebhookLog: (message: Record<string, unknown>) => void;
+  getAttachmentHostname: (url: string) => string | null;
+  handleStyleSelection: (
+    psid: string,
+    userId: string,
+    selectedStyle: Style,
     reqId: string,
     lang: Lang
   ) => Promise<void>;
@@ -123,14 +151,17 @@ type HandlerContext = {
     lang: Lang,
     reqId: string
   ) => Promise<boolean>;
-  handleTextMessage: (input: {
+  logImageFlowDecision: (input: {
     psid: string;
     userId: string;
     reqId: string;
-    lang: Lang;
-    text: string;
-    timestamp: number;
-  }) => Promise<void>;
+    stage: string;
+    hadPreviousPhoto: boolean;
+    incomingImageUrl: string;
+    selectedStyle: string | null;
+    preselectedStyle: string | null;
+    action: "show_style_picker" | "auto_run_preselected_style";
+  }) => void;
   logIncomingMessage: (
     psid: string,
     userId: string,
@@ -145,6 +176,25 @@ type HandlerContext = {
     context: string
   ) => void;
   maybeSendInFlightMessage: (psid: string, reqId: string) => Promise<boolean>;
+  runStyleGeneration: (
+    psid: string,
+    userId: string,
+    style: Style,
+    reqId: string,
+    lang: Lang,
+    sourceImageUrl?: string,
+    promptHint?: string
+  ) => Promise<void>;
+  sendFaceMemoryConsentPrompt: (
+    psid: string,
+    lang: Lang,
+    reqId: string
+  ) => Promise<void>;
+  sendFlowExplanation: (
+    psid: string,
+    lang: Lang,
+    reqId: string
+  ) => Promise<void>;
   sendLoggedImage: (
     psid: string,
     imageUrl: string,
@@ -165,19 +215,25 @@ type HandlerContext = {
     text: string,
     reqId: string
   ) => Promise<void>;
+  sendPhotoReceivedPrompt: (
+    psid: string,
+    lang: Lang,
+    reqId: string
+  ) => Promise<void>;
+  sendPrivacyInfo: (psid: string, lang: Lang, reqId: string) => Promise<void>;
   sendStateQuickReplies: (
     psid: string,
     stateName: ConversationState,
     text: string,
     reqId: string
   ) => Promise<void>;
-  tryHandleImageMessage: (input: {
-    psid: string;
-    userId: string;
-    reqId: string;
-    lang: Lang;
-    attachments: FacebookWebhookMessage["attachments"];
-  }) => Promise<boolean>;
+  sendStyleOptionsForCategory: (
+    psid: string,
+    category: StyleCategory,
+    lang: Lang,
+    reqId: string
+  ) => Promise<void>;
+  sendStylePicker: (psid: string, lang: Lang, reqId: string) => Promise<void>;
 };
 
 type MessageEventInput = {
@@ -194,6 +250,31 @@ type PostbackEventInput = {
   event: FacebookWebhookEvent;
   reqId: string;
   lang: Lang;
+};
+
+type PayloadFlowInput = {
+  psid: string;
+  userId: string;
+  payload: string;
+  reqId: string;
+  lang: Lang;
+};
+
+type ImageMessageInput = {
+  psid: string;
+  userId: string;
+  reqId: string;
+  lang: Lang;
+  attachments: FacebookWebhookMessage["attachments"];
+};
+
+type TextMessageInput = {
+  psid: string;
+  userId: string;
+  reqId: string;
+  lang: Lang;
+  text: string;
+  timestamp?: number;
 };
 
 const IN_FLIGHT_MESSAGE =
@@ -334,18 +415,18 @@ async function handleMessageEvent(
 
   const quickPayload = message.quick_reply?.payload;
   if (quickPayload) {
-    await ctx.handlePayload(
-      input.psid,
-      input.userId,
-      quickPayload,
-      input.reqId,
-      input.lang
-    );
+    await handlePayload(ctx, {
+      psid: input.psid,
+      userId: input.userId,
+      payload: quickPayload,
+      reqId: input.reqId,
+      lang: input.lang,
+    });
     return;
   }
 
   if (
-    await ctx.tryHandleImageMessage({
+    await tryHandleImageMessage(ctx, {
       psid: input.psid,
       userId: input.userId,
       reqId: input.reqId,
@@ -378,7 +459,7 @@ async function handleMessageEvent(
     return;
   }
 
-  await ctx.handleTextMessage({
+  await handleTextMessage(ctx, {
     psid: input.psid,
     userId: input.userId,
     reqId: input.reqId,
@@ -393,17 +474,270 @@ async function handlePostbackEvent(
   input: PostbackEventInput
 ): Promise<boolean> {
   if (input.event.postback?.payload) {
-    await ctx.handlePayload(
+    await handlePayload(ctx, {
+      psid: input.psid,
+      userId: input.userId,
+      payload: input.event.postback.payload,
+      reqId: input.reqId,
+      lang: input.lang,
+    });
+    return true;
+  }
+
+  return false;
+}
+
+async function handlePayload(
+  ctx: HandlerContext,
+  input: PayloadFlowInput
+): Promise<void> {
+  if (
+    (input.payload === FACE_MEMORY_CONSENT_YES ||
+      input.payload === FACE_MEMORY_CONSENT_NO) &&
+    !isFaceMemoryEnabled()
+  ) {
+    await ctx.sendPhotoReceivedPrompt(input.psid, input.lang, input.reqId);
+    return;
+  }
+
+  if (input.payload === FACE_MEMORY_CONSENT_YES) {
+    const state = await getOrCreateState(input.psid);
+    const sourceImageUrl = state.pendingImageUrl ?? state.lastPhotoUrl;
+    if (sourceImageUrl) {
+      await rememberFaceSourceImage(input.psid, sourceImageUrl);
+    } else {
+      await setFaceMemoryConsentGiven(input.psid);
+    }
+    await ctx.sendPhotoReceivedPrompt(input.psid, input.lang, input.reqId);
+    return;
+  }
+
+  if (input.payload === FACE_MEMORY_CONSENT_NO) {
+    await declineFaceMemory(input.psid);
+    await ctx.sendPhotoReceivedPrompt(input.psid, input.lang, input.reqId);
+    return;
+  }
+
+  await handleMessengerPayload({
+    psid: input.psid,
+    userId: input.userId,
+    payload: input.payload,
+    reqId: input.reqId,
+    lang: input.lang,
+    maybeSendInFlightMessage: ctx.maybeSendInFlightMessage,
+    getState: userPsid => Promise.resolve(getOrCreateState(userPsid)),
+    getFeatures: getBotFeatures,
+    createFeaturePayloadContext: ctx.createFeaturePayloadContext,
+    runStyleGeneration: ctx.runStyleGeneration,
+    handleStyleSelection: ctx.handleStyleSelection,
+    showStylePicker: async (userPsid, userLang, requestId) => {
+      await setPreselectedStyle(userPsid, null);
+      await setSelectedStyleCategory(userPsid, null);
+      await setFlowState(userPsid, "AWAITING_STYLE");
+      await ctx.sendStylePicker(userPsid, userLang, requestId);
+    },
+    showStyleCategory: async (userPsid, category, userLang, requestId) => {
+      await setSelectedStyleCategory(userPsid, category);
+      await setFlowState(userPsid, "AWAITING_STYLE");
+      await ctx.sendStyleOptionsForCategory(
+        userPsid,
+        category,
+        userLang,
+        requestId
+      );
+    },
+    sendFlowExplanation: ctx.sendFlowExplanation,
+    sendPrivacyInfo: ctx.sendPrivacyInfo,
+    sendUnknownPayloadLog: unknownUserId => {
+      safeLog("unknown_payload", { user: toLogUser(unknownUserId) });
+    },
+  });
+}
+
+async function tryHandleImageMessage(
+  ctx: HandlerContext,
+  input: ImageMessageInput
+): Promise<boolean> {
+  const imageAttachment = input.attachments?.find(
+    att => att.type === "image" && att.payload?.url
+  );
+  if (!imageAttachment?.payload?.url) {
+    return false;
+  }
+
+  const inboundImageUrl = imageAttachment.payload.url;
+  ctx.debugWebhookLog({
+    level: "debug",
+    msg: "photo_received",
+    reqId: input.reqId,
+    psidHash: anonymizePsid(input.psid).slice(0, 12),
+    hasAttachments: !!input.attachments,
+    attachmentHostname: ctx.getAttachmentHostname(inboundImageUrl),
+  });
+
+  const storedSourceImageUrl = await normalizeMessengerInboundImage({
+    inboundImageUrl,
+    psidHash: anonymizePsid(input.psid).slice(0, 12),
+    reqId: input.reqId,
+  });
+  if (!storedSourceImageUrl) {
+    await clearPendingImageState(input.psid);
+    await setFlowState(input.psid, "AWAITING_PHOTO");
+    await ctx.sendLoggedText(
+      input.psid,
+      t(input.lang, "missingInputImage"),
+      input.reqId
+    );
+    return true;
+  }
+
+  const state = await getOrCreateState(input.psid);
+  for (const feature of getBotFeatures()) {
+    const result = await feature.onImage?.(
+      ctx.createFeatureImageContext(
+        input.psid,
+        input.userId,
+        input.reqId,
+        input.lang,
+        state,
+        storedSourceImageUrl
+      )
+    );
+    if (result?.handled) {
+      return true;
+    }
+  }
+
+  ctx.logUserState(input.psid, input.userId, state, input.reqId, "image_received");
+  const imageDecision = getStoredMessengerImageDecision({
+    lastPhotoUrl: state.lastPhotoUrl,
+    preselectedStyle: state.preselectedStyle,
+    storedSourceImageUrl,
+  });
+  await setPendingStoredImage(input.psid, storedSourceImageUrl);
+  if (isFaceMemoryEnabled()) {
+    if (state.faceMemoryConsent?.given) {
+      await updateConsentedFaceMemorySource(input.psid, storedSourceImageUrl);
+    } else if (!state.faceMemoryConsent) {
+      await ctx.sendFaceMemoryConsentPrompt(input.psid, input.lang, input.reqId);
+      return true;
+    }
+  }
+
+  ctx.logImageFlowDecision({
+    psid: input.psid,
+    userId: input.userId,
+    reqId: input.reqId,
+    stage: state.stage,
+    hadPreviousPhoto: imageDecision.hadPreviousPhoto,
+    incomingImageUrl: imageDecision.incomingImageUrl,
+    selectedStyle: state.selectedStyle,
+    preselectedStyle: imageDecision.preselectedStyle,
+    action: imageDecision.action,
+  });
+
+  if (imageDecision.action === "auto_run_preselected_style") {
+    await setPreselectedStyle(input.psid, null);
+    await setChosenStyle(input.psid, imageDecision.preselectedStyle);
+    await ctx.runStyleGeneration(
       input.psid,
       input.userId,
-      input.event.postback.payload,
+      imageDecision.preselectedStyle,
       input.reqId,
       input.lang
     );
     return true;
   }
 
-  return false;
+  await setFlowState(input.psid, "AWAITING_STYLE");
+  await ctx.sendPhotoReceivedPrompt(input.psid, input.lang, input.reqId);
+  return true;
+}
+
+async function handleTextMessage(
+  ctx: HandlerContext,
+  input: TextMessageInput
+): Promise<void> {
+  const normalizedMessage: NormalizedInboundMessage = {
+    channel: "messenger",
+    senderId: input.psid,
+    userId: input.userId,
+    messageType: "text",
+    textBody: input.text,
+    timestamp: input.timestamp ?? Date.now(),
+  };
+  console.log("[messenger webhook] normalized event handoff", {
+    channel: normalizedMessage.channel,
+    reqId: input.reqId,
+    user: toLogUser(input.userId),
+    messageType: normalizedMessage.messageType,
+  });
+
+  const result = await handleSharedTextMessage({
+    message: normalizedMessage,
+    reqId: input.reqId,
+    lang: input.lang,
+    getState: () => Promise.resolve(getOrCreateState(input.psid)),
+    setFlowState: nextState =>
+      Promise.resolve(setFlowState(input.psid, nextState)),
+    runTextFeatures: async ({
+      state,
+      messageText,
+      normalizedText,
+      hasPhoto,
+    }) => {
+      for (const feature of getBotFeatures()) {
+        const result = await feature.onText?.(
+          ctx.createFeatureTextContext(
+            input.psid,
+            input.userId,
+            input.reqId,
+            input.lang,
+            state,
+            messageText,
+            normalizedText,
+            hasPhoto
+          )
+        );
+        if (result?.handled) {
+          return true;
+        }
+      }
+
+      return false;
+    },
+    logState: (state, context) => {
+      ctx.logUserState(input.psid, input.userId, state, input.reqId, context);
+    },
+    logAckIgnored: ack => {
+      safeLog("ack_ignored", { ack });
+    },
+    logRolloutDecision: rolloutDecision => {
+      safeLog("messenger_chat_engine_decision", {
+        user: toLogUser(input.userId),
+        engine: rolloutDecision.engine,
+        canaryPercent: rolloutDecision.canaryPercent,
+        bucket: rolloutDecision.bucket,
+        selected: rolloutDecision.useResponses ? "responses" : "legacy",
+      });
+    },
+    logEngineResult: ({ source, errorCode }) => {
+      safeLog("messenger_chat_engine_result", {
+        user: toLogUser(input.userId),
+        source,
+        ...(errorCode ? { errorCode } : {}),
+      });
+    },
+  });
+  await sendMessengerBotResponse(result.response, {
+    replyState: result.replyState,
+    sendText: text => ctx.sendLoggedText(input.psid, text, input.reqId),
+    sendStateText: (stateName, text) =>
+      ctx.sendStateQuickReplies(input.psid, stateName, text, input.reqId),
+  });
+  if (result.afterSend === "markIntroSeen") {
+    await Promise.resolve(markIntroSeen(input.psid));
+  }
 }
 
 export function createWebhookHandlers({
@@ -1146,270 +1480,6 @@ export function createWebhookHandlers({
     );
   }
 
-  async function handlePayload(
-    psid: string,
-    userId: string,
-    payload: string,
-    reqId: string,
-    lang: Lang
-  ): Promise<void> {
-    if (
-      (payload === FACE_MEMORY_CONSENT_YES ||
-        payload === FACE_MEMORY_CONSENT_NO) &&
-      !isFaceMemoryEnabled()
-    ) {
-      await sendPhotoReceivedPrompt(psid, lang, reqId);
-      return;
-    }
-
-    if (payload === FACE_MEMORY_CONSENT_YES) {
-      const state = await getOrCreateState(psid);
-      const sourceImageUrl = state.pendingImageUrl ?? state.lastPhotoUrl;
-      if (sourceImageUrl) {
-        await rememberFaceSourceImage(psid, sourceImageUrl);
-      } else {
-        await setFaceMemoryConsentGiven(psid);
-      }
-      await sendPhotoReceivedPrompt(psid, lang, reqId);
-      return;
-    }
-
-    if (payload === FACE_MEMORY_CONSENT_NO) {
-      await declineFaceMemory(psid);
-      await sendPhotoReceivedPrompt(psid, lang, reqId);
-      return;
-    }
-
-    await handleMessengerPayload({
-      psid,
-      userId,
-      payload,
-      reqId,
-      lang,
-      maybeSendInFlightMessage,
-      getState: userPsid => Promise.resolve(getOrCreateState(userPsid)),
-      getFeatures: getBotFeatures,
-      createFeaturePayloadContext,
-      runStyleGeneration,
-      handleStyleSelection,
-      showStylePicker: async (userPsid, userLang, requestId) => {
-        await setPreselectedStyle(userPsid, null);
-        await setSelectedStyleCategory(userPsid, null);
-        await setFlowState(userPsid, "AWAITING_STYLE");
-        await sendStylePicker(userPsid, userLang, requestId);
-      },
-      showStyleCategory: async (userPsid, category, userLang, requestId) => {
-        await setSelectedStyleCategory(userPsid, category);
-        await setFlowState(userPsid, "AWAITING_STYLE");
-        await sendStyleOptionsForCategory(
-          userPsid,
-          category,
-          userLang,
-          requestId
-        );
-      },
-      sendFlowExplanation: (userPsid, userLang, requestId) =>
-        sendLoggedText(userPsid, t(userLang, "flowExplanation"), requestId),
-      sendPrivacyInfo,
-      sendUnknownPayloadLog: unknownUserId => {
-        safeLog("unknown_payload", { user: toLogUser(unknownUserId) });
-      },
-    });
-  }
-
-  async function tryHandleImageMessage(input: {
-    psid: string;
-    userId: string;
-    reqId: string;
-    lang: Lang;
-    attachments: FacebookWebhookMessage["attachments"];
-  }): Promise<boolean> {
-    const imageAttachment = input.attachments?.find(
-      att => att.type === "image" && att.payload?.url
-    );
-    if (!imageAttachment?.payload?.url) {
-      return false;
-    }
-
-    const inboundImageUrl = imageAttachment.payload.url;
-    debugWebhookLog({
-      level: "debug",
-      msg: "photo_received",
-      reqId: input.reqId,
-      psidHash: anonymizePsid(input.psid).slice(0, 12),
-      hasAttachments: !!input.attachments,
-      attachmentHostname: getAttachmentHostname(inboundImageUrl),
-    });
-
-    const storedSourceImageUrl = await normalizeMessengerInboundImage({
-      inboundImageUrl,
-      psidHash: anonymizePsid(input.psid).slice(0, 12),
-      reqId: input.reqId,
-    });
-    if (!storedSourceImageUrl) {
-      await clearPendingImageState(input.psid);
-      await setFlowState(input.psid, "AWAITING_PHOTO");
-      await sendLoggedText(
-        input.psid,
-        t(input.lang, "missingInputImage"),
-        input.reqId
-      );
-      return true;
-    }
-
-    const state = await getOrCreateState(input.psid);
-    for (const feature of getBotFeatures()) {
-      const result = await feature.onImage?.(
-        createFeatureImageContext(
-          input.psid,
-          input.userId,
-          input.reqId,
-          input.lang,
-          state,
-          storedSourceImageUrl
-        )
-      );
-      if (result?.handled) {
-        return true;
-      }
-    }
-
-    logUserState(input.psid, input.userId, state, input.reqId, "image_received");
-    const imageDecision = getStoredMessengerImageDecision({
-      lastPhotoUrl: state.lastPhotoUrl,
-      preselectedStyle: state.preselectedStyle,
-      storedSourceImageUrl,
-    });
-    await setPendingStoredImage(input.psid, storedSourceImageUrl);
-    if (isFaceMemoryEnabled()) {
-      if (state.faceMemoryConsent?.given) {
-        await updateConsentedFaceMemorySource(input.psid, storedSourceImageUrl);
-      } else if (!state.faceMemoryConsent) {
-        await sendFaceMemoryConsentPrompt(input.psid, input.lang, input.reqId);
-        return true;
-      }
-    }
-
-    logImageFlowDecision({
-      psid: input.psid,
-      userId: input.userId,
-      reqId: input.reqId,
-      stage: state.stage,
-      hadPreviousPhoto: imageDecision.hadPreviousPhoto,
-      incomingImageUrl: imageDecision.incomingImageUrl,
-      selectedStyle: state.selectedStyle,
-      preselectedStyle: imageDecision.preselectedStyle,
-      action: imageDecision.action,
-    });
-
-    if (imageDecision.action === "auto_run_preselected_style") {
-      await setPreselectedStyle(input.psid, null);
-      await setChosenStyle(input.psid, imageDecision.preselectedStyle);
-      await runStyleGeneration(
-        input.psid,
-        input.userId,
-        imageDecision.preselectedStyle,
-        input.reqId,
-        input.lang
-      );
-      return true;
-    }
-
-    await setFlowState(input.psid, "AWAITING_STYLE");
-    await sendPhotoReceivedPrompt(input.psid, input.lang, input.reqId);
-    return true;
-  }
-
-  async function handleTextMessage(input: {
-    psid: string;
-    userId: string;
-    reqId: string;
-    lang: Lang;
-    text: string;
-    timestamp?: number;
-  }): Promise<void> {
-    const normalizedMessage: NormalizedInboundMessage = {
-      channel: "messenger",
-      senderId: input.psid,
-      userId: input.userId,
-      messageType: "text",
-      textBody: input.text,
-      timestamp: input.timestamp ?? Date.now(),
-    };
-    console.log("[messenger webhook] normalized event handoff", {
-      channel: normalizedMessage.channel,
-      reqId: input.reqId,
-      user: toLogUser(input.userId),
-      messageType: normalizedMessage.messageType,
-    });
-
-    const result = await handleSharedTextMessage({
-      message: normalizedMessage,
-      reqId: input.reqId,
-      lang: input.lang,
-      getState: () => Promise.resolve(getOrCreateState(input.psid)),
-      setFlowState: nextState =>
-        Promise.resolve(setFlowState(input.psid, nextState)),
-      runTextFeatures: async ({
-        state,
-        messageText,
-        normalizedText,
-        hasPhoto,
-      }) => {
-        for (const feature of getBotFeatures()) {
-          const result = await feature.onText?.(
-            createFeatureTextContext(
-              input.psid,
-              input.userId,
-              input.reqId,
-              input.lang,
-              state,
-              messageText,
-              normalizedText,
-              hasPhoto
-            )
-          );
-          if (result?.handled) {
-            return true;
-          }
-        }
-
-        return false;
-      },
-      logState: (state, context) => {
-        logUserState(input.psid, input.userId, state, input.reqId, context);
-      },
-      logAckIgnored: ack => {
-        safeLog("ack_ignored", { ack });
-      },
-      logRolloutDecision: rolloutDecision => {
-        safeLog("messenger_chat_engine_decision", {
-          user: toLogUser(input.userId),
-          engine: rolloutDecision.engine,
-          canaryPercent: rolloutDecision.canaryPercent,
-          bucket: rolloutDecision.bucket,
-          selected: rolloutDecision.useResponses ? "responses" : "legacy",
-        });
-      },
-      logEngineResult: ({ source, errorCode }) => {
-        safeLog("messenger_chat_engine_result", {
-          user: toLogUser(input.userId),
-          source,
-          ...(errorCode ? { errorCode } : {}),
-        });
-      },
-    });
-    await sendMessengerBotResponse(result.response, {
-      replyState: result.replyState,
-      sendText: text => sendLoggedText(input.psid, text, input.reqId),
-      sendStateText: (stateName, text) =>
-        sendStateQuickReplies(input.psid, stateName, text, input.reqId),
-    });
-    if (result.afterSend === "markIntroSeen") {
-      await Promise.resolve(markIntroSeen(input.psid));
-    }
-  }
-
   async function claimEventReplayOrLog(
     event: FacebookWebhookEvent,
     entryId: string | undefined,
@@ -1453,17 +1523,29 @@ export function createWebhookHandlers({
   const ctx: HandlerContext = {
     defaultLang,
     claimEventReplayOrLog,
-    handlePayload,
+    createFeatureImageContext,
+    createFeaturePayloadContext,
+    createFeatureTextContext,
+    debugWebhookLog,
+    getAttachmentHostname,
+    handleStyleSelection,
     handleReferralStyleEvent,
-    handleTextMessage,
+    logImageFlowDecision,
     logIncomingMessage,
     logUserState,
     maybeSendInFlightMessage,
+    runStyleGeneration,
+    sendFaceMemoryConsentPrompt,
+    sendFlowExplanation: (userPsid, userLang, requestId) =>
+      sendLoggedText(userPsid, t(userLang, "flowExplanation"), requestId),
     sendLoggedImage,
     sendLoggedQuickReplies,
     sendLoggedText,
+    sendPhotoReceivedPrompt,
+    sendPrivacyInfo,
     sendStateQuickReplies,
-    tryHandleImageMessage,
+    sendStyleOptionsForCategory,
+    sendStylePicker,
   };
 
   async function processFacebookWebhookPayload(
