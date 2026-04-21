@@ -11,8 +11,12 @@ import {
   verifyMetaWebhookSignature,
 } from "./_core/webhookSignatureVerification";
 
+const { rateLimitMock } = vi.hoisted(() => ({
+  rateLimitMock: vi.fn(() => (_req: unknown, _res: unknown, next: () => void) => next()),
+}));
+
 vi.mock("express-rate-limit", () => ({
-  default: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+  default: rateLimitMock,
 }));
 
 async function getWebhook(
@@ -91,6 +95,8 @@ describe("messenger webhook verification route", () => {
   afterEach(() => {
     delete process.env.FB_VERIFY_TOKEN;
     delete process.env.META_VERIFY_TOKEN;
+    vi.resetModules();
+    rateLimitMock.mockClear();
   });
 
   it("fails closed when FB_VERIFY_TOKEN is missing", async () => {
@@ -155,5 +161,21 @@ describe("messenger webhook verification route", () => {
     );
 
     expect(response.status).toBe(403);
+  });
+
+  it("registers a high-threshold limiter for webhook delivery routes", async () => {
+    const { registerMetaWebhookRoutes } = await import("./_core/meta/webhookRoutes");
+    const app = express();
+
+    registerMetaWebhookRoutes(app);
+
+    expect(rateLimitMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        legacyHeaders: false,
+        max: 1_000,
+        standardHeaders: true,
+        windowMs: 60_000,
+      })
+    );
   });
 });
