@@ -47,7 +47,7 @@ export async function deleteFaceMemoryForUser(psid: string): Promise<void> {
     return;
   }
 
-  const imageUrl = state.lastSourceImageUrl ?? state.lastPhotoUrl;
+  const imageUrl = state.lastSourceImageUrl;
   const deleted = await deleteStoredImageUrl(imageUrl);
   await clearFaceMemoryState(psid, Date.now(), deleted ? null : imageUrl ?? null);
 }

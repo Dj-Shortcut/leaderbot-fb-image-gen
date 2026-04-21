@@ -25,6 +25,13 @@ const webhookLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const webhookDeliveryLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 1_000,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 function getMetaVerifyToken(): string {
   return (
     process.env.META_VERIFY_TOKEN?.trim() ||
@@ -34,6 +41,7 @@ function getMetaVerifyToken(): string {
 }
 
 export function registerMetaWebhookRoutes(app: express.Express): void {
+
   const handleVerification: express.RequestHandler = (req, res) => {
     const configuredToken = getMetaVerifyToken();
     const parsedQuery = webhookVerificationQuerySchema.safeParse(req.query);
@@ -64,6 +72,7 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
 
   app.get("/webhook", webhookLimiter, handleVerification);
   app.get("/webhook/facebook", webhookLimiter, handleVerification);
+  app.get("/webhook/whatsapp", webhookLimiter, handleVerification); // NIEUW
 
   // Keep this dispatch branch local for now; it is the narrow seam for a later helper extraction.
   const handleWebhookPost: express.RequestHandler = async (req, res) => {
@@ -125,6 +134,7 @@ export function registerMetaWebhookRoutes(app: express.Express): void {
     scheduleWebhookIngressDrain();
   };
 
-  app.post("/webhook", handleWebhookPost);
-  app.post("/webhook/facebook", handleWebhookPost);
+  app.post("/webhook", webhookDeliveryLimiter, handleWebhookPost);
+  app.post("/webhook/facebook", webhookDeliveryLimiter, handleWebhookPost);
+  app.post("/webhook/whatsapp", webhookDeliveryLimiter, handleWebhookPost); // NIEUW
 }

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { registerMetaWebhookRoutes } from "./_core/meta/webhookRoutes";
 import { serveStatic } from "./_core/vite";
 
 const tempDirs: string[] = [];
@@ -47,6 +48,8 @@ async function listen(app: express.Express) {
 
 describe("serveStatic production mode", () => {
   afterEach(() => {
+    delete process.env.META_VERIFY_TOKEN;
+
     for (const dir of tempDirs.splice(0, tempDirs.length)) {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -85,6 +88,31 @@ describe("serveStatic production mode", () => {
       });
       expect(webhookResponse.status).toBe(200);
       expect(await webhookResponse.json()).toEqual({ received: true });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("keeps WhatsApp webhook verification ahead of the SPA fallback", async () => {
+    const app = express();
+    const staticDir = createTempBuild();
+    process.env.META_VERIFY_TOKEN = "test-token";
+
+    registerMetaWebhookRoutes(app);
+    serveStatic(app, staticDir);
+
+    const server = await listen(app);
+
+    try {
+      const response = await fetch(
+        `${server.baseUrl}/webhook/whatsapp?hub.mode=subscribe&hub.verify_token=test-token&hub.challenge=wa-static-order`
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("text/plain");
+      const payload = await response.text();
+      expect(payload).toBe("wa-static-order");
+      expect(payload).not.toContain("Landing UI");
     } finally {
       await server.close();
     }

@@ -348,6 +348,11 @@ async function startServer() {
   // Verify webhook signature for all Meta webhook deliveries.
   app.use("/webhook", verifyBotWebhookSignature);
 
+  // Register webhook routes AFTER signature verification middleware
+  // but BEFORE static files and catch-all routes.
+  registerBotRoutes(app);
+  scheduleWebhookIngressDrain();
+
   app.use((req, res, next) => {
     const startTime = process.hrtime.bigint();
 
@@ -583,11 +588,14 @@ async function startServer() {
     });
   }
 
+<<<<<<< HEAD
   // Register webhook routes AFTER signature verification middleware
   registerBotRoutes(app);
   scheduleWebhookIngressDrain();
   scheduleFaceMemoryExpiry();
 
+=======
+>>>>>>> main
   const oauthServerUrl = process.env.OAUTH_SERVER_URL;
   if (oauthServerUrl) {
     registerOAuthRoutes(app);
