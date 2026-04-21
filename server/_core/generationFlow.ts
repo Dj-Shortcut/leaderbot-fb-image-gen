@@ -92,7 +92,14 @@ async function resolveStoredRuntimeSourceUrl(input: {
   }
 
   const storageKey = storageKeyFromPublicUrl(originalSourceImageUrl);
-  if (!storageKey || !process.env.BUILT_IN_FORGE_API_URL?.trim()) {
+  if (!storageKey) {
+    return {
+      resolvedSourceImageUrl: originalSourceImageUrl,
+      trustedSourceImageUrl: false,
+    };
+  }
+
+  if (!process.env.BUILT_IN_FORGE_API_URL?.trim()) {
     return {
       resolvedSourceImageUrl: originalSourceImageUrl,
       trustedSourceImageUrl: true,

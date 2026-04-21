@@ -21,8 +21,12 @@ vi.mock("./_core/imageService", () => ({
 vi.mock("./storage", () => ({
   storageGet: storageGetMock,
   storageKeyFromPublicUrl: (publicUrl: string) => {
-    const parsed = new URL(publicUrl);
-    return decodeURIComponent(parsed.pathname.replace(/^\/+/, "")) || null;
+    try {
+      const parsed = new URL(publicUrl);
+      return decodeURIComponent(parsed.pathname.replace(/^\/+/, "")) || null;
+    } catch {
+      return null;
+    }
   },
 }));
 
@@ -142,6 +146,27 @@ describe("generationFlow", () => {
         sourceImageProvenance: "storeInbound",
       })
     );
+  });
+
+  it("does not trust stored source image URLs when no storage key can be derived", async () => {
+    process.env.BUILT_IN_FORGE_API_URL = "https://forge.example";
+
+    const result = await executeGenerationFlow({
+      style: "cyberpunk",
+      userId: "user-1",
+      reqId: "req-1",
+      lastPhotoUrl: "not-a-valid-url",
+      lastPhotoSource: "stored",
+    });
+
+    expect(result).toMatchObject({
+      kind: "error",
+      errorKind: "invalid_source_image",
+      resolvedSourceImageUrl: "not-a-valid-url",
+      trustedSourceImageUrl: false,
+    });
+    expect(storageGetMock).not.toHaveBeenCalled();
+    expect(createImageGeneratorMock).not.toHaveBeenCalled();
   });
 
   it("classifies mapped generator failures", async () => {

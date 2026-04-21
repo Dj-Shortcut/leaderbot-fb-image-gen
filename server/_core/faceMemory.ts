@@ -4,6 +4,7 @@ import {
   getState,
   getOrCreateState,
   rememberFaceSourceImage,
+  setPendingSourceImageDeleteUrl,
   type MessengerUserState,
 } from "./messengerState";
 import { forEachStoredState } from "./stateStore";
@@ -47,19 +48,26 @@ export async function deleteFaceMemoryForUser(psid: string): Promise<void> {
     return;
   }
 
-  const imageUrl = state.lastSourceImageUrl;
-  const deleted = await deleteStoredImageUrl(imageUrl);
-  await clearFaceMemoryState(psid, Date.now(), deleted ? null : imageUrl ?? null);
+  const urlsToDelete = [
+    state.pendingSourceImageDeleteUrl,
+    state.lastSourceImageUrl,
+  ].filter((url): url is string => Boolean(url));
+  let pendingDeleteUrl: string | null = null;
+
+  for (const imageUrl of new Set(urlsToDelete)) {
+    const deleted = await deleteStoredImageUrl(imageUrl);
+    if (!deleted && !pendingDeleteUrl) {
+      pendingDeleteUrl = imageUrl;
+    }
+  }
+
+  await clearFaceMemoryState(psid, Date.now(), pendingDeleteUrl);
 }
 
 export async function expireFaceMemory(
   now = Date.now(),
   options: { force?: boolean; matchAll?: boolean } = {}
 ): Promise<number> {
-  if (!options.force && !isFaceMemoryEnabled()) {
-    return 0;
-  }
-
   const finiteNow = Number.isFinite(now) ? now : Date.now();
   const expiredBefore = options.matchAll
     ? Number.POSITIVE_INFINITY
@@ -76,7 +84,11 @@ export async function expireFaceMemory(
     }
 
     const updatedAt = state.lastSourceImageUpdatedAt;
-    if (!updatedAt || updatedAt >= expiredBefore) {
+    const shouldClear = options.matchAll
+      ? Boolean(state.faceMemoryConsent || state.lastSourceImageUrl)
+      : Boolean(updatedAt && updatedAt < expiredBefore);
+
+    if (!shouldClear) {
       return;
     }
 
@@ -103,10 +115,10 @@ export async function updateConsentedFaceMemorySource(
   const state = await getOrCreateState(psid);
   if (state.faceMemoryConsent?.given) {
     const deleted = await deleteStoredImageUrl(state.lastSourceImageUrl);
-    if (!deleted && state.lastSourceImageUrl) {
-      await clearFaceMemoryState(psid, Date.now(), state.lastSourceImageUrl);
-    }
     await rememberFaceSourceImage(psid, imageUrl);
+    if (!deleted && state.lastSourceImageUrl) {
+      await setPendingSourceImageDeleteUrl(psid, state.lastSourceImageUrl);
+    }
   }
 }
 

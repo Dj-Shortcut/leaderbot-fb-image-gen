@@ -15,16 +15,22 @@ vi.mock("./storage", () => ({
   },
 }));
 
-import { deleteFaceMemoryForUser } from "./_core/faceMemory";
+import {
+  deleteFaceMemoryForUser,
+  expireFaceMemory,
+  updateConsentedFaceMemorySource,
+} from "./_core/faceMemory";
 import {
   getState,
   rememberFaceSourceImage,
   resetStateStore,
   setPendingStoredImage,
 } from "./_core/messengerState";
+import { writeState } from "./_core/stateStore";
 
 describe("face memory deletion", () => {
   const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
+  const originalEnableFaceMemory = process.env.ENABLE_FACE_MEMORY;
 
   beforeEach(() => {
     process.env.PRIVACY_PEPPER = "ci-test-pepper";
@@ -38,6 +44,11 @@ describe("face memory deletion", () => {
       delete process.env.PRIVACY_PEPPER;
     } else {
       process.env.PRIVACY_PEPPER = originalPrivacyPepper;
+    }
+    if (originalEnableFaceMemory === undefined) {
+      delete process.env.ENABLE_FACE_MEMORY;
+    } else {
+      process.env.ENABLE_FACE_MEMORY = originalEnableFaceMemory;
     }
   });
 
@@ -84,5 +95,67 @@ describe("face memory deletion", () => {
     expect(state?.lastSourceImageUpdatedAt).toBeNull();
     expect(state?.lastPhotoUrl).toBeNull();
     expect(state?.pendingSourceImageDeleteUrl).toBe(sourceUrl);
+  });
+
+  it("preserves existing pending delete markers during user deletion", async () => {
+    const pendingUrl = "https://assets.example/generated/pending-source.jpg";
+    storageDeleteMock.mockRejectedValueOnce(new Error("still unavailable"));
+    writeState("user-4", {
+      pendingSourceImageDeleteUrl: pendingUrl,
+    });
+
+    await deleteFaceMemoryForUser("user-4");
+
+    const state = await getState("user-4");
+    expect(storageDeleteMock).toHaveBeenCalledWith("generated/pending-source.jpg");
+    expect(state?.pendingSourceImageDeleteUrl).toBe(pendingUrl);
+  });
+
+  it("runs retention cleanup even when new face-memory capture is disabled", async () => {
+    delete process.env.ENABLE_FACE_MEMORY;
+    const oldSourceUrl = "https://assets.example/generated/old-source.jpg";
+    const now = Date.now();
+    writeState("user-5", {
+      faceMemoryConsent: { given: true, timestamp: now - 40, version: "v1" },
+      lastSourceImageUrl: oldSourceUrl,
+      lastSourceImageUpdatedAt: now - 31 * 24 * 60 * 60 * 1000,
+    });
+
+    const deleted = await expireFaceMemory(now);
+
+    const state = await getState("user-5");
+    expect(deleted).toBe(1);
+    expect(storageDeleteMock).toHaveBeenCalledWith("generated/old-source.jpg");
+    expect(state?.faceMemoryConsent).toBeNull();
+    expect(state?.lastSourceImageUrl).toBeNull();
+  });
+
+  it("clears consent-only records during match-all cleanup", async () => {
+    const now = Date.now();
+    writeState("user-6", {
+      faceMemoryConsent: { given: true, timestamp: now, version: "v1" },
+    });
+
+    await expireFaceMemory(now, { force: true, matchAll: true });
+
+    const state = await getState("user-6");
+    expect(storageDeleteMock).not.toHaveBeenCalled();
+    expect(state?.faceMemoryConsent).toBeNull();
+    expect(state?.lastSourceImageUrl).toBeNull();
+  });
+
+  it("preserves failed old-source delete marker when rotating retained source", async () => {
+    process.env.ENABLE_FACE_MEMORY = "true";
+    const oldSourceUrl = "https://assets.example/generated/old-rotate-source.jpg";
+    const newSourceUrl = "https://assets.example/generated/new-rotate-source.jpg";
+    await rememberFaceSourceImage("user-7", oldSourceUrl, Date.now());
+    storageDeleteMock.mockRejectedValueOnce(new Error("old source unavailable"));
+
+    await updateConsentedFaceMemorySource("user-7", newSourceUrl);
+
+    const state = await getState("user-7");
+    expect(storageDeleteMock).toHaveBeenCalledWith("generated/old-rotate-source.jpg");
+    expect(state?.lastSourceImageUrl).toBe(newSourceUrl);
+    expect(state?.pendingSourceImageDeleteUrl).toBe(oldSourceUrl);
   });
 });

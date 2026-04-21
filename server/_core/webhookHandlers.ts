@@ -857,6 +857,15 @@ export function createWebhookHandlers({
     reqId: string,
     lang: Lang
   ): Promise<void> {
+    if (
+      (payload === FACE_MEMORY_CONSENT_YES ||
+        payload === FACE_MEMORY_CONSENT_NO) &&
+      !isFaceMemoryEnabled()
+    ) {
+      await sendPhotoReceivedPrompt(psid, lang, reqId);
+      return;
+    }
+
     if (payload === FACE_MEMORY_CONSENT_YES) {
       const state = await getOrCreateState(psid);
       const sourceImageUrl = state.pendingImageUrl ?? state.lastPhotoUrl;

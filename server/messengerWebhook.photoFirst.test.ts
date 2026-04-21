@@ -257,6 +257,36 @@ describe("photo-first onboarding", () => {
     expect(userState?.lastSourceImageUrl).toBeNull();
   });
 
+  it("ignores stale face-memory consent payloads when the feature is disabled", async () => {
+    delete process.env.ENABLE_FACE_MEMORY;
+    const psid = "face-memory-disabled-consent-user";
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-face-memory-disabled-yes",
+                quick_reply: { payload: "CONSENT_FACE_YES" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const userState = getState(anonymizePsid(psid));
+    expect(userState?.faceMemoryConsent).toBeNull();
+    expect(userState?.lastSourceImageUrl).toBeNull();
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      psid,
+      expect.stringContaining("Kies eerst een stijlgroep"),
+      expect.any(Array)
+    );
+  });
+
   it("shows intro once and moves user to AWAITING_PHOTO", async () => {
     const psid = "text-user";
 

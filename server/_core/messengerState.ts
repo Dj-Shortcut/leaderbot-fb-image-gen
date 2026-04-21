@@ -494,6 +494,24 @@ export function clearFaceMemoryState(
   }
 }
 
+export function setPendingSourceImageDeleteUrl(
+  psid: string,
+  pendingDeleteUrl: string,
+  now = Date.now()
+): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      pendingSourceImageDeleteUrl: pendingDeleteUrl,
+    },
+    now
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
+}
+
 export function clearPendingImageState(psid: string, now = Date.now()): MaybePromise<MessengerUserState> {
   return patchState(
     psid,
