@@ -45,8 +45,22 @@ export async function deleteUserData(psid: string): Promise<void> {
 
   const urls = Array.from(new Set(getStateImageUrls(state)));
 
-  await deleteFaceMemoryForUser(psid);
+  const runStep = async (step: string, fn: () => Promise<void>) => {
+    try {
+      await fn();
+    } catch (error) {
+      safeLog("user_data_delete_step_failed", {
+        psid,
+        step,
+        errorCode: error instanceof Error ? error.constructor.name : "UnknownError",
+      });
+    }
+  };
+
+  await runStep("face_memory", () => deleteFaceMemoryForUser(psid));
   await Promise.all(urls.map(url => deleteStoredUrl(psid, url)));
-  await clearMessengerChatHistory(state.userKey);
+  await runStep("chat_history", () =>
+    Promise.resolve(clearMessengerChatHistory(state.userKey))
+  );
   await Promise.resolve(clearUserState(psid));
 }

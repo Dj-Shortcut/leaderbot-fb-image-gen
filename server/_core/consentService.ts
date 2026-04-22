@@ -98,7 +98,7 @@ function deleteReplies(lang: Lang): QuickReply[] {
     },
     {
       content_type: "text",
-      title: "Cancel",
+      title: lang === "en" ? "Cancel" : "Annuleer",
       payload: GDPR_DELETE_CANCEL,
     },
   ];
@@ -125,7 +125,7 @@ function whatsAppDeleteButtons(lang: Lang): Array<{ id: string; title: string }>
     },
     {
       id: GDPR_DELETE_CANCEL,
-      title: "Cancel",
+      title: lang === "en" ? "Cancel" : "Annuleer",
     },
   ];
 }

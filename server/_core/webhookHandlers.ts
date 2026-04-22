@@ -317,8 +317,12 @@ async function handleEvent(
     : ctx.defaultLang;
   const state = await getOrCreateState(psid);
   const lang = state.preferredLang || localeLang || ctx.defaultLang;
+  const isInboundUserEvent = Boolean(
+    event.postback || (event.message && !event.message.is_echo)
+  );
 
   if (
+    isInboundUserEvent &&
     await handleMessengerConsentGate({
       psid,
       lang,

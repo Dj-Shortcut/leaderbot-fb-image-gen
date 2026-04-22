@@ -36,19 +36,6 @@ export async function processWhatsAppWebhookPayload(
     };
     const state = await Promise.resolve(getOrCreateState(event.senderId));
 
-    if (
-      await handleWhatsAppConsentGate({
-        event,
-        lang: context.lang,
-        state,
-        sendText: text => sendWhatsAppTextReply(event.senderId, text),
-        sendButtons: (text, options) =>
-          sendWhatsAppButtonsReply(event.senderId, text, options),
-      })
-    ) {
-      continue;
-    }
-
     console.log("[whatsapp webhook] normalized inbound event", {
       channel: event.channel,
       user: toLogUser(event.userId),
@@ -61,6 +48,19 @@ export async function processWhatsAppWebhookPayload(
     );
 
     try {
+      if (
+        await handleWhatsAppConsentGate({
+          event,
+          lang: context.lang,
+          state,
+          sendText: text => sendWhatsAppTextReply(event.senderId, text),
+          sendButtons: (text, options) =>
+            sendWhatsAppButtonsReply(event.senderId, text, options),
+        })
+      ) {
+        continue;
+      }
+
       if (await handleWhatsAppExperienceRouting(event)) {
         continue;
       }
