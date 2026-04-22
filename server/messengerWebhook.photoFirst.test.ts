@@ -25,13 +25,24 @@ vi.mock("./_core/messengerApi", () => ({
   safeLog: safeLogMock,
 }));
 
-import { processFacebookWebhookPayload, resetMessengerEventDedupe } from "./_core/messengerWebhook";
+import {
+  processFacebookWebhookPayload as processFacebookWebhookPayloadBase,
+  resetMessengerEventDedupe,
+} from "./_core/messengerWebhook";
 import { anonymizePsid, getState, resetStateStore } from "./_core/messengerState";
 import { setSourceImageDnsLookupForTests } from "./_core/image-generation/sourceImageFetcher";
+import { processConsentedFacebookWebhookPayload } from "./testConsentHelpers";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
 const originalEnableFaceMemory = process.env.ENABLE_FACE_MEMORY;
+
+function processFacebookWebhookPayload(payload: unknown): Promise<void> {
+  return processConsentedFacebookWebhookPayload(
+    processFacebookWebhookPayloadBase,
+    payload
+  );
+}
 
 describe("photo-first onboarding", () => {
   beforeAll(() => {

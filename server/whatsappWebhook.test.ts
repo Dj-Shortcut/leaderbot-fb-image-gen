@@ -27,7 +27,7 @@ import {
   OpenAiImageGenerator,
 } from "./_core/imageService";
 import {
-  processWhatsAppWebhookPayload,
+  processWhatsAppWebhookPayload as processWhatsAppWebhookPayloadBase,
   resetMessengerEventDedupe,
 } from "./_core/messengerWebhook";
 import { t } from "./_core/i18n";
@@ -38,12 +38,20 @@ import {
   setFlowState,
 } from "./_core/messengerState";
 import { buildStateResponseText } from "./_core/stateResponseText";
+import { processConsentedWhatsAppWebhookPayload } from "./testConsentHelpers";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
 const originalAppBaseUrl = process.env.APP_BASE_URL;
 const originalAllowedHosts = process.env.SOURCE_IMAGE_ALLOWED_HOSTS;
 const originalOpenAiKey = process.env.OPENAI_API_KEY;
+
+function processWhatsAppWebhookPayload(payload: unknown): Promise<void> {
+  return processConsentedWhatsAppWebhookPayload(
+    processWhatsAppWebhookPayloadBase,
+    payload
+  );
+}
 
 function createWhatsAppPayload(message: Record<string, unknown>) {
   return {

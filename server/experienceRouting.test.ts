@@ -33,6 +33,7 @@ import {
   getState,
   resetStateStore,
 } from "./_core/messengerState";
+import { processConsentedFacebookWebhookPayload } from "./testConsentHelpers";
 
 describe("identity-ai-v1 routing", () => {
   let psidSeq = 0;
@@ -51,7 +52,7 @@ describe("identity-ai-v1 routing", () => {
   it("auto-start deep links send question 1 immediately without touching legacy style state", async () => {
     const psid = mkPsid("identity-ai-v1-deep-link-user");
 
-    await messengerWebhook.processFacebookWebhookPayload({
+    await processConsentedFacebookWebhookPayload(messengerWebhook.processFacebookWebhookPayload, {
       entry: [
         {
           messaging: [
@@ -106,7 +107,7 @@ describe("identity-ai-v1 routing", () => {
   it("starts Identity AI V1 from a bare ref value like the m.me deep-link payload", async () => {
     const psid = mkPsid("identity-ai-v1-bare-ref-user");
 
-    await messengerWebhook.processFacebookWebhookPayload({
+    await processConsentedFacebookWebhookPayload(messengerWebhook.processFacebookWebhookPayload, {
       entry: [
         {
           messaging: [
@@ -610,7 +611,7 @@ describe("identity-ai-v1 routing", () => {
   it("keeps mandatory routing order by letting the active game win over legacy commands", async () => {
     const psid = mkPsid("identity-ai-v1-routing-order-user");
 
-    await messengerWebhook.processFacebookWebhookPayload({
+    await processConsentedFacebookWebhookPayload(messengerWebhook.processFacebookWebhookPayload, {
       entry: [
         {
           messaging: [
@@ -631,7 +632,7 @@ describe("identity-ai-v1 routing", () => {
     sendTextMock.mockClear();
     sendQuickRepliesMock.mockClear();
 
-    await messengerWebhook.processFacebookWebhookPayload({
+    await processConsentedFacebookWebhookPayload(messengerWebhook.processFacebookWebhookPayload, {
       entry: [
         {
           messaging: [
@@ -1387,7 +1388,7 @@ describe("identity-ai-v1 routing", () => {
       });
 
     try {
-      await messengerWebhook.processFacebookWebhookPayload({
+      await processConsentedFacebookWebhookPayload(messengerWebhook.processFacebookWebhookPayload, {
         entry: [
           {
             messaging: [
@@ -1405,7 +1406,7 @@ describe("identity-ai-v1 routing", () => {
         ],
       });
 
-      await messengerWebhook.processFacebookWebhookPayload({
+      await processConsentedFacebookWebhookPayload(messengerWebhook.processFacebookWebhookPayload, {
         entry: [
           {
             messaging: [
@@ -1420,7 +1421,7 @@ describe("identity-ai-v1 routing", () => {
           },
         ],
       });
-      await messengerWebhook.processFacebookWebhookPayload({
+      await processConsentedFacebookWebhookPayload(messengerWebhook.processFacebookWebhookPayload, {
         entry: [
           {
             messaging: [
@@ -1439,7 +1440,7 @@ describe("identity-ai-v1 routing", () => {
       sendTextMock.mockClear();
       sendQuickRepliesMock.mockClear();
 
-      await messengerWebhook.processFacebookWebhookPayload({
+      await processConsentedFacebookWebhookPayload(messengerWebhook.processFacebookWebhookPayload, {
         entry: [
           {
             messaging: [
@@ -1458,7 +1459,7 @@ describe("identity-ai-v1 routing", () => {
       sendTextMock.mockClear();
       sendQuickRepliesMock.mockClear();
 
-      await messengerWebhook.processFacebookWebhookPayload({
+      await processConsentedFacebookWebhookPayload(messengerWebhook.processFacebookWebhookPayload, {
         entry: [
           {
             messaging: [
