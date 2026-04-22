@@ -8,10 +8,10 @@ import {
 } from "./messengerState";
 import type { NormalizedWhatsAppEvent } from "./whatsappTypes";
 
-export const GDPR_CONSENT_AGREE = "GDPR_CONSENT_AGREE";
-export const GDPR_CONSENT_DECLINE = "GDPR_CONSENT_DECLINE";
-export const GDPR_DELETE_CONFIRM = "GDPR_DELETE_CONFIRM";
-export const GDPR_DELETE_CANCEL = "GDPR_DELETE_CANCEL";
+const GDPR_CONSENT_AGREE = "GDPR_CONSENT_AGREE";
+const GDPR_CONSENT_DECLINE = "GDPR_CONSENT_DECLINE";
+const GDPR_DELETE_CONFIRM = "GDPR_DELETE_CONFIRM";
+const GDPR_DELETE_CANCEL = "GDPR_DELETE_CANCEL";
 
 const DELETE_COMMAND_BY_LANG: Record<Lang, string> = {
   en: "delete my data",
