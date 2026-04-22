@@ -81,8 +81,8 @@ function consentText(lang: Lang): string {
 
 function deletionConfirmText(lang: Lang): string {
   return lang === "en"
-    ? "Are you sure you want to delete all your data? This includes your images, generated results, stored preferences, and chat history."
-    : "Weet je zeker dat je al je data wil verwijderen? Dit omvat je beelden, gegenereerde resultaten, opgeslagen voorkeuren en chatgeschiedenis.";
+    ? "This will delete all data we store about you: your images, generated results, preferences, and chat history.\n\nMessages in this chat may still be visible in Messenger/WhatsApp."
+    : "Dit verwijdert alle data die wij over jou bewaren: je beelden, gegenereerde resultaten, voorkeuren en chatgeschiedenis.\n\nBerichten in deze chat kunnen nog zichtbaar blijven in Messenger/WhatsApp.";
 }
 
 function deletionDoneText(lang: Lang): string {
