@@ -107,7 +107,7 @@ export async function appendMessengerChatHistory(
   return nextHistory;
 }
 
-async function clearMessengerChatHistory(userKey: string): Promise<void> {
+export async function clearMessengerChatHistory(userKey: string): Promise<void> {
   await Promise.resolve(deleteScopedState(CHAT_HISTORY_SCOPE, userKey));
 }
 

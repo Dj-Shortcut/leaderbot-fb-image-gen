@@ -159,6 +159,10 @@ export function readState<T>(psid: string): MaybePromise<T | null> {
   return readRawState<T>(getStateKey(psid));
 }
 
+export function deleteState(psid: string): MaybePromise<void> {
+  return deleteRawState(getStateKey(psid));
+}
+
 export function writeState<T>(psid: string, value: T): MaybePromise<void> {
   const faceMemoryValue = value as {
     faceMemoryConsent?: { given?: boolean } | null;

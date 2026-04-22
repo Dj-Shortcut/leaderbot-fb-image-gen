@@ -1,0 +1,52 @@
+import { storageDelete, storageKeyFromPublicUrl } from "../storage";
+import { deleteFaceMemoryForUser } from "./faceMemory";
+import { safeLog } from "./messengerApi";
+import { clearMessengerChatHistory } from "./messengerChatMemory";
+import {
+  clearUserState,
+  getState,
+  type MessengerUserState,
+} from "./messengerState";
+
+function getStateImageUrls(state: MessengerUserState): string[] {
+  return [
+    state.lastPhotoUrl,
+    state.pendingImageUrl,
+    state.lastSourceImageUrl,
+    state.pendingSourceImageDeleteUrl,
+    state.lastGeneratedUrl,
+    state.lastImageUrl,
+  ].filter((url): url is string => Boolean(url));
+}
+
+async function deleteStoredUrl(psid: string, imageUrl: string): Promise<void> {
+  const key = storageKeyFromPublicUrl(imageUrl);
+  if (!key) {
+    return;
+  }
+
+  try {
+    await storageDelete(key);
+  } catch (error) {
+    safeLog("user_data_storage_delete_failed", {
+      psid,
+      key,
+      errorCode: error instanceof Error ? error.constructor.name : "UnknownError",
+    });
+  }
+}
+
+export async function deleteUserData(psid: string): Promise<void> {
+  const state = await getState(psid);
+  if (!state) {
+    await Promise.resolve(clearUserState(psid));
+    return;
+  }
+
+  const urls = Array.from(new Set(getStateImageUrls(state)));
+
+  await deleteFaceMemoryForUser(psid);
+  await Promise.all(urls.map(url => deleteStoredUrl(psid, url)));
+  await clearMessengerChatHistory(state.userKey);
+  await Promise.resolve(clearUserState(psid));
+}
