@@ -34,10 +34,10 @@ import {
 import {
   FACE_MEMORY_CONSENT_NO,
   FACE_MEMORY_CONSENT_YES,
-  deleteFaceMemoryForUser,
   isFaceMemoryEnabled,
   updateConsentedFaceMemorySource,
 } from "./faceMemory";
+import { handleMessengerConsentGate } from "./consentService";
 import { normalizeLang, t, type Lang } from "./i18n";
 import { toLogUser, toUserKey } from "./privacy";
 import {
@@ -316,9 +316,29 @@ async function handleEvent(
     ? normalizeLang(senderLocale)
     : ctx.defaultLang;
   const state = await getOrCreateState(psid);
+  const lang = state.preferredLang || localeLang || ctx.defaultLang;
+  const isInboundUserEvent = Boolean(
+    event.postback || (event.message && !event.message.is_echo)
+  );
+
+  if (
+    isInboundUserEvent &&
+    await handleMessengerConsentGate({
+      psid,
+      lang,
+      text: event.message?.text,
+      payload: event.message?.quick_reply?.payload ?? event.postback?.payload,
+      state,
+      sendText: text => ctx.sendLoggedText(psid, text, reqId),
+      sendQuickReplies: (text, replies) =>
+        ctx.sendLoggedQuickReplies(psid, text, replies, reqId),
+    })
+  ) {
+    return;
+  }
+
   ctx.logIncomingMessage(psid, userId, event, reqId);
   ctx.logUserState(psid, userId, state, reqId, "handle_event");
-  const lang = state.preferredLang || localeLang || ctx.defaultLang;
 
   if (senderLocale && localeLang !== state.preferredLang) {
     await setPreferredLang(psid, localeLang);
@@ -440,22 +460,6 @@ async function handleMessageEvent(
   const text = message.text;
   const trimmedText = text?.trim();
   if (!trimmedText) {
-    return;
-  }
-
-  const normalizedDeleteText = trimmedText.toLocaleLowerCase("nl-BE");
-  if (
-    normalizedDeleteText === "verwijder mijn data" ||
-    normalizedDeleteText === "delete my data"
-  ) {
-    await deleteFaceMemoryForUser(input.psid);
-    await ctx.sendLoggedText(
-      input.psid,
-      input.lang === "en"
-        ? "Your retained photo and face-memory data have been deleted."
-        : "Je bewaarde foto en face-memory data zijn gewist.",
-      input.reqId
-    );
     return;
   }
 

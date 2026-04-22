@@ -1,12 +1,13 @@
 import { normalizeLang, t } from "./i18n";
-import { setLastUserMessageAt } from "./messengerState";
+import { getOrCreateState, setLastUserMessageAt } from "./messengerState";
 import { toLogUser } from "./privacy";
+import { handleWhatsAppConsentGate } from "./consentService";
 import { extractWhatsAppEvents, logWhatsAppWebhookPayload } from "./inbound/whatsappInbound";
 import { handleWhatsAppImageEvent } from "./whatsappHandlers/imageHandler";
 import { handleWhatsAppInteractiveEvent } from "./whatsappHandlers/interactiveHandler";
 import { handleWhatsAppTextEvent } from "./whatsappHandlers/textHandler";
 import { handleWhatsAppExperienceRouting } from "./whatsappRouting";
-import { sendWhatsAppTextReply } from "./whatsappResponseService";
+import { sendWhatsAppButtonsReply, sendWhatsAppTextReply } from "./whatsappResponseService";
 import type { NormalizedWhatsAppEvent } from "./whatsappTypes";
 
 const DEFAULT_LANG = normalizeLang(process.env.DEFAULT_MESSENGER_LANG);
@@ -33,6 +34,7 @@ export async function processWhatsAppWebhookPayload(
       reqId: `${event.senderId}-${Date.now()}`,
       lang: DEFAULT_LANG,
     };
+    const state = await Promise.resolve(getOrCreateState(event.senderId));
 
     console.log("[whatsapp webhook] normalized inbound event", {
       channel: event.channel,
@@ -46,6 +48,19 @@ export async function processWhatsAppWebhookPayload(
     );
 
     try {
+      if (
+        await handleWhatsAppConsentGate({
+          event,
+          lang: context.lang,
+          state,
+          sendText: text => sendWhatsAppTextReply(event.senderId, text),
+          sendButtons: (text, options) =>
+            sendWhatsAppButtonsReply(event.senderId, text, options),
+        })
+      ) {
+        continue;
+      }
+
       if (await handleWhatsAppExperienceRouting(event)) {
         continue;
       }

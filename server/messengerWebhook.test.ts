@@ -41,7 +41,7 @@ vi.mock("./_core/messengerResponsesService", () => ({
 }));
 
 import {
-  processFacebookWebhookPayload,
+  processFacebookWebhookPayload as processFacebookWebhookPayloadBase,
   resetMessengerEventDedupe,
 } from "./_core/messengerWebhook";
 import { t } from "./_core/i18n";
@@ -60,9 +60,17 @@ import {
 } from "./_core/webhookHelpers";
 import { getBotFeatures } from "./_core/bot/features";
 import { setSourceImageDnsLookupForTests } from "./_core/image-generation/sourceImageFetcher";
+import { processConsentedFacebookWebhookPayload } from "./testConsentHelpers";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
+
+function processFacebookWebhookPayload(payload: unknown): Promise<void> {
+  return processConsentedFacebookWebhookPayload(
+    processFacebookWebhookPayloadBase,
+    payload
+  );
+}
 
 function toUrlString(url: string | URL): string {
   return typeof url === "string" ? url : url.toString();

@@ -25,13 +25,24 @@ vi.mock("./_core/messengerApi", () => ({
   safeLog: safeLogMock,
 }));
 
-import { processFacebookWebhookPayload, resetMessengerEventDedupe } from "./_core/messengerWebhook";
+import {
+  processFacebookWebhookPayload as processFacebookWebhookPayloadBase,
+  resetMessengerEventDedupe,
+} from "./_core/messengerWebhook";
 import { anonymizePsid, getState, resetStateStore } from "./_core/messengerState";
 import { setSourceImageDnsLookupForTests } from "./_core/image-generation/sourceImageFetcher";
+import { processConsentedFacebookWebhookPayload } from "./testConsentHelpers";
 
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
 const originalEnableFaceMemory = process.env.ENABLE_FACE_MEMORY;
+
+function processFacebookWebhookPayload(payload: unknown): Promise<void> {
+  return processConsentedFacebookWebhookPayload(
+    processFacebookWebhookPayloadBase,
+    payload
+  );
+}
 
 describe("photo-first onboarding", () => {
   beforeAll(() => {
@@ -183,7 +194,7 @@ describe("photo-first onboarding", () => {
     expect(userState?.lastSourceImageUpdatedAt).toEqual(expect.any(Number));
   });
 
-  it("deletes retained face-memory data via text command", async () => {
+  it("deletes retained face-memory data after confirmation", async () => {
     process.env.ENABLE_FACE_MEMORY = "true";
     const psid = "face-memory-delete-user";
 
@@ -217,16 +228,39 @@ describe("photo-first onboarding", () => {
       ],
     });
 
-    const userState = getState(anonymizePsid(psid));
-    expect(userState?.faceMemoryConsent).toBeNull();
-    expect(userState?.lastSourceImageUrl).toBeNull();
-    expect(userState?.lastPhotoUrl).toBeNull();
-    expect(userState?.pendingSourceImageDeleteUrl).toMatch(
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      psid,
+      expect.stringContaining("Weet je zeker dat je al je data wil verwijderen?"),
+      expect.arrayContaining([
+        expect.objectContaining({ payload: "GDPR_DELETE_CONFIRM" }),
+        expect.objectContaining({ payload: "GDPR_DELETE_CANCEL" }),
+      ])
+    );
+    expect(getState(anonymizePsid(psid))?.lastSourceImageUrl).toMatch(
       /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
     );
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-face-memory-delete-confirm",
+                quick_reply: { payload: "GDPR_DELETE_CONFIRM" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const userState = getState(anonymizePsid(psid));
+    expect(userState).toBeNull();
     expect(sendTextMock).toHaveBeenCalledWith(
       psid,
-      "Je bewaarde foto en face-memory data zijn gewist."
+      "Je data is verwijderd. Als je opnieuw contact opneemt, vraag ik eerst opnieuw toestemming."
     );
   });
 

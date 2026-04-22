@@ -9,6 +9,7 @@ import type { Lang } from "./i18n";
 import { toUserKey } from "./privacy";
 import {
   clearStateStore,
+  deleteState,
   findInMemoryState,
   getOrCreateStoredState,
   isPromiseLike,
@@ -56,6 +57,9 @@ export type MessengerUserState = {
   selectedStyleCategory?: StyleCategory | null;
   preselectedStyle?: string | null;
   preferredLang?: Lang;
+  consentGiven: boolean;
+  consentTimestamp?: number;
+  pendingDeleteConfirm?: boolean;
   hasSeenIntro: boolean;
   pendingImageUrl?: string;
   pendingImageAt?: number;
@@ -137,6 +141,9 @@ function createDefaultState(psid: string, now = Date.now()): MessengerUserState 
     selectedStyleCategory: null,
     preselectedStyle: null,
     preferredLang: "nl",
+    consentGiven: false,
+    consentTimestamp: undefined,
+    pendingDeleteConfirm: false,
     hasSeenIntro: false,
     pendingImageUrl: undefined,
     pendingImageAt: undefined,
@@ -205,6 +212,10 @@ function applyNormalizedStateShape(
     ...value,
     psid: resolvedPsid,
     userKey: value?.userKey ?? fallback.userKey,
+    consentGiven: value?.consentGiven ?? fallback.consentGiven,
+    consentTimestamp: value?.consentTimestamp ?? fallback.consentTimestamp,
+    pendingDeleteConfirm:
+      value?.pendingDeleteConfirm ?? fallback.pendingDeleteConfirm,
     hasSeenIntro: value?.hasSeenIntro ?? fallback.hasSeenIntro,
     stage,
     state: stage,
@@ -334,6 +345,10 @@ export function getState(psid: string): MaybePromise<MessengerUserState | null> 
   return getStateFromRedis(psid);
 }
 
+export function clearUserState(psid: string): MaybePromise<void> {
+  return deleteState(psid);
+}
+
 export function hasOpenMessengerResponseWindow(psid: string, now = Date.now()): MaybePromise<boolean> {
   const state = getState(psid);
 
@@ -375,6 +390,44 @@ export function setFlowState(psid: string, nextState: MessengerFlowState): Maybe
     stage: nextState,
     state: nextState,
   });
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
+}
+
+export function setConsentState(
+  psid: string,
+  consentGiven: boolean,
+  now = Date.now()
+): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      consentGiven,
+      consentTimestamp: consentGiven ? now : undefined,
+      pendingDeleteConfirm: false,
+    },
+    now
+  );
+
+  if (isPromiseLike(result)) {
+    return result.then(() => undefined);
+  }
+}
+
+export function setPendingDeleteConfirm(
+  psid: string,
+  pendingDeleteConfirm: boolean,
+  now = Date.now()
+): MaybePromise<void> {
+  const result = patchState(
+    psid,
+    {
+      pendingDeleteConfirm,
+    },
+    now
+  );
 
   if (isPromiseLike(result)) {
     return result.then(() => undefined);

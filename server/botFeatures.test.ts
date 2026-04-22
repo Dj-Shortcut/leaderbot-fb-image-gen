@@ -30,10 +30,18 @@ vi.mock("./_core/messengerResponsesService", () => ({
 
 import { t } from "./_core/i18n";
 import {
-  processFacebookWebhookPayload,
+  processFacebookWebhookPayload as processFacebookWebhookPayloadBase,
   resetMessengerEventDedupe,
 } from "./_core/messengerWebhook";
 import { anonymizePsid, getState, resetStateStore } from "./_core/messengerState";
+import { processConsentedFacebookWebhookPayload } from "./testConsentHelpers";
+
+function processFacebookWebhookPayload(payload: unknown): Promise<void> {
+  return processConsentedFacebookWebhookPayload(
+    processFacebookWebhookPayloadBase,
+    payload
+  );
+}
 
 describe("bot features", () => {
   beforeEach(() => {
