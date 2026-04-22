@@ -609,8 +609,8 @@ async function handleEvent(
         reqId: requestId,
         user: toLogUser(toUserKey(userPsid)),
         kind: "text",
-        sent: outcome.sent,
-        ...(!outcome.sent ? { reason: outcome.reason } : {}),
+        sent: outcome?.sent ?? false,
+        ...(outcome && !outcome.sent ? { reason: outcome.reason } : {}),
       });
       return outcome;
     },
@@ -631,8 +631,8 @@ async function handleEvent(
         reqId: requestId,
         user: toLogUser(toUserKey(userPsid)),
         kind: "quick_replies",
-        sent: outcome.sent,
-        ...(!outcome.sent ? { reason: outcome.reason } : {}),
+        sent: outcome?.sent ?? false,
+        ...(outcome && !outcome.sent ? { reason: outcome.reason } : {}),
       });
       return outcome;
     },
@@ -648,8 +648,8 @@ async function handleEvent(
         reqId: requestId,
         user: toLogUser(toUserKey(userPsid)),
         kind: "image",
-        sent: outcome.sent,
-        ...(!outcome.sent ? { reason: outcome.reason } : {}),
+        sent: outcome?.sent ?? false,
+        ...(outcome && !outcome.sent ? { reason: outcome.reason } : {}),
       });
       return outcome;
     },
@@ -672,8 +672,8 @@ async function handleEvent(
         user: toLogUser(toUserKey(userPsid)),
         kind: "state_quick_replies",
         state: stateName,
-        sent: outcome.sent,
-        ...(!outcome.sent ? { reason: outcome.reason } : {}),
+        sent: outcome?.sent ?? false,
+        ...(outcome && !outcome.sent ? { reason: outcome.reason } : {}),
       });
       return outcome;
     },
