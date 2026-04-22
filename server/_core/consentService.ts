@@ -18,6 +18,13 @@ const DELETE_COMMAND_BY_LANG: Record<Lang, string> = {
   nl: "verwijder mijn data",
 };
 const DELETE_COMMANDS = new Set(Object.values(DELETE_COMMAND_BY_LANG));
+const DELETE_CONFIRM_TEXTS = new Set([
+  "ja",
+  "ja verwijder",
+  "yes",
+  "confirm",
+]);
+const DELETE_CANCEL_TEXTS = new Set(["nee", "no", "cancel", "stop"]);
 
 type MessengerConsentGateInput = {
   psid: string;
@@ -40,8 +47,26 @@ type WhatsAppConsentGateInput = {
   ) => Promise<void>;
 };
 
+function normalizeControlText(text: string | null | undefined): string {
+  return (
+    text
+      ?.trim()
+      .toLocaleLowerCase("nl-BE")
+      .replace(/[^\p{L}\p{N}\s]/gu, "")
+      .replace(/\s+/g, " ") ?? ""
+  );
+}
+
 function isDeleteCommand(text: string | null | undefined): boolean {
-  return DELETE_COMMANDS.has(text?.trim().toLocaleLowerCase("nl-BE") ?? "");
+  return DELETE_COMMANDS.has(normalizeControlText(text));
+}
+
+function isDeleteConfirmText(text: string | null | undefined): boolean {
+  return DELETE_CONFIRM_TEXTS.has(normalizeControlText(text));
+}
+
+function isDeleteCancelText(text: string | null | undefined): boolean {
+  return DELETE_CANCEL_TEXTS.has(normalizeControlText(text));
 }
 
 function deleteCommand(lang: Lang): string {
@@ -56,14 +81,14 @@ function consentText(lang: Lang): string {
 
 function deletionConfirmText(lang: Lang): string {
   return lang === "en"
-    ? "Are you sure you want to delete all your data? This includes your images, generated results, stored preferences, and chat history."
-    : "Weet je zeker dat je al je data wil verwijderen? Dit omvat je beelden, gegenereerde resultaten, opgeslagen voorkeuren en chatgeschiedenis.";
+    ? "This will delete all data we store about you: your images, generated results, preferences, and chat history.\n\nMessages in this chat may still be visible in Messenger/WhatsApp."
+    : "Dit verwijdert alle data die wij over jou bewaren: je beelden, gegenereerde resultaten, voorkeuren en chatgeschiedenis.\n\nBerichten in deze chat kunnen nog zichtbaar blijven in Messenger/WhatsApp.";
 }
 
 function deletionDoneText(lang: Lang): string {
   return lang === "en"
-    ? "Your data has been deleted. If you contact me again, I will ask for consent first."
-    : "Je data is verwijderd. Als je opnieuw contact opneemt, vraag ik eerst opnieuw toestemming.";
+    ? "Your data has been deleted ✅\nIf you continue, we'll treat you as a new user."
+    : "Je data is verwijderd ✅\nAls je verdergaat, behandelen we je als een nieuwe gebruiker.";
 }
 
 function consentDeclinedText(lang: Lang): string {
@@ -190,6 +215,18 @@ export async function handleMessengerConsentGate(
     return true;
   }
 
+  if (input.state.pendingDeleteConfirm && isDeleteConfirmText(input.text)) {
+    await deleteUserData(input.psid);
+    await input.sendText(deletionDoneText(input.lang));
+    return true;
+  }
+
+  if (input.state.pendingDeleteConfirm && isDeleteCancelText(input.text)) {
+    await Promise.resolve(setPendingDeleteConfirm(input.psid, false));
+    await input.sendText(deleteCancelledText(input.lang));
+    return true;
+  }
+
   if (isDeleteCommand(input.text) || isDeleteCommand(input.payload)) {
     await Promise.resolve(setPendingDeleteConfirm(input.psid, true));
     await input.sendQuickReplies(deletionConfirmText(input.lang), deleteReplies(input.lang));
@@ -242,6 +279,18 @@ export async function handleWhatsAppConsentGate(
   if (payload === GDPR_DELETE_CONFIRM) {
     await deleteUserData(input.event.senderId);
     await input.sendText(deletionDoneText(input.lang));
+    return true;
+  }
+
+  if (input.state.pendingDeleteConfirm && isDeleteConfirmText(text)) {
+    await deleteUserData(input.event.senderId);
+    await input.sendText(deletionDoneText(input.lang));
+    return true;
+  }
+
+  if (input.state.pendingDeleteConfirm && isDeleteCancelText(text)) {
+    await Promise.resolve(setPendingDeleteConfirm(input.event.senderId, false));
+    await input.sendText(deleteCancelledText(input.lang));
     return true;
   }
 

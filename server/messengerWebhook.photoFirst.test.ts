@@ -230,7 +230,7 @@ describe("photo-first onboarding", () => {
 
     expect(sendQuickRepliesMock).toHaveBeenCalledWith(
       psid,
-      expect.stringContaining("Weet je zeker dat je al je data wil verwijderen?"),
+      expect.stringContaining("data"),
       expect.arrayContaining([
         expect.objectContaining({ payload: "GDPR_DELETE_CONFIRM" }),
         expect.objectContaining({ payload: "GDPR_DELETE_CANCEL" }),
@@ -260,7 +260,7 @@ describe("photo-first onboarding", () => {
     expect(userState).toBeNull();
     expect(sendTextMock).toHaveBeenCalledWith(
       psid,
-      "Je data is verwijderd. Als je opnieuw contact opneemt, vraag ik eerst opnieuw toestemming."
+      expect.stringContaining("Je data is verwijderd")
     );
   });
 
