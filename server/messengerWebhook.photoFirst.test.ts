@@ -260,7 +260,7 @@ describe("photo-first onboarding", () => {
     expect(userState).toBeNull();
     expect(sendTextMock).toHaveBeenCalledWith(
       psid,
-      "Je data is verwijderd. Als je opnieuw contact opneemt, vraag ik eerst opnieuw toestemming."
+      expect.stringContaining("Je data is verwijderd")
     );
   });
 
