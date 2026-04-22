@@ -688,9 +688,7 @@ async function handleEvent(
         trackedCtx.sendStateQuickReplies(psid, stateName, text, reqId),
       sendOptionsPrompt: async (
         prompt: string,
-        options: Array<{ id: string; title: string }>,
-        _fallbackLogName: string | undefined,
-        _fallbackText: string | undefined
+        options: Array<{ id: string; title: string }>
       ) => {
         await trackedCtx.sendLoggedQuickReplies(
           psid,
