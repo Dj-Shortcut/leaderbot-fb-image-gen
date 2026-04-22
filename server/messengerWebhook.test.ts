@@ -542,6 +542,64 @@ describe("messenger webhook dedupe", () => {
     expect(getState(userId)?.lastUserMessageAt).toBe(1730000000123);
   });
 
+  it("opens the Messenger response window before a fresh consent prompt", async () => {
+    const psid = "fresh-consent-window-user";
+    const timestamp = 1730000000456;
+
+    sendQuickRepliesMock.mockImplementationOnce(async () => {
+      expect(getState(psid)?.lastUserMessageAt).toBe(timestamp);
+      return { sent: true };
+    });
+
+    await processFacebookWebhookPayloadBase({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              timestamp,
+              message: { mid: "mid-fresh-consent-window", text: "Hi" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendQuickRepliesMock).toHaveBeenCalledTimes(1);
+    expect(sendTextMock).not.toHaveBeenCalled();
+    expect(safeLogMock).not.toHaveBeenCalledWith(
+      "messenger_send_skipped",
+      expect.objectContaining({ reason: "response_window_closed" })
+    );
+  });
+
+  it("opens the Messenger response window before postback routing", async () => {
+    const psid = "fresh-postback-window-user";
+    const timestamp = 1730000000789;
+
+    sendTextMock.mockImplementationOnce(async () => {
+      expect(getState(psid)?.lastUserMessageAt).toBe(timestamp);
+      return { sent: true };
+    });
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              timestamp,
+              postback: { payload: "STYLE_CATEGORY_ILLUSTRATED" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledTimes(1);
+    expect(sendGenericTemplateMock).toHaveBeenCalledTimes(1);
+  });
+
   it("returns generated images for all canonical styles through the OpenAI path", async () => {
     const styles = STYLE_CONFIGS.map(style => style.style);
 

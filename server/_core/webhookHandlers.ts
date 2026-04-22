@@ -741,6 +741,9 @@ async function handleEvent(
   const isIntentionalSilentUnknownPayload = Boolean(
     eventPayload && !isKnownMessengerPayload(eventPayload)
   );
+  if (isInboundUserEvent) {
+    await setLastUserMessageAt(psid, event.timestamp ?? Date.now());
+  }
   const sendFallbackIfNeeded = async () => {
     if (
       isInboundUserEvent &&
@@ -934,7 +937,6 @@ async function handleMessageEvent(
 ): Promise<void> {
   const message = input.event.message;
   if (!message || message.is_echo) return;
-  await setLastUserMessageAt(input.psid, input.event.timestamp ?? Date.now());
 
   if ((await ctx.maybeSendInFlightMessage(input.psid, input.reqId)).handled) {
     return;
