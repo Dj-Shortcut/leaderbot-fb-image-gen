@@ -21,10 +21,10 @@ const DELETE_COMMANDS = new Set(Object.values(DELETE_COMMAND_BY_LANG));
 const DELETE_CONFIRM_TEXTS = new Set([
   "ja",
   "ja verwijder",
-  "verwijder",
   "yes",
   "confirm",
 ]);
+const DELETE_CANCEL_TEXTS = new Set(["nee", "no", "cancel", "stop"]);
 
 type MessengerConsentGateInput = {
   psid: string;
@@ -65,6 +65,10 @@ function isDeleteConfirmText(text: string | null | undefined): boolean {
   return DELETE_CONFIRM_TEXTS.has(normalizeControlText(text));
 }
 
+function isDeleteCancelText(text: string | null | undefined): boolean {
+  return DELETE_CANCEL_TEXTS.has(normalizeControlText(text));
+}
+
 function deleteCommand(lang: Lang): string {
   return DELETE_COMMAND_BY_LANG[lang] ?? DELETE_COMMAND_BY_LANG.nl;
 }
@@ -83,8 +87,8 @@ function deletionConfirmText(lang: Lang): string {
 
 function deletionDoneText(lang: Lang): string {
   return lang === "en"
-    ? "Your data has been deleted. If you contact me again, I will ask for consent first."
-    : "Je data is verwijderd. Als je opnieuw contact opneemt, vraag ik eerst opnieuw toestemming.";
+    ? "Your data has been deleted ✅\nIf you continue, we'll treat you as a new user."
+    : "Je data is verwijderd ✅\nAls je verdergaat, behandelen we je als een nieuwe gebruiker.";
 }
 
 function consentDeclinedText(lang: Lang): string {
@@ -217,6 +221,12 @@ export async function handleMessengerConsentGate(
     return true;
   }
 
+  if (input.state.pendingDeleteConfirm && isDeleteCancelText(input.text)) {
+    await Promise.resolve(setPendingDeleteConfirm(input.psid, false));
+    await input.sendText(deleteCancelledText(input.lang));
+    return true;
+  }
+
   if (isDeleteCommand(input.text) || isDeleteCommand(input.payload)) {
     await Promise.resolve(setPendingDeleteConfirm(input.psid, true));
     await input.sendQuickReplies(deletionConfirmText(input.lang), deleteReplies(input.lang));
@@ -275,6 +285,12 @@ export async function handleWhatsAppConsentGate(
   if (input.state.pendingDeleteConfirm && isDeleteConfirmText(text)) {
     await deleteUserData(input.event.senderId);
     await input.sendText(deletionDoneText(input.lang));
+    return true;
+  }
+
+  if (input.state.pendingDeleteConfirm && isDeleteCancelText(text)) {
+    await Promise.resolve(setPendingDeleteConfirm(input.event.senderId, false));
+    await input.sendText(deleteCancelledText(input.lang));
     return true;
   }
 
