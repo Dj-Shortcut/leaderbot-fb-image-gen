@@ -66,8 +66,8 @@ function consentDeclinedText(lang: Lang): string {
 
 function consentAcceptedText(lang: Lang): string {
   return lang === "en"
-    ? "Thanks. You can now send a photo or message."
-    : "Dank je. Je kan nu een foto of bericht sturen.";
+    ? "You're all set ✅\nYou can delete your data anytime.\nType 'delete my data' or use the button below 👇"
+    : "Je bent klaar ✅\nJe kan je data altijd verwijderen.\nTyp 'delete my data' of gebruik de knop hieronder 👇";
 }
 
 function deleteCancelledText(lang: Lang): string {
@@ -85,6 +85,16 @@ function consentReplies(lang: Lang): QuickReply[] {
       content_type: "text",
       title: lang === "en" ? "No thanks" : "Nee bedankt",
       payload: GDPR_CONSENT_DECLINE,
+    },
+  ];
+}
+
+function deleteNoticeReplies(): QuickReply[] {
+  return [
+    {
+      content_type: "text",
+      title: "🗑 Delete my data",
+      payload: "delete my data",
     },
   ];
 }
@@ -130,12 +140,24 @@ function whatsAppDeleteButtons(lang: Lang): Array<{ id: string; title: string }>
   ];
 }
 
+function whatsAppDeleteNoticeButtons(): Array<{ id: string; title: string }> {
+  return [
+    {
+      id: "delete my data",
+      title: "🗑 Delete my data",
+    },
+  ];
+}
+
 export async function handleMessengerConsentGate(
   input: MessengerConsentGateInput
 ): Promise<boolean> {
   if (input.payload === GDPR_CONSENT_AGREE) {
     await Promise.resolve(setConsentState(input.psid, true));
-    await input.sendText(consentAcceptedText(input.lang));
+    await input.sendQuickReplies(
+      consentAcceptedText(input.lang),
+      deleteNoticeReplies()
+    );
     return true;
   }
 
@@ -157,7 +179,7 @@ export async function handleMessengerConsentGate(
     return true;
   }
 
-  if (isDeleteCommand(input.text)) {
+  if (isDeleteCommand(input.text) || isDeleteCommand(input.payload)) {
     await Promise.resolve(setPendingDeleteConfirm(input.psid, true));
     await input.sendQuickReplies(deletionConfirmText(input.lang), deleteReplies(input.lang));
     return true;
@@ -187,7 +209,10 @@ export async function handleWhatsAppConsentGate(
 
   if (payload === GDPR_CONSENT_AGREE) {
     await Promise.resolve(setConsentState(input.event.senderId, true));
-    await input.sendText(consentAcceptedText(input.lang));
+    await input.sendButtons(
+      consentAcceptedText(input.lang),
+      whatsAppDeleteNoticeButtons()
+    );
     return true;
   }
 
@@ -209,7 +234,7 @@ export async function handleWhatsAppConsentGate(
     return true;
   }
 
-  if (isDeleteCommand(text)) {
+  if (isDeleteCommand(text) || isDeleteCommand(payload)) {
     await Promise.resolve(setPendingDeleteConfirm(input.event.senderId, true));
     await input.sendButtons(
       deletionConfirmText(input.lang),
