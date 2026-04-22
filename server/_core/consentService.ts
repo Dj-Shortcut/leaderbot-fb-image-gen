@@ -8,12 +8,16 @@ import {
 } from "./messengerState";
 import type { NormalizedWhatsAppEvent } from "./whatsappTypes";
 
-export const GDPR_CONSENT_AGREE = "GDPR_CONSENT_AGREE";
-export const GDPR_CONSENT_DECLINE = "GDPR_CONSENT_DECLINE";
-export const GDPR_DELETE_CONFIRM = "GDPR_DELETE_CONFIRM";
-export const GDPR_DELETE_CANCEL = "GDPR_DELETE_CANCEL";
+const GDPR_CONSENT_AGREE = "GDPR_CONSENT_AGREE";
+const GDPR_CONSENT_DECLINE = "GDPR_CONSENT_DECLINE";
+const GDPR_DELETE_CONFIRM = "GDPR_DELETE_CONFIRM";
+const GDPR_DELETE_CANCEL = "GDPR_DELETE_CANCEL";
 
-const DELETE_COMMANDS = new Set(["delete my data", "verwijder mijn data"]);
+const DELETE_COMMAND_BY_LANG: Record<Lang, string> = {
+  en: "delete my data",
+  nl: "verwijder mijn data",
+};
+const DELETE_COMMANDS = new Set(Object.values(DELETE_COMMAND_BY_LANG));
 
 type MessengerConsentGateInput = {
   psid: string;
@@ -38,6 +42,10 @@ type WhatsAppConsentGateInput = {
 
 function isDeleteCommand(text: string | null | undefined): boolean {
   return DELETE_COMMANDS.has(text?.trim().toLocaleLowerCase("nl-BE") ?? "");
+}
+
+function deleteCommand(lang: Lang): string {
+  return DELETE_COMMAND_BY_LANG[lang] ?? DELETE_COMMAND_BY_LANG.nl;
 }
 
 function consentText(lang: Lang): string {
@@ -65,9 +73,10 @@ function consentDeclinedText(lang: Lang): string {
 }
 
 function consentAcceptedText(lang: Lang): string {
+  const command = deleteCommand(lang);
   return lang === "en"
-    ? "Thanks. You can now send a photo or message."
-    : "Dank je. Je kan nu een foto of bericht sturen.";
+    ? `You're all set ✅\nYou can delete your data anytime.\nType '${command}' or use the button below 👇`
+    : `Je bent klaar ✅\nJe kan je data altijd verwijderen.\nTyp '${command}' of gebruik de knop hieronder 👇`;
 }
 
 function deleteCancelledText(lang: Lang): string {
@@ -85,6 +94,17 @@ function consentReplies(lang: Lang): QuickReply[] {
       content_type: "text",
       title: lang === "en" ? "No thanks" : "Nee bedankt",
       payload: GDPR_CONSENT_DECLINE,
+    },
+  ];
+}
+
+function deleteNoticeReplies(lang: Lang): QuickReply[] {
+  const command = deleteCommand(lang);
+  return [
+    {
+      content_type: "text",
+      title: lang === "en" ? "🗑 Delete my data" : "🗑 Verwijder mijn data",
+      payload: command,
     },
   ];
 }
@@ -130,12 +150,25 @@ function whatsAppDeleteButtons(lang: Lang): Array<{ id: string; title: string }>
   ];
 }
 
+function whatsAppDeleteNoticeButtons(lang: Lang): Array<{ id: string; title: string }> {
+  const command = deleteCommand(lang);
+  return [
+    {
+      id: command,
+      title: lang === "en" ? "🗑 Delete my data" : "🗑 Verwijder data",
+    },
+  ];
+}
+
 export async function handleMessengerConsentGate(
   input: MessengerConsentGateInput
 ): Promise<boolean> {
   if (input.payload === GDPR_CONSENT_AGREE) {
     await Promise.resolve(setConsentState(input.psid, true));
-    await input.sendText(consentAcceptedText(input.lang));
+    await input.sendQuickReplies(
+      consentAcceptedText(input.lang),
+      deleteNoticeReplies(input.lang)
+    );
     return true;
   }
 
@@ -157,7 +190,7 @@ export async function handleMessengerConsentGate(
     return true;
   }
 
-  if (isDeleteCommand(input.text)) {
+  if (isDeleteCommand(input.text) || isDeleteCommand(input.payload)) {
     await Promise.resolve(setPendingDeleteConfirm(input.psid, true));
     await input.sendQuickReplies(deletionConfirmText(input.lang), deleteReplies(input.lang));
     return true;
@@ -187,7 +220,10 @@ export async function handleWhatsAppConsentGate(
 
   if (payload === GDPR_CONSENT_AGREE) {
     await Promise.resolve(setConsentState(input.event.senderId, true));
-    await input.sendText(consentAcceptedText(input.lang));
+    await input.sendButtons(
+      consentAcceptedText(input.lang),
+      whatsAppDeleteNoticeButtons(input.lang)
+    );
     return true;
   }
 
@@ -209,7 +245,7 @@ export async function handleWhatsAppConsentGate(
     return true;
   }
 
-  if (isDeleteCommand(text)) {
+  if (isDeleteCommand(text) || isDeleteCommand(payload)) {
     await Promise.resolve(setPendingDeleteConfirm(input.event.senderId, true));
     await input.sendButtons(
       deletionConfirmText(input.lang),
