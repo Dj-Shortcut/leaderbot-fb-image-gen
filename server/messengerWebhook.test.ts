@@ -17,10 +17,10 @@ const {
   safeLogMock,
   generateMessengerReplyMock,
 } = vi.hoisted(() => ({
-  sendGenericTemplateMock: vi.fn(async () => undefined),
-  sendImageMock: vi.fn(async () => undefined),
-  sendQuickRepliesMock: vi.fn(async () => undefined),
-  sendTextMock: vi.fn(async () => undefined),
+  sendGenericTemplateMock: vi.fn(async () => ({ sent: true })),
+  sendImageMock: vi.fn(async () => ({ sent: true })),
+  sendQuickRepliesMock: vi.fn(async () => ({ sent: true })),
+  sendTextMock: vi.fn(async () => ({ sent: true })),
   safeLogMock: vi.fn(),
   generateMessengerReplyMock: vi.fn(async () => ({
     text: "Stuur gerust een foto, dan kan ik een stijl voor je maken.",

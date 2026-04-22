@@ -27,6 +27,10 @@ type GenericTemplateElement = {
   buttons?: TemplateButton[];
 };
 
+type MessengerSendOutcome =
+  | { sent: true }
+  | { sent: false; reason: "response_window_closed" };
+
 function getPageToken(): string {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
 
@@ -85,11 +89,11 @@ async function sendMessage(
     onRetry?: (attempt: number, maxAttempts: number, error: Error) => void;
     onFinalFailure?: (attempts: number, error: Error) => void;
   }
-): Promise<void> {
+): Promise<MessengerSendOutcome> {
   const withinResponseWindow = await Promise.resolve(hasOpenMessengerResponseWindow(psid));
   if (!withinResponseWindow) {
     safeLog("messenger_send_skipped", { reason: "response_window_closed" });
-    return;
+    return { sent: false, reason: "response_window_closed" };
   }
 
   const maxRetries =
@@ -127,7 +131,7 @@ async function sendMessage(
     }
 
     if (response.ok) {
-      return;
+      return { sent: true };
     }
 
     const body = await response.text();
@@ -186,16 +190,19 @@ export function safeLog(
   console.log(`[messenger] ${event}`, redactLogDetails(details));
 }
 
-export async function sendText(psid: string, text: string): Promise<void> {
-  await sendMessage(psid, { text });
+export async function sendText(
+  psid: string,
+  text: string
+): Promise<MessengerSendOutcome> {
+  return await sendMessage(psid, { text });
 }
 
 export async function sendQuickReplies(
   psid: string,
   text: string,
   replies: QuickReply[]
-): Promise<void> {
-  await sendMessage(psid, {
+): Promise<MessengerSendOutcome> {
+  return await sendMessage(psid, {
     text,
     quick_replies: replies,
   });
@@ -204,8 +211,8 @@ export async function sendQuickReplies(
 export async function sendGenericTemplate(
   psid: string,
   elements: GenericTemplateElement[]
-): Promise<void> {
-  await sendMessage(psid, {
+): Promise<MessengerSendOutcome> {
+  return await sendMessage(psid, {
     attachment: {
       type: "template",
       payload: {
@@ -220,8 +227,8 @@ export async function sendButtonTemplate(
   psid: string,
   text: string,
   buttons: TemplateButton[]
-): Promise<void> {
-  await sendMessage(psid, {
+): Promise<MessengerSendOutcome> {
+  return await sendMessage(psid, {
     attachment: {
       type: "template",
       payload: {
@@ -233,7 +240,10 @@ export async function sendButtonTemplate(
   });
 }
 
-export async function sendImage(psid: string, imageUrl: string): Promise<void> {
+export async function sendImage(
+  psid: string,
+  imageUrl: string
+): Promise<MessengerSendOutcome> {
   console.info(
     JSON.stringify({
       level: "info",
@@ -242,7 +252,7 @@ export async function sendImage(psid: string, imageUrl: string): Promise<void> {
     })
   );
 
-  await sendMessage(
+  return await sendMessage(
     psid,
     {
       attachment: {
@@ -283,4 +293,9 @@ export async function sendImage(psid: string, imageUrl: string): Promise<void> {
   );
 }
 
-export type { QuickReply, GenericTemplateElement, TemplateButton };
+export type {
+  QuickReply,
+  GenericTemplateElement,
+  TemplateButton,
+  MessengerSendOutcome,
+};

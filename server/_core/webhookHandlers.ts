@@ -6,6 +6,7 @@ import {
   sendText,
   safeLog,
 } from "./messengerApi";
+import type { MessengerSendOutcome } from "./messengerApi";
 import {
   getGenerationMetrics,
 } from "./imageService";
@@ -104,6 +105,21 @@ type FeatureContextBase = Omit<
   "payload"
 >;
 type MessengerState = Awaited<ReturnType<typeof getOrCreateState>>;
+const MESSENGER_SEND_SKIPPED: MessengerSendOutcome = {
+  sent: false,
+  reason: "response_window_closed",
+};
+type MaybeInFlightMessageResult =
+  | { handled: false }
+  | { handled: true; outcome?: MessengerSendOutcome };
+
+function combineMessengerSendOutcomes(
+  ...outcomes: MessengerSendOutcome[]
+): MessengerSendOutcome {
+  return outcomes.some(outcome => outcome.sent)
+    ? { sent: true }
+    : MESSENGER_SEND_SKIPPED;
+}
 
 type HandlerContext = {
   defaultLang: Lang;
@@ -146,13 +162,13 @@ type HandlerContext = {
     selectedStyle: Style,
     reqId: string,
     lang: Lang
-  ) => Promise<void>;
+  ) => Promise<MessengerSendOutcome>;
   handleReferralStyleEvent: (
     psid: string,
     referralRef: string | undefined,
     lang: Lang,
     reqId: string
-  ) => Promise<boolean>;
+  ) => Promise<MaybeInFlightMessageResult>;
   logImageFlowDecision: (input: {
     psid: string;
     userId: string;
@@ -177,7 +193,10 @@ type HandlerContext = {
     reqId: string,
     context: string
   ) => void;
-  maybeSendInFlightMessage: (psid: string, reqId: string) => Promise<boolean>;
+  maybeSendInFlightMessage: (
+    psid: string,
+    reqId: string
+  ) => Promise<MaybeInFlightMessageResult>;
   runStyleGeneration: (
     psid: string,
     userId: string,
@@ -186,22 +205,22 @@ type HandlerContext = {
     lang: Lang,
     sourceImageUrl?: string,
     promptHint?: string
-  ) => Promise<void>;
+  ) => Promise<MessengerSendOutcome>;
   sendFaceMemoryConsentPrompt: (
     psid: string,
     lang: Lang,
     reqId: string
-  ) => Promise<void>;
+  ) => Promise<MessengerSendOutcome>;
   sendFlowExplanation: (
     psid: string,
     lang: Lang,
     reqId: string
-  ) => Promise<void>;
+  ) => Promise<MessengerSendOutcome>;
   sendLoggedImage: (
     psid: string,
     imageUrl: string,
     reqId: string
-  ) => Promise<void>;
+  ) => Promise<MessengerSendOutcome>;
   sendLoggedQuickReplies: (
     psid: string,
     text: string,
@@ -211,31 +230,39 @@ type HandlerContext = {
       payload: string;
     }>,
     reqId: string
-  ) => Promise<void>;
+  ) => Promise<MessengerSendOutcome>;
   sendLoggedText: (
     psid: string,
     text: string,
     reqId: string
-  ) => Promise<void>;
+  ) => Promise<MessengerSendOutcome>;
   sendPhotoReceivedPrompt: (
     psid: string,
     lang: Lang,
     reqId: string
-  ) => Promise<void>;
-  sendPrivacyInfo: (psid: string, lang: Lang, reqId: string) => Promise<void>;
+  ) => Promise<MessengerSendOutcome>;
+  sendPrivacyInfo: (
+    psid: string,
+    lang: Lang,
+    reqId: string
+  ) => Promise<MessengerSendOutcome>;
   sendStateQuickReplies: (
     psid: string,
     stateName: ConversationState,
     text: string,
     reqId: string
-  ) => Promise<void>;
+  ) => Promise<MessengerSendOutcome>;
   sendStyleOptionsForCategory: (
     psid: string,
     category: StyleCategory,
     lang: Lang,
     reqId: string
-  ) => Promise<void>;
-  sendStylePicker: (psid: string, lang: Lang, reqId: string) => Promise<void>;
+  ) => Promise<MessengerSendOutcome>;
+  sendStylePicker: (
+    psid: string,
+    lang: Lang,
+    reqId: string
+  ) => Promise<MessengerSendOutcome>;
 };
 
 type MessageEventInput = {
@@ -341,12 +368,10 @@ async function handleEvent(
   const markResponseSent = () => {
     responseSent = true;
   };
-  const markHandledIfSent = async <T>(
-    operation: Promise<T>
-  ): Promise<T> => {
-    const result = await operation;
-    markResponseSent();
-    return result;
+  const markResponseSentFromOutcome = (outcome: MessengerSendOutcome) => {
+    if (outcome.sent) {
+      markResponseSent();
+    }
   };
   const trackedCtx: HandlerContext = {
     ...ctx,
@@ -368,23 +393,34 @@ async function handleEvent(
       );
       return {
         ...featureCtx,
-        sendText: text => trackedCtx.sendLoggedText(userPsid, text, requestId),
-        sendImage: nextImageUrl =>
-          trackedCtx.sendLoggedImage(userPsid, nextImageUrl, requestId),
-        sendQuickReplies: (text, replies) =>
-          trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId),
-        sendStateQuickReplies: (nextState, text) =>
-          trackedCtx.sendStateQuickReplies(userPsid, nextState, text, requestId),
-        chooseStyle: style =>
-          trackedCtx.handleStyleSelection(
+        sendText: async text => {
+          await trackedCtx.sendLoggedText(userPsid, text, requestId);
+        },
+        sendImage: async nextImageUrl => {
+          await trackedCtx.sendLoggedImage(userPsid, nextImageUrl, requestId);
+        },
+        sendQuickReplies: async (text, replies) => {
+          await trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId);
+        },
+        sendStateQuickReplies: async (nextState, text) => {
+          await trackedCtx.sendStateQuickReplies(
+            userPsid,
+            nextState,
+            text,
+            requestId
+          );
+        },
+        chooseStyle: async style => {
+          await trackedCtx.handleStyleSelection(
             userPsid,
             featureUserId,
             style,
             requestId,
             userLang
-          ),
-        runStyleGeneration: (style, sourceImageUrl, promptHint) =>
-          trackedCtx.runStyleGeneration(
+          );
+        },
+        runStyleGeneration: async (style, sourceImageUrl, promptHint) => {
+          await trackedCtx.runStyleGeneration(
             userPsid,
             featureUserId,
             style,
@@ -392,7 +428,8 @@ async function handleEvent(
             userLang,
             sourceImageUrl,
             promptHint
-          ),
+          );
+        },
       };
     },
     createFeaturePayloadContext: (
@@ -413,23 +450,34 @@ async function handleEvent(
       );
       return {
         ...featureCtx,
-        sendText: text => trackedCtx.sendLoggedText(userPsid, text, requestId),
-        sendImage: imageUrl =>
-          trackedCtx.sendLoggedImage(userPsid, imageUrl, requestId),
-        sendQuickReplies: (text, replies) =>
-          trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId),
-        sendStateQuickReplies: (nextState, text) =>
-          trackedCtx.sendStateQuickReplies(userPsid, nextState, text, requestId),
-        chooseStyle: style =>
-          trackedCtx.handleStyleSelection(
+        sendText: async text => {
+          await trackedCtx.sendLoggedText(userPsid, text, requestId);
+        },
+        sendImage: async imageUrl => {
+          await trackedCtx.sendLoggedImage(userPsid, imageUrl, requestId);
+        },
+        sendQuickReplies: async (text, replies) => {
+          await trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId);
+        },
+        sendStateQuickReplies: async (nextState, text) => {
+          await trackedCtx.sendStateQuickReplies(
+            userPsid,
+            nextState,
+            text,
+            requestId
+          );
+        },
+        chooseStyle: async style => {
+          await trackedCtx.handleStyleSelection(
             userPsid,
             featureUserId,
             style,
             requestId,
             userLang
-          ),
-        runStyleGeneration: (style, sourceImageUrl, promptHint) =>
-          trackedCtx.runStyleGeneration(
+          );
+        },
+        runStyleGeneration: async (style, sourceImageUrl, promptHint) => {
+          await trackedCtx.runStyleGeneration(
             userPsid,
             featureUserId,
             style,
@@ -437,7 +485,8 @@ async function handleEvent(
             userLang,
             sourceImageUrl,
             promptHint
-          ),
+          );
+        },
       };
     },
     createFeatureTextContext: (
@@ -462,23 +511,34 @@ async function handleEvent(
       );
       return {
         ...featureCtx,
-        sendText: text => trackedCtx.sendLoggedText(userPsid, text, requestId),
-        sendImage: imageUrl =>
-          trackedCtx.sendLoggedImage(userPsid, imageUrl, requestId),
-        sendQuickReplies: (text, replies) =>
-          trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId),
-        sendStateQuickReplies: (nextState, text) =>
-          trackedCtx.sendStateQuickReplies(userPsid, nextState, text, requestId),
-        chooseStyle: style =>
-          trackedCtx.handleStyleSelection(
+        sendText: async text => {
+          await trackedCtx.sendLoggedText(userPsid, text, requestId);
+        },
+        sendImage: async imageUrl => {
+          await trackedCtx.sendLoggedImage(userPsid, imageUrl, requestId);
+        },
+        sendQuickReplies: async (text, replies) => {
+          await trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId);
+        },
+        sendStateQuickReplies: async (nextState, text) => {
+          await trackedCtx.sendStateQuickReplies(
+            userPsid,
+            nextState,
+            text,
+            requestId
+          );
+        },
+        chooseStyle: async style => {
+          await trackedCtx.handleStyleSelection(
             userPsid,
             featureUserId,
             style,
             requestId,
             userLang
-          ),
-        runStyleGeneration: (style, sourceImageUrl, promptHint) =>
-          trackedCtx.runStyleGeneration(
+          );
+        },
+        runStyleGeneration: async (style, sourceImageUrl, promptHint) => {
+          await trackedCtx.runStyleGeneration(
             userPsid,
             featureUserId,
             style,
@@ -486,27 +546,35 @@ async function handleEvent(
             userLang,
             sourceImageUrl,
             promptHint
-          ),
+          );
+        },
       };
     },
-    handleStyleSelection: (userPsid, featureUserId, style, requestId, userLang) =>
-      markHandledIfSent(
-        ctx.handleStyleSelection(
-          userPsid,
-          featureUserId,
-          style,
-          requestId,
-          userLang
-        )
-      ),
-    maybeSendInFlightMessage: async (userPsid, requestId) => {
-      const handled = await ctx.maybeSendInFlightMessage(userPsid, requestId);
-      if (handled) {
-        markResponseSent();
-      }
-      return handled;
+    handleStyleSelection: async (
+      userPsid,
+      featureUserId,
+      style,
+      requestId,
+      userLang
+    ) => {
+      const outcome = await ctx.handleStyleSelection(
+        userPsid,
+        featureUserId,
+        style,
+        requestId,
+        userLang
+      );
+      markResponseSentFromOutcome(outcome);
+      return outcome;
     },
-    runStyleGeneration: (
+    maybeSendInFlightMessage: async (userPsid, requestId) => {
+      const result = await ctx.maybeSendInFlightMessage(userPsid, requestId);
+      if (result.handled && "outcome" in result && result.outcome) {
+        markResponseSentFromOutcome(result.outcome);
+      }
+      return result;
+    },
+    runStyleGeneration: async (
       userPsid,
       featureUserId,
       style,
@@ -514,31 +582,35 @@ async function handleEvent(
       userLang,
       sourceImageUrl,
       promptHint
-    ) =>
-      markHandledIfSent(
-        ctx.runStyleGeneration(
-          userPsid,
-          featureUserId,
-          style,
-          requestId,
-          userLang,
-          sourceImageUrl,
-          promptHint
-        )
-      ),
+    ) => {
+      const outcome = await ctx.runStyleGeneration(
+        userPsid,
+        featureUserId,
+        style,
+        requestId,
+        userLang,
+        sourceImageUrl,
+        promptHint
+      );
+      markResponseSentFromOutcome(outcome);
+      return outcome;
+    },
     sendLoggedText: async (userPsid, text, requestId) => {
       logMessengerWebhookTrace("before_send", {
         reqId: requestId,
         user: toLogUser(toUserKey(userPsid)),
         kind: "text",
       });
-      await ctx.sendLoggedText(userPsid, text, requestId);
-      markResponseSent();
+      const outcome = await ctx.sendLoggedText(userPsid, text, requestId);
+      markResponseSentFromOutcome(outcome);
       logMessengerWebhookTrace("after_send", {
         reqId: requestId,
         user: toLogUser(toUserKey(userPsid)),
         kind: "text",
+        sent: outcome.sent,
+        ...(!outcome.sent ? { reason: outcome.reason } : {}),
       });
+      return outcome;
     },
     sendLoggedQuickReplies: async (userPsid, text, replies, requestId) => {
       logMessengerWebhookTrace("before_send", {
@@ -546,13 +618,21 @@ async function handleEvent(
         user: toLogUser(toUserKey(userPsid)),
         kind: "quick_replies",
       });
-      await ctx.sendLoggedQuickReplies(userPsid, text, replies, requestId);
-      markResponseSent();
+      const outcome = await ctx.sendLoggedQuickReplies(
+        userPsid,
+        text,
+        replies,
+        requestId
+      );
+      markResponseSentFromOutcome(outcome);
       logMessengerWebhookTrace("after_send", {
         reqId: requestId,
         user: toLogUser(toUserKey(userPsid)),
         kind: "quick_replies",
+        sent: outcome.sent,
+        ...(!outcome.sent ? { reason: outcome.reason } : {}),
       });
+      return outcome;
     },
     sendLoggedImage: async (userPsid, imageUrl, requestId) => {
       logMessengerWebhookTrace("before_send", {
@@ -560,13 +640,16 @@ async function handleEvent(
         user: toLogUser(toUserKey(userPsid)),
         kind: "image",
       });
-      await ctx.sendLoggedImage(userPsid, imageUrl, requestId);
-      markResponseSent();
+      const outcome = await ctx.sendLoggedImage(userPsid, imageUrl, requestId);
+      markResponseSentFromOutcome(outcome);
       logMessengerWebhookTrace("after_send", {
         reqId: requestId,
         user: toLogUser(toUserKey(userPsid)),
         kind: "image",
+        sent: outcome.sent,
+        ...(!outcome.sent ? { reason: outcome.reason } : {}),
       });
+      return outcome;
     },
     sendStateQuickReplies: async (userPsid, stateName, text, requestId) => {
       logMessengerWebhookTrace("before_send", {
@@ -575,38 +658,65 @@ async function handleEvent(
         kind: "state_quick_replies",
         state: stateName,
       });
-      await ctx.sendStateQuickReplies(userPsid, stateName, text, requestId);
-      markResponseSent();
+      const outcome = await ctx.sendStateQuickReplies(
+        userPsid,
+        stateName,
+        text,
+        requestId
+      );
+      markResponseSentFromOutcome(outcome);
       logMessengerWebhookTrace("after_send", {
         reqId: requestId,
         user: toLogUser(toUserKey(userPsid)),
         kind: "state_quick_replies",
         state: stateName,
+        sent: outcome.sent,
+        ...(!outcome.sent ? { reason: outcome.reason } : {}),
       });
+      return outcome;
     },
     sendFaceMemoryConsentPrompt: async (userPsid, userLang, requestId) => {
-      await ctx.sendFaceMemoryConsentPrompt(userPsid, userLang, requestId);
-      markResponseSent();
+      const outcome = await ctx.sendFaceMemoryConsentPrompt(
+        userPsid,
+        userLang,
+        requestId
+      );
+      markResponseSentFromOutcome(outcome);
+      return outcome;
     },
     sendFlowExplanation: async (userPsid, userLang, requestId) => {
-      await ctx.sendFlowExplanation(userPsid, userLang, requestId);
-      markResponseSent();
+      const outcome = await ctx.sendFlowExplanation(userPsid, userLang, requestId);
+      markResponseSentFromOutcome(outcome);
+      return outcome;
     },
     sendPhotoReceivedPrompt: async (userPsid, userLang, requestId) => {
-      await ctx.sendPhotoReceivedPrompt(userPsid, userLang, requestId);
-      markResponseSent();
+      const outcome = await ctx.sendPhotoReceivedPrompt(
+        userPsid,
+        userLang,
+        requestId
+      );
+      markResponseSentFromOutcome(outcome);
+      return outcome;
     },
     sendPrivacyInfo: async (userPsid, userLang, requestId) => {
-      await ctx.sendPrivacyInfo(userPsid, userLang, requestId);
-      markResponseSent();
+      const outcome = await ctx.sendPrivacyInfo(userPsid, userLang, requestId);
+      markResponseSentFromOutcome(outcome);
+      return outcome;
     },
     sendStyleOptionsForCategory: async (userPsid, category, userLang, requestId) => {
-      await ctx.sendStyleOptionsForCategory(userPsid, category, userLang, requestId);
-      markResponseSent();
+      const outcome = await ctx.sendStyleOptionsForCategory(
+        userPsid,
+        category,
+        userLang,
+        requestId
+      );
+      markResponseSentFromOutcome(outcome);
+      return outcome;
     },
     sendStylePicker: async (userPsid, userLang, requestId) => {
-      await ctx.sendStylePicker(userPsid, userLang, requestId);
-      markResponseSent();
+      const outcome = await ctx.sendStylePicker(userPsid, userLang, requestId);
+      markResponseSentFromOutcome(outcome);
+      return outcome;
     },
   };
 
@@ -657,9 +767,12 @@ async function handleEvent(
         text: event.message?.text,
         payload: eventPayload,
         state,
-        sendText: text => trackedCtx.sendLoggedText(psid, text, reqId),
-        sendQuickReplies: (text, replies) =>
-          trackedCtx.sendLoggedQuickReplies(psid, text, replies, reqId),
+        sendText: async text => {
+          await trackedCtx.sendLoggedText(psid, text, reqId);
+        },
+        sendQuickReplies: async (text, replies) => {
+          await trackedCtx.sendLoggedQuickReplies(psid, text, replies, reqId);
+        },
       })
     ) {
       logMessengerWebhookTrace("selected_branch", {
@@ -683,9 +796,12 @@ async function handleEvent(
       psid,
       userId,
       reqId,
-      sendText: (text: string) => trackedCtx.sendLoggedText(psid, text, reqId),
-      sendStateText: (stateName: ConversationState, text: string) =>
-        trackedCtx.sendStateQuickReplies(psid, stateName, text, reqId),
+      sendText: async (text: string) => {
+        await trackedCtx.sendLoggedText(psid, text, reqId);
+      },
+      sendStateText: async (stateName: ConversationState, text: string) => {
+        await trackedCtx.sendStateQuickReplies(psid, stateName, text, reqId);
+      },
       sendOptionsPrompt: async (
         prompt: string,
         options: Array<{ id: string; title: string }>
@@ -701,8 +817,9 @@ async function handleEvent(
           reqId
         );
       },
-      sendImage: (imageUrl: string) =>
-        trackedCtx.sendLoggedImage(psid, imageUrl, reqId),
+      sendImage: async (imageUrl: string) => {
+        await trackedCtx.sendLoggedImage(psid, imageUrl, reqId);
+      },
       safeLog,
       setLastEntryIntent: (nextEntryIntent: EntryIntent | null) =>
         Promise.resolve(setLastEntryIntent(psid, nextEntryIntent)),
@@ -750,7 +867,16 @@ async function handleEvent(
       return;
     }
 
-    if (await trackedCtx.handleReferralStyleEvent(psid, referralRef, lang, reqId)) {
+    const referralResult = await trackedCtx.handleReferralStyleEvent(
+      psid,
+      referralRef,
+      lang,
+      reqId
+    );
+    if (referralResult.handled) {
+      if (referralResult.outcome) {
+        markResponseSentFromOutcome(referralResult.outcome);
+      }
       logMessengerWebhookTrace("selected_branch", {
         reqId,
         user: toLogUser(userId),
@@ -808,7 +934,7 @@ async function handleMessageEvent(
   if (!message || message.is_echo) return;
   await setLastUserMessageAt(input.psid, input.event.timestamp ?? Date.now());
 
-  if (await ctx.maybeSendInFlightMessage(input.psid, input.reqId)) {
+  if ((await ctx.maybeSendInFlightMessage(input.psid, input.reqId)).handled) {
     return;
   }
 
@@ -907,12 +1033,35 @@ async function handlePayload(
     payload: input.payload,
     reqId: input.reqId,
     lang: input.lang,
-    maybeSendInFlightMessage: ctx.maybeSendInFlightMessage,
+    maybeSendInFlightMessage: async (userPsid, requestId) =>
+      (await ctx.maybeSendInFlightMessage(userPsid, requestId)).handled,
     getState: userPsid => Promise.resolve(getOrCreateState(userPsid)),
     getFeatures: getBotFeatures,
     createFeaturePayloadContext: ctx.createFeaturePayloadContext,
-    runStyleGeneration: ctx.runStyleGeneration,
-    handleStyleSelection: ctx.handleStyleSelection,
+    runStyleGeneration: async (userPsid, inputUserId, style, requestId, userLang) => {
+      await ctx.runStyleGeneration(
+        userPsid,
+        inputUserId,
+        style,
+        requestId,
+        userLang
+      );
+    },
+    handleStyleSelection: async (
+      userPsid,
+      inputUserId,
+      style,
+      requestId,
+      userLang
+    ) => {
+      await ctx.handleStyleSelection(
+        userPsid,
+        inputUserId,
+        style,
+        requestId,
+        userLang
+      );
+    },
     showStylePicker: async (userPsid, userLang, requestId) => {
       await setPreselectedStyle(userPsid, null);
       await setSelectedStyleCategory(userPsid, null);
@@ -929,8 +1078,12 @@ async function handlePayload(
         requestId
       );
     },
-    sendFlowExplanation: ctx.sendFlowExplanation,
-    sendPrivacyInfo: ctx.sendPrivacyInfo,
+    sendFlowExplanation: async (userPsid, userLang, requestId) => {
+      await ctx.sendFlowExplanation(userPsid, userLang, requestId);
+    },
+    sendPrivacyInfo: async (userPsid, userLang, requestId) => {
+      await ctx.sendPrivacyInfo(userPsid, userLang, requestId);
+    },
     sendUnknownPayloadLog: unknownUserId => {
       safeLog("unknown_payload", { user: toLogUser(unknownUserId) });
     },
@@ -1144,9 +1297,12 @@ async function sendSharedMessengerTextResponse(
 ): Promise<void> {
   await sendMessengerBotResponse(result.response, {
     replyState: result.replyState,
-    sendText: text => ctx.sendLoggedText(input.psid, text, input.reqId),
-    sendStateText: (stateName, text) =>
-      ctx.sendStateQuickReplies(input.psid, stateName, text, input.reqId),
+    sendText: async text => {
+      await ctx.sendLoggedText(input.psid, text, input.reqId);
+    },
+    sendStateText: async (stateName, text) => {
+      await ctx.sendStateQuickReplies(input.psid, stateName, text, input.reqId);
+    },
   });
 }
 
@@ -1181,19 +1337,22 @@ export function createWebhookHandlers({
     }
   }
 
-  async function maybeSendInFlightMessage(psid: string, reqId: string) {
+  async function maybeSendInFlightMessage(
+    psid: string,
+    reqId: string
+  ): Promise<MaybeInFlightMessageResult> {
     if (!(await hasInFlightGeneration(psid))) {
       inFlightNoticeSent.delete(psid);
-      return false;
+      return { handled: false };
     }
 
     if (inFlightNoticeSent.has(psid)) {
-      return true;
+      return { handled: true };
     }
 
     inFlightNoticeSent.add(psid);
-    await sendLoggedText(psid, IN_FLIGHT_MESSAGE, reqId);
-    return true;
+    const outcome = await sendLoggedText(psid, IN_FLIGHT_MESSAGE, reqId);
+    return { handled: true, outcome };
   }
 
   function logIncomingMessage(
@@ -1248,7 +1407,7 @@ export function createWebhookHandlers({
     psid: string,
     text: string,
     reqId: string
-  ): Promise<void> {
+  ): Promise<MessengerSendOutcome> {
     debugWebhookLog({
       level: "debug",
       msg: "outgoing_message",
@@ -1257,7 +1416,7 @@ export function createWebhookHandlers({
       psidHash: anonymizePsid(psid).slice(0, 12),
       text,
     });
-    await sendText(psid, text);
+    return await sendText(psid, text);
   }
 
   async function sendLoggedQuickReplies(
@@ -1265,7 +1424,7 @@ export function createWebhookHandlers({
     text: string,
     replies: Parameters<typeof sendQuickReplies>[2],
     reqId: string
-  ): Promise<void> {
+  ): Promise<MessengerSendOutcome> {
     debugWebhookLog({
       level: "debug",
       msg: "outgoing_message",
@@ -1278,14 +1437,14 @@ export function createWebhookHandlers({
         payload: reply.payload,
       })),
     });
-    await sendQuickReplies(psid, text, replies);
+    return await sendQuickReplies(psid, text, replies);
   }
 
   async function sendLoggedImage(
     psid: string,
     imageUrl: string,
     reqId: string
-  ): Promise<void> {
+  ): Promise<MessengerSendOutcome> {
     debugWebhookLog({
       level: "debug",
       msg: "outgoing_message",
@@ -1294,7 +1453,7 @@ export function createWebhookHandlers({
       psidHash: anonymizePsid(psid).slice(0, 12),
       imageUrl,
     });
-    await sendImage(psid, imageUrl);
+    return await sendImage(psid, imageUrl);
   }
 
   async function sendStateQuickReplies(
@@ -1302,14 +1461,13 @@ export function createWebhookHandlers({
     state: ConversationState,
     text: string,
     reqId: string
-  ): Promise<void> {
+  ): Promise<MessengerSendOutcome> {
     const replies = toMessengerReplies(state);
     if (replies.length === 0) {
-      await sendLoggedText(psid, text, reqId);
-      return;
+      return await sendLoggedText(psid, text, reqId);
     }
 
-    await sendLoggedQuickReplies(psid, text, replies, reqId);
+    return await sendLoggedQuickReplies(psid, text, replies, reqId);
   }
 
   function resolvePrivacyPolicyUrl(): string | undefined {
@@ -1349,7 +1507,7 @@ export function createWebhookHandlers({
     psid: string,
     elements: Parameters<typeof sendGenericTemplate>[1],
     reqId: string
-  ): Promise<void> {
+  ): Promise<MessengerSendOutcome> {
     debugWebhookLog({
       level: "debug",
       msg: "outgoing_message",
@@ -1376,7 +1534,7 @@ export function createWebhookHandlers({
         }),
       })),
     });
-    await sendGenericTemplate(psid, elements);
+    return await sendGenericTemplate(psid, elements);
   }
 
   async function sendLoggedButtonTemplate(
@@ -1384,7 +1542,7 @@ export function createWebhookHandlers({
     text: string,
     buttons: Parameters<typeof sendButtonTemplate>[2],
     reqId: string
-  ): Promise<void> {
+  ): Promise<MessengerSendOutcome> {
     debugWebhookLog({
       level: "debug",
       msg: "outgoing_message",
@@ -1404,7 +1562,7 @@ export function createWebhookHandlers({
         };
       }),
     });
-    await sendButtonTemplate(psid, text, buttons);
+    return await sendButtonTemplate(psid, text, buttons);
   }
 
   function createFeatureLogger(userId: string): BotLogger {
@@ -1436,22 +1594,29 @@ export function createWebhookHandlers({
       reqId,
       lang,
       state,
-      sendText: text => sendLoggedText(psid, text, reqId),
-      sendImage: imageUrl => sendLoggedImage(psid, imageUrl, reqId),
-      sendQuickReplies: (text, replies) =>
-        sendLoggedQuickReplies(psid, text, replies, reqId),
-      sendStateQuickReplies: (nextState, text) =>
-        sendStateQuickReplies(psid, nextState, text, reqId),
+      sendText: async text => {
+        await sendLoggedText(psid, text, reqId);
+      },
+      sendImage: async imageUrl => {
+        await sendLoggedImage(psid, imageUrl, reqId);
+      },
+      sendQuickReplies: async (text, replies) => {
+        await sendLoggedQuickReplies(psid, text, replies, reqId);
+      },
+      sendStateQuickReplies: async (nextState, text) => {
+        await sendStateQuickReplies(psid, nextState, text, reqId);
+      },
       setFlowState: async nextState => {
         await setFlowState(psid, nextState);
       },
       preselectStyle: async style => {
         await setPreselectedStyle(psid, style);
       },
-      chooseStyle: style =>
-        handleStyleSelection(psid, userId, style, reqId, lang),
-      runStyleGeneration: (style, sourceImageUrl, promptHint) =>
-        runStyleGeneration(
+      chooseStyle: async style => {
+        await handleStyleSelection(psid, userId, style, reqId, lang);
+      },
+      runStyleGeneration: async (style, sourceImageUrl, promptHint) => {
+        await runStyleGeneration(
           psid,
           userId,
           style,
@@ -1459,7 +1624,8 @@ export function createWebhookHandlers({
           lang,
           sourceImageUrl,
           promptHint
-        ),
+        );
+      },
       getRuntimeStats: () => getTodayRuntimeStats(),
       logger: createFeatureLogger(userId),
     };
@@ -1539,8 +1705,8 @@ export function createWebhookHandlers({
     psid: string,
     lang: Lang,
     reqId: string
-  ): Promise<void> {
-    await sendStateQuickReplies(
+  ): Promise<MessengerSendOutcome> {
+    return await sendStateQuickReplies(
       psid,
       "AWAITING_STYLE",
       t(lang, "styleCategoryPicker"),
@@ -1553,7 +1719,7 @@ export function createWebhookHandlers({
     category: StyleCategory,
     lang: Lang,
     reqId: string
-  ): Promise<void> {
+  ): Promise<MessengerSendOutcome> {
     const styles = getStylesForCategory(category);
     const categoryLabel = STYLE_CATEGORY_LABELS[category];
     const introText = t(lang, "styleCategoryCarouselIntro", {
@@ -1561,8 +1727,8 @@ export function createWebhookHandlers({
     });
 
     try {
-      await sendLoggedText(psid, introText, reqId);
-      await sendLoggedGenericTemplate(
+      const introOutcome = await sendLoggedText(psid, introText, reqId);
+      const templateOutcome = await sendLoggedGenericTemplate(
         psid,
         styles.map(style => ({
           title: STYLE_LABELS[style.style],
@@ -1579,7 +1745,7 @@ export function createWebhookHandlers({
         })),
         reqId
       );
-      return;
+      return combineMessengerSendOutcomes(introOutcome, templateOutcome);
     } catch (error) {
       safeLog("style_category_carousel_failed", {
         user: toLogUser(psid),
@@ -1588,7 +1754,7 @@ export function createWebhookHandlers({
       });
     }
 
-    await sendLoggedQuickReplies(
+    return await sendLoggedQuickReplies(
       psid,
       introText,
       toMessengerStyleReplies(category, lang),
@@ -1600,16 +1766,16 @@ export function createWebhookHandlers({
     psid: string,
     lang: Lang,
     reqId: string
-  ): Promise<void> {
-    await sendStylePicker(psid, lang, reqId);
+  ): Promise<MessengerSendOutcome> {
+    return await sendStylePicker(psid, lang, reqId);
   }
 
   async function sendFaceMemoryConsentPrompt(
     psid: string,
     lang: Lang,
     reqId: string
-  ): Promise<void> {
-    await sendLoggedQuickReplies(
+  ): Promise<MessengerSendOutcome> {
+    return await sendLoggedQuickReplies(
       psid,
       lang === "en"
         ? "May I keep your photo for 30 days? Then you do not have to upload it again every time. You can delete it any time with \"delete my data\"."
@@ -1648,13 +1814,13 @@ export function createWebhookHandlers({
     style: Style,
     lang: Lang,
     reqId: string
-  ): Promise<void> {
+  ): Promise<MessengerSendOutcome> {
     const styleLabel = STYLE_LABELS[style];
     const text =
       lang === "en"
         ? `You came in via ${styleLabel}. Send a photo to start `
         : `Je bent binnengekomen via ${styleLabel}. Stuur een foto om te starten `;
-    await sendLoggedText(psid, text, reqId);
+    return await sendLoggedText(psid, text, reqId);
   }
 
   async function runStyleGeneration(
@@ -1665,7 +1831,13 @@ export function createWebhookHandlers({
     lang: Lang,
     sourceImageUrl?: string,
     promptHint?: string
-  ): Promise<void> {
+  ): Promise<MessengerSendOutcome> {
+    let sendOutcome: MessengerSendOutcome = MESSENGER_SEND_SKIPPED;
+    const rememberSendOutcome = (outcome: MessengerSendOutcome) => {
+      sendOutcome = combineMessengerSendOutcomes(sendOutcome, outcome);
+      return outcome;
+    };
+
     const didRun = await runGuardedGeneration(psid, async () => {
       const allowed = await canGenerate(psid);
       const quotaState = await getOrCreateState(psid);
@@ -1685,23 +1857,23 @@ export function createWebhookHandlers({
         })
       );
       if (!allowed) {
-        await sendLoggedText(
+        rememberSendOutcome(await sendLoggedText(
           psid,
           lang === "en"
             ? "You used your free credits for today. Come back tomorrow."
             : "Je hebt je gratis credits voor vandaag opgebruikt. Kom morgen terug.",
           reqId
-        );
+        ));
         await setFlowState(psid, "AWAITING_STYLE");
         return;
       }
 
       await setFlowState(psid, "PROCESSING");
-      await sendLoggedText(
+      rememberSendOutcome(await sendLoggedText(
         psid,
         t(lang, "generatingPrompt", { styleLabel: STYLE_LABELS[style] }),
         reqId
-      );
+      ));
 
       const state = await getOrCreateState(psid);
       const generationResult = await executeGenerationFlow({
@@ -1759,17 +1931,17 @@ export function createWebhookHandlers({
           })
         );
 
-        await sendLoggedImage(psid, imageUrl, reqId);
+        rememberSendOutcome(await sendLoggedImage(psid, imageUrl, reqId));
         await increment(psid);
         await setLastGenerated(psid, imageUrl);
         await setLastGenerationContext(psid, { style, prompt: promptHint });
         recordGenerationSuccess(style, metrics.totalMs);
-        await sendStateQuickReplies(
+        rememberSendOutcome(await sendStateQuickReplies(
           psid,
           "RESULT_READY",
           t(lang, "success"),
           reqId
-        );
+        ));
         await setFlowState(psid, "IDLE");
         return;
       }
@@ -1800,14 +1972,18 @@ export function createWebhookHandlers({
 
       let failureText = t(lang, "generationGenericFailure");
       if (generationResult.errorKind === "missing_source_image") {
-        await sendLoggedText(psid, t(lang, "styleWithoutPhoto"), reqId);
+        rememberSendOutcome(
+          await sendLoggedText(psid, t(lang, "styleWithoutPhoto"), reqId)
+        );
         await setFlowState(psid, "AWAITING_PHOTO");
         return;
       } else if (
         generationResult.errorKind === "missing_input_image" ||
         generationResult.errorKind === "invalid_source_image"
       ) {
-        await sendLoggedText(psid, t(lang, "missingInputImage"), reqId);
+        rememberSendOutcome(
+          await sendLoggedText(psid, t(lang, "missingInputImage"), reqId)
+        );
         await setFlowState(psid, "AWAITING_PHOTO");
         return;
       } else if (generationResult.errorKind === "generation_unavailable") {
@@ -1815,15 +1991,17 @@ export function createWebhookHandlers({
       } else if (generationResult.errorKind === "generation_timeout") {
         failureText = t(lang, "generationTimeout");
       } else if (generationResult.errorKind === "generation_budget_reached") {
-        await sendLoggedText(psid, t(lang, "generationBudgetReached"), reqId);
+        rememberSendOutcome(
+          await sendLoggedText(psid, t(lang, "generationBudgetReached"), reqId)
+        );
         await setFlowState(psid, "AWAITING_STYLE");
         return;
       }
 
-      await sendLoggedText(psid, t(lang, "failure"), reqId);
+      rememberSendOutcome(await sendLoggedText(psid, t(lang, "failure"), reqId));
       await setFlowState(psid, "FAILURE");
 
-      await sendLoggedQuickReplies(
+      rememberSendOutcome(await sendLoggedQuickReplies(
         psid,
         failureText,
         [
@@ -1839,14 +2017,18 @@ export function createWebhookHandlers({
           },
         ],
         reqId
-      );
+      ));
     });
 
     if (didRun === null) {
-      await maybeSendInFlightMessage(psid, reqId);
-      return;
+      const result = await maybeSendInFlightMessage(psid, reqId);
+      if ("outcome" in result && result.outcome) {
+        rememberSendOutcome(result.outcome);
+      }
+      return sendOutcome;
     }
     inFlightNoticeSent.delete(psid);
+    return sendOutcome;
   }
 
   async function handleStyleSelection(
@@ -1855,37 +2037,37 @@ export function createWebhookHandlers({
     selectedStyle: Style,
     reqId: string,
     lang: Lang
-  ): Promise<void> {
+  ): Promise<MessengerSendOutcome> {
     const state = await getOrCreateState(psid);
     if (state.stage === "PROCESSING") {
-      await maybeSendInFlightMessage(psid, reqId);
-      return;
+      const result = await maybeSendInFlightMessage(psid, reqId);
+      return "outcome" in result && result.outcome
+        ? result.outcome
+        : MESSENGER_SEND_SKIPPED;
     }
 
     await setChosenStyle(psid, selectedStyle);
     if (!state.lastPhotoUrl) {
       await setFlowState(psid, "AWAITING_PHOTO");
-      await sendLoggedText(psid, t(lang, "styleWithoutPhoto"), reqId);
-      return;
+      return await sendLoggedText(psid, t(lang, "styleWithoutPhoto"), reqId);
     }
 
-    await runStyleGeneration(psid, userId, selectedStyle, reqId, lang);
+    return await runStyleGeneration(psid, userId, selectedStyle, reqId, lang);
   }
 
   async function sendPrivacyInfo(
     psid: string,
     lang: Lang,
     reqId: string
-  ): Promise<void> {
+  ): Promise<MessengerSendOutcome> {
     const resolvedPrivacyUrl = resolvePrivacyPolicyUrl();
     const privacyText = t(lang, "privacy", { link: resolvedPrivacyUrl });
 
     if (!resolvedPrivacyUrl) {
-      await sendLoggedText(psid, privacyText, reqId);
-      return;
+      return await sendLoggedText(psid, privacyText, reqId);
     }
 
-    await sendLoggedButtonTemplate(
+    return await sendLoggedButtonTemplate(
       psid,
       privacyText,
       [
@@ -1926,17 +2108,17 @@ export function createWebhookHandlers({
     referralRef: string | undefined,
     lang: Lang,
     reqId: string
-  ): Promise<boolean> {
+  ): Promise<MaybeInFlightMessageResult> {
     const referralStyle = parseReferralStyle(referralRef);
     if (!referralStyle) {
-      return false;
+      return { handled: false };
     }
 
     await clearPendingImageState(psid);
     await setPreselectedStyle(psid, referralStyle);
     await setFlowState(psid, "AWAITING_PHOTO");
-    await sendReferralPhotoPrompt(psid, referralStyle, lang, reqId);
-    return true;
+    const outcome = await sendReferralPhotoPrompt(psid, referralStyle, lang, reqId);
+    return { handled: true, outcome };
   }
 
   const ctx: HandlerContext = {

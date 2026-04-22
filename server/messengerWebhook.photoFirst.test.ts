@@ -8,11 +8,11 @@ const {
   sendTextMock,
   safeLogMock,
 } = vi.hoisted(() => ({
-  sendButtonTemplateMock: vi.fn(async () => undefined),
-  sendGenericTemplateMock: vi.fn(async () => undefined),
-  sendImageMock: vi.fn(async () => undefined),
-  sendQuickRepliesMock: vi.fn(async () => undefined),
-  sendTextMock: vi.fn(async () => undefined),
+  sendButtonTemplateMock: vi.fn(async () => ({ sent: true })),
+  sendGenericTemplateMock: vi.fn(async () => ({ sent: true })),
+  sendImageMock: vi.fn(async () => ({ sent: true })),
+  sendQuickRepliesMock: vi.fn(async () => ({ sent: true })),
+  sendTextMock: vi.fn(async () => ({ sent: true })),
   safeLogMock: vi.fn(),
 }));
 

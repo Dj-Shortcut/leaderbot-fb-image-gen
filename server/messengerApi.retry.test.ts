@@ -142,7 +142,10 @@ describe("messengerApi retries", () => {
     const fetchMock = vi.fn<typeof fetch>();
     global.fetch = fetchMock;
 
-    await expect(sendText("psid-1", "hello")).resolves.toBeUndefined();
+    await expect(sendText("psid-1", "hello")).resolves.toEqual({
+      sent: false,
+      reason: "response_window_closed",
+    });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
