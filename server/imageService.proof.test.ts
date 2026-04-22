@@ -167,6 +167,36 @@ function expectDistinctivePrompt(
   );
 }
 
+function installStoredSourcePromptFetchMock(
+  assertPrompt: (prompt: string) => void
+) {
+  process.env.OPENAI_API_KEY = "dummy-key";
+  process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+  process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
+
+  const fixture = Buffer.alloc(7000, 9);
+  const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+    if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
+      return {
+        ok: true,
+        headers: new Headers({ "content-type": "image/jpeg" }),
+        arrayBuffer: async () => fixture,
+      } as Response;
+    }
+
+    const formData = init?.body as FormData;
+    assertPrompt(String(formData.get("prompt")));
+
+    return {
+      ok: true,
+      json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+    } as Response;
+  });
+
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
 describe("OpenAi image-to-image proof", () => {
   beforeEach(() => {
     setSourceImageDnsLookupForTests(async () => [
@@ -251,38 +281,16 @@ describe("OpenAi image-to-image proof", () => {
   );
 
   it("uses the cyberpunk preset prompt for OpenAI edits", async () => {
-    process.env.OPENAI_API_KEY = "dummy-key";
-    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
-
-    const fixture = Buffer.alloc(7000, 9);
-
-    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
-        return {
-          ok: true,
-          headers: new Headers({ "content-type": "image/jpeg" }),
-          arrayBuffer: async () => fixture,
-        } as Response;
-      }
-
-      const formData = init?.body as FormData;
-      expect(formData.get("prompt")).toContain(
+    const fetchMock = installStoredSourcePromptFetchMock(prompt => {
+      expect(prompt).toContain(
         "Transform this photo into a cyberpunk portrait"
       );
-      expect(formData.get("prompt")).toContain("neon signage glow");
-      expect(formData.get("prompt")).toContain("rain-slick reflections");
-      expect(formData.get("prompt")).toContain(
+      expect(prompt).toContain("neon signage glow");
+      expect(prompt).toContain("rain-slick reflections");
+      expect(prompt).toContain(
         "vivid palette of electric pink, cyan, ultraviolet, and toxic blue"
       );
-
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
     });
-
-    vi.stubGlobal("fetch", fetchMock);
 
     const generator = new OpenAiImageGenerator();
     await generator.generate({
@@ -297,23 +305,7 @@ describe("OpenAi image-to-image proof", () => {
   });
 
   it("uses the Norman Blackwell preset prompt for OpenAI edits", async () => {
-    process.env.OPENAI_API_KEY = "dummy-key";
-    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
-
-    const fixture = Buffer.alloc(7000, 9);
-
-    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
-        return {
-          ok: true,
-          headers: new Headers({ "content-type": "image/jpeg" }),
-          arrayBuffer: async () => fixture,
-        } as Response;
-      }
-
-      const formData = init?.body as FormData;
-      const prompt = String(formData.get("prompt"));
+    const fetchMock = installStoredSourcePromptFetchMock(prompt => {
       expect(prompt).toContain(
         "Reimagine this photo as a nostalgic mid-century American editorial illustration"
       );
@@ -324,14 +316,7 @@ describe("OpenAi image-to-image proof", () => {
       expect(prompt).toContain(
         "polished finish of a vintage family magazine cover from the 1940s or 1950s"
       );
-
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
     });
-
-    vi.stubGlobal("fetch", fetchMock);
 
     const generator = new OpenAiImageGenerator();
     await generator.generate({
@@ -346,23 +331,7 @@ describe("OpenAi image-to-image proof", () => {
   });
 
   it("uses the oil-paint preset prompt for OpenAI edits", async () => {
-    process.env.OPENAI_API_KEY = "dummy-key";
-    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
-
-    const fixture = Buffer.alloc(7000, 9);
-
-    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
-        return {
-          ok: true,
-          headers: new Headers({ "content-type": "image/jpeg" }),
-          arrayBuffer: async () => fixture,
-        } as Response;
-      }
-
-      const formData = init?.body as FormData;
-      const prompt = String(formData.get("prompt"));
+    const fetchMock = installStoredSourcePromptFetchMock(prompt => {
       expect(prompt).toContain(
         "Render this portrait as a classical oil painting"
       );
@@ -372,14 +341,7 @@ describe("OpenAi image-to-image proof", () => {
       expect(prompt).toContain(
         "rich museum-grade palette of umber, ochre, crimson, and deep blue"
       );
-
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
     });
-
-    vi.stubGlobal("fetch", fetchMock);
 
     const generator = new OpenAiImageGenerator();
     await generator.generate({
