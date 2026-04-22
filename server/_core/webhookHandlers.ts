@@ -22,7 +22,6 @@ import {
   setLastGenerated,
   setLastGenerationContext,
   setLastEntryIntent,
-  setLastUserMessageAt,
   setPendingStoredImage,
   setPreselectedStyle,
   setPreferredLang,
@@ -32,6 +31,8 @@ import {
   anonymizePsid,
   type ConversationState,
 } from "./messengerState";
+import { recordInboundUserActivity } from "./messengerInboundActivity";
+import { classifyInboundEvent } from "./messengerInboundClassification";
 import {
   FACE_MEMORY_CONSENT_NO,
   FACE_MEMORY_CONSENT_YES,
@@ -52,7 +53,6 @@ import {
 } from "./messengerStyles";
 import { claimWebhookReplayKey } from "./webhookReplayProtection";
 import {
-  detectAck,
   type FacebookWebhookEntry,
   FacebookWebhookEvent,
   getEventDedupeKey,
@@ -62,8 +62,6 @@ import {
   STYLE_LABELS,
   toMessengerReplies,
   toMessengerStyleReplies,
-  styleCategoryPayloadToCategory,
-  stylePayloadToStyle,
 } from "./webhookHelpers";
 import { hasInFlightGeneration, runGuardedGeneration } from "./generationGuard";
 import { canGenerate, increment } from "./messengerQuota";
@@ -324,24 +322,6 @@ function logMessengerWebhookTrace(
   details: Record<string, unknown>
 ): void {
   safeLog("messenger_response_window_trace", { stage, ...details });
-}
-
-function isKnownMessengerPayload(payload: string | undefined): boolean {
-  if (!payload) {
-    return false;
-  }
-
-  return Boolean(
-    payload === FACE_MEMORY_CONSENT_YES ||
-      payload === FACE_MEMORY_CONSENT_NO ||
-      payload === "CHOOSE_STYLE" ||
-      payload === "WHAT_IS_THIS" ||
-      payload === "PRIVACY_INFO" ||
-      payload === "RETRY_STYLE" ||
-      payload.startsWith("RETRY_STYLE_") ||
-      stylePayloadToStyle(payload) ||
-      styleCategoryPayloadToCategory(payload)
-  );
 }
 
 async function handleEntry(
@@ -733,22 +713,13 @@ async function handleEvent(
     : ctx.defaultLang;
   const state = await getOrCreateState(psid);
   const lang = state.preferredLang || localeLang || ctx.defaultLang;
-  const isInboundUserEvent = Boolean(
-    event.postback || (event.message && !event.message.is_echo)
-  );
-  const isIntentionalSilentAck = Boolean(detectAck(event.message?.text));
-  const eventPayload = event.message?.quick_reply?.payload ?? event.postback?.payload;
-  const isIntentionalSilentUnknownPayload = Boolean(
-    eventPayload && !isKnownMessengerPayload(eventPayload)
-  );
-  if (isInboundUserEvent) {
-    await setLastUserMessageAt(psid, event.timestamp ?? Date.now());
-  }
+  const classification = classifyInboundEvent(event);
+  await recordInboundUserActivity(psid, event, classification);
   const sendFallbackIfNeeded = async () => {
     if (
-      isInboundUserEvent &&
-      !isIntentionalSilentAck &&
-      !isIntentionalSilentUnknownPayload &&
+      classification.isInboundUserEvent &&
+      !classification.isIntentionalSilentAck &&
+      !classification.isIntentionalSilentUnknownPayload &&
       !responseSent
     ) {
       await trackedCtx.sendLoggedText(psid, t(lang, "failure"), reqId);
@@ -765,12 +736,12 @@ async function handleEvent(
 
   try {
     if (
-      isInboundUserEvent &&
+      classification.isInboundUserEvent &&
       await handleMessengerConsentGate({
         psid,
         lang,
         text: event.message?.text,
-        payload: eventPayload,
+        payload: classification.eventPayload,
         state,
         sendText: async text => {
           await trackedCtx.sendLoggedText(psid, text, reqId);
