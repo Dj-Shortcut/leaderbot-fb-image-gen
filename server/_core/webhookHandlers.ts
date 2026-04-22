@@ -368,8 +368,10 @@ async function handleEvent(
   const markResponseSent = () => {
     responseSent = true;
   };
-  const markResponseSentFromOutcome = (outcome: MessengerSendOutcome) => {
-    if (outcome.sent) {
+  const markResponseSentFromOutcome = (
+    outcome: MessengerSendOutcome | undefined
+  ) => {
+    if (outcome?.sent) {
       markResponseSent();
     }
   };
