@@ -594,6 +594,7 @@ describe("messenger webhook dedupe", () => {
     });
 
     expect(getState(psid)?.consentGiven).toBe(true);
+    expect(getState(psid)?.stage).toBe("AWAITING_STYLE");
     expect(sendTextMock).toHaveBeenCalledWith(
       psid,
       expect.stringContaining("Je bent klaar")

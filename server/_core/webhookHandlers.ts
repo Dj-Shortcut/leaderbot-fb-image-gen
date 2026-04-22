@@ -762,6 +762,7 @@ async function handleEvent(
           await trackedCtx.sendLoggedQuickReplies(psid, text, replies, reqId);
         },
         sendRestyleStarterPills: async () => {
+          await setFlowState(psid, "AWAITING_STYLE");
           await trackedCtx.sendStylePicker(psid, lang, reqId);
         },
       })
