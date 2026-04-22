@@ -1798,6 +1798,10 @@ describe("messenger greeting behavior", () => {
     expect(sendTextMock.mock.invocationCallOrder[0]).toBeLessThan(
       sendGenericTemplateMock.mock.invocationCallOrder[0]
     );
+    expect(sendTextMock).not.toHaveBeenCalledWith(
+      "category-user",
+      "Oeps. Probeer nog een stijl."
+    );
   });
 
   it("keeps category selection in no-photo flow on a single text-plus-carousel path", async () => {

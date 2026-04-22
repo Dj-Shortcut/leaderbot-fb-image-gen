@@ -321,8 +321,191 @@ async function handleEvent(
   const markResponseSent = () => {
     responseSent = true;
   };
+  const markHandledIfSent = async <T>(
+    operation: Promise<T>
+  ): Promise<T> => {
+    const result = await operation;
+    markResponseSent();
+    return result;
+  };
   const trackedCtx: HandlerContext = {
     ...ctx,
+    createFeatureImageContext: (
+      userPsid,
+      featureUserId,
+      requestId,
+      userLang,
+      featureState,
+      imageUrl
+    ) => {
+      const featureCtx = ctx.createFeatureImageContext(
+        userPsid,
+        featureUserId,
+        requestId,
+        userLang,
+        featureState,
+        imageUrl
+      );
+      return {
+        ...featureCtx,
+        sendText: text => trackedCtx.sendLoggedText(userPsid, text, requestId),
+        sendImage: nextImageUrl =>
+          trackedCtx.sendLoggedImage(userPsid, nextImageUrl, requestId),
+        sendQuickReplies: (text, replies) =>
+          trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId),
+        sendStateQuickReplies: (nextState, text) =>
+          trackedCtx.sendStateQuickReplies(userPsid, nextState, text, requestId),
+        chooseStyle: style =>
+          trackedCtx.handleStyleSelection(
+            userPsid,
+            featureUserId,
+            style,
+            requestId,
+            userLang
+          ),
+        runStyleGeneration: (style, sourceImageUrl, promptHint) =>
+          trackedCtx.runStyleGeneration(
+            userPsid,
+            featureUserId,
+            style,
+            requestId,
+            userLang,
+            sourceImageUrl,
+            promptHint
+          ),
+      };
+    },
+    createFeaturePayloadContext: (
+      userPsid,
+      featureUserId,
+      requestId,
+      userLang,
+      featureState,
+      payload
+    ) => {
+      const featureCtx = ctx.createFeaturePayloadContext(
+        userPsid,
+        featureUserId,
+        requestId,
+        userLang,
+        featureState,
+        payload
+      );
+      return {
+        ...featureCtx,
+        sendText: text => trackedCtx.sendLoggedText(userPsid, text, requestId),
+        sendImage: imageUrl =>
+          trackedCtx.sendLoggedImage(userPsid, imageUrl, requestId),
+        sendQuickReplies: (text, replies) =>
+          trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId),
+        sendStateQuickReplies: (nextState, text) =>
+          trackedCtx.sendStateQuickReplies(userPsid, nextState, text, requestId),
+        chooseStyle: style =>
+          trackedCtx.handleStyleSelection(
+            userPsid,
+            featureUserId,
+            style,
+            requestId,
+            userLang
+          ),
+        runStyleGeneration: (style, sourceImageUrl, promptHint) =>
+          trackedCtx.runStyleGeneration(
+            userPsid,
+            featureUserId,
+            style,
+            requestId,
+            userLang,
+            sourceImageUrl,
+            promptHint
+          ),
+      };
+    },
+    createFeatureTextContext: (
+      userPsid,
+      featureUserId,
+      requestId,
+      userLang,
+      featureState,
+      messageText,
+      normalizedText,
+      hasPhoto
+    ) => {
+      const featureCtx = ctx.createFeatureTextContext(
+        userPsid,
+        featureUserId,
+        requestId,
+        userLang,
+        featureState,
+        messageText,
+        normalizedText,
+        hasPhoto
+      );
+      return {
+        ...featureCtx,
+        sendText: text => trackedCtx.sendLoggedText(userPsid, text, requestId),
+        sendImage: imageUrl =>
+          trackedCtx.sendLoggedImage(userPsid, imageUrl, requestId),
+        sendQuickReplies: (text, replies) =>
+          trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId),
+        sendStateQuickReplies: (nextState, text) =>
+          trackedCtx.sendStateQuickReplies(userPsid, nextState, text, requestId),
+        chooseStyle: style =>
+          trackedCtx.handleStyleSelection(
+            userPsid,
+            featureUserId,
+            style,
+            requestId,
+            userLang
+          ),
+        runStyleGeneration: (style, sourceImageUrl, promptHint) =>
+          trackedCtx.runStyleGeneration(
+            userPsid,
+            featureUserId,
+            style,
+            requestId,
+            userLang,
+            sourceImageUrl,
+            promptHint
+          ),
+      };
+    },
+    handleStyleSelection: (userPsid, featureUserId, style, requestId, userLang) =>
+      markHandledIfSent(
+        ctx.handleStyleSelection(
+          userPsid,
+          featureUserId,
+          style,
+          requestId,
+          userLang
+        )
+      ),
+    maybeSendInFlightMessage: async (userPsid, requestId) => {
+      const handled = await ctx.maybeSendInFlightMessage(userPsid, requestId);
+      if (handled) {
+        markResponseSent();
+      }
+      return handled;
+    },
+    runStyleGeneration: (
+      userPsid,
+      featureUserId,
+      style,
+      requestId,
+      userLang,
+      sourceImageUrl,
+      promptHint
+    ) =>
+      markHandledIfSent(
+        ctx.runStyleGeneration(
+          userPsid,
+          featureUserId,
+          style,
+          requestId,
+          userLang,
+          sourceImageUrl,
+          promptHint
+        )
+      ),
     sendLoggedText: async (userPsid, text, requestId) => {
       logMessengerWebhookTrace("before_send", {
         reqId: requestId,
@@ -421,8 +604,9 @@ async function handleEvent(
   const isInboundUserEvent = Boolean(
     event.postback || (event.message && !event.message.is_echo)
   );
+  const isIntentionalSilentAck = Boolean(detectAck(event.message?.text));
   const sendFallbackIfNeeded = async () => {
-    if (isInboundUserEvent && !responseSent) {
+    if (isInboundUserEvent && !isIntentionalSilentAck && !responseSent) {
       await trackedCtx.sendLoggedText(psid, t(lang, "failure"), reqId);
     }
   };
