@@ -191,8 +191,22 @@ export async function handleMessengerConsentGate(
 ): Promise<boolean> {
   if (input.payload === GDPR_CONSENT_AGREE) {
     await Promise.resolve(setConsentState(input.psid, true));
-    await input.sendText(consentAcceptedText(input.lang));
+function messengerConsentAcceptedText(lang: Lang): string {
+  const command = deleteCommand(lang);
+  return lang === "en"
+    ? `You're all set ✅\nYou can delete your data anytime by typing '${command}'.`
+    : `Je bent klaar ✅\nJe kan je data altijd verwijderen door '${command}' te typen.`;
+}
+
+export async function handleMessengerConsentGate(
+  input: MessengerConsentGateInput
+): Promise<boolean> {
+  if (input.payload === GDPR_CONSENT_AGREE) {
+    await Promise.resolve(setConsentState(input.psid, true));
+    await input.sendText(messengerConsentAcceptedText(input.lang));
     await input.sendRestyleStarterPills();
+    return true;
+  }
     return true;
   }
 
