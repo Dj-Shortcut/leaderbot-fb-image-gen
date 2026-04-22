@@ -573,6 +573,47 @@ describe("messenger webhook dedupe", () => {
     );
   });
 
+  it("continues with restyle starter pills after consent is granted", async () => {
+    const psid = "fresh-consent-accepted-user";
+
+    await processFacebookWebhookPayloadBase({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              timestamp: 1730000000555,
+              message: {
+                mid: "mid-fresh-consent-accepted",
+                quick_reply: { payload: "GDPR_CONSENT_AGREE" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(getState(psid)?.consentGiven).toBe(true);
+    expect(sendTextMock).toHaveBeenCalledWith(
+      psid,
+      expect.stringContaining("Je bent klaar")
+    );
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      psid,
+      t("nl", "styleCategoryPicker"),
+      expect.arrayContaining([
+        expect.objectContaining({ payload: "STYLE_CATEGORY_ILLUSTRATED" }),
+        expect.objectContaining({ payload: "STYLE_CATEGORY_ATMOSPHERE" }),
+        expect.objectContaining({ payload: "STYLE_CATEGORY_BOLD" }),
+      ])
+    );
+    expect(sendQuickRepliesMock).not.toHaveBeenCalledWith(
+      psid,
+      expect.stringContaining("Je bent klaar"),
+      expect.any(Array)
+    );
+  });
+
   it("opens the Messenger response window before postback routing", async () => {
     const psid = "fresh-postback-window-user";
     const timestamp = 1730000000789;

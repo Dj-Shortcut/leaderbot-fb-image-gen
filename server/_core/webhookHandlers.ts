@@ -749,6 +749,9 @@ async function handleEvent(
         sendQuickReplies: async (text, replies) => {
           await trackedCtx.sendLoggedQuickReplies(psid, text, replies, reqId);
         },
+        sendRestyleStarterPills: async () => {
+          await trackedCtx.sendStylePicker(psid, lang, reqId);
+        },
       })
     ) {
       logMessengerWebhookTrace("selected_branch", {

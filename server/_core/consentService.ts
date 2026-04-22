@@ -34,6 +34,7 @@ type MessengerConsentGateInput = {
   state: MessengerUserState;
   sendText: (text: string) => Promise<void>;
   sendQuickReplies: (text: string, replies: QuickReply[]) => Promise<void>;
+  sendRestyleStarterPills: () => Promise<void>;
 };
 
 type WhatsAppConsentGateInput = {
@@ -190,10 +191,8 @@ export async function handleMessengerConsentGate(
 ): Promise<boolean> {
   if (input.payload === GDPR_CONSENT_AGREE) {
     await Promise.resolve(setConsentState(input.psid, true));
-    await input.sendQuickReplies(
-      consentAcceptedText(input.lang),
-      deleteNoticeReplies(input.lang)
-    );
+    await input.sendText(consentAcceptedText(input.lang));
+    await input.sendRestyleStarterPills();
     return true;
   }
 
