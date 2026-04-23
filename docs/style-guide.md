@@ -1,135 +1,258 @@
-# Style Guide
+Style Guide
 
-This document is the working reference for adding or updating image styles in Leaderbot.
+This document is the authoritative reference for creating, updating, and reviewing image styles in Leaderbot.
 
-The goal is consistency. As the style catalog grows, we should not rely on memory or taste alone to keep previews and prompts aligned.
+The goal is not just consistency, but predictable, reproducible visual output at scale.
 
-## When to use this
+As the style catalog grows, we optimize for:
+
+clarity over creativity
+consistency over experimentation
+systems over intuition
+When to use this
 
 Use this guide whenever you:
 
-- add a new style
-- update an existing style prompt
-- regenerate a style preview thumbnail
-- review a PR that changes style previews or style metadata
+add a new style
+update an existing style prompt
+regenerate a style preview
+review a PR affecting styles, previews, or metadata
+Definition of Done (DoD)
 
-## Definition of done for a new style
+A style is only production-ready when all conditions are met:
 
-A style is only ready when all of the following are true:
+The style has a clear and distinct visual identity
+The output is consistent across multiple inputs (not one lucky sample)
+The preview is readable at small mobile sizes
+The prompt is structured, specific, and reproducible
+Naming is consistent across code, assets, and metadata
+The preview asset is committed in the correct location
+The style has been compared against existing styles for overlap
 
-- the style has a clear visual identity that is easy to distinguish from other styles
-- the preview looks good at small mobile sizes
-- the prompt is specific enough to reproduce the intended look consistently
-- the naming is consistent across code, preview assets, and manifest data
-- the preview asset is committed in the expected location
-- the change has been compared against nearby styles for overlap or redundancy
+If any of these fail → the style is not ready.
 
-## Quality bar
+Quality Bar (Preview & Output)
 
-Every style preview should pass these checks:
+Every style must pass:
 
-- Strong silhouette: the subject should read clearly at a glance
-- Clear focal point: avoid muddy compositions with no obvious center
-- Small-screen readability: the preview must still feel intentional when viewed as a compact card
-- Controlled background: background can support the style, but should not drown the subject
-- Distinct palette or mood: users should quickly understand what makes the style different
-- Stable composition: avoid previews that only work because of one lucky crop
-- Consistent polish: new styles should feel as finished as the existing best styles, not like experiments
+Strong silhouette
+Subject is immediately recognizable
+Clear focal point
+No muddy or unfocused compositions
+Small-screen readability
+Works as a compact mobile thumbnail
+Controlled background
+Supports subject, never competes with it
+Distinct identity
+Palette, lighting, or mood clearly differentiates the style
+Stable composition
+Works across multiple images, not dependent on crop luck
+Production polish
+Feels finished, not experimental
+Prompt Structure (Required)
 
-## Prompt-writing rules
+All prompts must follow a consistent structure.
 
-When creating or refining a style prompt:
+This is mandatory, not optional.
 
-- Lead with the core visual identity first
-- Be concrete about wardrobe, lighting, framing, and mood
-- Prefer visual direction over vague adjectives
-- Avoid stacking too many competing ideas in one prompt
-- Optimize for reproducibility, not just a single good sample
-- If the preview is meant for mobile, say so explicitly when helpful
+1. Subject (required)
 
-Good prompt qualities:
+Define framing and subject explicitly.
 
-- specific
-- visual
-- composable
-- reproducible
+close-up portrait of a person, centered, looking at camera
 
-Weak prompt qualities:
+Rules:
 
-- generic
-- overloaded
-- dependent on luck
-- too subtle to read in a thumbnail
+Always specify “portrait”
+Face must be central and visible
+Avoid vague subject definitions
+2. Style Identity (required)
 
-## Preview rules
+Define the visual category clearly.
 
-Preview images should:
+cinematic portrait
+cyberpunk aesthetic
+anime illustration
 
-- represent the style honestly
-- be centered and readable in thumbnail form
-- avoid edge-cropped faces or confusing poses
-- avoid text-heavy or detail-heavy compositions that collapse on mobile
-- feel balanced next to the existing preview set
+Rules:
 
-If a style only looks good in full resolution but weak as a thumbnail, it is not ready yet.
+No vague adjectives (“cool”, “nice”)
+Max 1–2 style influences
+Must be visually recognizable
+3. Scene / Context (recommended)
 
-## Naming and asset conventions
+Ground the subject in a clear environment.
 
-Keep naming consistent everywhere:
+set in a neon-lit city at night
+studio background with soft gradient
 
-- use kebab-case for style ids
-- use the same id in filenames and metadata where applicable
-- keep preview files in `public/style-previews/`
-- keep metadata in `public/style-previews/manifest.json`
+Rules:
 
-Before merging, verify:
+Avoid empty or undefined backgrounds
+Context should support, not dominate
+4. Lighting (required)
 
-- the preview filename matches the style id
-- the manifest entry points at the correct output path
-- any prompt-specific metadata uses the same style id naming
+Lighting is critical for consistency.
 
-## Review checklist
+soft studio lighting
+harsh flash lighting
+neon rim light
+golden hour sunlight
 
-Before approving a new style, check:
+Rules:
 
-- Is this style visually distinct from the current set?
-- Does the preview still work when viewed very small?
-- Is the subject clear within one second of looking?
-- Is the prompt specific enough for future regeneration?
-- Is the crop intentional rather than accidental?
-- Does the style feel production-ready rather than exploratory?
-- Are file naming and manifest updates consistent?
+Always specify lighting
+Prefer one dominant light source
+5. Color Palette (recommended)
 
-## PR expectations
+Control the visual tone.
 
-For style-related changes, include:
+muted warm tones
+neon blue and magenta
+pastel colors
 
-- the style name or id
-- what changed
-- whether the prompt changed, the preview changed, or both
-- any tradeoff worth noting, especially if the style is intentionally more subtle than usual
+Rules:
 
-## Practical workflow
+Limit to 2–3 dominant colors
+Avoid vague terms like “colorful”
+6. Texture / Medium (optional but powerful)
 
-Recommended workflow for adding a style:
+Adds realism or stylization.
 
-1. Draft the style concept in one sentence.
-2. Write a prompt that emphasizes the defining visual traits.
-3. Generate or refine preview candidates.
-4. Pick the candidate that reads best at thumbnail size, not just at full size.
-5. Add the preview asset and metadata.
-6. Compare it against the existing style set for overlap and consistency.
-7. Do one final small-size sanity check before merging.
+film grain
+oil paint texture
+matte finish
+glossy skin
+7. Camera / Composition (required)
 
-## Tie-breaker rule
+Ensure consistent framing.
 
-If there is a choice between:
+35mm lens
+shallow depth of field
+sharp focus on face
 
-- a preview that is more artistic
-- a preview that is clearer and more consistent
+Rules:
 
-Choose the clearer and more consistent preview.
+Face must always be sharp
+Avoid extreme perspectives
+8. Constraints / Negatives (required)
 
-## Maintenance note
+Prevent common failures.
 
-This document should evolve with the style system. If we notice repeated review comments or recurring quality issues, update this guide in the same PR that addresses them.
+blurry, distorted face, extra limbs, bad anatomy, low detail, oversaturated
+
+Rules:
+
+Minimum 4–6 constraints
+Always protect face quality
+Full Prompt Example
+close-up portrait of a person, centered, looking at camera,
+cinematic portrait,
+set in a dark environment with subtle background blur,
+soft directional lighting with strong shadows,
+muted cool tones,
+film grain texture,
+35mm lens, shallow depth of field, sharp focus on face,
+no blur, no distortion, no extra limbs, high detail
+Prompt Quality Rules
+
+A good prompt is:
+
+specific
+visual
+structured
+reproducible
+
+A bad prompt is:
+
+vague
+overloaded
+inconsistent
+dependent on luck
+Critical Rule
+
+If output is inconsistent, the issue is almost always missing structure
+(lighting, camera, or constraints), not the model itself.
+
+Preview Rules
+
+Preview images must:
+
+represent the style honestly
+be centered and readable as a thumbnail
+keep the face clearly visible
+avoid edge crops or awkward framing
+avoid detail-heavy compositions that break on mobile
+feel consistent with the existing style set
+
+If a preview only works at full resolution → reject it.
+
+Naming & Asset Conventions
+
+Consistency is required:
+
+Use kebab-case for style IDs
+Use the same ID across:
+filenames
+metadata
+prompt references
+
+Assets:
+
+Previews → public/style-previews/
+Metadata → public/style-previews/manifest.json
+
+Before merging:
+
+filename matches style id
+manifest path is correct
+metadata uses consistent naming
+Style Catalog Rules
+Each style must be visually distinct
+Avoid overlapping styles with minor differences
+Prefer fewer strong styles over many weak ones
+New styles must be compared to adjacent ones before approval
+Review Checklist
+
+Before approving:
+
+Is the style visually distinct?
+Does it work at thumbnail size?
+Is the subject readable within 1 second?
+Is the prompt structured and reproducible?
+Is composition stable across samples?
+Does it feel production-ready?
+Are naming and assets correct?
+PR Expectations
+
+Include:
+
+style id
+what changed (prompt / preview / both)
+reason for change
+any tradeoffs
+Practical Workflow
+Define the style in one sentence
+Write a structured prompt (using required blocks)
+Generate multiple samples
+Select based on thumbnail readability, not just quality
+Add preview + metadata
+Compare against existing styles
+Final mobile-size sanity check
+Tie-breaker Rule
+
+If forced to choose:
+
+artistic but unclear
+clear and consistent
+
+→ choose clear and consistent
+
+Maintenance Note
+
+This document is a living system.
+
+If recurring issues appear:
+
+update this guide
+enforce the rule in the same PR
