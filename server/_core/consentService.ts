@@ -34,6 +34,7 @@ type MessengerConsentGateInput = {
   state: MessengerUserState;
   sendText: (text: string) => Promise<void>;
   sendQuickReplies: (text: string, replies: QuickReply[]) => Promise<void>;
+  sendRestyleStarterPills: () => Promise<void>;
 };
 
 type WhatsAppConsentGateInput = {
@@ -106,6 +107,13 @@ function consentAcceptedText(lang: Lang): string {
 
 function deleteCancelledText(lang: Lang): string {
   return lang === "en" ? "Deletion cancelled." : "Verwijderen geannuleerd.";
+}
+
+function messengerConsentAcceptedText(lang: Lang): string {
+  const command = deleteCommand(lang);
+  return lang === "en"
+    ? `You're all set ✅\nYou can delete your data anytime by typing '${command}'.`
+    : `Je bent klaar ✅\nJe kan je data altijd verwijderen door '${command}' te typen.`;
 }
 
 function consentReplies(lang: Lang): QuickReply[] {
@@ -190,10 +198,8 @@ export async function handleMessengerConsentGate(
 ): Promise<boolean> {
   if (input.payload === GDPR_CONSENT_AGREE) {
     await Promise.resolve(setConsentState(input.psid, true));
-    await input.sendQuickReplies(
-      consentAcceptedText(input.lang),
-      deleteNoticeReplies(input.lang)
-    );
+    await input.sendText(messengerConsentAcceptedText(input.lang));
+    await input.sendRestyleStarterPills();
     return true;
   }
 

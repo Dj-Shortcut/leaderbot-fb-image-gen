@@ -334,27 +334,12 @@ async function handleEntry(
   }
 }
 
-async function handleEvent(
+function createTrackedHandlerContext(
   ctx: HandlerContext,
-  event: FacebookWebhookEvent,
-  entryId?: string
-): Promise<void> {
-  const psid = event.sender?.id;
-  if (!psid) return;
-
-  const userId = toUserKey(psid);
-  const reqId = `${psid}-${Date.now()}`;
-  let responseSent = false;
-  const markResponseSent = () => {
-    responseSent = true;
-  };
-  const markResponseSentFromOutcome = (
+  markResponseSentFromOutcome: (
     outcome: MessengerSendOutcome | undefined
-  ) => {
-    if (outcome?.sent) {
-      markResponseSent();
-    }
-  };
+  ) => void
+): HandlerContext {
   const trackedCtx: HandlerContext = {
     ...ctx,
     createFeatureImageContext: (
@@ -702,6 +687,32 @@ async function handleEvent(
     },
   };
 
+  return trackedCtx;
+}
+
+async function handleEvent(
+  ctx: HandlerContext,
+  event: FacebookWebhookEvent,
+  entryId?: string
+): Promise<void> {
+  const psid = event.sender?.id;
+  if (!psid) return;
+
+  const userId = toUserKey(psid);
+  const reqId = `${psid}-${Date.now()}`;
+  let responseSent = false;
+  const markResponseSent = () => {
+    responseSent = true;
+  };
+  const markResponseSentFromOutcome = (
+    outcome: MessengerSendOutcome | undefined
+  ) => {
+    if (outcome?.sent) {
+      markResponseSent();
+    }
+  };
+  const trackedCtx = createTrackedHandlerContext(ctx, markResponseSentFromOutcome);
+
   if (!(await ctx.claimEventReplayOrLog(event, entryId, userId))) {
     return;
   }
@@ -748,6 +759,10 @@ async function handleEvent(
         },
         sendQuickReplies: async (text, replies) => {
           await trackedCtx.sendLoggedQuickReplies(psid, text, replies, reqId);
+        },
+        sendRestyleStarterPills: async () => {
+          await setFlowState(psid, "AWAITING_STYLE");
+          await trackedCtx.sendStylePicker(psid, lang, reqId);
         },
       })
     ) {
