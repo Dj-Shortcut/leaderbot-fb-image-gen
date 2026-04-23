@@ -340,8 +340,7 @@ function createTrackedHandlerContext(
     outcome: MessengerSendOutcome | undefined
   ) => void
 ): HandlerContext {
-  let trackedCtx: HandlerContext;
-  trackedCtx = {
+  const trackedCtx: HandlerContext = {
     ...ctx,
     createFeatureImageContext: (
       userPsid,
