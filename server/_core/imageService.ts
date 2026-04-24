@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { type Style } from "./messengerStyles";
 import { safeLen, sha256 } from "./imageProof";
 import {
@@ -21,10 +20,18 @@ import {
   type SourceImageData,
 } from "./image-generation/sourceImageFetcher";
 import {
-  buildGeneratedImageUrl,
-  putGeneratedImage,
-} from "./generatedImageStore";
-import { storagePut } from "../storage";
+  assertProductionImageStorageConfig,
+  getConfiguredBaseUrl,
+  hasObjectStorageConfig,
+} from "./image-generation/imageServiceConfig";
+import { publishGeneratedImage } from "./image-generation/generatedImagePublisher";
+import {
+  GenerationTimeoutError,
+  InvalidGenerationInputError,
+  MissingOpenAiApiKeyError,
+  MissingAppBaseUrlError,
+  MissingObjectStorageConfigError,
+} from "./image-generation/imageServiceErrors";
 
 type GeneratorMode = "openai";
 
@@ -53,12 +60,6 @@ interface ImageGenerator {
   }>;
 }
 
-class InvalidGenerationInputError extends Error {}
-export class MissingOpenAiApiKeyError extends Error {}
-export class GenerationTimeoutError extends Error {}
-export class MissingAppBaseUrlError extends Error {}
-export class MissingObjectStorageConfigError extends Error {}
-
 type GeneratorInput = {
   style: Style;
   sourceImageUrl?: string;
@@ -79,109 +80,6 @@ type PreparedGenerationInput = {
   sourceImage: DownloadedSourceImage;
 };
 
-function getConfiguredBaseUrl(): string | undefined {
-  const configuredBaseUrl =
-    process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
-
-  if (!configuredBaseUrl || !/^https?:\/\//.test(configuredBaseUrl)) {
-    return undefined;
-  }
-
-  if (
-    process.env.NODE_ENV === "production" &&
-    !configuredBaseUrl.startsWith("https://")
-  ) {
-    console.error("APP_BASE_URL must use https:// in production", {
-      hasConfiguredBaseUrl: true,
-      protocol: configuredBaseUrl.split(":")[0],
-    });
-    return undefined;
-  }
-
-  return configuredBaseUrl.replace(/\/$/, "");
-}
-
-function getRequiredPublicBaseUrl(): string {
-  const baseUrl = getConfiguredBaseUrl();
-  if (!baseUrl) {
-    console.error("APP_BASE_URL is required for image generation");
-    throw new MissingAppBaseUrlError("APP_BASE_URL is missing or invalid");
-  }
-
-  return baseUrl;
-}
-
-function hasObjectStorageConfig(): boolean {
-  return Boolean(
-    process.env.BUILT_IN_FORGE_API_URL?.trim() &&
-    process.env.BUILT_IN_FORGE_API_KEY?.trim()
-  );
-}
-
-function isProductionRuntime(): boolean {
-  return process.env.NODE_ENV === "production";
-}
-
-export function assertProductionImageStorageConfig(): void {
-  if (!isProductionRuntime()) {
-    return;
-  }
-
-  if (!hasObjectStorageConfig()) {
-    throw new MissingObjectStorageConfigError(
-      "BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY are required in production for durable generated image storage"
-    );
-  }
-}
-
-async function publishGeneratedImage(
-  jpegBuffer: Buffer,
-  style: Style,
-  reqId?: string
-): Promise<string> {
-  if (hasObjectStorageConfig()) {
-    const key = `generated/${style}/${Date.now()}-${randomUUID()}.jpg`;
-    try {
-      const { url } = await storagePut(key, jpegBuffer, "image/jpeg");
-      console.info(
-        JSON.stringify({
-          level: "info",
-          msg: "generated_image_upload_success",
-          reqId,
-          style,
-          storageKey: key,
-          publicUrl: url,
-        })
-      );
-      return url;
-    } catch (error) {
-      console.error("GENERATED_IMAGE_UPLOAD_FAILED", {
-        reqId,
-        style,
-        storageKey: key,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  if (isProductionRuntime()) {
-    throw new MissingObjectStorageConfigError(
-      "BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY are required in production for durable generated image storage"
-    );
-  }
-
-  const token = putGeneratedImage(jpegBuffer, "image/jpeg");
-  const publicBaseUrl = getRequiredPublicBaseUrl();
-  const localUrl = buildGeneratedImageUrl(publicBaseUrl, token);
-  console.warn("GENERATED_IMAGE_LOCAL_FALLBACK", {
-    reqId,
-    style,
-    token,
-    publicUrl: localUrl,
-  });
-  return localUrl;
-}
 function ensureJpegBuffer(buffer: Buffer): Buffer {
   return buffer;
 }
@@ -331,8 +229,13 @@ export function createImageGenerator(mode: GeneratorMode = "openai"): {
 
 // TEMP: backward-compatibility re-exports during caller migration away from imageService.ts.
 export {
+  assertProductionImageStorageConfig,
+  GenerationTimeoutError,
   getGenerationMetrics,
   InvalidSourceImageUrlError,
+  MissingAppBaseUrlError,
   MissingInputImageError,
+  MissingObjectStorageConfigError,
+  MissingOpenAiApiKeyError,
   OpenAiBudgetExceededError,
 };

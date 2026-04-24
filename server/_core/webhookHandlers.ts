@@ -13,10 +13,7 @@ import {
 import { executeGenerationFlow } from "./generationFlow";
 import {
   clearPendingImageState,
-  declineFaceMemory,
   getOrCreateState,
-  rememberFaceSourceImage,
-  setFaceMemoryConsentGiven,
   setChosenStyle,
   setFlowState,
   setLastGenerated,
@@ -25,7 +22,6 @@ import {
   setPendingStoredImage,
   setPreselectedStyle,
   setPreferredLang,
-  setSelectedStyleCategory,
   setActiveExperience,
   markIntroSeen,
   anonymizePsid,
@@ -76,7 +72,6 @@ import {
   routeMessengerActiveExperience,
   routeMessengerEntryIntent,
 } from "./messengerExperienceRouting";
-import { handleMessengerPayload } from "./messengerPayloadRouting";
 import type { EntryIntent } from "./entryIntent";
 import type { ActiveExperience } from "./activeExperience";
 import {
@@ -91,6 +86,11 @@ import type {
   BotTextContext,
   BotImageContext,
 } from "./botContext";
+import { createTrackedHandlerContext } from "./webhookTrackedContext";
+import {
+  handlePayload,
+  handlePostbackEvent,
+} from "./webhookPayloadBranch";
 
 type HandlerDeps = {
   defaultLang: Lang;
@@ -119,7 +119,7 @@ function combineMessengerSendOutcomes(
     : MESSENGER_SEND_SKIPPED;
 }
 
-type HandlerContext = {
+export type HandlerContext = {
   defaultLang: Lang;
   claimEventReplayOrLog: (
     event: FacebookWebhookEvent,
@@ -271,22 +271,6 @@ type MessageEventInput = {
   lang: Lang;
 };
 
-type PostbackEventInput = {
-  psid: string;
-  userId: string;
-  event: FacebookWebhookEvent;
-  reqId: string;
-  lang: Lang;
-};
-
-type PayloadFlowInput = {
-  psid: string;
-  userId: string;
-  payload: string;
-  reqId: string;
-  lang: Lang;
-};
-
 type ImageMessageInput = {
   psid: string;
   userId: string;
@@ -332,362 +316,6 @@ async function handleEntry(
   for (const event of events) {
     await handleEvent(ctx, event, entry?.id);
   }
-}
-
-function createTrackedHandlerContext(
-  ctx: HandlerContext,
-  markResponseSentFromOutcome: (
-    outcome: MessengerSendOutcome | undefined
-  ) => void
-): HandlerContext {
-  const trackedCtx: HandlerContext = {
-    ...ctx,
-    createFeatureImageContext: (
-      userPsid,
-      featureUserId,
-      requestId,
-      userLang,
-      featureState,
-      imageUrl
-    ) => {
-      const featureCtx = ctx.createFeatureImageContext(
-        userPsid,
-        featureUserId,
-        requestId,
-        userLang,
-        featureState,
-        imageUrl
-      );
-      return {
-        ...featureCtx,
-        sendText: async text => {
-          await trackedCtx.sendLoggedText(userPsid, text, requestId);
-        },
-        sendImage: async nextImageUrl => {
-          await trackedCtx.sendLoggedImage(userPsid, nextImageUrl, requestId);
-        },
-        sendQuickReplies: async (text, replies) => {
-          await trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId);
-        },
-        sendStateQuickReplies: async (nextState, text) => {
-          await trackedCtx.sendStateQuickReplies(
-            userPsid,
-            nextState,
-            text,
-            requestId
-          );
-        },
-        chooseStyle: async style => {
-          await trackedCtx.handleStyleSelection(
-            userPsid,
-            featureUserId,
-            style,
-            requestId,
-            userLang
-          );
-        },
-        runStyleGeneration: async (style, sourceImageUrl, promptHint) => {
-          await trackedCtx.runStyleGeneration(
-            userPsid,
-            featureUserId,
-            style,
-            requestId,
-            userLang,
-            sourceImageUrl,
-            promptHint
-          );
-        },
-      };
-    },
-    createFeaturePayloadContext: (
-      userPsid,
-      featureUserId,
-      requestId,
-      userLang,
-      featureState,
-      payload
-    ) => {
-      const featureCtx = ctx.createFeaturePayloadContext(
-        userPsid,
-        featureUserId,
-        requestId,
-        userLang,
-        featureState,
-        payload
-      );
-      return {
-        ...featureCtx,
-        sendText: async text => {
-          await trackedCtx.sendLoggedText(userPsid, text, requestId);
-        },
-        sendImage: async imageUrl => {
-          await trackedCtx.sendLoggedImage(userPsid, imageUrl, requestId);
-        },
-        sendQuickReplies: async (text, replies) => {
-          await trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId);
-        },
-        sendStateQuickReplies: async (nextState, text) => {
-          await trackedCtx.sendStateQuickReplies(
-            userPsid,
-            nextState,
-            text,
-            requestId
-          );
-        },
-        chooseStyle: async style => {
-          await trackedCtx.handleStyleSelection(
-            userPsid,
-            featureUserId,
-            style,
-            requestId,
-            userLang
-          );
-        },
-        runStyleGeneration: async (style, sourceImageUrl, promptHint) => {
-          await trackedCtx.runStyleGeneration(
-            userPsid,
-            featureUserId,
-            style,
-            requestId,
-            userLang,
-            sourceImageUrl,
-            promptHint
-          );
-        },
-      };
-    },
-    createFeatureTextContext: (
-      userPsid,
-      featureUserId,
-      requestId,
-      userLang,
-      featureState,
-      messageText,
-      normalizedText,
-      hasPhoto
-    ) => {
-      const featureCtx = ctx.createFeatureTextContext(
-        userPsid,
-        featureUserId,
-        requestId,
-        userLang,
-        featureState,
-        messageText,
-        normalizedText,
-        hasPhoto
-      );
-      return {
-        ...featureCtx,
-        sendText: async text => {
-          await trackedCtx.sendLoggedText(userPsid, text, requestId);
-        },
-        sendImage: async imageUrl => {
-          await trackedCtx.sendLoggedImage(userPsid, imageUrl, requestId);
-        },
-        sendQuickReplies: async (text, replies) => {
-          await trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId);
-        },
-        sendStateQuickReplies: async (nextState, text) => {
-          await trackedCtx.sendStateQuickReplies(
-            userPsid,
-            nextState,
-            text,
-            requestId
-          );
-        },
-        chooseStyle: async style => {
-          await trackedCtx.handleStyleSelection(
-            userPsid,
-            featureUserId,
-            style,
-            requestId,
-            userLang
-          );
-        },
-        runStyleGeneration: async (style, sourceImageUrl, promptHint) => {
-          await trackedCtx.runStyleGeneration(
-            userPsid,
-            featureUserId,
-            style,
-            requestId,
-            userLang,
-            sourceImageUrl,
-            promptHint
-          );
-        },
-      };
-    },
-    handleStyleSelection: async (
-      userPsid,
-      featureUserId,
-      style,
-      requestId,
-      userLang
-    ) => {
-      const outcome = await ctx.handleStyleSelection(
-        userPsid,
-        featureUserId,
-        style,
-        requestId,
-        userLang
-      );
-      markResponseSentFromOutcome(outcome);
-      return outcome;
-    },
-    maybeSendInFlightMessage: async (userPsid, requestId) => {
-      const result = await ctx.maybeSendInFlightMessage(userPsid, requestId);
-      if (result.handled && "outcome" in result && result.outcome) {
-        markResponseSentFromOutcome(result.outcome);
-      }
-      return result;
-    },
-    runStyleGeneration: async (
-      userPsid,
-      featureUserId,
-      style,
-      requestId,
-      userLang,
-      sourceImageUrl,
-      promptHint
-    ) => {
-      const outcome = await ctx.runStyleGeneration(
-        userPsid,
-        featureUserId,
-        style,
-        requestId,
-        userLang,
-        sourceImageUrl,
-        promptHint
-      );
-      markResponseSentFromOutcome(outcome);
-      return outcome;
-    },
-    sendLoggedText: async (userPsid, text, requestId) => {
-      logMessengerWebhookTrace("before_send", {
-        reqId: requestId,
-        user: toLogUser(toUserKey(userPsid)),
-        kind: "text",
-      });
-      const outcome = await ctx.sendLoggedText(userPsid, text, requestId);
-      markResponseSentFromOutcome(outcome);
-      logMessengerWebhookTrace("after_send", {
-        reqId: requestId,
-        user: toLogUser(toUserKey(userPsid)),
-        kind: "text",
-        sent: outcome?.sent ?? false,
-        ...(outcome && !outcome.sent ? { reason: outcome.reason } : {}),
-      });
-      return outcome;
-    },
-    sendLoggedQuickReplies: async (userPsid, text, replies, requestId) => {
-      logMessengerWebhookTrace("before_send", {
-        reqId: requestId,
-        user: toLogUser(toUserKey(userPsid)),
-        kind: "quick_replies",
-      });
-      const outcome = await ctx.sendLoggedQuickReplies(
-        userPsid,
-        text,
-        replies,
-        requestId
-      );
-      markResponseSentFromOutcome(outcome);
-      logMessengerWebhookTrace("after_send", {
-        reqId: requestId,
-        user: toLogUser(toUserKey(userPsid)),
-        kind: "quick_replies",
-        sent: outcome?.sent ?? false,
-        ...(outcome && !outcome.sent ? { reason: outcome.reason } : {}),
-      });
-      return outcome;
-    },
-    sendLoggedImage: async (userPsid, imageUrl, requestId) => {
-      logMessengerWebhookTrace("before_send", {
-        reqId: requestId,
-        user: toLogUser(toUserKey(userPsid)),
-        kind: "image",
-      });
-      const outcome = await ctx.sendLoggedImage(userPsid, imageUrl, requestId);
-      markResponseSentFromOutcome(outcome);
-      logMessengerWebhookTrace("after_send", {
-        reqId: requestId,
-        user: toLogUser(toUserKey(userPsid)),
-        kind: "image",
-        sent: outcome?.sent ?? false,
-        ...(outcome && !outcome.sent ? { reason: outcome.reason } : {}),
-      });
-      return outcome;
-    },
-    sendStateQuickReplies: async (userPsid, stateName, text, requestId) => {
-      logMessengerWebhookTrace("before_send", {
-        reqId: requestId,
-        user: toLogUser(toUserKey(userPsid)),
-        kind: "state_quick_replies",
-        state: stateName,
-      });
-      const outcome = await ctx.sendStateQuickReplies(
-        userPsid,
-        stateName,
-        text,
-        requestId
-      );
-      markResponseSentFromOutcome(outcome);
-      logMessengerWebhookTrace("after_send", {
-        reqId: requestId,
-        user: toLogUser(toUserKey(userPsid)),
-        kind: "state_quick_replies",
-        state: stateName,
-        sent: outcome?.sent ?? false,
-        ...(outcome && !outcome.sent ? { reason: outcome.reason } : {}),
-      });
-      return outcome;
-    },
-    sendFaceMemoryConsentPrompt: async (userPsid, userLang, requestId) => {
-      const outcome = await ctx.sendFaceMemoryConsentPrompt(
-        userPsid,
-        userLang,
-        requestId
-      );
-      markResponseSentFromOutcome(outcome);
-      return outcome;
-    },
-    sendFlowExplanation: async (userPsid, userLang, requestId) => {
-      const outcome = await ctx.sendFlowExplanation(userPsid, userLang, requestId);
-      markResponseSentFromOutcome(outcome);
-      return outcome;
-    },
-    sendPhotoReceivedPrompt: async (userPsid, userLang, requestId) => {
-      const outcome = await ctx.sendPhotoReceivedPrompt(
-        userPsid,
-        userLang,
-        requestId
-      );
-      markResponseSentFromOutcome(outcome);
-      return outcome;
-    },
-    sendPrivacyInfo: async (userPsid, userLang, requestId) => {
-      const outcome = await ctx.sendPrivacyInfo(userPsid, userLang, requestId);
-      markResponseSentFromOutcome(outcome);
-      return outcome;
-    },
-    sendStyleOptionsForCategory: async (userPsid, category, userLang, requestId) => {
-      const outcome = await ctx.sendStyleOptionsForCategory(
-        userPsid,
-        category,
-        userLang,
-        requestId
-      );
-      markResponseSentFromOutcome(outcome);
-      return outcome;
-    },
-    sendStylePicker: async (userPsid, userLang, requestId) => {
-      const outcome = await ctx.sendStylePicker(userPsid, userLang, requestId);
-      markResponseSentFromOutcome(outcome);
-      return outcome;
-    },
-  };
-
-  return trackedCtx;
 }
 
 async function handleEvent(
@@ -965,118 +593,6 @@ async function handleMessageEvent(
     lang: input.lang,
     text: trimmedText,
     timestamp: input.event.timestamp ?? Date.now(),
-  });
-}
-
-async function handlePostbackEvent(
-  ctx: HandlerContext,
-  input: PostbackEventInput
-): Promise<boolean> {
-  if (input.event.postback?.payload) {
-    await handlePayload(ctx, {
-      psid: input.psid,
-      userId: input.userId,
-      payload: input.event.postback.payload,
-      reqId: input.reqId,
-      lang: input.lang,
-    });
-    return true;
-  }
-
-  return false;
-}
-
-async function handlePayload(
-  ctx: HandlerContext,
-  input: PayloadFlowInput
-): Promise<void> {
-  if (
-    (input.payload === FACE_MEMORY_CONSENT_YES ||
-      input.payload === FACE_MEMORY_CONSENT_NO) &&
-    !isFaceMemoryEnabled()
-  ) {
-    await ctx.sendPhotoReceivedPrompt(input.psid, input.lang, input.reqId);
-    return;
-  }
-
-  if (input.payload === FACE_MEMORY_CONSENT_YES) {
-    const state = await getOrCreateState(input.psid);
-    const sourceImageUrl = state.pendingImageUrl ?? state.lastPhotoUrl;
-    if (sourceImageUrl) {
-      await rememberFaceSourceImage(input.psid, sourceImageUrl);
-    } else {
-      await setFaceMemoryConsentGiven(input.psid);
-    }
-    await ctx.sendPhotoReceivedPrompt(input.psid, input.lang, input.reqId);
-    return;
-  }
-
-  if (input.payload === FACE_MEMORY_CONSENT_NO) {
-    await declineFaceMemory(input.psid);
-    await ctx.sendPhotoReceivedPrompt(input.psid, input.lang, input.reqId);
-    return;
-  }
-
-  await handleMessengerPayload({
-    psid: input.psid,
-    userId: input.userId,
-    payload: input.payload,
-    reqId: input.reqId,
-    lang: input.lang,
-    maybeSendInFlightMessage: async (userPsid, requestId) =>
-      (await ctx.maybeSendInFlightMessage(userPsid, requestId)).handled,
-    getState: userPsid => Promise.resolve(getOrCreateState(userPsid)),
-    getFeatures: getBotFeatures,
-    createFeaturePayloadContext: ctx.createFeaturePayloadContext,
-    runStyleGeneration: async (userPsid, inputUserId, style, requestId, userLang) => {
-      await ctx.runStyleGeneration(
-        userPsid,
-        inputUserId,
-        style,
-        requestId,
-        userLang
-      );
-    },
-    handleStyleSelection: async (
-      userPsid,
-      inputUserId,
-      style,
-      requestId,
-      userLang
-    ) => {
-      await ctx.handleStyleSelection(
-        userPsid,
-        inputUserId,
-        style,
-        requestId,
-        userLang
-      );
-    },
-    showStylePicker: async (userPsid, userLang, requestId) => {
-      await setPreselectedStyle(userPsid, null);
-      await setSelectedStyleCategory(userPsid, null);
-      await setFlowState(userPsid, "AWAITING_STYLE");
-      await ctx.sendStylePicker(userPsid, userLang, requestId);
-    },
-    showStyleCategory: async (userPsid, category, userLang, requestId) => {
-      await setSelectedStyleCategory(userPsid, category);
-      await setFlowState(userPsid, "AWAITING_STYLE");
-      await ctx.sendStyleOptionsForCategory(
-        userPsid,
-        category,
-        userLang,
-        requestId
-      );
-    },
-    sendFlowExplanation: async (userPsid, userLang, requestId) => {
-      await ctx.sendFlowExplanation(userPsid, userLang, requestId);
-    },
-    sendPrivacyInfo: async (userPsid, userLang, requestId) => {
-      await ctx.sendPrivacyInfo(userPsid, userLang, requestId);
-    },
-    sendUnknownPayloadLog: unknownUserId => {
-      safeLog("unknown_payload", { user: toLogUser(unknownUserId) });
-    },
   });
 }
 
