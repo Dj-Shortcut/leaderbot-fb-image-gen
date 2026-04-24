@@ -22,10 +22,8 @@ vi.mock("./_core/whatsappApi", () => ({
   sendWhatsAppText: sendWhatsAppTextMock,
 }));
 
-import {
-  InvalidSourceImageUrlError,
-  OpenAiImageGenerator,
-} from "./_core/imageService";
+import { OpenAiImageGenerator } from "./_core/imageService";
+import { InvalidSourceImageUrlError } from "./_core/image-generation/sourceImageFetcher";
 import {
   processWhatsAppWebhookPayload as processWhatsAppWebhookPayloadBase,
   resetMessengerEventDedupe,
