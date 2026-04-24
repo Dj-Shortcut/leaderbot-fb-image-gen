@@ -65,12 +65,9 @@ import { processConsentedFacebookWebhookPayload } from "./testConsentHelpers";
 const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
 
-function processFacebookWebhookPayload(payload: unknown): Promise<void> {
-  return processConsentedFacebookWebhookPayload(
-    processFacebookWebhookPayloadBase,
-    payload
-  );
-}
+const processFacebookWebhookPayload = processConsentedFacebookWebhookPayload(
+  processFacebookWebhookPayloadBase
+);
 
 function toUrlString(url: string | URL): string {
   return typeof url === "string" ? url : url.toString();

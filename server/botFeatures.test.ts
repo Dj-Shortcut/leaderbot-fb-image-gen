@@ -36,12 +36,9 @@ import {
 import { anonymizePsid, getState, resetStateStore } from "./_core/messengerState";
 import { processConsentedFacebookWebhookPayload } from "./testConsentHelpers";
 
-function processFacebookWebhookPayload(payload: unknown): Promise<void> {
-  return processConsentedFacebookWebhookPayload(
-    processFacebookWebhookPayloadBase,
-    payload
-  );
-}
+const processFacebookWebhookPayload = processConsentedFacebookWebhookPayload(
+  processFacebookWebhookPayloadBase
+);
 
 describe("bot features", () => {
   beforeEach(() => {

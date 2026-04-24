@@ -46,12 +46,9 @@ const originalAppBaseUrl = process.env.APP_BASE_URL;
 const originalAllowedHosts = process.env.SOURCE_IMAGE_ALLOWED_HOSTS;
 const originalOpenAiKey = process.env.OPENAI_API_KEY;
 
-function processWhatsAppWebhookPayload(payload: unknown): Promise<void> {
-  return processConsentedWhatsAppWebhookPayload(
-    processWhatsAppWebhookPayloadBase,
-    payload
-  );
-}
+const processWhatsAppWebhookPayload = processConsentedWhatsAppWebhookPayload(
+  processWhatsAppWebhookPayloadBase
+);
 
 function createWhatsAppPayload(message: Record<string, unknown>) {
   return {

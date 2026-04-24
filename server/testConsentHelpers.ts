@@ -1,77 +1,95 @@
 import { setConsentState } from "./_core/messengerState";
 
-function getMessengerSenderIds(payload: unknown): string[] {
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function collectSenderIds(
+  values: unknown[],
+  getSenderId: (value: unknown) => unknown
+): string[] {
   const ids = new Set<string>();
-  const entries = (payload as { entry?: unknown[] })?.entry;
-  if (!Array.isArray(entries)) {
-    return [];
-  }
 
-  for (const entry of entries) {
-    const events = (entry as { messaging?: unknown[] })?.messaging;
-    if (!Array.isArray(events)) {
-      continue;
-    }
-
-    for (const event of events) {
-      const senderId = (event as { sender?: { id?: unknown } })?.sender?.id;
-      if (typeof senderId === "string") {
-        ids.add(senderId);
-      }
+  for (const value of values) {
+    const senderId = getSenderId(value);
+    if (typeof senderId === "string") {
+      ids.add(senderId);
     }
   }
 
   return Array.from(ids);
 }
 
+function getPayloadEntries(payload: unknown): unknown[] {
+  return asArray((payload as { entry?: unknown[] })?.entry);
+}
+
+function getMessengerEvents(payload: unknown): unknown[] {
+  return getPayloadEntries(payload).flatMap(entry =>
+    asArray((entry as { messaging?: unknown[] })?.messaging)
+  );
+}
+
+function getWhatsAppMessages(payload: unknown): unknown[] {
+  return getPayloadEntries(payload)
+    .flatMap(entry => asArray((entry as { changes?: unknown[] })?.changes))
+    .flatMap(change =>
+      asArray((change as { value?: { messages?: unknown[] } })?.value?.messages)
+    );
+}
+
+function getMessengerSenderIds(payload: unknown): string[] {
+  return collectSenderIds(
+    getMessengerEvents(payload),
+    event => (event as { sender?: { id?: unknown } })?.sender?.id
+  );
+}
+
 function getWhatsAppSenderIds(payload: unknown): string[] {
-  const ids = new Set<string>();
-  const entries = (payload as { entry?: unknown[] })?.entry;
-  if (!Array.isArray(entries)) {
-    return [];
-  }
-
-  for (const entry of entries) {
-    const changes = (entry as { changes?: unknown[] })?.changes;
-    if (!Array.isArray(changes)) {
-      continue;
-    }
-
-    for (const change of changes) {
-      const messages = (change as { value?: { messages?: unknown[] } })?.value
-        ?.messages;
-      if (!Array.isArray(messages)) {
-        continue;
-      }
-
-      for (const message of messages) {
-        const senderId = (message as { from?: unknown })?.from;
-        if (typeof senderId === "string") {
-          ids.add(senderId);
-        }
-      }
-    }
-  }
-
-  return Array.from(ids);
+  return collectSenderIds(
+    getWhatsAppMessages(payload),
+    message => (message as { from?: unknown })?.from
+  );
 }
 
 async function grantConsent(senderIds: string[]): Promise<void> {
   await Promise.all(senderIds.map(senderId => setConsentState(senderId, true)));
 }
 
-export async function processConsentedFacebookWebhookPayload(
-  processPayload: (payload: unknown) => Promise<void>,
-  payload: unknown
-): Promise<void> {
-  await grantConsent(getMessengerSenderIds(payload));
-  await processPayload(payload);
+type WebhookPayloadProcessor = (payload: unknown) => Promise<void>;
+type SenderIdExtractor = (payload: unknown) => string[];
+
+function createConsentedWebhookPayloadProcessor(
+  getSenderIds: SenderIdExtractor
+) {
+  function processConsentedPayload(
+    processPayload: WebhookPayloadProcessor
+  ): WebhookPayloadProcessor;
+  function processConsentedPayload(
+    processPayload: WebhookPayloadProcessor,
+    payload: unknown
+  ): Promise<void>;
+  function processConsentedPayload(
+    processPayload: WebhookPayloadProcessor,
+    payload?: unknown
+  ): Promise<void> | WebhookPayloadProcessor {
+    const processWithConsent: WebhookPayloadProcessor = async nextPayload => {
+      await grantConsent(getSenderIds(nextPayload));
+      await processPayload(nextPayload);
+    };
+
+    if (payload === undefined) {
+      return processWithConsent;
+    }
+
+    return processWithConsent(payload);
+  }
+
+  return processConsentedPayload;
 }
 
-export async function processConsentedWhatsAppWebhookPayload(
-  processPayload: (payload: unknown) => Promise<void>,
-  payload: unknown
-): Promise<void> {
-  await grantConsent(getWhatsAppSenderIds(payload));
-  await processPayload(payload);
-}
+export const processConsentedFacebookWebhookPayload =
+  createConsentedWebhookPayloadProcessor(getMessengerSenderIds);
+
+export const processConsentedWhatsAppWebhookPayload =
+  createConsentedWebhookPayloadProcessor(getWhatsAppSenderIds);
