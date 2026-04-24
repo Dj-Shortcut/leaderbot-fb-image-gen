@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  InvalidSourceImageUrlError,
-  OpenAiImageGenerator,
-} from "./_core/imageService";
+import { OpenAiImageGenerator } from "./_core/imageService";
+import { InvalidSourceImageUrlError } from "./_core/image-generation/sourceImageFetcher";
 import { sha256 } from "./_core/imageProof";
 import { setSourceImageDnsLookupForTests } from "./_core/image-generation/sourceImageFetcher";
 

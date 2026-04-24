@@ -2,12 +2,66 @@ import type { MessengerSendOutcome } from "./messengerApi";
 import { safeLog } from "./messengerApi";
 import { toLogUser, toUserKey } from "./privacy";
 import type { HandlerContext } from "./webhookHandlers";
+import type { BotImageContext, BotPayloadContext, BotTextContext } from "./botContext";
+import type { Lang } from "./i18n";
 
 function logMessengerWebhookTrace(
   stage: "before_send" | "after_send",
   details: Record<string, unknown>
 ): void {
   safeLog("messenger_response_window_trace", { stage, ...details });
+}
+
+type FeatureContext = BotImageContext | BotPayloadContext | BotTextContext;
+
+function decorateFeatureContext<TContext extends FeatureContext>(
+  featureCtx: TContext,
+  trackedCtx: HandlerContext,
+  userPsid: string,
+  featureUserId: string,
+  requestId: string,
+  userLang: Lang
+): TContext {
+  return {
+    ...featureCtx,
+    sendText: async text => {
+      await trackedCtx.sendLoggedText(userPsid, text, requestId);
+    },
+    sendImage: async imageUrl => {
+      await trackedCtx.sendLoggedImage(userPsid, imageUrl, requestId);
+    },
+    sendQuickReplies: async (text, replies) => {
+      await trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId);
+    },
+    sendStateQuickReplies: async (nextState, text) => {
+      await trackedCtx.sendStateQuickReplies(
+        userPsid,
+        nextState,
+        text,
+        requestId
+      );
+    },
+    chooseStyle: async style => {
+      await trackedCtx.handleStyleSelection(
+        userPsid,
+        featureUserId,
+        style,
+        requestId,
+        userLang
+      );
+    },
+    runStyleGeneration: async (style, sourceImageUrl, promptHint) => {
+      await trackedCtx.runStyleGeneration(
+        userPsid,
+        featureUserId,
+        style,
+        requestId,
+        userLang,
+        sourceImageUrl,
+        promptHint
+      );
+    },
+  };
 }
 
 export function createTrackedHandlerContext(
@@ -34,46 +88,14 @@ export function createTrackedHandlerContext(
         featureState,
         imageUrl
       );
-      return {
-        ...featureCtx,
-        sendText: async text => {
-          await trackedCtx.sendLoggedText(userPsid, text, requestId);
-        },
-        sendImage: async nextImageUrl => {
-          await trackedCtx.sendLoggedImage(userPsid, nextImageUrl, requestId);
-        },
-        sendQuickReplies: async (text, replies) => {
-          await trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId);
-        },
-        sendStateQuickReplies: async (nextState, text) => {
-          await trackedCtx.sendStateQuickReplies(
-            userPsid,
-            nextState,
-            text,
-            requestId
-          );
-        },
-        chooseStyle: async style => {
-          await trackedCtx.handleStyleSelection(
-            userPsid,
-            featureUserId,
-            style,
-            requestId,
-            userLang
-          );
-        },
-        runStyleGeneration: async (style, sourceImageUrl, promptHint) => {
-          await trackedCtx.runStyleGeneration(
-            userPsid,
-            featureUserId,
-            style,
-            requestId,
-            userLang,
-            sourceImageUrl,
-            promptHint
-          );
-        },
-      };
+      return decorateFeatureContext(
+        featureCtx,
+        trackedCtx,
+        userPsid,
+        featureUserId,
+        requestId,
+        userLang
+      );
     },
     createFeaturePayloadContext: (
       userPsid,
@@ -91,46 +113,14 @@ export function createTrackedHandlerContext(
         featureState,
         payload
       );
-      return {
-        ...featureCtx,
-        sendText: async text => {
-          await trackedCtx.sendLoggedText(userPsid, text, requestId);
-        },
-        sendImage: async imageUrl => {
-          await trackedCtx.sendLoggedImage(userPsid, imageUrl, requestId);
-        },
-        sendQuickReplies: async (text, replies) => {
-          await trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId);
-        },
-        sendStateQuickReplies: async (nextState, text) => {
-          await trackedCtx.sendStateQuickReplies(
-            userPsid,
-            nextState,
-            text,
-            requestId
-          );
-        },
-        chooseStyle: async style => {
-          await trackedCtx.handleStyleSelection(
-            userPsid,
-            featureUserId,
-            style,
-            requestId,
-            userLang
-          );
-        },
-        runStyleGeneration: async (style, sourceImageUrl, promptHint) => {
-          await trackedCtx.runStyleGeneration(
-            userPsid,
-            featureUserId,
-            style,
-            requestId,
-            userLang,
-            sourceImageUrl,
-            promptHint
-          );
-        },
-      };
+      return decorateFeatureContext(
+        featureCtx,
+        trackedCtx,
+        userPsid,
+        featureUserId,
+        requestId,
+        userLang
+      );
     },
     createFeatureTextContext: (
       userPsid,
@@ -152,46 +142,14 @@ export function createTrackedHandlerContext(
         normalizedText,
         hasPhoto
       );
-      return {
-        ...featureCtx,
-        sendText: async text => {
-          await trackedCtx.sendLoggedText(userPsid, text, requestId);
-        },
-        sendImage: async imageUrl => {
-          await trackedCtx.sendLoggedImage(userPsid, imageUrl, requestId);
-        },
-        sendQuickReplies: async (text, replies) => {
-          await trackedCtx.sendLoggedQuickReplies(userPsid, text, replies, requestId);
-        },
-        sendStateQuickReplies: async (nextState, text) => {
-          await trackedCtx.sendStateQuickReplies(
-            userPsid,
-            nextState,
-            text,
-            requestId
-          );
-        },
-        chooseStyle: async style => {
-          await trackedCtx.handleStyleSelection(
-            userPsid,
-            featureUserId,
-            style,
-            requestId,
-            userLang
-          );
-        },
-        runStyleGeneration: async (style, sourceImageUrl, promptHint) => {
-          await trackedCtx.runStyleGeneration(
-            userPsid,
-            featureUserId,
-            style,
-            requestId,
-            userLang,
-            sourceImageUrl,
-            promptHint
-          );
-        },
-      };
+      return decorateFeatureContext(
+        featureCtx,
+        trackedCtx,
+        userPsid,
+        featureUserId,
+        requestId,
+        userLang
+      );
     },
     handleStyleSelection: async (
       userPsid,

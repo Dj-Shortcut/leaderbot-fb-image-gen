@@ -227,15 +227,7 @@ export function createImageGenerator(mode: GeneratorMode = "openai"): {
   return { mode, generator: new OpenAiImageGenerator() };
 }
 
-// TEMP: backward-compatibility re-exports during caller migration away from imageService.ts.
 export {
-  assertProductionImageStorageConfig,
-  GenerationTimeoutError,
   getGenerationMetrics,
-  InvalidSourceImageUrlError,
-  MissingAppBaseUrlError,
-  MissingInputImageError,
-  MissingObjectStorageConfigError,
-  MissingOpenAiApiKeyError,
   OpenAiBudgetExceededError,
 };

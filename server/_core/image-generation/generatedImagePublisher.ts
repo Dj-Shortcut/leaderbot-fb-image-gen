@@ -6,11 +6,10 @@ import {
   putGeneratedImage,
 } from "../generatedImageStore";
 import {
+  assertProductionImageStorageConfig,
   getRequiredPublicBaseUrl,
   hasObjectStorageConfig,
-  isProductionRuntime,
 } from "./imageServiceConfig";
-import { MissingObjectStorageConfigError } from "./imageServiceErrors";
 
 export async function publishGeneratedImage(
   jpegBuffer: Buffer,
@@ -43,11 +42,7 @@ export async function publishGeneratedImage(
     }
   }
 
-  if (isProductionRuntime()) {
-    throw new MissingObjectStorageConfigError(
-      "BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY are required in production for durable generated image storage"
-    );
-  }
+  assertProductionImageStorageConfig();
 
   const token = putGeneratedImage(jpegBuffer, "image/jpeg");
   const publicBaseUrl = getRequiredPublicBaseUrl();

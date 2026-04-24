@@ -1,14 +1,20 @@
 import {
   createImageGenerator,
+} from "./imageService";
+import {
   GenerationTimeoutError,
-  getGenerationMetrics,
-  InvalidSourceImageUrlError,
   MissingAppBaseUrlError,
-  MissingInputImageError,
   MissingObjectStorageConfigError,
   MissingOpenAiApiKeyError,
+} from "./image-generation/imageServiceErrors";
+import {
+  getGenerationMetrics,
   OpenAiBudgetExceededError,
-} from "./imageService";
+} from "./image-generation/openAiImageClient";
+import {
+  InvalidSourceImageUrlError,
+  MissingInputImageError,
+} from "./image-generation/sourceImageFetcher";
 import type { SourceImageOrigin } from "./messengerState";
 import type { Style } from "./messengerStyles";
 import { storageGet, storageKeyFromPublicUrl } from "../storage";

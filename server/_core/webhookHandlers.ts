@@ -10,6 +10,7 @@ import type { MessengerSendOutcome } from "./messengerApi";
 import {
   getGenerationMetrics,
 } from "./imageService";
+import { getConfiguredBaseUrl } from "./image-generation/imageServiceConfig";
 import { executeGenerationFlow } from "./generationFlow";
 import {
   clearPendingImageState,
@@ -982,7 +983,7 @@ export function createWebhookHandlers({
       return trimmed;
     }
 
-    const appBaseUrl = resolveAppBaseUrl();
+    const appBaseUrl = getConfiguredBaseUrl();
     if (appBaseUrl) {
       return `${appBaseUrl}/privacy`;
     }
@@ -990,18 +991,8 @@ export function createWebhookHandlers({
     return undefined;
   }
 
-  function resolveAppBaseUrl(): string | undefined {
-    const appBaseUrl =
-      process.env.APP_BASE_URL?.trim() ?? process.env.BASE_URL?.trim();
-    if (appBaseUrl && /^https?:\/\//i.test(appBaseUrl)) {
-      return appBaseUrl.replace(/\/$/, "");
-    }
-
-    return undefined;
-  }
-
   function resolveStylePreviewUrl(style: Style): string | undefined {
-    const appBaseUrl = resolveAppBaseUrl();
+    const appBaseUrl = getConfiguredBaseUrl();
     if (!appBaseUrl) {
       return undefined;
     }

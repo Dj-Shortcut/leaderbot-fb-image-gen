@@ -89,10 +89,7 @@ function patchStateInMemory(
   patch: PartialState,
   now = Date.now()
 ): MessengerUserState {
-  const current = getOrCreatePersistedState(psid);
-  if (isPromiseLike(current)) {
-    throw new Error("Unexpected async state patch in memory mode");
-  }
+  const current = getStateFromMemory(psid) ?? createDefaultState(psid);
 
   const nextState = normalizeState(psid, {
     ...current,
