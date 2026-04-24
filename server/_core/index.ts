@@ -11,7 +11,7 @@ import {
   registerBotRoutes,
   verifyBotWebhookSignature,
 } from "./bot";
-import { assertProductionImageStorageConfig } from "./imageService";
+import { assertProductionImageStorageConfig } from "./image-generation/imageServiceConfig";
 import { registerChatRoutes } from "./chat";
 import { appRouter } from "../routers";
 import { createContext } from "./context";

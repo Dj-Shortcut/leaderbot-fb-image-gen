@@ -7,15 +7,24 @@ const { createImageGeneratorMock, storageGetMock } = vi.hoisted(() => ({
 
 vi.mock("./_core/imageService", () => ({
   createImageGenerator: createImageGeneratorMock,
+}));
+
+vi.mock("./_core/image-generation/imageServiceErrors", () => ({
   GenerationTimeoutError: class GenerationTimeoutError extends Error {},
-  getGenerationMetrics: (error: Error & { generationMetrics?: unknown }) =>
-    error.generationMetrics,
-  InvalidSourceImageUrlError: class InvalidSourceImageUrlError extends Error {},
   MissingAppBaseUrlError: class MissingAppBaseUrlError extends Error {},
-  MissingInputImageError: class MissingInputImageError extends Error {},
   MissingObjectStorageConfigError: class MissingObjectStorageConfigError extends Error {},
   MissingOpenAiApiKeyError: class MissingOpenAiApiKeyError extends Error {},
+}));
+
+vi.mock("./_core/image-generation/openAiImageClient", () => ({
+  getGenerationMetrics: (error: Error & { generationMetrics?: unknown }) =>
+    error.generationMetrics,
   OpenAiBudgetExceededError: class OpenAiBudgetExceededError extends Error {},
+}));
+
+vi.mock("./_core/image-generation/sourceImageFetcher", () => ({
+  InvalidSourceImageUrlError: class InvalidSourceImageUrlError extends Error {},
+  MissingInputImageError: class MissingInputImageError extends Error {},
 }));
 
 vi.mock("./storage", () => ({
@@ -31,12 +40,12 @@ vi.mock("./storage", () => ({
 }));
 
 import { executeGenerationFlow } from "./_core/generationFlow";
+import { GenerationTimeoutError } from "./_core/image-generation/imageServiceErrors";
+import { OpenAiBudgetExceededError } from "./_core/image-generation/openAiImageClient";
 import {
-  GenerationTimeoutError,
   InvalidSourceImageUrlError,
   MissingInputImageError,
-  OpenAiBudgetExceededError,
-} from "./_core/imageService";
+} from "./_core/image-generation/sourceImageFetcher";
 
 describe("generationFlow", () => {
   const originalForgeApiUrl = process.env.BUILT_IN_FORGE_API_URL;

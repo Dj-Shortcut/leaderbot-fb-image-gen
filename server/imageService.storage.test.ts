@@ -86,10 +86,12 @@ describe("OpenAi image delivery via object storage", () => {
   it("fails clearly in production when durable storage config is missing", async () => {
     process.env.NODE_ENV = "production";
 
-    const {
-      assertProductionImageStorageConfig,
-      MissingObjectStorageConfigError,
-    } = await import("./_core/imageService");
+    const { assertProductionImageStorageConfig } = await import(
+      "./_core/image-generation/imageServiceConfig"
+    );
+    const { MissingObjectStorageConfigError } = await import(
+      "./_core/image-generation/imageServiceErrors"
+    );
 
     expect(() => assertProductionImageStorageConfig()).toThrow(
       MissingObjectStorageConfigError
