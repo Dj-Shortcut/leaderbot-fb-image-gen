@@ -37,12 +37,9 @@ const TEST_PEPPER = "ci-test-pepper";
 const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
 const originalEnableFaceMemory = process.env.ENABLE_FACE_MEMORY;
 
-function processFacebookWebhookPayload(payload: unknown): Promise<void> {
-  return processConsentedFacebookWebhookPayload(
-    processFacebookWebhookPayloadBase,
-    payload
-  );
-}
+const processFacebookWebhookPayload = processConsentedFacebookWebhookPayload(
+  processFacebookWebhookPayloadBase
+);
 
 describe("photo-first onboarding", () => {
   beforeAll(() => {

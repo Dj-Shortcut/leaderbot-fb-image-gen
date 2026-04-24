@@ -60,18 +60,50 @@ async function grantConsent(senderIds: string[]): Promise<void> {
   await Promise.all(senderIds.map(senderId => setConsentState(senderId, true)));
 }
 
-export async function processConsentedFacebookWebhookPayload(
-  processPayload: (payload: unknown) => Promise<void>,
+type WebhookPayloadProcessor = (payload: unknown) => Promise<void>;
+
+export function processConsentedFacebookWebhookPayload(
+  processPayload: WebhookPayloadProcessor
+): WebhookPayloadProcessor;
+export function processConsentedFacebookWebhookPayload(
+  processPayload: WebhookPayloadProcessor,
   payload: unknown
-): Promise<void> {
-  await grantConsent(getMessengerSenderIds(payload));
-  await processPayload(payload);
+): Promise<void>;
+export function processConsentedFacebookWebhookPayload(
+  processPayload: (payload: unknown) => Promise<void>,
+  payload?: unknown
+): Promise<void> | WebhookPayloadProcessor {
+  async function processConsentedPayload(nextPayload: unknown): Promise<void> {
+    await grantConsent(getMessengerSenderIds(nextPayload));
+    await processPayload(nextPayload);
+  }
+
+  if (arguments.length === 1) {
+    return processConsentedPayload;
+  }
+
+  return processConsentedPayload(payload);
 }
 
-export async function processConsentedWhatsAppWebhookPayload(
-  processPayload: (payload: unknown) => Promise<void>,
+export function processConsentedWhatsAppWebhookPayload(
+  processPayload: WebhookPayloadProcessor
+): WebhookPayloadProcessor;
+export function processConsentedWhatsAppWebhookPayload(
+  processPayload: WebhookPayloadProcessor,
   payload: unknown
-): Promise<void> {
-  await grantConsent(getWhatsAppSenderIds(payload));
-  await processPayload(payload);
+): Promise<void>;
+export function processConsentedWhatsAppWebhookPayload(
+  processPayload: WebhookPayloadProcessor,
+  payload?: unknown
+): Promise<void> | WebhookPayloadProcessor {
+  async function processConsentedPayload(nextPayload: unknown): Promise<void> {
+    await grantConsent(getWhatsAppSenderIds(nextPayload));
+    await processPayload(nextPayload);
+  }
+
+  if (arguments.length === 1) {
+    return processConsentedPayload;
+  }
+
+  return processConsentedPayload(payload);
 }
