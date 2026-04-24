@@ -57,49 +57,39 @@ async function grantConsent(senderIds: string[]): Promise<void> {
 }
 
 type WebhookPayloadProcessor = (payload: unknown) => Promise<void>;
+type SenderIdExtractor = (payload: unknown) => string[];
 
-export function processConsentedFacebookWebhookPayload(
-  processPayload: WebhookPayloadProcessor
-): WebhookPayloadProcessor;
-export function processConsentedFacebookWebhookPayload(
-  processPayload: WebhookPayloadProcessor,
-  payload: unknown
-): Promise<void>;
-export function processConsentedFacebookWebhookPayload(
-  processPayload: WebhookPayloadProcessor,
-  payload?: unknown
-): Promise<void> | WebhookPayloadProcessor {
-  async function processConsentedPayload(nextPayload: unknown): Promise<void> {
-    await grantConsent(getMessengerSenderIds(nextPayload));
-    await processPayload(nextPayload);
+function createConsentedWebhookPayloadProcessor(
+  getSenderIds: SenderIdExtractor
+) {
+  function processConsentedPayload(
+    processPayload: WebhookPayloadProcessor
+  ): WebhookPayloadProcessor;
+  function processConsentedPayload(
+    processPayload: WebhookPayloadProcessor,
+    payload: unknown
+  ): Promise<void>;
+  function processConsentedPayload(
+    processPayload: WebhookPayloadProcessor,
+    payload?: unknown
+  ): Promise<void> | WebhookPayloadProcessor {
+    const processWithConsent: WebhookPayloadProcessor = async nextPayload => {
+      await grantConsent(getSenderIds(nextPayload));
+      await processPayload(nextPayload);
+    };
+
+    if (payload === undefined) {
+      return processWithConsent;
+    }
+
+    return processWithConsent(payload);
   }
 
-  if (arguments.length === 1) {
-    return processConsentedPayload;
-  }
-
-  return processConsentedPayload(payload);
+  return processConsentedPayload;
 }
 
-export function processConsentedWhatsAppWebhookPayload(
-  processPayload: WebhookPayloadProcessor
-): WebhookPayloadProcessor;
-export function processConsentedWhatsAppWebhookPayload(
-  processPayload: WebhookPayloadProcessor,
-  payload: unknown
-): Promise<void>;
-export function processConsentedWhatsAppWebhookPayload(
-  processPayload: WebhookPayloadProcessor,
-  payload?: unknown
-): Promise<void> | WebhookPayloadProcessor {
-  async function processConsentedPayload(nextPayload: unknown): Promise<void> {
-    await grantConsent(getWhatsAppSenderIds(nextPayload));
-    await processPayload(nextPayload);
-  }
+export const processConsentedFacebookWebhookPayload =
+  createConsentedWebhookPayloadProcessor(getMessengerSenderIds);
 
-  if (arguments.length === 1) {
-    return processConsentedPayload;
-  }
-
-  return processConsentedPayload(payload);
-}
+export const processConsentedWhatsAppWebhookPayload =
+  createConsentedWebhookPayloadProcessor(getWhatsAppSenderIds);
