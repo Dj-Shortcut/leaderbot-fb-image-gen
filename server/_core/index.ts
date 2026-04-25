@@ -1,4 +1,8 @@
 import "dotenv/config";
+import { initSentry } from "./observability/sentry";
+
+initSentry();
+
 import express from "express";
 import path from "path";
 import { createServer } from "http";
@@ -325,6 +329,12 @@ async function startServer() {
   applySecurityHeaders(app);
   app.use(attachRequestTracing());
   app.use(createGlobalHttpRateLimiter());
+
+  if (process.env.NODE_ENV !== "production") {
+    app.get("/debug/sentry", () => {
+      throw new Error("Sentry smoke test");
+    });
+  }
 
   app.use(
     express.json({

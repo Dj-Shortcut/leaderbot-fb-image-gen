@@ -81,6 +81,7 @@ import {
   recordGenerationError,
   recordGenerationSuccess,
 } from "./botRuntimeStats";
+import { captureException } from "./observability/sentry";
 import type {
   BotLogger,
   BotPayloadContext,
@@ -539,8 +540,16 @@ async function handleEvent(
       user: toLogUser(userId),
       errorCode: error instanceof Error ? error.constructor.name : "UnknownError",
     });
+    captureException(error, {
+      area: "webhook",
+      eventType: event.postback ? "postback" : event.message ? "message" : "unknown",
+      hasImage: Boolean(
+        event.message?.attachments?.some(attachment => attachment.type === "image")
+      ),
+      hasText: Boolean(event.message?.text),
+    });
     await sendFallbackIfNeeded();
-    return;
+    throw error;
   }
 
   await sendFallbackIfNeeded();
