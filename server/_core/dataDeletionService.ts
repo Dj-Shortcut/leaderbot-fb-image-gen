@@ -1,11 +1,14 @@
 import { storageDelete, storageKeyFromPublicUrl } from "../storage";
 import { deleteFaceMemoryForUser } from "./faceMemory";
 import { safeLog } from "./messengerApi";
+import { deleteScopedState } from "./stateStore";
 import {
   clearUserState,
   getState,
   type MessengerUserState,
 } from "./messengerState";
+
+const LEGACY_CHAT_HISTORY_SCOPE = "chat:history";
 
 function getStateImageUrls(state: MessengerUserState): string[] {
   return [
@@ -58,5 +61,8 @@ export async function deleteUserData(psid: string): Promise<void> {
 
   await runStep("face_memory", () => deleteFaceMemoryForUser(psid));
   await Promise.all(urls.map(url => deleteStoredUrl(psid, url)));
+  await runStep("legacy_chat_history", () =>
+    Promise.resolve(deleteScopedState(LEGACY_CHAT_HISTORY_SCOPE, state.userKey))
+  );
   await Promise.resolve(clearUserState(psid));
 }
