@@ -239,12 +239,6 @@ export function createImageGenerator(provider: ImageProvider = getImageProvider(
   mode: ImageProvider;
   generator: ImageGenerator;
 } {
-  if (provider !== "openai-images") {
-    throw new Error(
-      `Unsupported image provider "${provider}". Expected "openai-images".`
-    );
-  }
-
   return { mode: provider, generator: new OpenAiImageGenerator() };
 }
 

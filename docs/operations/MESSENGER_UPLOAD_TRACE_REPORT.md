@@ -85,19 +85,17 @@ From webhook event to generated image send:
 9. **First Messenger image send call:** `sendImage(psid, imageUrl)`.
 10. `sendImage` -> `sendMessage` -> `POST /me/messages` with image attachment URL payload.
 
-## 4) Mock mode investigation
+## 4) Image provider boundary
 
 - `mode: "openai-images"` is produced by `createImageGenerator(...)` through the current image provider boundary.
-- In all other cases (unset or any other value), mode resolves to `openai`.
-- Mock generator returns:
-  - `imageUrl = "${baseUrl}/demo/<style-file>.png"`
-  - `baseUrl` comes from `APP_BASE_URL` (fallback `BASE_URL`), else defaults to `http://localhost:3000`.
-- `/demo/*` files are static files under `public/demo`, served by Express static middleware in production.
+- `IMAGE_PROVIDER` is optional; when unset, `getImageProvider()` defaults to `openai-images`.
+- Any other `IMAGE_PROVIDER` value fails fast during generator creation.
+- The image service no longer produces localhost `/demo/<style-file>.png` fallback URLs.
 
 Reachability implications:
-- The current image provider is `openai-images`; generated URLs depend on the normal app/storage configuration.
-- In `openai` mode, the service requires a valid public base URL (`APP_BASE_URL` or valid `BASE_URL`) and throws when missing/invalid; it does not intentionally continue with a localhost fallback URL.
-- Therefore, troubleshooting should treat localhost fallback URLs as a **mock-mode/configuration signal**, not as the default production-path assumption.
+- The current `openai-images` provider depends on normal app/storage configuration.
+- `APP_BASE_URL` must be a valid public URL for generated image delivery.
+- Troubleshooting should treat localhost/demo URLs as obsolete legacy/mock evidence, not as output from the current image service.
 
 ## 5) Most likely root causes for Messenger 400 "Bijlage uploaden is mislukt"
 
