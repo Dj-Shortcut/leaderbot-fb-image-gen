@@ -1,7 +1,6 @@
 import { storageDelete, storageKeyFromPublicUrl } from "../storage";
 import { deleteFaceMemoryForUser } from "./faceMemory";
 import { safeLog } from "./messengerApi";
-import { clearMessengerChatHistory } from "./messengerChatMemory";
 import {
   clearUserState,
   getState,
@@ -59,8 +58,5 @@ export async function deleteUserData(psid: string): Promise<void> {
 
   await runStep("face_memory", () => deleteFaceMemoryForUser(psid));
   await Promise.all(urls.map(url => deleteStoredUrl(psid, url)));
-  await runStep("chat_history", () =>
-    Promise.resolve(clearMessengerChatHistory(state.userKey))
-  );
   await Promise.resolve(clearUserState(psid));
 }

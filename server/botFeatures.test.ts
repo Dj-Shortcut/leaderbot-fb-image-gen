@@ -5,16 +5,11 @@ const {
   sendQuickRepliesMock,
   sendTextMock,
   safeLogMock,
-  generateMessengerReplyMock,
 } = vi.hoisted(() => ({
   sendImageMock: vi.fn(async () => undefined),
   sendQuickRepliesMock: vi.fn(async () => undefined),
   sendTextMock: vi.fn(async () => undefined),
   safeLogMock: vi.fn(),
-  generateMessengerReplyMock: vi.fn(async () => ({
-    text: "fallback",
-    source: "fallback",
-  })),
 }));
 
 vi.mock("./_core/messengerApi", () => ({
@@ -22,10 +17,6 @@ vi.mock("./_core/messengerApi", () => ({
   sendQuickReplies: sendQuickRepliesMock,
   sendText: sendTextMock,
   safeLog: safeLogMock,
-}));
-
-vi.mock("./_core/messengerResponsesService", () => ({
-  generateMessengerReply: generateMessengerReplyMock,
 }));
 
 import { t } from "./_core/i18n";
@@ -49,7 +40,6 @@ describe("bot features", () => {
     sendQuickRepliesMock.mockClear();
     sendTextMock.mockClear();
     safeLogMock.mockClear();
-    generateMessengerReplyMock.mockClear();
   });
 
   it("rate limits inbound text spam after 10 messages", async () => {
@@ -71,13 +61,13 @@ describe("bot features", () => {
     }
 
     expect(sendTextMock).toHaveBeenCalledWith(psid, "⏳ Slow down a bit.");
-    const chatEngineDecisions = safeLogMock.mock.calls.filter(
-      ([event]) => event === "messenger_chat_engine_decision"
+    const textExecutions = safeLogMock.mock.calls.filter(
+      ([event]) => event === "shared_text_executing"
     );
-    expect(chatEngineDecisions).toHaveLength(10);
+    expect(textExecutions).toHaveLength(11);
   });
 
-  it("lets remix text fall back to normal assistant handling", async () => {
+  it("lets remix text fall back to deterministic text handling", async () => {
     const psid = "remix-fallback-user";
 
     await processFacebookWebhookPayload({
@@ -94,10 +84,9 @@ describe("bot features", () => {
     });
 
     expect(sendTextMock).toHaveBeenCalledWith(psid, t("nl", "textWithoutPhoto"));
-    expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
 
-  it("handles help command via bot feature without calling chat engine", async () => {
+  it("handles help command via bot feature without OpenAI text", async () => {
     const psid = "help-user";
 
     await processFacebookWebhookPayload({
@@ -117,7 +106,6 @@ describe("bot features", () => {
       psid,
       [t("nl", "textWithoutPhoto"), t("nl", "assistantPhotoTip")].join("\n\n")
     );
-    expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
 
   it("keeps surprise-without-photo users in awaiting-photo state", async () => {
@@ -138,6 +126,5 @@ describe("bot features", () => {
 
     expect(sendTextMock).toHaveBeenCalledWith(psid, t("nl", "textWithoutPhoto"));
     expect(getState(anonymizePsid(psid))?.stage).toBe("AWAITING_PHOTO");
-    expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
 });

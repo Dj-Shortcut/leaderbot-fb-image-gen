@@ -787,22 +787,6 @@ async function handleSharedMessengerText(
     logAckIgnored: ack => {
       safeLog("ack_ignored", { ack });
     },
-    logRolloutDecision: rolloutDecision => {
-      safeLog("messenger_chat_engine_decision", {
-        user: toLogUser(input.userId),
-        engine: rolloutDecision.engine,
-        canaryPercent: rolloutDecision.canaryPercent,
-        bucket: rolloutDecision.bucket,
-        selected: rolloutDecision.useResponses ? "responses" : "legacy",
-      });
-    },
-    logEngineResult: ({ source, errorCode }) => {
-      safeLog("messenger_chat_engine_result", {
-        user: toLogUser(input.userId),
-        source,
-        ...(errorCode ? { errorCode } : {}),
-      });
-    },
   });
 }
 

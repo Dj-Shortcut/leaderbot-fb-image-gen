@@ -1,24 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { safeLogMock, generateMessengerReplyMock } = vi.hoisted(() => ({
+const { safeLogMock } = vi.hoisted(() => ({
   safeLogMock: vi.fn(),
-  generateMessengerReplyMock: vi.fn(),
 }));
 
 vi.mock("./_core/messengerApi", () => ({
   safeLog: safeLogMock,
 }));
 
-vi.mock("./_core/messengerResponsesService", () => ({
-  generateMessengerReply: generateMessengerReplyMock,
-}));
-
 import { t } from "./_core/i18n";
 import { handleSharedTextMessage } from "./_core/sharedTextHandler";
 import type { MessengerUserState } from "./_core/messengerState";
-
-const originalEngine = process.env.MESSENGER_CHAT_ENGINE;
-const originalCanary = process.env.MESSENGER_CHAT_CANARY_PERCENT;
 
 function createState(
   overrides: Partial<MessengerUserState> = {}
@@ -48,24 +40,11 @@ function createState(
 
 describe("sharedTextHandler", () => {
   beforeEach(() => {
-    delete process.env.MESSENGER_CHAT_ENGINE;
-    delete process.env.MESSENGER_CHAT_CANARY_PERCENT;
     safeLogMock.mockReset();
-    generateMessengerReplyMock.mockReset();
   });
 
   afterEach(() => {
-    if (originalEngine === undefined) {
-      delete process.env.MESSENGER_CHAT_ENGINE;
-    } else {
-      process.env.MESSENGER_CHAT_ENGINE = originalEngine;
-    }
-
-    if (originalCanary === undefined) {
-      delete process.env.MESSENGER_CHAT_CANARY_PERCENT;
-    } else {
-      process.env.MESSENGER_CHAT_CANARY_PERCENT = originalCanary;
-    }
+    vi.unstubAllGlobals();
   });
 
   it("returns intro response metadata for a new greeting", async () => {
@@ -145,13 +124,10 @@ describe("sharedTextHandler", () => {
     });
   });
 
-  it("returns the generated reply when responses rollout is enabled", async () => {
-    process.env.MESSENGER_CHAT_ENGINE = "responses";
-    process.env.MESSENGER_CHAT_CANARY_PERCENT = "100";
-    generateMessengerReplyMock.mockResolvedValue({
-      text: "Generated response",
-      source: "responses",
-    });
+  it("keeps free text deterministic without calling OpenAI text APIs", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const setFlowState = vi.fn(async () => {});
 
     const result = await handleSharedTextMessage({
       message: {
@@ -161,12 +137,45 @@ describe("sharedTextHandler", () => {
         messageType: "text",
         textBody: "Can you help me?",
       },
-      reqId: "req-rollout",
+      reqId: "req-deterministic",
       lang: "en",
       getState: async () =>
         createState({
           psid: "psid-2",
           userKey: "user-key-2",
+          hasSeenIntro: true,
+        }),
+      setFlowState,
+    });
+
+    expect(setFlowState).toHaveBeenCalledWith("AWAITING_PHOTO");
+    expect(result).toEqual({
+      response: {
+        kind: "text",
+        text: t("en", "textWithoutPhoto"),
+      },
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps free text with an existing photo on fixed style guidance", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await handleSharedTextMessage({
+      message: {
+        channel: "messenger",
+        senderId: "psid-3",
+        userId: "user-key-3",
+        messageType: "text",
+        textBody: "Wat kan ik nu doen?",
+      },
+      reqId: "req-has-photo",
+      lang: "nl",
+      getState: async () =>
+        createState({
+          psid: "psid-3",
+          userKey: "user-key-3",
           stage: "AWAITING_STYLE",
           state: "AWAITING_STYLE",
           hasSeenIntro: true,
@@ -176,94 +185,12 @@ describe("sharedTextHandler", () => {
       setFlowState: async () => {},
     });
 
-    expect(generateMessengerReplyMock).toHaveBeenCalledWith({
-      psid: "psid-2",
-      userKey: "user-key-2",
-      lang: "en",
-      stage: "AWAITING_STYLE",
-      text: "Can you help me?",
-      hasPhoto: true,
-    });
-    expect(result).toEqual({
-      response: { kind: "text", text: "Generated response" },
-    });
-  });
-
-  it("falls back to the no-photo guidance when the responses engine fails", async () => {
-    process.env.MESSENGER_CHAT_ENGINE = "responses";
-    process.env.MESSENGER_CHAT_CANARY_PERCENT = "100";
-    generateMessengerReplyMock.mockRejectedValue(new Error("boom"));
-
-    const setFlowState = vi.fn(async () => {});
-    const logEngineResult = vi.fn();
-
-    const result = await handleSharedTextMessage({
-      message: {
-        channel: "messenger",
-        senderId: "psid-3",
-        userId: "user-key-3",
-        messageType: "text",
-        textBody: "Help",
-      },
-      reqId: "req-fallback",
-      lang: "en",
-      getState: async () =>
-        createState({
-          psid: "psid-3",
-          userKey: "user-key-3",
-          hasSeenIntro: true,
-        }),
-      setFlowState,
-      logEngineResult,
-    });
-
-    expect(logEngineResult).toHaveBeenCalledWith({
-      source: "fallback",
-      errorCode: "Error",
-    });
     expect(result).toEqual({
       response: {
         kind: "text",
-        text: t("en", "textWithoutPhoto"),
+        text: t("nl", "flowExplanation"),
       },
     });
-  });
-
-  it("passes the post-transition stage into the responses engine after awaiting a photo", async () => {
-    process.env.MESSENGER_CHAT_ENGINE = "responses";
-    process.env.MESSENGER_CHAT_CANARY_PERCENT = "100";
-    generateMessengerReplyMock.mockResolvedValue({
-      text: "Generated response",
-      source: "responses",
-    });
-
-    const setFlowState = vi.fn(async () => {});
-
-    await handleSharedTextMessage({
-      message: {
-        channel: "messenger",
-        senderId: "psid-4",
-        userId: "user-key-4",
-        messageType: "text",
-        textBody: "Help me pick a style",
-      },
-      reqId: "req-stage-transition",
-      lang: "en",
-      getState: async () =>
-        createState({
-          psid: "psid-4",
-          userKey: "user-key-4",
-          hasSeenIntro: true,
-        }),
-      setFlowState,
-    });
-
-    expect(setFlowState).toHaveBeenCalledWith("AWAITING_PHOTO");
-    expect(generateMessengerReplyMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        stage: "AWAITING_PHOTO",
-        hasPhoto: false,
-      })
-    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

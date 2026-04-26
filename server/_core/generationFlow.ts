@@ -1,5 +1,6 @@
 import {
   createImageGenerator,
+  type ImageProvider,
 } from "./imageService";
 import {
   GenerationTimeoutError,
@@ -38,7 +39,7 @@ export type GenerationFlowSuccess = {
   imageUrl: string;
   metrics: GenerationMetrics;
   proof: GenerationProof;
-  mode: "openai";
+  mode: ImageProvider;
   resolvedSourceImageUrl: string;
   trustedSourceImageUrl: boolean;
 };

@@ -86,7 +86,7 @@ describe("generationFlow", () => {
       metrics: { totalMs: 123 },
     });
     createImageGeneratorMock.mockReturnValue({
-      mode: "openai",
+      mode: "openai-images",
       generator: { generate: generateMock },
     });
 
@@ -128,7 +128,7 @@ describe("generationFlow", () => {
       metrics: { totalMs: 123 },
     });
     createImageGeneratorMock.mockReturnValue({
-      mode: "openai",
+      mode: "openai-images",
       generator: { generate: generateMock },
     });
 
@@ -185,7 +185,7 @@ describe("generationFlow", () => {
     };
 
     createImageGeneratorMock.mockReturnValue({
-      mode: "openai",
+      mode: "openai-images",
       generator: { generate: vi.fn().mockRejectedValue(timeoutError) },
     });
 
@@ -204,7 +204,7 @@ describe("generationFlow", () => {
     });
 
     createImageGeneratorMock.mockReturnValue({
-      mode: "openai",
+      mode: "openai-images",
       generator: {
         generate: vi.fn().mockRejectedValue(new InvalidSourceImageUrlError("bad")),
       },
@@ -224,7 +224,7 @@ describe("generationFlow", () => {
     });
 
     createImageGeneratorMock.mockReturnValue({
-      mode: "openai",
+      mode: "openai-images",
       generator: {
         generate: vi.fn().mockRejectedValue(new MissingInputImageError("missing")),
       },
@@ -244,7 +244,7 @@ describe("generationFlow", () => {
     });
 
     createImageGeneratorMock.mockReturnValue({
-      mode: "openai",
+      mode: "openai-images",
       generator: {
         generate: vi.fn().mockRejectedValue(new OpenAiBudgetExceededError("budget")),
       },
@@ -267,7 +267,7 @@ describe("generationFlow", () => {
   it("rejects non-stored source image URLs before calling the generator", async () => {
     const generateMock = vi.fn();
     createImageGeneratorMock.mockReturnValue({
-      mode: "openai",
+      mode: "openai-images",
       generator: { generate: generateMock },
     });
 

@@ -21,11 +21,7 @@ const DEFAULT_MAX_RETRIES = 1;
 const MAX_INPUT_LENGTH = 240;
 
 function getModel(): string {
-  return (
-    process.env.OPENAI_EDIT_INTERPRETER_MODEL?.trim() ||
-    process.env.OPENAI_TEXT_MODEL?.trim() ||
-    DEFAULT_MODEL
-  );
+  return process.env.OPENAI_EDIT_INTERPRETER_MODEL?.trim() || DEFAULT_MODEL;
 }
 
 function getTimeoutMs(): number {

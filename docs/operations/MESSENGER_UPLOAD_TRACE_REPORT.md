@@ -87,7 +87,7 @@ From webhook event to generated image send:
 
 ## 4) Mock mode investigation
 
-- `mode: "mock"` is produced by `createImageGenerator(...)` only when `process.env.GENERATOR_MODE === "mock"`.
+- `mode: "openai-images"` is produced by `createImageGenerator(...)` through the current image provider boundary.
 - In all other cases (unset or any other value), mode resolves to `openai`.
 - Mock generator returns:
   - `imageUrl = "${baseUrl}/demo/<style-file>.png"`
@@ -95,7 +95,7 @@ From webhook event to generated image send:
 - `/demo/*` files are static files under `public/demo`, served by Express static middleware in production.
 
 Reachability implications:
-- The `http://localhost:3000/demo/...` fallback applies **only when running in explicit mock mode** (`GENERATOR_MODE=mock`) and base URL config is missing/invalid.
+- The current image provider is `openai-images`; generated URLs depend on the normal app/storage configuration.
 - In `openai` mode, the service requires a valid public base URL (`APP_BASE_URL` or valid `BASE_URL`) and throws when missing/invalid; it does not intentionally continue with a localhost fallback URL.
 - Therefore, troubleshooting should treat localhost fallback URLs as a **mock-mode/configuration signal**, not as the default production-path assumption.
 
@@ -105,7 +105,7 @@ Based on current code and payload shape:
 
 1. **Generated image URL not publicly reachable from Meta**
    - Code always sends by URL (`payload.url`) and never uploads binary.
-   - In explicit mock mode (`GENERATOR_MODE=mock`), fallback URL is `http://localhost:3000/...` if base URL config is missing/invalid.
+   - Confirm `APP_BASE_URL` and storage proxy configuration before debugging generated URL delivery.
 
 2. **OpenAI returned URL may be temporary/expired or inaccessible at send time**
    - OpenAI path takes `result.data[0].url` and immediately forwards that URL to Messenger with no persistence/proxying.
