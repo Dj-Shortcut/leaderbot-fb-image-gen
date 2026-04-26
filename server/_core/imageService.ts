@@ -31,8 +31,11 @@ import {
   MissingAppBaseUrlError,
   MissingObjectStorageConfigError,
 } from "./image-generation/imageServiceErrors";
+import { createLogger } from "./logger";
 
-export type ImageProvider = "openai-images";
+const OPENAI_IMAGES_PROVIDER = "openai-images" as const;
+
+export type ImageProvider = typeof OPENAI_IMAGES_PROVIDER;
 
 interface ImageGenerator {
   generate(input: {
@@ -100,15 +103,15 @@ export function getGeneratorStartupConfig(): {
 function getImageProvider(): ImageProvider {
   const configured = process.env.IMAGE_PROVIDER?.trim();
   if (!configured) {
-    return "openai-images";
+    return OPENAI_IMAGES_PROVIDER;
   }
 
-  if (configured === "openai-images") {
+  if (configured === OPENAI_IMAGES_PROVIDER) {
     return configured;
   }
 
   throw new Error(
-    `Unsupported IMAGE_PROVIDER "${configured}". Expected "openai-images".`
+    `Unsupported IMAGE_PROVIDER "${configured}". Expected "${OPENAI_IMAGES_PROVIDER}".`
   );
 }
 
@@ -140,10 +143,26 @@ async function prepareGenerationInput(
   logSourceImageFetchStart(input);
 
   return {
-    hasSourceImage: Boolean(input.sourceImageUrl || input.sourceImageData),
+    hasSourceImage: computeHasSourceImage(input),
     prompt: buildStylePrompt(input.style, input.promptHint),
     sourceImage: await resolveStoredSourceImage(input),
   };
+}
+
+function computeHasSourceImage(input: GeneratorInput): boolean {
+  return Boolean(input.sourceImageUrl || input.sourceImageData);
+}
+
+function logImageProviderUsed(
+  input: GeneratorInput,
+  provider: ImageProvider,
+  hasSourceImage: boolean
+): void {
+  createLogger({ reqId: input.reqId }).info({
+    msg: "image_provider_used",
+    provider,
+    hasSourceImage,
+  });
 }
 
 export class OpenAiImageGenerator implements ImageGenerator {
@@ -168,7 +187,9 @@ export class OpenAiImageGenerator implements ImageGenerator {
     }
 
     try {
+      const provider = getImageProvider();
       const preparedInput = await prepareGenerationInput(input);
+      logImageProviderUsed(input, provider, preparedInput.hasSourceImage);
       const sourceImage = preparedInput.sourceImage;
       partialMetrics.fbImageFetchMs = sourceImage.fbImageFetchMs;
 

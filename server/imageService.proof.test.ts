@@ -28,6 +28,46 @@ function createStoredSourceImageInput(input: {
   };
 }
 
+function createOpenAiEditsFetchMock(options?: {
+  sourceImageFixture?: Buffer;
+  failuresBeforeSuccess?: number;
+  payload?: { data: Array<{ b64_json: string }> };
+  failureFactory?: (attempt: number) => Error;
+}) {
+  const sourceImageFixture = options?.sourceImageFixture ?? Buffer.alloc(7000, 9);
+  const failuresBeforeSuccess = options?.failuresBeforeSuccess ?? 0;
+  const payload = options?.payload ?? {
+    data: [{ b64_json: GENERATED_IMAGE_BASE64 }],
+  };
+  let openAiCallCount = 0;
+
+  const fetchMock = vi.fn(async (url: string | URL) => {
+    if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
+      return {
+        ok: true,
+        headers: new Headers({ "content-type": "image/jpeg" }),
+        arrayBuffer: async () => sourceImageFixture,
+      } as Response;
+    }
+
+    expect(toUrlString(url)).toBe("https://api.openai.com/v1/images/edits");
+    openAiCallCount += 1;
+    if (openAiCallCount <= failuresBeforeSuccess) {
+      const failure =
+        options?.failureFactory?.(openAiCallCount) ??
+        Object.assign(new Error("request failed"), { name: "AbortError" });
+      throw failure;
+    }
+
+    return {
+      ok: true,
+      json: async () => payload,
+    } as Response;
+  });
+
+  return { fetchMock, getOpenAiCallCount: () => openAiCallCount };
+}
+
 type StylePromptCase = {
   style:
     | "caricature"
@@ -933,28 +973,13 @@ describe("OpenAi image-to-image proof", () => {
     process.env.OPENAI_IMAGE_TIMEOUT_MS = "5";
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = STORED_SOURCE_IMAGE_ALLOWED_HOSTS;
 
-    const fixture = Buffer.alloc(7000, 9);
-    let openAiCallCount = 0;
-    const fetchMock = vi.fn(async (url: string | URL) => {
-      if (toUrlString(url) === STORED_SOURCE_IMAGE_URL) {
-        return {
-          ok: true,
-          headers: new Headers({ "content-type": "image/jpeg" }),
-          arrayBuffer: async () => fixture,
-        } as Response;
-      }
-
-      openAiCallCount += 1;
-      if (openAiCallCount === 1) {
+    const { fetchMock } = createOpenAiEditsFetchMock({
+      failuresBeforeSuccess: 1,
+      failureFactory: () => {
         const abortError = new Error("request aborted");
         abortError.name = "AbortError";
-        throw abortError;
-      }
-
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
+        return abortError;
+      },
     });
 
     vi.stubGlobal("fetch", fetchMock);
