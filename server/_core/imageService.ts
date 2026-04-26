@@ -31,8 +31,10 @@ import {
   MissingAppBaseUrlError,
   MissingObjectStorageConfigError,
 } from "./image-generation/imageServiceErrors";
+import { createLogger } from "./logger";
 
-export type ImageProvider = "openai-images";
+export const OPENAI_IMAGES_PROVIDER = "openai-images" as const;
+export type ImageProvider = typeof OPENAI_IMAGES_PROVIDER;
 
 interface ImageGenerator {
   generate(input: {
@@ -100,15 +102,15 @@ export function getGeneratorStartupConfig(): {
 function getImageProvider(): ImageProvider {
   const configured = process.env.IMAGE_PROVIDER?.trim();
   if (!configured) {
-    return "openai-images";
+    return OPENAI_IMAGES_PROVIDER;
   }
 
-  if (configured === "openai-images") {
+  if (configured === OPENAI_IMAGES_PROVIDER) {
     return configured;
   }
 
   throw new Error(
-    `Unsupported IMAGE_PROVIDER "${configured}". Expected "openai-images".`
+    `Unsupported IMAGE_PROVIDER "${configured}". Expected "${OPENAI_IMAGES_PROVIDER}".`
   );
 }
 
@@ -131,6 +133,14 @@ function isTransientNetworkError(error: unknown): boolean {
   }
 
   return error.name === "AbortError" || error instanceof TypeError;
+}
+
+function logImageProviderUsed(input: GeneratorInput): void {
+  createLogger({ reqId: input.reqId }).info({
+    msg: "image_provider_used",
+    provider: OPENAI_IMAGES_PROVIDER,
+    hasSourceImage: Boolean(input.sourceImageUrl || input.sourceImageData),
+  });
 }
 
 async function prepareGenerationInput(
@@ -166,6 +176,8 @@ export class OpenAiImageGenerator implements ImageGenerator {
     if (!process.env.OPENAI_API_KEY) {
       throw new MissingOpenAiApiKeyError("OPENAI_API_KEY is missing");
     }
+
+    logImageProviderUsed(input);
 
     try {
       const preparedInput = await prepareGenerationInput(input);
