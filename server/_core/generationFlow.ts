@@ -34,7 +34,7 @@ type GenerationMetrics = NonNullable<ReturnType<typeof getGenerationMetrics>> | 
   uploadOrServeMs?: number;
 };
 
-export type GenerationFlowSuccess = {
+type GenerationFlowSuccess = {
   kind: "success";
   imageUrl: string;
   metrics: GenerationMetrics;
@@ -44,7 +44,7 @@ export type GenerationFlowSuccess = {
   trustedSourceImageUrl: boolean;
 };
 
-export type GenerationFlowFailureKind =
+type GenerationFlowFailureKind =
   | "missing_source_image"
   | "invalid_source_image"
   | "missing_input_image"
@@ -53,7 +53,7 @@ export type GenerationFlowFailureKind =
   | "generation_budget_reached"
   | "generation_failed";
 
-export type GenerationFlowFailure = {
+type GenerationFlowFailure = {
   kind: "error";
   errorKind: GenerationFlowFailureKind;
   error: unknown;
@@ -62,7 +62,7 @@ export type GenerationFlowFailure = {
   trustedSourceImageUrl: boolean;
 };
 
-export type GenerationFlowResult =
+type GenerationFlowResult =
   | GenerationFlowSuccess
   | GenerationFlowFailure;
 

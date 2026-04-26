@@ -38,7 +38,7 @@ type SharedTextHandlerInput = {
  * Channel adapters remain responsible for media-specific flows and any
  * post-send side effects returned via this result contract.
  */
-export type SharedTextHandlerResult = {
+type SharedTextHandlerResult = {
   response: BotResponse | null;
   replyState?: ConversationState;
   afterSend?: "markIntroSeen";

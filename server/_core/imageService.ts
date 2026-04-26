@@ -6,7 +6,6 @@ import {
   fetchOpenAiImageResponse,
   finalizeGenerationMetrics,
   getGenerationMetrics,
-  OpenAiBudgetExceededError,
   parseOpenAiImageResponse,
   type GenerationMetrics,
 } from "./image-generation/openAiImageClient";
@@ -244,5 +243,4 @@ export function createImageGenerator(provider: ImageProvider = getImageProvider(
 
 export {
   getGenerationMetrics,
-  OpenAiBudgetExceededError,
 };

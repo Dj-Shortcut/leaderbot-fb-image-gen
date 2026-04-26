@@ -113,6 +113,23 @@ type MaybeInFlightMessageResult =
   | { handled: false }
   | { handled: true; outcome?: MessengerSendOutcome };
 
+type TrackedEventContext = {
+  psid: string;
+  userId: string;
+  reqId: string;
+  lang: Lang;
+  localeLang: Lang;
+  senderLocale?: string;
+  state: MessengerState;
+  classification: ReturnType<typeof classifyInboundEvent>;
+  responseSent: () => boolean;
+  markResponseSentFromOutcome: (
+    outcome: MessengerSendOutcome | undefined
+  ) => void;
+  sendFallbackIfNeeded: () => Promise<void>;
+  trackedCtx: HandlerContext;
+};
+
 function combineMessengerSendOutcomes(
   ...outcomes: MessengerSendOutcome[]
 ): MessengerSendOutcome {
@@ -320,13 +337,13 @@ async function handleEntry(
   }
 }
 
-async function handleEvent(
+async function createTrackedEventContext(
   ctx: HandlerContext,
   event: FacebookWebhookEvent,
   entryId?: string
-): Promise<void> {
+): Promise<TrackedEventContext | null> {
   const psid = event.sender?.id;
-  if (!psid) return;
+  if (!psid) return null;
 
   const userId = toUserKey(psid);
   const reqId = `${psid}-${Date.now()}`;
@@ -344,7 +361,7 @@ async function handleEvent(
   const trackedCtx = createTrackedHandlerContext(ctx, markResponseSentFromOutcome);
 
   if (!(await ctx.claimEventReplayOrLog(event, entryId, userId))) {
-    return;
+    return null;
   }
 
   recordActiveUserToday(userId);
@@ -366,6 +383,33 @@ async function handleEvent(
       await trackedCtx.sendLoggedText(psid, t(lang, "failure"), reqId);
     }
   };
+
+  return {
+    psid,
+    userId,
+    reqId,
+    lang,
+    localeLang,
+    senderLocale,
+    state,
+    classification,
+    responseSent: () => responseSent,
+    markResponseSentFromOutcome,
+    sendFallbackIfNeeded,
+    trackedCtx,
+  };
+}
+
+async function handleEvent(
+  ctx: HandlerContext,
+  event: FacebookWebhookEvent,
+  entryId?: string
+): Promise<void> {
+  const eventContext = await createTrackedEventContext(ctx, event, entryId);
+  if (!eventContext) return;
+
+  const { psid, userId, reqId, state, trackedCtx } = eventContext;
+
   logMessengerWebhookTrace("webhook_received", {
     reqId,
     user: toLogUser(userId),
@@ -376,164 +420,17 @@ async function handleEvent(
   });
 
   try {
-    if (
-      classification.isInboundUserEvent &&
-      await handleMessengerConsentGate({
-        psid,
-        lang,
-        text: event.message?.text,
-        payload: classification.eventPayload,
-        state,
-        sendText: async text => {
-          await trackedCtx.sendLoggedText(psid, text, reqId);
-        },
-        sendQuickReplies: async (text, replies) => {
-          await trackedCtx.sendLoggedQuickReplies(psid, text, replies, reqId);
-        },
-        sendRestyleStarterPills: async () => {
-          await setFlowState(psid, "AWAITING_STYLE");
-          await trackedCtx.sendStylePicker(psid, lang, reqId);
-        },
-      })
-    ) {
-      logMessengerWebhookTrace("selected_branch", {
-        reqId,
-        user: toLogUser(userId),
-        branch: "consent_gate",
-        responseSent,
-      });
-      await sendFallbackIfNeeded();
-      return;
-    }
-
     trackedCtx.logIncomingMessage(psid, userId, event, reqId);
     trackedCtx.logUserState(psid, userId, state, reqId, "handle_event");
 
-    if (senderLocale && localeLang !== state.preferredLang) {
-      await setPreferredLang(psid, localeLang);
-    }
-
-    const routeDeps = {
-      psid,
-      userId,
-      reqId,
-      sendText: async (text: string) => {
-        await trackedCtx.sendLoggedText(psid, text, reqId);
-      },
-      sendStateText: async (stateName: ConversationState, text: string) => {
-        await trackedCtx.sendStateQuickReplies(psid, stateName, text, reqId);
-      },
-      sendOptionsPrompt: async (
-        prompt: string,
-        options: Array<{ id: string; title: string }>
-      ) => {
-        await trackedCtx.sendLoggedQuickReplies(
-          psid,
-          prompt,
-          options.map(option => ({
-            content_type: "text",
-            title: option.title,
-            payload: option.id,
-          })),
-          reqId
-        );
-      },
-      sendImage: async (imageUrl: string) => {
-        await trackedCtx.sendLoggedImage(psid, imageUrl, reqId);
-      },
-      safeLog,
-      setLastEntryIntent: (nextEntryIntent: EntryIntent | null) =>
-        Promise.resolve(setLastEntryIntent(psid, nextEntryIntent)),
-      setActiveExperience: (nextActiveExperience: ActiveExperience | null) =>
-        Promise.resolve(setActiveExperience(psid, nextActiveExperience)),
-    };
-    const { referralRef, entryIntent } = parseMessengerEntryIntent({
-      event,
-      reqId,
-      userId,
-      localeLang,
-      safeLog,
-    });
     if (
-      await routeMessengerEntryIntent({
-        deps: routeDeps,
-        state,
-        entryIntent,
-      })
+      eventContext.senderLocale &&
+      eventContext.localeLang !== state.preferredLang
     ) {
-      logMessengerWebhookTrace("selected_branch", {
-        reqId,
-        user: toLogUser(userId),
-        branch: "entry_intent",
-        responseSent,
-      });
-      await sendFallbackIfNeeded();
-      return;
+      await setPreferredLang(psid, eventContext.localeLang);
     }
 
-    if (
-      await routeMessengerActiveExperience({
-        deps: routeDeps,
-        state,
-        event,
-      })
-    ) {
-      logMessengerWebhookTrace("selected_branch", {
-        reqId,
-        user: toLogUser(userId),
-        branch: "active_experience",
-        responseSent,
-      });
-      await sendFallbackIfNeeded();
-      return;
-    }
-
-    const referralResult = await trackedCtx.handleReferralStyleEvent(
-      psid,
-      referralRef,
-      lang,
-      reqId
-    );
-    if (referralResult.handled) {
-      if (referralResult.outcome) {
-        markResponseSentFromOutcome(referralResult.outcome);
-      }
-      logMessengerWebhookTrace("selected_branch", {
-        reqId,
-        user: toLogUser(userId),
-        branch: "referral",
-        responseSent,
-      });
-      await sendFallbackIfNeeded();
-      return;
-    }
-
-    if (
-      await handlePostbackEvent(trackedCtx, {
-        psid,
-        userId,
-        event,
-        reqId,
-        lang,
-      })
-    ) {
-      logMessengerWebhookTrace("selected_branch", {
-        reqId,
-        user: toLogUser(userId),
-        branch: "postback",
-        responseSent,
-      });
-      await sendFallbackIfNeeded();
-      return;
-    }
-
-    await handleMessageEvent(trackedCtx, { psid, userId, event, reqId, lang });
-    logMessengerWebhookTrace("selected_branch", {
-      reqId,
-      user: toLogUser(userId),
-      branch: "message",
-      responseSent,
-    });
+    await routeTrackedEvent(eventContext, event);
   } catch (error) {
     logMessengerWebhookTrace("top_level_catch", {
       reqId,
@@ -548,11 +445,163 @@ async function handleEvent(
       ),
       hasText: Boolean(event.message?.text),
     });
-    await sendFallbackIfNeeded();
+    await eventContext.sendFallbackIfNeeded();
     throw error;
   }
 
-  await sendFallbackIfNeeded();
+  await eventContext.sendFallbackIfNeeded();
+}
+
+async function routeTrackedEvent(
+  context: TrackedEventContext,
+  event: FacebookWebhookEvent
+): Promise<void> {
+  const { psid, userId, reqId, lang, localeLang, state, trackedCtx } = context;
+  if (await routeConsentGate(context, event)) return;
+
+  const routeDeps = createMessengerRouteDeps(context);
+  const { referralRef, entryIntent } = parseMessengerEntryIntent({
+    event,
+    reqId,
+    userId,
+    localeLang,
+    safeLog,
+  });
+
+  if (
+    await routeMessengerEntryIntent({
+      deps: routeDeps,
+      state,
+      entryIntent,
+    })
+  ) {
+    await finishSelectedBranch(context, "entry_intent");
+    return;
+  }
+
+  if (
+    await routeMessengerActiveExperience({
+      deps: routeDeps,
+      state,
+      event,
+    })
+  ) {
+    await finishSelectedBranch(context, "active_experience");
+    return;
+  }
+
+  const referralResult = await trackedCtx.handleReferralStyleEvent(
+    psid,
+    referralRef,
+    lang,
+    reqId
+  );
+  if (referralResult.handled) {
+    context.markResponseSentFromOutcome(referralResult.outcome);
+    await finishSelectedBranch(context, "referral");
+    return;
+  }
+
+  if (
+    await handlePostbackEvent(trackedCtx, {
+      psid,
+      userId,
+      event,
+      reqId,
+      lang,
+    })
+  ) {
+    await finishSelectedBranch(context, "postback");
+    return;
+  }
+
+  await handleMessageEvent(trackedCtx, { psid, userId, event, reqId, lang });
+  await finishSelectedBranch(context, "message");
+}
+
+async function routeConsentGate(
+  context: TrackedEventContext,
+  event: FacebookWebhookEvent
+): Promise<boolean> {
+  const { psid, lang, reqId, state, classification, trackedCtx } = context;
+  if (!classification.isInboundUserEvent) {
+    return false;
+  }
+
+  const handled = await handleMessengerConsentGate({
+    psid,
+    lang,
+    text: event.message?.text,
+    payload: classification.eventPayload,
+    state,
+    sendText: async text => {
+      await trackedCtx.sendLoggedText(psid, text, reqId);
+    },
+    sendQuickReplies: async (text, replies) => {
+      await trackedCtx.sendLoggedQuickReplies(psid, text, replies, reqId);
+    },
+    sendRestyleStarterPills: async () => {
+      await setFlowState(psid, "AWAITING_STYLE");
+      await trackedCtx.sendStylePicker(psid, lang, reqId);
+    },
+  });
+
+  if (handled) {
+    await finishSelectedBranch(context, "consent_gate");
+  }
+
+  return handled;
+}
+
+function createMessengerRouteDeps(context: TrackedEventContext) {
+  const { psid, userId, reqId, trackedCtx } = context;
+  return {
+    psid,
+    userId,
+    reqId,
+    sendText: async (text: string) => {
+      await trackedCtx.sendLoggedText(psid, text, reqId);
+    },
+    sendStateText: async (stateName: ConversationState, text: string) => {
+      await trackedCtx.sendStateQuickReplies(psid, stateName, text, reqId);
+    },
+    sendOptionsPrompt: async (
+      prompt: string,
+      options: Array<{ id: string; title: string }>
+    ) => {
+      await trackedCtx.sendLoggedQuickReplies(
+        psid,
+        prompt,
+        options.map(option => ({
+          content_type: "text",
+          title: option.title,
+          payload: option.id,
+        })),
+        reqId
+      );
+    },
+    sendImage: async (imageUrl: string) => {
+      await trackedCtx.sendLoggedImage(psid, imageUrl, reqId);
+    },
+    safeLog,
+    setLastEntryIntent: (nextEntryIntent: EntryIntent | null) =>
+      Promise.resolve(setLastEntryIntent(psid, nextEntryIntent)),
+    setActiveExperience: (nextActiveExperience: ActiveExperience | null) =>
+      Promise.resolve(setActiveExperience(psid, nextActiveExperience)),
+  };
+}
+
+async function finishSelectedBranch(
+  context: TrackedEventContext,
+  branch: string
+): Promise<void> {
+  logMessengerWebhookTrace("selected_branch", {
+    reqId: context.reqId,
+    user: toLogUser(context.userId),
+    branch,
+    responseSent: context.responseSent(),
+  });
+  await context.sendFallbackIfNeeded();
 }
 
 async function handleMessageEvent(

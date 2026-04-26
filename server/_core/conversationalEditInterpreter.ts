@@ -8,7 +8,7 @@ type ResponsesApiPayload = {
   max_output_tokens: number;
 };
 
-export type ConversationalEditDecision = {
+type ConversationalEditDecision = {
   shouldEdit: boolean;
   style?: Style;
   promptHint?: string;
