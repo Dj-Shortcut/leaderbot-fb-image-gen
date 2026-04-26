@@ -85,19 +85,17 @@ From webhook event to generated image send:
 9. **First Messenger image send call:** `sendImage(psid, imageUrl)`.
 10. `sendImage` -> `sendMessage` -> `POST /me/messages` with image attachment URL payload.
 
-## 4) Mock mode investigation
+## 4) Image provider boundary
 
-- `mode: "mock"` is produced by `createImageGenerator(...)` only when `process.env.GENERATOR_MODE === "mock"`.
-- In all other cases (unset or any other value), mode resolves to `openai`.
-- Mock generator returns:
-  - `imageUrl = "${baseUrl}/demo/<style-file>.png"`
-  - `baseUrl` comes from `APP_BASE_URL` (fallback `BASE_URL`), else defaults to `http://localhost:3000`.
-- `/demo/*` files are static files under `public/demo`, served by Express static middleware in production.
+- `mode: "openai-images"` is produced by `createImageGenerator(...)` through the current image provider boundary.
+- `IMAGE_PROVIDER` is optional; when unset, `getImageProvider()` defaults to `openai-images`.
+- Any other `IMAGE_PROVIDER` value fails fast during generator creation.
+- The image service no longer produces localhost `/demo/<style-file>.png` fallback URLs.
 
 Reachability implications:
-- The `http://localhost:3000/demo/...` fallback applies **only when running in explicit mock mode** (`GENERATOR_MODE=mock`) and base URL config is missing/invalid.
-- In `openai` mode, the service requires a valid public base URL (`APP_BASE_URL` or valid `BASE_URL`) and throws when missing/invalid; it does not intentionally continue with a localhost fallback URL.
-- Therefore, troubleshooting should treat localhost fallback URLs as a **mock-mode/configuration signal**, not as the default production-path assumption.
+- The current `openai-images` provider depends on normal app/storage configuration.
+- `APP_BASE_URL` must be a valid public URL for generated image delivery.
+- Troubleshooting should treat localhost/demo URLs as obsolete legacy/mock evidence, not as output from the current image service.
 
 ## 5) Most likely root causes for Messenger 400 "Bijlage uploaden is mislukt"
 
@@ -105,7 +103,7 @@ Based on current code and payload shape:
 
 1. **Generated image URL not publicly reachable from Meta**
    - Code always sends by URL (`payload.url`) and never uploads binary.
-   - In explicit mock mode (`GENERATOR_MODE=mock`), fallback URL is `http://localhost:3000/...` if base URL config is missing/invalid.
+   - Confirm `APP_BASE_URL` and storage proxy configuration before debugging generated URL delivery.
 
 2. **OpenAI returned URL may be temporary/expired or inaccessible at send time**
    - OpenAI path takes `result.data[0].url` and immediately forwards that URL to Messenger with no persistence/proxying.

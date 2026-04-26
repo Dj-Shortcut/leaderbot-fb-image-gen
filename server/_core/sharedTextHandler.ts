@@ -1,7 +1,5 @@
 import { t, type Lang } from "./i18n";
 import type { ConversationState, MessengerUserState } from "./messengerState";
-import { getChatRolloutDecision } from "./chatRollout";
-import { generateMessengerReply } from "./messengerResponsesService";
 import { safeLog } from "./messengerApi";
 import { detectAck, getGreetingResponse } from "./webhookHelpers";
 import { toLogUser } from "./privacy";
@@ -33,10 +31,6 @@ type SharedTextHandlerInput = {
   }) => Promise<boolean>;
   logState?: (state: MessengerUserState, context: string) => void;
   logAckIgnored?: (ack: string) => void;
-  logRolloutDecision?: (
-    decision: ReturnType<typeof getChatRolloutDecision>
-  ) => void;
-  logEngineResult?: (details: { source: string; errorCode?: string }) => void;
 };
 
 /**
@@ -44,7 +38,7 @@ type SharedTextHandlerInput = {
  * Channel adapters remain responsible for media-specific flows and any
  * post-send side effects returned via this result contract.
  */
-export type SharedTextHandlerResult = {
+type SharedTextHandlerResult = {
   response: BotResponse | null;
   replyState?: ConversationState;
   afterSend?: "markIntroSeen";
@@ -147,40 +141,6 @@ async function tryHandleNewStyleShortcut(
   };
 }
 
-function logRolloutDecision(
-  input: SharedTextHandlerInput,
-  decision: ReturnType<typeof getChatRolloutDecision>
-): void {
-  if (input.logRolloutDecision) {
-    input.logRolloutDecision(decision);
-    return;
-  }
-
-  console.log("[shared text] rollout decision", {
-    channel: input.message.channel,
-    user: toLogUser(input.message.userId),
-    engine: decision.engine,
-    selected: decision.useResponses ? "responses" : "legacy",
-  });
-}
-
-function logEngineResult(
-  input: SharedTextHandlerInput,
-  details: { source: string; errorCode?: string }
-): void {
-  if (input.logEngineResult) {
-    input.logEngineResult(details);
-    return;
-  }
-
-  safeLog("shared_text_engine_result", {
-    channel: input.message.channel,
-    user: toLogUser(input.message.userId),
-    source: details.source,
-    errorCode: details.errorCode,
-  });
-}
-
 function buildDefaultTextResponse(
   lang: Lang,
   hasPhoto: boolean
@@ -191,35 +151,6 @@ function buildDefaultTextResponse(
       text: hasPhoto ? t(lang, "flowExplanation") : t(lang, "textWithoutPhoto"),
     },
   };
-}
-
-async function generateResponsesReply(
-  input: SharedTextHandlerInput,
-  args: {
-    trimmedText: string;
-    state: MessengerUserState;
-    hasPhoto: boolean;
-  }
-): Promise<SharedTextHandlerResult> {
-  try {
-    const reply = await generateMessengerReply({
-      psid: input.message.senderId,
-      userKey: input.message.userId,
-      lang: input.lang,
-      stage: args.state.stage,
-      text: args.trimmedText,
-      hasPhoto: args.hasPhoto,
-    });
-
-    logEngineResult(input, { source: reply.source });
-    return { response: { kind: "text", text: reply.text } };
-  } catch (error) {
-    logEngineResult(input, {
-      source: "fallback",
-      errorCode: error instanceof Error ? error.name : "unknown_error",
-    });
-    return buildDefaultTextResponse(input.lang, args.hasPhoto);
-  }
 }
 
 export async function handleSharedTextMessage(
@@ -266,21 +197,8 @@ export async function handleSharedTextMessage(
   }
 
   input.logState?.(state, "text_message");
-  const effectiveState =
-    hasPhoto ? state : { ...state, stage: "AWAITING_PHOTO" as const };
   if (!hasPhoto) {
     await input.setFlowState("AWAITING_PHOTO");
-  }
-
-  const rolloutDecision = getChatRolloutDecision(input.message.userId);
-  logRolloutDecision(input, rolloutDecision);
-
-  if (rolloutDecision.useResponses) {
-    return generateResponsesReply(input, {
-      trimmedText,
-      state: effectiveState,
-      hasPhoto,
-    });
   }
 
   return buildDefaultTextResponse(input.lang, hasPhoto);

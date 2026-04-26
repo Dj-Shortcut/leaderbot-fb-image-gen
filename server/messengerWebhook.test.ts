@@ -15,17 +15,12 @@ const {
   sendQuickRepliesMock,
   sendTextMock,
   safeLogMock,
-  generateMessengerReplyMock,
 } = vi.hoisted(() => ({
   sendGenericTemplateMock: vi.fn(async () => ({ sent: true })),
   sendImageMock: vi.fn(async () => ({ sent: true })),
   sendQuickRepliesMock: vi.fn(async () => ({ sent: true })),
   sendTextMock: vi.fn(async () => ({ sent: true })),
   safeLogMock: vi.fn(),
-  generateMessengerReplyMock: vi.fn(async () => ({
-    text: "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
-    source: "fallback",
-  })),
 }));
 
 vi.mock("./_core/messengerApi", () => ({
@@ -34,10 +29,6 @@ vi.mock("./_core/messengerApi", () => ({
   sendQuickReplies: sendQuickRepliesMock,
   sendText: sendTextMock,
   safeLog: safeLogMock,
-}));
-
-vi.mock("./_core/messengerResponsesService", () => ({
-  generateMessengerReply: generateMessengerReplyMock,
 }));
 
 import {
@@ -163,20 +154,11 @@ beforeEach(() => {
   setSourceImageDnsLookupForTests(async () => [
     { address: "93.184.216.34", family: 4 },
   ]);
-  delete process.env.MESSENGER_CHAT_ENGINE;
-  delete process.env.MESSENGER_CHAT_CANARY_PERCENT;
-
-  generateMessengerReplyMock.mockReset();
-  generateMessengerReplyMock.mockResolvedValue({
-    text: "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
-    source: "fallback",
-  });
 });
 
 describe("messenger webhook dedupe", () => {
   beforeEach(() => {
     delete process.env.MOCK_MODE;
-    process.env.GENERATOR_MODE = "openai";
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = DEFAULT_ALLOWED_SOURCE_IMAGE_HOSTS;
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
@@ -1342,9 +1324,8 @@ describe("messenger webhook dedupe", () => {
   });
 });
 
-describe("messenger text brain rollout", () => {
+describe("messenger deterministic free text", () => {
   beforeEach(() => {
-    process.env.GENERATOR_MODE = "openai";
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = DEFAULT_ALLOWED_SOURCE_IMAGE_HOSTS;
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
@@ -1357,70 +1338,27 @@ describe("messenger text brain rollout", () => {
     resetMessengerEventDedupe();
   });
 
-  it("keeps legacy free-text behavior when engine is legacy", async () => {
-    process.env.MESSENGER_CHAT_ENGINE = "legacy";
-    process.env.MESSENGER_CHAT_CANARY_PERCENT = "100";
-
+  it("keeps free-text deterministic with an existing photo", async () => {
     await processFacebookWebhookPayload({
       entry: [
         {
           messaging: [
             {
-              sender: { id: "legacy-user" },
+              sender: { id: "deterministic-user" },
               message: {
-                mid: "mid-legacy-photo",
+                mid: "mid-deterministic-photo",
                 attachments: [
                   {
                     type: "image",
-                    payload: { url: "https://img.example/legacy.jpg" },
+                    payload: { url: "https://img.example/deterministic.jpg" },
                   },
                 ],
               },
             },
             {
-              sender: { id: "legacy-user" },
-              message: { mid: "mid-legacy-text", text: "Wat kan ik nu doen?" },
-            },
-          ],
-        },
-      ],
-    });
-
-    expect(generateMessengerReplyMock).not.toHaveBeenCalled();
-    expect(sendTextMock).toHaveBeenLastCalledWith(
-      "legacy-user",
-      t("nl", "flowExplanation")
-    );
-  });
-
-  it("uses responses engine on canary hit and passes userKey instead of raw psid", async () => {
-    process.env.MESSENGER_CHAT_ENGINE = "responses";
-    process.env.MESSENGER_CHAT_CANARY_PERCENT = "100";
-    generateMessengerReplyMock.mockResolvedValue({
-      text: "Kies een stijl via de knoppen hieronder.",
-      source: "responses",
-    });
-
-    await processFacebookWebhookPayload({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: "responses-user" },
+              sender: { id: "deterministic-user" },
               message: {
-                mid: "mid-responses-photo",
-                attachments: [
-                  {
-                    type: "image",
-                    payload: { url: "https://img.example/responses.jpg" },
-                  },
-                ],
-              },
-            },
-            {
-              sender: { id: "responses-user" },
-              message: {
-                mid: "mid-responses-text",
+                mid: "mid-deterministic-text",
                 text: "Wat kan ik nu doen?",
               },
             },
@@ -1429,104 +1367,23 @@ describe("messenger text brain rollout", () => {
       ],
     });
 
-    expect(generateMessengerReplyMock).toHaveBeenCalledTimes(1);
-    expect(generateMessengerReplyMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        psid: "responses-user",
-        userKey: anonymizePsid("responses-user"),
-        hasPhoto: true,
-        stage: "AWAITING_STYLE",
-        text: "Wat kan ik nu doen?",
-      })
-    );
-    expect(generateMessengerReplyMock.mock.calls[0]?.[0]?.userKey).not.toBe(
-      "responses-user"
-    );
     expect(sendTextMock).toHaveBeenLastCalledWith(
-      "responses-user",
-      "Kies een stijl via de knoppen hieronder."
-    );
-  });
-
-  it("falls back to legacy response when canary misses", async () => {
-    process.env.MESSENGER_CHAT_ENGINE = "responses";
-    process.env.MESSENGER_CHAT_CANARY_PERCENT = "0";
-
-    await processFacebookWebhookPayload({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: "canary-miss-user" },
-              message: {
-                mid: "mid-canary-photo",
-                attachments: [
-                  {
-                    type: "image",
-                    payload: { url: "https://img.example/canary.jpg" },
-                  },
-                ],
-              },
-            },
-            {
-              sender: { id: "canary-miss-user" },
-              message: { mid: "mid-canary-text", text: "Wat kan ik nu doen?" },
-            },
-          ],
-        },
-      ],
-    });
-
-    expect(generateMessengerReplyMock).not.toHaveBeenCalled();
-    expect(sendTextMock).toHaveBeenLastCalledWith(
-      "canary-miss-user",
+      "deterministic-user",
       t("nl", "flowExplanation")
     );
   });
 
-  it("uses deterministic fallback text and keeps stage stable when responses falls back", async () => {
-    process.env.MESSENGER_CHAT_ENGINE = "responses";
-    process.env.MESSENGER_CHAT_CANARY_PERCENT = "100";
-    generateMessengerReplyMock.mockResolvedValue({
-      text: "Stuur gerust een foto, dan kan ik een stijl voor je maken.",
-      source: "fallback",
-    });
+  it("keeps free-text deterministic without a photo and does not call fetch", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
 
     await processFacebookWebhookPayload({
       entry: [
         {
           messaging: [
             {
-              sender: { id: "responses-fallback-user" },
-              message: { mid: "mid-fallback-text", text: "Wie ben jij?" },
-            },
-          ],
-        },
-      ],
-    });
-
-    expect(generateMessengerReplyMock).toHaveBeenCalledTimes(1);
-    expect(sendTextMock).toHaveBeenLastCalledWith(
-      "responses-fallback-user",
-      "Stuur gerust een foto, dan kan ik een stijl voor je maken."
-    );
-    expect(getState(anonymizePsid("responses-fallback-user"))?.stage).toBe(
-      "AWAITING_PHOTO"
-    );
-  });
-
-  it("falls back to deterministic text when responses service throws", async () => {
-    process.env.MESSENGER_CHAT_ENGINE = "responses";
-    process.env.MESSENGER_CHAT_CANARY_PERCENT = "100";
-    generateMessengerReplyMock.mockRejectedValue(new Error("boom"));
-
-    await processFacebookWebhookPayload({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: "responses-error-user" },
-              message: { mid: "mid-fallback-error", text: "Wie ben jij?" },
+              sender: { id: "deterministic-no-photo-user" },
+              message: { mid: "mid-deterministic-no-photo", text: "Wie ben jij?" },
             },
           ],
         },
@@ -1534,17 +1391,16 @@ describe("messenger text brain rollout", () => {
     });
 
     expect(sendTextMock).toHaveBeenLastCalledWith(
-      "responses-error-user",
-      "Stuur gerust een foto, dan kan ik een stijl voor je maken."
+      "deterministic-no-photo-user",
+      t("nl", "textWithoutPhoto")
     );
-    expect(getState(anonymizePsid("responses-error-user"))?.stage).toBe(
+    expect(getState(anonymizePsid("deterministic-no-photo-user"))?.stage).toBe(
       "AWAITING_PHOTO"
     );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("does not affect attachment/style/image generation path when responses engine is enabled", async () => {
-    process.env.MESSENGER_CHAT_ENGINE = "responses";
-    process.env.MESSENGER_CHAT_CANARY_PERCENT = "100";
+  it("keeps attachment/style/image generation path independent from free-text chat", async () => {
     installOpenAiSuccessFetchMock();
 
     await processFacebookWebhookPayload({
@@ -1552,9 +1408,9 @@ describe("messenger text brain rollout", () => {
         {
           messaging: [
             {
-              sender: { id: "responses-image-user" },
+              sender: { id: "deterministic-image-user" },
               message: {
-                mid: "mid-responses-image-photo",
+                mid: "mid-deterministic-image-photo",
                 attachments: [
                   {
                     type: "image",
@@ -1564,9 +1420,9 @@ describe("messenger text brain rollout", () => {
               },
             },
             {
-              sender: { id: "responses-image-user" },
+              sender: { id: "deterministic-image-user" },
               message: {
-                mid: "mid-responses-image-style",
+                mid: "mid-deterministic-image-style",
                 quick_reply: { payload: "disco" },
               },
             },
@@ -1575,7 +1431,6 @@ describe("messenger text brain rollout", () => {
       ],
     });
 
-    expect(generateMessengerReplyMock).not.toHaveBeenCalled();
     expect(sendImageMock).toHaveBeenCalledTimes(1);
   });
 });
@@ -2163,7 +2018,6 @@ describe("bot rate limit feature", () => {
 
 describe("disabled bot features stay out of the runtime flow", () => {
   beforeEach(() => {
-    process.env.GENERATOR_MODE = "openai";
     process.env.SOURCE_IMAGE_ALLOWED_HOSTS = DEFAULT_ALLOWED_SOURCE_IMAGE_HOSTS;
     process.env.OPENAI_API_KEY = "dummy-key";
     process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
@@ -2232,7 +2086,6 @@ describe("disabled bot features stay out of the runtime flow", () => {
       t("nl", "flowExplanation")
     );
     expect(sendImageMock).not.toHaveBeenCalled();
-    expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
 
   it("auto-runs surprise when a photo is already available", async () => {
@@ -2297,7 +2150,6 @@ describe("disabled bot features stay out of the runtime flow", () => {
       )
     );
     expect(sendImageMock).toHaveBeenCalledTimes(1);
-    expect(generateMessengerReplyMock).not.toHaveBeenCalled();
   });
 
   it("handles /style cyberpunk as a first-class style selection", async () => {

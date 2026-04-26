@@ -16,7 +16,6 @@ import {
   verifyBotWebhookSignature,
 } from "./bot";
 import { assertProductionImageStorageConfig } from "./image-generation/imageServiceConfig";
-import { registerChatRoutes } from "./chat";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./vite";
@@ -608,7 +607,6 @@ async function startServer() {
       "[OAuth] OAUTH_SERVER_URL not set, skipping OAuth route initialization"
     );
   }
-  registerChatRoutes(app);
   registerIdentityGameShareRoutes(app);
   app.use(
     "/api/trpc",

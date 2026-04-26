@@ -6,7 +6,6 @@ import {
   fetchOpenAiImageResponse,
   finalizeGenerationMetrics,
   getGenerationMetrics,
-  OpenAiBudgetExceededError,
   parseOpenAiImageResponse,
   type GenerationMetrics,
 } from "./image-generation/openAiImageClient";
@@ -33,7 +32,7 @@ import {
   MissingObjectStorageConfigError,
 } from "./image-generation/imageServiceErrors";
 
-type GeneratorMode = "openai";
+export type ImageProvider = "openai-images";
 
 interface ImageGenerator {
   generate(input: {
@@ -85,17 +84,32 @@ function ensureJpegBuffer(buffer: Buffer): Buffer {
 }
 
 export function getGeneratorStartupConfig(): {
-  mode: GeneratorMode;
+  mode: ImageProvider;
   resolvedBaseUrl: string | undefined;
   objectStorageEnabled: boolean;
   requiresDurableStorageInProduction: boolean;
 } {
   return {
-    mode: "openai",
+    mode: getImageProvider(),
     resolvedBaseUrl: getConfiguredBaseUrl(),
     objectStorageEnabled: hasObjectStorageConfig(),
     requiresDurableStorageInProduction: true,
   };
+}
+
+function getImageProvider(): ImageProvider {
+  const configured = process.env.IMAGE_PROVIDER?.trim();
+  if (!configured) {
+    return "openai-images";
+  }
+
+  if (configured === "openai-images") {
+    return configured;
+  }
+
+  throw new Error(
+    `Unsupported IMAGE_PROVIDER "${configured}". Expected "openai-images".`
+  );
 }
 
 function getInboundImageTimeoutMs(): number {
@@ -220,14 +234,13 @@ export class OpenAiImageGenerator implements ImageGenerator {
   }
 }
 
-export function createImageGenerator(mode: GeneratorMode = "openai"): {
-  mode: GeneratorMode;
+export function createImageGenerator(provider: ImageProvider = getImageProvider()): {
+  mode: ImageProvider;
   generator: ImageGenerator;
 } {
-  return { mode, generator: new OpenAiImageGenerator() };
+  return { mode: provider, generator: new OpenAiImageGenerator() };
 }
 
 export {
   getGenerationMetrics,
-  OpenAiBudgetExceededError,
 };
