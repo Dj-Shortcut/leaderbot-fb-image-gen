@@ -108,6 +108,103 @@ function resolveLegacyStateFields(
   return { stage, lastPhoto, selectedStyle, lastGeneratedUrl };
 }
 
+function resolveConsentState(
+  value: PartialState | null | undefined,
+  fallback: MessengerUserState
+): Pick<
+  MessengerUserState,
+  "consentGiven" | "consentTimestamp" | "pendingDeleteConfirm" | "hasSeenIntro"
+> {
+  return {
+    consentGiven: value?.consentGiven ?? fallback.consentGiven,
+    consentTimestamp: value?.consentTimestamp ?? fallback.consentTimestamp,
+    pendingDeleteConfirm:
+      value?.pendingDeleteConfirm ?? fallback.pendingDeleteConfirm,
+    hasSeenIntro: value?.hasSeenIntro ?? fallback.hasSeenIntro,
+  };
+}
+
+function resolveConversationContext(
+  value: PartialState | null | undefined,
+  fallback: MessengerUserState
+): Pick<
+  MessengerUserState,
+  "lastEntryIntent" | "activeExperience" | "lastUserMessageAt"
+> {
+  return {
+    lastEntryIntent: value?.lastEntryIntent ?? fallback.lastEntryIntent,
+    activeExperience: value?.activeExperience ?? fallback.activeExperience,
+    lastUserMessageAt: value?.lastUserMessageAt ?? fallback.lastUserMessageAt,
+  };
+}
+
+function resolvePhotoAndStyleState(
+  value: PartialState | null | undefined,
+  fallback: MessengerUserState,
+  legacyFields: Pick<LegacyStateFields, "lastPhoto" | "selectedStyle">
+): Pick<
+  MessengerUserState,
+  | "lastPhotoUrl"
+  | "lastPhoto"
+  | "lastPhotoSource"
+  | "selectedStyle"
+  | "chosenStyle"
+  | "selectedStyleCategory"
+> {
+  const { lastPhoto, selectedStyle } = legacyFields;
+
+  return {
+    lastPhotoUrl: lastPhoto,
+    lastPhoto,
+    lastPhotoSource: value?.lastPhotoSource ?? fallback.lastPhotoSource,
+    selectedStyle,
+    chosenStyle: selectedStyle,
+    selectedStyleCategory:
+      value?.selectedStyleCategory ?? fallback.selectedStyleCategory,
+  };
+}
+
+function resolveGeneratedImageState(
+  value: PartialState | null | undefined,
+  fallback: MessengerUserState,
+  lastGeneratedUrl: LegacyStateFields["lastGeneratedUrl"]
+): Pick<MessengerUserState, "lastImageUrl" | "lastGeneratedUrl"> {
+  return {
+    lastImageUrl: value?.lastImageUrl ?? lastGeneratedUrl ?? fallback.lastImageUrl,
+    lastGeneratedUrl,
+  };
+}
+
+function resolveSourceImageState(
+  value: PartialState | null | undefined,
+  fallback: MessengerUserState
+): Pick<
+  MessengerUserState,
+  | "faceMemoryConsent"
+  | "lastSourceImageUrl"
+  | "lastSourceImageUpdatedAt"
+  | "pendingSourceImageDeleteUrl"
+> {
+  return {
+    faceMemoryConsent: value?.faceMemoryConsent ?? fallback.faceMemoryConsent,
+    lastSourceImageUrl: value?.lastSourceImageUrl ?? fallback.lastSourceImageUrl,
+    lastSourceImageUpdatedAt:
+      value?.lastSourceImageUpdatedAt ?? fallback.lastSourceImageUpdatedAt,
+    pendingSourceImageDeleteUrl:
+      value?.pendingSourceImageDeleteUrl ?? fallback.pendingSourceImageDeleteUrl,
+  };
+}
+
+function resolveQuotaState(
+  value: PartialState | null | undefined,
+  fallback: MessengerUserState
+): MessengerUserState["quota"] {
+  return {
+    dayKey: value?.quota?.dayKey ?? fallback.quota.dayKey,
+    count: value?.quota?.count ?? fallback.quota.count,
+  };
+}
+
 function applyNormalizedStateShape(
   value: PartialState | null | undefined,
   base: StateNormalizationBase,
@@ -121,35 +218,14 @@ function applyNormalizedStateShape(
     ...value,
     psid: resolvedPsid,
     userKey: value?.userKey ?? fallback.userKey,
-    consentGiven: value?.consentGiven ?? fallback.consentGiven,
-    consentTimestamp: value?.consentTimestamp ?? fallback.consentTimestamp,
-    pendingDeleteConfirm:
-      value?.pendingDeleteConfirm ?? fallback.pendingDeleteConfirm,
-    hasSeenIntro: value?.hasSeenIntro ?? fallback.hasSeenIntro,
+    ...resolveConsentState(value, fallback),
     stage,
     state: stage,
-    lastEntryIntent: value?.lastEntryIntent ?? fallback.lastEntryIntent,
-    activeExperience: value?.activeExperience ?? fallback.activeExperience,
-    lastUserMessageAt: value?.lastUserMessageAt ?? fallback.lastUserMessageAt,
-    lastPhotoUrl: lastPhoto,
-    lastPhoto,
-    lastPhotoSource: value?.lastPhotoSource ?? fallback.lastPhotoSource,
-    selectedStyle,
-    chosenStyle: selectedStyle,
-    selectedStyleCategory:
-      value?.selectedStyleCategory ?? fallback.selectedStyleCategory,
-    lastImageUrl: value?.lastImageUrl ?? lastGeneratedUrl ?? fallback.lastImageUrl,
-    lastGeneratedUrl,
-    faceMemoryConsent: value?.faceMemoryConsent ?? fallback.faceMemoryConsent,
-    lastSourceImageUrl: value?.lastSourceImageUrl ?? fallback.lastSourceImageUrl,
-    lastSourceImageUpdatedAt:
-      value?.lastSourceImageUpdatedAt ?? fallback.lastSourceImageUpdatedAt,
-    pendingSourceImageDeleteUrl:
-      value?.pendingSourceImageDeleteUrl ?? fallback.pendingSourceImageDeleteUrl,
-    quota: {
-      dayKey: value?.quota?.dayKey ?? fallback.quota.dayKey,
-      count: value?.quota?.count ?? fallback.quota.count,
-    },
+    ...resolveConversationContext(value, fallback),
+    ...resolvePhotoAndStyleState(value, fallback, { lastPhoto, selectedStyle }),
+    ...resolveGeneratedImageState(value, fallback, lastGeneratedUrl),
+    ...resolveSourceImageState(value, fallback),
+    quota: resolveQuotaState(value, fallback),
     updatedAt: value?.updatedAt ?? fallback.updatedAt,
   };
 }

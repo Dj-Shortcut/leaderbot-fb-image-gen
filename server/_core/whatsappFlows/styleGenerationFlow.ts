@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { executeGenerationFlow } from "../generationFlow";
-import { getGenerationMetrics } from "../imageService";
+import { getGenerationMetrics } from "../image-generation/openAiImageClient";
 import { t, type Lang } from "../i18n";
 import type { Style } from "../messengerStyles";
 import { canGenerate, increment } from "../messengerQuota";

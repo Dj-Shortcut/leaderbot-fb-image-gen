@@ -234,7 +234,3 @@ export function createImageGenerator(provider: ImageProvider = getImageProvider(
 } {
   return { mode: provider, generator: new OpenAiImageGenerator() };
 }
-
-export {
-  getGenerationMetrics,
-};

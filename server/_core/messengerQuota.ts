@@ -1,4 +1,5 @@
-import { getDayKey, getOrCreateState, type MessengerUserState } from "./messengerState";
+import { getDayKey } from "./messengerStateNormalization";
+import { getOrCreateState, type MessengerUserState } from "./messengerState";
 import { updateStoredState } from "./stateStore";
 
 const FREE_DAILY_LIMIT = 3;

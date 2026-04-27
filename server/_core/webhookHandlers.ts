@@ -7,9 +7,7 @@ import {
   safeLog,
 } from "./messengerApi";
 import type { MessengerSendOutcome } from "./messengerApi";
-import {
-  getGenerationMetrics,
-} from "./imageService";
+import { getGenerationMetrics } from "./image-generation/openAiImageClient";
 import { getConfiguredBaseUrl } from "./image-generation/imageServiceConfig";
 import { executeGenerationFlow } from "./generationFlow";
 import {
