@@ -150,10 +150,26 @@ async function prepareGenerationInput(
   logSourceImageFetchStart(input);
 
   return {
-    hasSourceImage: Boolean(input.sourceImageUrl || input.sourceImageData),
+    hasSourceImage: computeHasSourceImage(input),
     prompt: buildStylePrompt(input.style, input.promptHint),
     sourceImage: await resolveStoredSourceImage(input),
   };
+}
+
+function computeHasSourceImage(input: GeneratorInput): boolean {
+  return Boolean(input.sourceImageUrl || input.sourceImageData);
+}
+
+function logImageProviderUsed(
+  input: GeneratorInput,
+  provider: ImageProvider,
+  hasSourceImage: boolean
+): void {
+  createLogger({ reqId: input.reqId }).info({
+    msg: "image_provider_used",
+    provider,
+    hasSourceImage,
+  });
 }
 
 export class OpenAiImageGenerator implements ImageGenerator {
@@ -180,7 +196,9 @@ export class OpenAiImageGenerator implements ImageGenerator {
     logImageProviderUsed(input);
 
     try {
+      const provider = getImageProvider();
       const preparedInput = await prepareGenerationInput(input);
+      logImageProviderUsed(input, provider, preparedInput.hasSourceImage);
       const sourceImage = preparedInput.sourceImage;
       partialMetrics.fbImageFetchMs = sourceImage.fbImageFetchMs;
 
