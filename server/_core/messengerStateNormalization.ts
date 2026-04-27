@@ -22,17 +22,6 @@ function looksLikeUserKey(value: string): boolean {
   return /^[a-f0-9]{64}$/i.test(value);
 }
 
-function firstDefined<T>(...values: Array<T | null | undefined>): T {
-  for (let index = 0; index < values.length - 1; index += 1) {
-    const value = values[index];
-    if (value !== null && value !== undefined) {
-      return value;
-    }
-  }
-
-  return values[values.length - 1] as T;
-}
-
 export function getUserKey(psid: string): string {
   return looksLikeUserKey(psid) ? psid : toUserKey(psid);
 }
@@ -108,22 +97,13 @@ function resolveLegacyStateFields(
   value: PartialState | null | undefined,
   fallback: MessengerUserState
 ): LegacyStateFields {
-  const stage = firstDefined(value?.stage, value?.state, fallback.stage);
-  const lastPhoto = firstDefined(
-    value?.lastPhotoUrl,
-    value?.lastPhoto,
-    fallback.lastPhoto
-  );
-  const selectedStyle = firstDefined(
-    value?.selectedStyle,
-    value?.chosenStyle,
-    fallback.selectedStyle
-  );
-  const lastGeneratedUrl = firstDefined(
-    value?.lastGeneratedUrl,
-    value?.lastImageUrl,
-    fallback.lastGeneratedUrl
-  );
+  const stage = value?.stage ?? value?.state ?? fallback.stage;
+  const lastPhoto =
+    value?.lastPhotoUrl ?? value?.lastPhoto ?? fallback.lastPhoto;
+  const selectedStyle =
+    value?.selectedStyle ?? value?.chosenStyle ?? fallback.selectedStyle;
+  const lastGeneratedUrl =
+    value?.lastGeneratedUrl ?? value?.lastImageUrl ?? fallback.lastGeneratedUrl;
 
   return { stage, lastPhoto, selectedStyle, lastGeneratedUrl };
 }
@@ -140,65 +120,36 @@ function applyNormalizedStateShape(
     ...fallback,
     ...value,
     psid: resolvedPsid,
-    userKey: firstDefined(value?.userKey, fallback.userKey),
-    consentGiven: firstDefined(value?.consentGiven, fallback.consentGiven),
-    consentTimestamp: firstDefined(
-      value?.consentTimestamp,
-      fallback.consentTimestamp
-    ),
+    userKey: value?.userKey ?? fallback.userKey,
+    consentGiven: value?.consentGiven ?? fallback.consentGiven,
+    consentTimestamp: value?.consentTimestamp ?? fallback.consentTimestamp,
     pendingDeleteConfirm:
-      firstDefined(value?.pendingDeleteConfirm, fallback.pendingDeleteConfirm),
-    hasSeenIntro: firstDefined(value?.hasSeenIntro, fallback.hasSeenIntro),
+      value?.pendingDeleteConfirm ?? fallback.pendingDeleteConfirm,
+    hasSeenIntro: value?.hasSeenIntro ?? fallback.hasSeenIntro,
     stage,
     state: stage,
-    lastEntryIntent: firstDefined(
-      value?.lastEntryIntent,
-      fallback.lastEntryIntent
-    ),
-    activeExperience: firstDefined(
-      value?.activeExperience,
-      fallback.activeExperience
-    ),
-    lastUserMessageAt: firstDefined(
-      value?.lastUserMessageAt,
-      fallback.lastUserMessageAt
-    ),
+    lastEntryIntent: value?.lastEntryIntent ?? fallback.lastEntryIntent,
+    activeExperience: value?.activeExperience ?? fallback.activeExperience,
+    lastUserMessageAt: value?.lastUserMessageAt ?? fallback.lastUserMessageAt,
     lastPhotoUrl: lastPhoto,
     lastPhoto,
-    lastPhotoSource: firstDefined(
-      value?.lastPhotoSource,
-      fallback.lastPhotoSource
-    ),
+    lastPhotoSource: value?.lastPhotoSource ?? fallback.lastPhotoSource,
     selectedStyle,
     chosenStyle: selectedStyle,
     selectedStyleCategory:
-      firstDefined(value?.selectedStyleCategory, fallback.selectedStyleCategory),
-    lastImageUrl: firstDefined(
-      value?.lastImageUrl,
-      lastGeneratedUrl,
-      fallback.lastImageUrl
-    ),
+      value?.selectedStyleCategory ?? fallback.selectedStyleCategory,
+    lastImageUrl: value?.lastImageUrl ?? lastGeneratedUrl ?? fallback.lastImageUrl,
     lastGeneratedUrl,
-    faceMemoryConsent: firstDefined(
-      value?.faceMemoryConsent,
-      fallback.faceMemoryConsent
-    ),
-    lastSourceImageUrl: firstDefined(
-      value?.lastSourceImageUrl,
-      fallback.lastSourceImageUrl
-    ),
-    lastSourceImageUpdatedAt: firstDefined(
-      value?.lastSourceImageUpdatedAt,
-      fallback.lastSourceImageUpdatedAt
-    ),
-    pendingSourceImageDeleteUrl: firstDefined(
-      value?.pendingSourceImageDeleteUrl,
-      fallback.pendingSourceImageDeleteUrl
-    ),
+    faceMemoryConsent: value?.faceMemoryConsent ?? fallback.faceMemoryConsent,
+    lastSourceImageUrl: value?.lastSourceImageUrl ?? fallback.lastSourceImageUrl,
+    lastSourceImageUpdatedAt:
+      value?.lastSourceImageUpdatedAt ?? fallback.lastSourceImageUpdatedAt,
+    pendingSourceImageDeleteUrl:
+      value?.pendingSourceImageDeleteUrl ?? fallback.pendingSourceImageDeleteUrl,
     quota: {
-      dayKey: firstDefined(value?.quota?.dayKey, fallback.quota.dayKey),
-      count: firstDefined(value?.quota?.count, fallback.quota.count),
+      dayKey: value?.quota?.dayKey ?? fallback.quota.dayKey,
+      count: value?.quota?.count ?? fallback.quota.count,
     },
-    updatedAt: firstDefined(value?.updatedAt, fallback.updatedAt),
+    updatedAt: value?.updatedAt ?? fallback.updatedAt,
   };
 }
