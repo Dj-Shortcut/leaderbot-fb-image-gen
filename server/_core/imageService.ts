@@ -12,14 +12,10 @@ import {
 import { buildStylePrompt } from "./image-generation/promptBuilder";
 import {
   type DownloadedSourceImage,
-  InvalidSourceImageUrlError,
   logSourceImageFetchStart,
-  MissingInputImageError,
   resolveStoredSourceImage,
-  type SourceImageData,
 } from "./image-generation/sourceImageFetcher";
 import {
-  assertProductionImageStorageConfig,
   getConfiguredBaseUrl,
   hasObjectStorageConfig,
 } from "./image-generation/imageServiceConfig";
@@ -28,12 +24,11 @@ import {
   GenerationTimeoutError,
   InvalidGenerationInputError,
   MissingOpenAiApiKeyError,
-  MissingAppBaseUrlError,
-  MissingObjectStorageConfigError,
 } from "./image-generation/imageServiceErrors";
 import { createLogger } from "./logger";
 
 export const OPENAI_IMAGES_PROVIDER = "openai-images" as const;
+
 export type ImageProvider = typeof OPENAI_IMAGES_PROVIDER;
 
 interface ImageGenerator {
@@ -114,35 +109,6 @@ function getImageProvider(): ImageProvider {
   );
 }
 
-function getInboundImageTimeoutMs(): number {
-  const raw = Number.parseInt(process.env.FB_IMAGE_FETCH_TIMEOUT_MS ?? "", 10);
-  if (Number.isFinite(raw) && raw > 0) {
-    return raw;
-  }
-
-  return 10_000;
-}
-
-function isRetryableResponseStatus(status: number): boolean {
-  return status === 408 || status === 429 || status >= 500;
-}
-
-function isTransientNetworkError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  return error.name === "AbortError" || error instanceof TypeError;
-}
-
-function logImageProviderUsed(input: GeneratorInput): void {
-  createLogger({ reqId: input.reqId }).info({
-    msg: "image_provider_used",
-    provider: OPENAI_IMAGES_PROVIDER,
-    hasSourceImage: Boolean(input.sourceImageUrl || input.sourceImageData),
-  });
-}
-
 async function prepareGenerationInput(
   input: GeneratorInput
 ): Promise<PreparedGenerationInput> {
@@ -192,8 +158,6 @@ export class OpenAiImageGenerator implements ImageGenerator {
     if (!process.env.OPENAI_API_KEY) {
       throw new MissingOpenAiApiKeyError("OPENAI_API_KEY is missing");
     }
-
-    logImageProviderUsed(input);
 
     try {
       const provider = getImageProvider();
