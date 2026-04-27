@@ -12,14 +12,10 @@ import {
 import { buildStylePrompt } from "./image-generation/promptBuilder";
 import {
   type DownloadedSourceImage,
-  InvalidSourceImageUrlError,
   logSourceImageFetchStart,
-  MissingInputImageError,
   resolveStoredSourceImage,
-  type SourceImageData,
 } from "./image-generation/sourceImageFetcher";
 import {
-  assertProductionImageStorageConfig,
   getConfiguredBaseUrl,
   hasObjectStorageConfig,
 } from "./image-generation/imageServiceConfig";
@@ -28,23 +24,18 @@ import {
   GenerationTimeoutError,
   InvalidGenerationInputError,
   MissingOpenAiApiKeyError,
-  MissingAppBaseUrlError,
-  MissingObjectStorageConfigError,
 } from "./image-generation/imageServiceErrors";
 import { createLogger } from "./logger";
 
-<<<<<<< ours
-<<<<<<< ours
 export const OPENAI_IMAGES_PROVIDER = "openai-images" as const;
-=======
-const OPENAI_IMAGES_PROVIDER = "openai-images" as const;
 
->>>>>>> theirs
-=======
-const OPENAI_IMAGES_PROVIDER = "openai-images" as const;
-
->>>>>>> theirs
 export type ImageProvider = typeof OPENAI_IMAGES_PROVIDER;
+
+const logger = {
+  info(message: string, fields: Record<string, unknown>): void {
+    createLogger({}).info({ msg: message, ...fields });
+  },
+};
 
 interface ImageGenerator {
   generate(input: {
@@ -124,35 +115,6 @@ function getImageProvider(): ImageProvider {
   );
 }
 
-function getInboundImageTimeoutMs(): number {
-  const raw = Number.parseInt(process.env.FB_IMAGE_FETCH_TIMEOUT_MS ?? "", 10);
-  if (Number.isFinite(raw) && raw > 0) {
-    return raw;
-  }
-
-  return 10_000;
-}
-
-function isRetryableResponseStatus(status: number): boolean {
-  return status === 408 || status === 429 || status >= 500;
-}
-
-function isTransientNetworkError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  return error.name === "AbortError" || error instanceof TypeError;
-}
-
-function logImageProviderUsed(input: GeneratorInput): void {
-  createLogger({ reqId: input.reqId }).info({
-    msg: "image_provider_used",
-    provider: OPENAI_IMAGES_PROVIDER,
-    hasSourceImage: Boolean(input.sourceImageUrl || input.sourceImageData),
-  });
-}
-
 async function prepareGenerationInput(
   input: GeneratorInput
 ): Promise<PreparedGenerationInput> {
@@ -170,13 +132,8 @@ function computeHasSourceImage(input: GeneratorInput): boolean {
   return Boolean(input.sourceImageUrl || input.sourceImageData);
 }
 
-function logImageProviderUsed(
-  input: GeneratorInput,
-  provider: ImageProvider,
-  hasSourceImage: boolean
-): void {
-  createLogger({ reqId: input.reqId }).info({
-    msg: "image_provider_used",
+function logImageProviderUsed(provider: ImageProvider, hasSourceImage: boolean): void {
+  logger.info("image_provider_used", {
     provider,
     hasSourceImage,
   });
@@ -203,12 +160,10 @@ export class OpenAiImageGenerator implements ImageGenerator {
       throw new MissingOpenAiApiKeyError("OPENAI_API_KEY is missing");
     }
 
-    logImageProviderUsed(input);
-
     try {
       const provider = getImageProvider();
       const preparedInput = await prepareGenerationInput(input);
-      logImageProviderUsed(input, provider, preparedInput.hasSourceImage);
+      logImageProviderUsed(provider, preparedInput.hasSourceImage);
       const sourceImage = preparedInput.sourceImage;
       partialMetrics.fbImageFetchMs = sourceImage.fbImageFetchMs;
 
