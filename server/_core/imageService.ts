@@ -31,12 +31,6 @@ export const OPENAI_IMAGES_PROVIDER = "openai-images" as const;
 
 export type ImageProvider = typeof OPENAI_IMAGES_PROVIDER;
 
-const logger = {
-  info(message: string, fields: Record<string, unknown>): void {
-    createLogger({}).info({ msg: message, ...fields });
-  },
-};
-
 interface ImageGenerator {
   generate(input: {
     style: Style;
@@ -132,8 +126,13 @@ function computeHasSourceImage(input: GeneratorInput): boolean {
   return Boolean(input.sourceImageUrl || input.sourceImageData);
 }
 
-function logImageProviderUsed(provider: ImageProvider, hasSourceImage: boolean): void {
-  logger.info("image_provider_used", {
+function logImageProviderUsed(
+  input: GeneratorInput,
+  provider: ImageProvider,
+  hasSourceImage: boolean
+): void {
+  createLogger({ reqId: input.reqId }).info({
+    msg: "image_provider_used",
     provider,
     hasSourceImage,
   });
@@ -163,7 +162,7 @@ export class OpenAiImageGenerator implements ImageGenerator {
     try {
       const provider = getImageProvider();
       const preparedInput = await prepareGenerationInput(input);
-      logImageProviderUsed(provider, preparedInput.hasSourceImage);
+      logImageProviderUsed(input, provider, preparedInput.hasSourceImage);
       const sourceImage = preparedInput.sourceImage;
       partialMetrics.fbImageFetchMs = sourceImage.fbImageFetchMs;
 
