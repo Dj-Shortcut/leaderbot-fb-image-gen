@@ -33,7 +33,17 @@ import {
 } from "./image-generation/imageServiceErrors";
 import { createLogger } from "./logger";
 
+<<<<<<< ours
+<<<<<<< ours
 export const OPENAI_IMAGES_PROVIDER = "openai-images" as const;
+=======
+const OPENAI_IMAGES_PROVIDER = "openai-images" as const;
+
+>>>>>>> theirs
+=======
+const OPENAI_IMAGES_PROVIDER = "openai-images" as const;
+
+>>>>>>> theirs
 export type ImageProvider = typeof OPENAI_IMAGES_PROVIDER;
 
 interface ImageGenerator {
