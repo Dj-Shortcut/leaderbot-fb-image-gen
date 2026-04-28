@@ -54,6 +54,7 @@ describe("messenger state normalization", () => {
   it("normalizes legacy aliases while preserving explicit state fields", () => {
     const normalized = normalizeState("fallback-psid", {
       psid: "stored-psid",
+      userKey: "legacy-raw-user-key",
       state: "RESULT_READY",
       lastPhoto: "https://example.test/legacy-photo.jpg",
       chosenStyle: "disco",
@@ -72,7 +73,7 @@ describe("messenger state normalization", () => {
 
     expect(normalized).toMatchObject({
       psid: "stored-psid",
-      userKey: getUserKey("stored-psid"),
+      userKey: getUserKey("legacy-raw-user-key"),
       stage: "RESULT_READY",
       state: "RESULT_READY",
       lastPhotoUrl: "https://example.test/legacy-photo.jpg",

@@ -21,7 +21,6 @@ type LegacyStateFields = {
 type NormalizationCtx = {
   value: PartialState | null | undefined;
   fallback: MessengerUserState;
-  legacyFields: LegacyStateFields;
 };
 
 function looksLikeUserKey(value: string): boolean {
@@ -223,13 +222,13 @@ function applyNormalizedStateShape(
 ): MessengerUserState {
   const { resolvedPsid, fallback } = base;
   const { stage, lastPhoto, selectedStyle, lastGeneratedUrl } = legacyFields;
-  const ctx: NormalizationCtx = { value, fallback, legacyFields };
+  const ctx: NormalizationCtx = { value, fallback };
 
   return {
     ...fallback,
     ...value,
     psid: resolvedPsid,
-    userKey: value?.userKey ?? fallback.userKey,
+    userKey: getUserKey(value?.userKey ?? fallback.userKey),
     ...resolveConsentState(ctx),
     stage,
     state: stage,
