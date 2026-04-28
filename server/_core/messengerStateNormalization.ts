@@ -229,7 +229,7 @@ function applyNormalizedStateShape(
     ...fallback,
     ...value,
     psid: resolvedPsid,
-    userKey: value?.userKey ?? fallback.userKey,
+    userKey: getUserKey(value?.userKey ?? fallback.userKey),
     ...resolveConsentState(ctx),
     stage,
     state: stage,
