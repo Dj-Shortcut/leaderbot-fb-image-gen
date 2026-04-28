@@ -18,6 +18,12 @@ type LegacyStateFields = {
   lastGeneratedUrl: string | null | undefined;
 };
 
+type NormalizationCtx = {
+  value: PartialState | null | undefined;
+  fallback: MessengerUserState;
+  legacyFields: LegacyStateFields;
+};
+
 function looksLikeUserKey(value: string): boolean {
   return /^[a-f0-9]{64}$/i.test(value);
 }
@@ -109,12 +115,13 @@ function resolveLegacyStateFields(
 }
 
 function resolveConsentState(
-  value: PartialState | null | undefined,
-  fallback: MessengerUserState
+  ctx: NormalizationCtx
 ): Pick<
   MessengerUserState,
   "consentGiven" | "consentTimestamp" | "pendingDeleteConfirm" | "hasSeenIntro"
 > {
+  const { value, fallback } = ctx;
+
   return {
     consentGiven: value?.consentGiven ?? fallback.consentGiven,
     consentTimestamp: value?.consentTimestamp ?? fallback.consentTimestamp,
@@ -125,12 +132,13 @@ function resolveConsentState(
 }
 
 function resolveConversationContext(
-  value: PartialState | null | undefined,
-  fallback: MessengerUserState
+  ctx: NormalizationCtx
 ): Pick<
   MessengerUserState,
   "lastEntryIntent" | "activeExperience" | "lastUserMessageAt"
 > {
+  const { value, fallback } = ctx;
+
   return {
     lastEntryIntent: value?.lastEntryIntent ?? fallback.lastEntryIntent,
     activeExperience: value?.activeExperience ?? fallback.activeExperience,
@@ -139,8 +147,7 @@ function resolveConversationContext(
 }
 
 function resolvePhotoAndStyleState(
-  value: PartialState | null | undefined,
-  fallback: MessengerUserState,
+  ctx: NormalizationCtx,
   legacyFields: Pick<LegacyStateFields, "lastPhoto" | "selectedStyle">
 ): Pick<
   MessengerUserState,
@@ -151,6 +158,7 @@ function resolvePhotoAndStyleState(
   | "chosenStyle"
   | "selectedStyleCategory"
 > {
+  const { value, fallback } = ctx;
   const { lastPhoto, selectedStyle } = legacyFields;
 
   return {
@@ -165,10 +173,11 @@ function resolvePhotoAndStyleState(
 }
 
 function resolveGeneratedImageState(
-  value: PartialState | null | undefined,
-  fallback: MessengerUserState,
+  ctx: NormalizationCtx,
   lastGeneratedUrl: LegacyStateFields["lastGeneratedUrl"]
 ): Pick<MessengerUserState, "lastImageUrl" | "lastGeneratedUrl"> {
+  const { value, fallback } = ctx;
+
   return {
     lastImageUrl: value?.lastImageUrl ?? lastGeneratedUrl ?? fallback.lastImageUrl,
     lastGeneratedUrl,
@@ -176,8 +185,7 @@ function resolveGeneratedImageState(
 }
 
 function resolveSourceImageState(
-  value: PartialState | null | undefined,
-  fallback: MessengerUserState
+  ctx: NormalizationCtx
 ): Pick<
   MessengerUserState,
   | "faceMemoryConsent"
@@ -185,6 +193,8 @@ function resolveSourceImageState(
   | "lastSourceImageUpdatedAt"
   | "pendingSourceImageDeleteUrl"
 > {
+  const { value, fallback } = ctx;
+
   return {
     faceMemoryConsent: value?.faceMemoryConsent ?? fallback.faceMemoryConsent,
     lastSourceImageUrl: value?.lastSourceImageUrl ?? fallback.lastSourceImageUrl,
@@ -196,9 +206,10 @@ function resolveSourceImageState(
 }
 
 function resolveQuotaState(
-  value: PartialState | null | undefined,
-  fallback: MessengerUserState
+  ctx: NormalizationCtx
 ): MessengerUserState["quota"] {
+  const { value, fallback } = ctx;
+
   return {
     dayKey: value?.quota?.dayKey ?? fallback.quota.dayKey,
     count: value?.quota?.count ?? fallback.quota.count,
@@ -212,20 +223,21 @@ function applyNormalizedStateShape(
 ): MessengerUserState {
   const { resolvedPsid, fallback } = base;
   const { stage, lastPhoto, selectedStyle, lastGeneratedUrl } = legacyFields;
+  const ctx: NormalizationCtx = { value, fallback, legacyFields };
 
   return {
     ...fallback,
     ...value,
     psid: resolvedPsid,
     userKey: value?.userKey ?? fallback.userKey,
-    ...resolveConsentState(value, fallback),
+    ...resolveConsentState(ctx),
     stage,
     state: stage,
-    ...resolveConversationContext(value, fallback),
-    ...resolvePhotoAndStyleState(value, fallback, { lastPhoto, selectedStyle }),
-    ...resolveGeneratedImageState(value, fallback, lastGeneratedUrl),
-    ...resolveSourceImageState(value, fallback),
-    quota: resolveQuotaState(value, fallback),
+    ...resolveConversationContext(ctx),
+    ...resolvePhotoAndStyleState(ctx, { lastPhoto, selectedStyle }),
+    ...resolveGeneratedImageState(ctx, lastGeneratedUrl),
+    ...resolveSourceImageState(ctx),
+    quota: resolveQuotaState(ctx),
     updatedAt: value?.updatedAt ?? fallback.updatedAt,
   };
 }
