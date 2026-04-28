@@ -1,8 +1,8 @@
 import type { BotChannel } from "./normalizedInboundMessage";
 
-export type EntryMode = "auto_start" | "confirm_first";
+type EntryMode = "auto_start" | "confirm_first";
 
-export type EntrySourceType =
+type EntrySourceType =
   | "deep_link"
   | "postback"
   | "organic_message"
@@ -10,7 +10,7 @@ export type EntrySourceType =
   | "ad"
   | "unknown";
 
-export type ExperienceType = "identity_game";
+type ExperienceType = "identity_game";
 
 export type EntryIntent = {
   sourceChannel: BotChannel;

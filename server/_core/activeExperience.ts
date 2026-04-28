@@ -1,4 +1,4 @@
-export type ActiveExperienceStatus =
+type ActiveExperienceStatus =
   | "started"
   | "in_progress"
   | "resolving"

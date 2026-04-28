@@ -13,7 +13,6 @@ import {
   type MaybePromise,
 } from "./stateStore";
 import { toUserKey } from "./privacy";
-import { getDayKey } from "./messengerStateNormalization";
 import {
   getOrCreatePersistedState,
   getPersistedState,
@@ -109,8 +108,6 @@ export function getQuickRepliesForState(state: ConversationState): StateQuickRep
 export function anonymizePsid(psid: string): string {
   return toUserKey(psid);
 }
-
-export { getDayKey };
 
 function getMessengerResponseWindowMs(): number {
   const configured = Number(process.env.MESSENGER_RESPONSE_WINDOW_MS);
