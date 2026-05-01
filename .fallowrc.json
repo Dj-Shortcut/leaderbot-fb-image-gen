@@ -1,9 +1,5 @@
 {
   "ignoreDependencies": ["mysql2"],
-  "exclude": [
-    "tools/manus/debug-collector.js"
-  ],
-  "//": "Manus local debug artifact, intentionally isolated from app runtime.",
   "overrides": [
     {
       "files": ["client/index.html"],
