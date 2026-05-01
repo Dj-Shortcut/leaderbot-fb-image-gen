@@ -42,6 +42,7 @@ jobs:
           npx --yes fallow@2.27.0 --root . --production --summary --score -f json > .fallow/report-production.json || true
 
       - name: Build maintainability badge
+        if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         run: |
           node scripts/fallow-badge.mjs \
             .fallow/report.json \
