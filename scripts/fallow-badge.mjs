@@ -12,13 +12,8 @@ if (!inputPath || !badgePath || !metricsPath) {
 
 const raw = fs.readFileSync(inputPath, "utf8").replace(/^\uFEFF/, "");
 const report = JSON.parse(raw);
-const summary = report.check?.summary ?? report.summary;
+const summary = report.check?.summary ?? report.summary ?? null;
 const healthSummary = report.health?.summary;
-
-if (!summary) {
-  console.error("Fallow summary not found in report JSON");
-  process.exit(1);
-}
 
 const averageMaintainability = Number(healthSummary?.average_maintainability);
 
