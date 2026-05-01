@@ -33,13 +33,21 @@ jobs:
         shell: bash
         run: |
           mkdir -p .fallow
-          npx --yes fallow@2.27.0 --root . -f json > .fallow/report.json || true
+          if ! npx --yes fallow@2.27.0 --root . -f json > .fallow/report.json.tmp; then
+            echo "Fallow exited non-zero; validating generated report before continuing"
+          fi
+          node -e "JSON.parse(require('node:fs').readFileSync('.fallow/report.json.tmp','utf8'))"
+          mv .fallow/report.json.tmp .fallow/report.json
 
       - name: Generate production Fallow report
         shell: bash
         run: |
           mkdir -p .fallow
-          npx --yes fallow@2.27.0 --root . --production -f json > .fallow/report-production.json || true
+          if ! npx --yes fallow@2.27.0 --root . --production -f json > .fallow/report-production.json.tmp; then
+            echo "Fallow exited non-zero; validating generated production report before continuing"
+          fi
+          node -e "JSON.parse(require('node:fs').readFileSync('.fallow/report-production.json.tmp','utf8'))"
+          mv .fallow/report-production.json.tmp .fallow/report-production.json
 
       - name: Build maintainability badge
         run: |
