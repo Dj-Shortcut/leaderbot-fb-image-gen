@@ -33,13 +33,13 @@ jobs:
         shell: bash
         run: |
           mkdir -p .fallow
-          npx --yes fallow@2.27.0 --root . -f json > .fallow/report.json
+          npx --yes fallow@2.27.0 --root . -f json > .fallow/report.json || true
 
       - name: Generate production Fallow report
         shell: bash
         run: |
           mkdir -p .fallow
-          npx --yes fallow@2.27.0 --root . --production -f json > .fallow/report-production.json
+          npx --yes fallow@2.27.0 --root . --production -f json > .fallow/report-production.json || true
 
       - name: Build maintainability badge
         run: |
