@@ -12,14 +12,19 @@ if (!inputPath || !badgePath || !metricsPath) {
 
 const raw = fs.readFileSync(inputPath, "utf8").replace(/^\uFEFF/, "");
 const report = JSON.parse(raw);
-const summary = report.check?.summary ?? report.summary ?? null;
+const summary = report.check?.summary ?? report.summary;
 const healthSummary = report.health?.summary;
+
+if (!summary) {
+  console.error("Fallow summary not found in report JSON");
+  process.exit(1);
+}
 
 const averageMaintainability = Number(healthSummary?.average_maintainability);
 
 if (!Number.isFinite(averageMaintainability)) {
-  console.log("Fallow native maintainability not found in report JSON; skipping badge update");
-  process.exit(0);
+  console.error("Fallow native maintainability not found in report JSON");
+  process.exit(1);
 }
 
 const score = Number(averageMaintainability.toFixed(1));
