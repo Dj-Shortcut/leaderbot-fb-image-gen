@@ -18,8 +18,8 @@ const healthSummary = report.health?.summary;
 const averageMaintainability = Number(healthSummary?.average_maintainability);
 
 if (!Number.isFinite(averageMaintainability)) {
-  console.error("Fallow native maintainability not found in report JSON");
-  process.exit(1);
+  console.log("Fallow native maintainability not found in report JSON; skipping badge update");
+  process.exit(0);
 }
 
 const score = Number(averageMaintainability.toFixed(1));
