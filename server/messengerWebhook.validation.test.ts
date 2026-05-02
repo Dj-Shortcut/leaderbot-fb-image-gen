@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import http from "node:http";
 import express from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { bindTestHttpServer } from "./testHttpServer";
 
 import {
   captureMetaWebhookRawBody,
@@ -31,55 +32,40 @@ async function postWebhook(
   registerMetaWebhookRoutes(app);
 
   const server = http.createServer(app);
-  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
+  const boundServer = await bindTestHttpServer(server);
 
-  if (!address || typeof address === "string") {
-    server.close();
-    throw new Error("Failed to bind test server");
-  }
-
-  const result = await new Promise<{ status: number; payload: string }>((resolve, reject) => {
-    const request = http.request(
-      {
-        hostname: "127.0.0.1",
-        port: address.port,
-        path,
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "content-length": Buffer.byteLength(body),
-          "x-hub-signature-256": signature,
+  try {
+    return await new Promise<{ status: number; payload: string }>((resolve, reject) => {
+      const request = http.request(
+        {
+          hostname: "127.0.0.1",
+          port: boundServer.port,
+          path,
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "content-length": Buffer.byteLength(body),
+            "x-hub-signature-256": signature,
+          },
         },
-      },
-      response => {
-        let payload = "";
-        response.on("data", chunk => {
-          payload += chunk;
-        });
-        response.on("end", () => {
-          resolve({ status: response.statusCode ?? 0, payload });
-        });
-      },
-    );
+        response => {
+          let payload = "";
+          response.on("data", chunk => {
+            payload += chunk;
+          });
+          response.on("end", () => {
+            resolve({ status: response.statusCode ?? 0, payload });
+          });
+        },
+      );
 
-    request.on("error", reject);
-    request.write(body);
-    request.end();
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    server.close(error => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve();
+      request.on("error", reject);
+      request.write(body);
+      request.end();
     });
-  });
-
-  return result;
+  } finally {
+    await boundServer.close();
+  }
 }
 
 describe("messenger webhook payload validation", () => {

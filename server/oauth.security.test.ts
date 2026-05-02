@@ -2,6 +2,7 @@ import http from "node:http";
 import express from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerOAuthRoutes } from "./_core/oauth";
+import { bindTestHttpServer } from "./testHttpServer";
 
 const OAUTH_STATE_COOKIE_NAME = "lb_oauth_state_nonce";
 
@@ -37,13 +38,7 @@ async function sendCallbackRequest(params: {
   registerOAuthRoutes(app);
 
   const server = http.createServer(app);
-  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-
-  if (!address || typeof address === "string") {
-    server.close();
-    throw new Error("Failed to bind test server");
-  }
+  const boundServer = await bindTestHttpServer(server);
 
   const path = `/api/oauth/callback?code=${encodeURIComponent(params.code)}&state=${encodeURIComponent(params.state)}`;
   try {
@@ -52,7 +47,7 @@ async function sendCallbackRequest(params: {
         const request = http.request(
           {
             hostname: "127.0.0.1",
-            port: address.port,
+            port: boundServer.port,
             path,
             method: "GET",
             headers: params.cookie ? { cookie: params.cookie } : undefined,
@@ -77,16 +72,7 @@ async function sendCallbackRequest(params: {
       }
     );
   } finally {
-    await new Promise<void>((resolve, reject) => {
-      server.close(error => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve();
-      });
-    });
+    await boundServer.close();
   }
 }
 

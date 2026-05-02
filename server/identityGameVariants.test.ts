@@ -7,6 +7,7 @@ import {
   registerIdentityGameShareRoutes,
   type GameVariantDefinition,
 } from "./_core/identityGameVariants";
+import { bindTestHttpServer } from "./testHttpServer";
 
 function createVariant(overrides: Partial<GameVariantDefinition> = {}): GameVariantDefinition {
   const base: GameVariantDefinition = {
@@ -109,31 +110,18 @@ function createVariant(overrides: Partial<GameVariantDefinition> = {}): GameVari
 
 async function listen(app: express.Express) {
   const server = http.createServer(app);
-  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-  if (!address || typeof address === "string") {
-    throw new Error("Unable to get test server address");
-  }
+  const boundServer = await bindTestHttpServer(server);
 
   return {
-    baseUrl: `http://127.0.0.1:${address.port}`,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        server.close(error => {
-          if (error) {
-            reject(error);
-            return;
-          }
-          resolve();
-        });
-      }),
+    baseUrl: boundServer.baseUrl,
+    close: boundServer.close,
     requestWithHost: (path: string, host: string) =>
       new Promise<{ status: number; headers: http.IncomingHttpHeaders; body: string }>(
         (resolve, reject) => {
           const request = http.request(
             {
               hostname: "127.0.0.1",
-              port: address.port,
+              port: boundServer.port,
               path,
               method: "GET",
               headers: { host },

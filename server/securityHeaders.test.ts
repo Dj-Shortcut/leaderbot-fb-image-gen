@@ -2,6 +2,7 @@ import http from "node:http";
 import express from "express";
 import { afterEach, describe, expect, it } from "vitest";
 import { applySecurityHeaders } from "./_core/securityHeaders";
+import { bindTestHttpServer } from "./testHttpServer";
 
 const originalNodeEnv = process.env.NODE_ENV;
 
@@ -16,27 +17,11 @@ async function startServer(
   });
 
   const server = http.createServer(app);
-  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-
-  if (!address || typeof address === "string") {
-    server.close();
-    throw new Error("Unable to get test server address");
-  }
+  const boundServer = await bindTestHttpServer(server);
 
   return {
-    baseUrl: `http://127.0.0.1:${address.port}`,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        server.close(error => {
-          if (error) {
-            reject(error);
-            return;
-          }
-
-          resolve();
-        });
-      }),
+    baseUrl: boundServer.baseUrl,
+    close: boundServer.close,
   };
 }
 

@@ -9,6 +9,7 @@ import {
   recordHttpRequestMetric,
   registerMetricsRoute,
 } from "./_core/observability";
+import { bindTestHttpServer } from "./testHttpServer";
 
 async function startServer(configure?: (app: express.Express) => void) {
   const app = express();
@@ -25,26 +26,11 @@ async function startServer(configure?: (app: express.Express) => void) {
   registerMetricsRoute(app);
 
   const server = http.createServer(app);
-  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-
-  if (!address || typeof address === "string") {
-    server.close();
-    throw new Error("Unable to get test server address");
-  }
+  const boundServer = await bindTestHttpServer(server);
 
   return {
-    baseUrl: `http://127.0.0.1:${address.port}`,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        server.close(error => {
-          if (error) {
-            reject(error);
-            return;
-          }
-          resolve();
-        });
-      }),
+    baseUrl: boundServer.baseUrl,
+    close: boundServer.close,
   };
 }
 
