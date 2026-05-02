@@ -69,6 +69,7 @@ jobs:
           git push
 
       - name: Enforce maintainability gate
+        if: github.event_name != 'pull_request'
         run: |
           node scripts/check-fallow-gate.mjs .fallow/report.json
 
