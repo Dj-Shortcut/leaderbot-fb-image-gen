@@ -46,48 +46,48 @@ async function sendCallbackRequest(params: {
   }
 
   const path = `/api/oauth/callback?code=${encodeURIComponent(params.code)}&state=${encodeURIComponent(params.state)}`;
-  const response = await new Promise<{ status: number; headers: http.IncomingHttpHeaders; payload: string }>(
-    (resolve, reject) => {
-      const request = http.request(
-        {
-          hostname: "127.0.0.1",
-          port: address.port,
-          path,
-          method: "GET",
-          headers: params.cookie ? { cookie: params.cookie } : undefined,
-        },
-        res => {
-          let payload = "";
-          res.on("data", chunk => {
-            payload += chunk;
-          });
-          res.on("end", () => {
-            resolve({
-              status: res.statusCode ?? 0,
-              headers: res.headers,
-              payload,
+  try {
+    return await new Promise<{ status: number; headers: http.IncomingHttpHeaders; payload: string }>(
+      (resolve, reject) => {
+        const request = http.request(
+          {
+            hostname: "127.0.0.1",
+            port: address.port,
+            path,
+            method: "GET",
+            headers: params.cookie ? { cookie: params.cookie } : undefined,
+          },
+          res => {
+            let payload = "";
+            res.on("data", chunk => {
+              payload += chunk;
             });
-          });
-        }
-      );
+            res.on("end", () => {
+              resolve({
+                status: res.statusCode ?? 0,
+                headers: res.headers,
+                payload,
+              });
+            });
+          }
+        );
 
-      request.on("error", reject);
-      request.end();
-    }
-  );
-
-  await new Promise<void>((resolve, reject) => {
-    server.close(error => {
-      if (error) {
-        reject(error);
-        return;
+        request.on("error", reject);
+        request.end();
       }
+    );
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close(error => {
+        if (error) {
+          reject(error);
+          return;
+        }
 
-      resolve();
+        resolve();
+      });
     });
-  });
-
-  return response;
+  }
 }
 
 describe("OAuth callback security", () => {
