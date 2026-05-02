@@ -11,7 +11,7 @@ export type Style =
   | "oil-paint"
   | "norman-blackwell";
 
-export type StyleId =
+type StyleId =
   | "STYLE_CARICATURE"
   | "STYLE_STORYBOOK_ANIME"
   | "STYLE_AFROMAN_AMERICANA"
@@ -29,12 +29,12 @@ export type StyleCategory =
   | "atmosphere"
   | "bold";
 
-export type StyleCategoryId =
+type StyleCategoryId =
   | "STYLE_CATEGORY_ILLUSTRATED"
   | "STYLE_CATEGORY_ATMOSPHERE"
   | "STYLE_CATEGORY_BOLD";
 
-export type StyleConfig = {
+type StyleConfig = {
   id: StyleId;
   payload: StyleId;
   style: Style;
@@ -43,7 +43,7 @@ export type StyleConfig = {
   thumbnailPrompt?: string;
 };
 
-export type StyleCategoryConfig = {
+type StyleCategoryConfig = {
   id: StyleCategoryId;
   payload: StyleCategoryId;
   category: StyleCategory;

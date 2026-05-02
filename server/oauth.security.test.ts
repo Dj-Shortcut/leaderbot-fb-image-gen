@@ -1,7 +1,9 @@
 import http from "node:http";
 import express from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { registerOAuthRoutes, OAUTH_STATE_COOKIE_NAME, parseOAuthState } from "./_core/oauth";
+import { registerOAuthRoutes } from "./_core/oauth";
+
+const OAUTH_STATE_COOKIE_NAME = "lb_oauth_state_nonce";
 
 const mocks = vi.hoisted(() => ({
   exchangeCodeForToken: vi.fn(),
@@ -140,14 +142,15 @@ describe("OAuth callback security", () => {
     expect(mocks.createSessionToken).toHaveBeenCalled();
   });
 
-  it("parses valid state payloads and rejects malformed ones", () => {
-    const valid = parseOAuthState(buildState("https://leaderbot.example/api/oauth/callback", "nonce-1234567890abcdef"));
-    const invalid = parseOAuthState("not-base64");
-
-    expect(valid).toEqual({
-      redirectUri: "https://leaderbot.example/api/oauth/callback",
-      nonce: "nonce-1234567890abcdef",
+  it("rejects malformed state payloads through the callback route", async () => {
+    const response = await sendCallbackRequest({
+      code: "code-3",
+      state: "not-base64",
+      cookie: `${OAUTH_STATE_COOKIE_NAME}=nonce-1234567890abcdef`,
     });
-    expect(invalid).toBeNull();
+
+    expect(response.status).toBe(400);
+    expect(response.payload).toContain("invalid oauth state");
+    expect(mocks.exchangeCodeForToken).not.toHaveBeenCalled();
   });
 });
