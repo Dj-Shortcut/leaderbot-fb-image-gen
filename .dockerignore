@@ -11,8 +11,7 @@ dist
 .idea
 .env
 .env.*
-coverage
-.manus-logs
+coverag
 docs
 references
 tests
