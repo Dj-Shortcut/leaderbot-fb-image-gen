@@ -36,7 +36,10 @@ import {
   resetMessengerEventDedupe,
 } from "./_core/messengerWebhook";
 import { t } from "./_core/i18n";
-import { STYLE_CONFIGS } from "./_core/messengerStyles";
+import {
+  STYLE_CATEGORY_CONFIGS,
+  getStylesForCategory,
+} from "./_core/messengerStyles";
 import {
   anonymizePsid,
   getState,
@@ -622,7 +625,9 @@ describe("messenger webhook dedupe", () => {
   });
 
   it("returns generated images for all canonical styles through the OpenAI path", async () => {
-    const styles = STYLE_CONFIGS.map(style => style.style);
+    const styles = STYLE_CATEGORY_CONFIGS.flatMap(category =>
+      getStylesForCategory(category.category).map(style => style.style)
+    );
 
     for (const style of styles) {
       const fetchMock = installOpenAiSuccessFetchMock();
