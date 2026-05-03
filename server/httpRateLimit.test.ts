@@ -3,6 +3,7 @@ import express from "express";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createGlobalHttpRateLimiter } from "./_core/httpRateLimit";
+import { bindTestHttpServer } from "./testHttpServer";
 
 const originalWindowMs = process.env.HTTP_RATE_LIMIT_WINDOW_MS;
 const originalMaxRequests = process.env.HTTP_RATE_LIMIT_MAX_REQUESTS;
@@ -47,29 +48,13 @@ async function startServer(options?: { forceIp?: string; pathPrefix?: string }) 
   });
 
   const server = http.createServer(app);
-  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-
-  if (!address || typeof address === "string") {
-    server.close();
-    throw new Error("Unable to get test server address");
-  }
+  const boundServer = await bindTestHttpServer(server);
 
   return {
-    baseUrl: `http://127.0.0.1:${address.port}`,
+    baseUrl: boundServer.baseUrl,
     limitedPath,
     healthPath,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        server.close(error => {
-          if (error) {
-            reject(error);
-            return;
-          }
-
-          resolve();
-        });
-      }),
+    close: boundServer.close,
   };
 }
 

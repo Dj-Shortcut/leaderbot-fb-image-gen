@@ -6,6 +6,7 @@ import {
   captureMetaWebhookRawBody,
   verifyMetaWebhookSignature,
 } from "./_core/webhookSignatureVerification";
+import { bindTestHttpServer } from "./testHttpServer";
 
 function buildSignature(body: string, secret: string): string {
   const digest = createHmac("sha256", secret).update(body).digest("hex");
@@ -34,13 +35,7 @@ async function postWebhook(
   });
 
   const server = http.createServer(app);
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-
-  if (!address || typeof address === "string") {
-    server.close();
-    throw new Error("Failed to bind test server");
-  }
+  const boundServer = await bindTestHttpServer(server);
 
   const headers: Record<string, string | number> = {
     "content-type": "application/json",
@@ -53,11 +48,11 @@ async function postWebhook(
 
   const result = await new Promise<{ status: number; payload: string }>((resolve, reject) => {
     const request = http.request(
-      {
-        hostname: "127.0.0.1",
-        port: address.port,
-        path,
-        method: "POST",
+          {
+            hostname: "127.0.0.1",
+            port: boundServer.port,
+            path,
+            method: "POST",
         headers,
       },
       (response) => {
@@ -76,15 +71,7 @@ async function postWebhook(
     request.end();
   });
 
-  await new Promise<void>((resolve, reject) => {
-    server.close((error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve();
-    });
-  });
+  await boundServer.close();
 
   return result;
 }

@@ -10,6 +10,7 @@ import {
 import {
   verifyMetaWebhookSignature,
 } from "./_core/webhookSignatureVerification";
+import { bindTestHttpServer } from "./testHttpServer";
 
 const { rateLimitMock } = vi.hoisted(() => ({
   rateLimitMock: vi.fn(() => (_req: unknown, _res: unknown, next: () => void) => next()),
@@ -42,51 +43,40 @@ async function getWebhook(
   registerMetaWebhookRoutes(app);
 
   const server = http.createServer(app);
-  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
+  const boundServer = await bindTestHttpServer(server);
 
-  if (!address || typeof address === "string") {
-    server.close();
-    throw new Error("Failed to bind test server");
-  }
+  const response = await (async () => {
+    try {
+      return await new Promise<{ contentType: string; payload: string; status: number }>((resolve, reject) => {
+        const request = http.request(
+          {
+            hostname: "127.0.0.1",
+            port: boundServer.port,
+            path,
+            method: "GET",
+          },
+          res => {
+            let payload = "";
+            res.on("data", chunk => {
+              payload += chunk;
+            });
+            res.on("end", () => {
+              resolve({
+                contentType: String(res.headers["content-type"] ?? ""),
+                payload,
+                status: res.statusCode ?? 0,
+              });
+            });
+          },
+        );
 
-  const response = await new Promise<{ contentType: string; payload: string; status: number }>((resolve, reject) => {
-    const request = http.request(
-      {
-        hostname: "127.0.0.1",
-        port: address.port,
-        path,
-        method: "GET",
-      },
-      res => {
-        let payload = "";
-        res.on("data", chunk => {
-          payload += chunk;
-        });
-        res.on("end", () => {
-          resolve({
-            contentType: String(res.headers["content-type"] ?? ""),
-            payload,
-            status: res.statusCode ?? 0,
-          });
-        });
-      },
-    );
-
-    request.on("error", reject);
-    request.end();
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    server.close(error => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve();
-    });
-  });
+        request.on("error", reject);
+        request.end();
+      });
+    } finally {
+      await boundServer.close();
+    }
+  })();
 
   return { ...response, signatureMiddlewareCalls };
 }

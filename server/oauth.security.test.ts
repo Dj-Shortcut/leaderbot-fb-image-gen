@@ -1,7 +1,10 @@
 import http from "node:http";
 import express from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { registerOAuthRoutes, OAUTH_STATE_COOKIE_NAME, parseOAuthState } from "./_core/oauth";
+import { registerOAuthRoutes } from "./_core/oauth";
+import { bindTestHttpServer } from "./testHttpServer";
+
+const OAUTH_STATE_COOKIE_NAME = "lb_oauth_state_nonce";
 
 const mocks = vi.hoisted(() => ({
   exchangeCodeForToken: vi.fn(),
@@ -35,57 +38,42 @@ async function sendCallbackRequest(params: {
   registerOAuthRoutes(app);
 
   const server = http.createServer(app);
-  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-
-  if (!address || typeof address === "string") {
-    server.close();
-    throw new Error("Failed to bind test server");
-  }
+  const boundServer = await bindTestHttpServer(server);
 
   const path = `/api/oauth/callback?code=${encodeURIComponent(params.code)}&state=${encodeURIComponent(params.state)}`;
-  const response = await new Promise<{ status: number; headers: http.IncomingHttpHeaders; payload: string }>(
-    (resolve, reject) => {
-      const request = http.request(
-        {
-          hostname: "127.0.0.1",
-          port: address.port,
-          path,
-          method: "GET",
-          headers: params.cookie ? { cookie: params.cookie } : undefined,
-        },
-        res => {
-          let payload = "";
-          res.on("data", chunk => {
-            payload += chunk;
-          });
-          res.on("end", () => {
-            resolve({
-              status: res.statusCode ?? 0,
-              headers: res.headers,
-              payload,
+  try {
+    return await new Promise<{ status: number; headers: http.IncomingHttpHeaders; payload: string }>(
+      (resolve, reject) => {
+        const request = http.request(
+          {
+            hostname: "127.0.0.1",
+            port: boundServer.port,
+            path,
+            method: "GET",
+            headers: params.cookie ? { cookie: params.cookie } : undefined,
+          },
+          res => {
+            let payload = "";
+            res.on("data", chunk => {
+              payload += chunk;
             });
-          });
-        }
-      );
+            res.on("end", () => {
+              resolve({
+                status: res.statusCode ?? 0,
+                headers: res.headers,
+                payload,
+              });
+            });
+          }
+        );
 
-      request.on("error", reject);
-      request.end();
-    }
-  );
-
-  await new Promise<void>((resolve, reject) => {
-    server.close(error => {
-      if (error) {
-        reject(error);
-        return;
+        request.on("error", reject);
+        request.end();
       }
-
-      resolve();
-    });
-  });
-
-  return response;
+    );
+  } finally {
+    await boundServer.close();
+  }
 }
 
 describe("OAuth callback security", () => {
@@ -140,14 +128,15 @@ describe("OAuth callback security", () => {
     expect(mocks.createSessionToken).toHaveBeenCalled();
   });
 
-  it("parses valid state payloads and rejects malformed ones", () => {
-    const valid = parseOAuthState(buildState("https://leaderbot.example/api/oauth/callback", "nonce-1234567890abcdef"));
-    const invalid = parseOAuthState("not-base64");
-
-    expect(valid).toEqual({
-      redirectUri: "https://leaderbot.example/api/oauth/callback",
-      nonce: "nonce-1234567890abcdef",
+  it("rejects malformed state payloads through the callback route", async () => {
+    const response = await sendCallbackRequest({
+      code: "code-3",
+      state: "not-base64",
+      cookie: `${OAUTH_STATE_COOKIE_NAME}=nonce-1234567890abcdef`,
     });
-    expect(invalid).toBeNull();
+
+    expect(response.status).toBe(400);
+    expect(response.payload).toContain("invalid oauth state");
+    expect(mocks.exchangeCodeForToken).not.toHaveBeenCalled();
   });
 });

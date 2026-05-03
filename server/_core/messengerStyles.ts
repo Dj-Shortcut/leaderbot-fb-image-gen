@@ -11,7 +11,7 @@ export type Style =
   | "oil-paint"
   | "norman-blackwell";
 
-export type StyleId =
+type StyleId =
   | "STYLE_CARICATURE"
   | "STYLE_STORYBOOK_ANIME"
   | "STYLE_AFROMAN_AMERICANA"
@@ -29,12 +29,12 @@ export type StyleCategory =
   | "atmosphere"
   | "bold";
 
-export type StyleCategoryId =
+type StyleCategoryId =
   | "STYLE_CATEGORY_ILLUSTRATED"
   | "STYLE_CATEGORY_ATMOSPHERE"
   | "STYLE_CATEGORY_BOLD";
 
-export type StyleConfig = {
+type StyleConfig = {
   id: StyleId;
   payload: StyleId;
   style: Style;
@@ -43,14 +43,14 @@ export type StyleConfig = {
   thumbnailPrompt?: string;
 };
 
-export type StyleCategoryConfig = {
+type StyleCategoryConfig = {
   id: StyleCategoryId;
   payload: StyleCategoryId;
   category: StyleCategory;
   label: string;
 };
 
-export const STYLE_CONFIGS: StyleConfig[] = [
+const STYLE_CONFIGS: StyleConfig[] = [
   {
     id: "STYLE_CARICATURE",
     payload: "STYLE_CARICATURE",
@@ -159,15 +159,15 @@ const STYLE_CATEGORY_IDS = new Set<StyleCategoryId>(
   STYLE_CATEGORY_CONFIGS.map(category => category.id)
 );
 
-export function isStylePayload(value: string): value is StyleId {
+function isStylePayload(value: string): value is StyleId {
   return STYLE_IDS.has(value as StyleId);
 }
 
-export function isStyleCategoryPayload(value: string): value is StyleCategoryId {
+function isStyleCategoryPayload(value: string): value is StyleCategoryId {
   return STYLE_CATEGORY_IDS.has(value as StyleCategoryId);
 }
 
-export function getStyleById(styleId: StyleId): StyleConfig {
+function getStyleById(styleId: StyleId): StyleConfig {
   const style = STYLE_CONFIGS.find(item => item.id === styleId);
 
   if (!style) {
@@ -177,7 +177,7 @@ export function getStyleById(styleId: StyleId): StyleConfig {
   return style;
 }
 
-export function getStyleCategoryById(
+function getStyleCategoryById(
   styleCategoryId: StyleCategoryId
 ): StyleCategoryConfig {
   const category = STYLE_CATEGORY_CONFIGS.find(item => item.id === styleCategoryId);

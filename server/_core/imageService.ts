@@ -27,7 +27,7 @@ import {
 } from "./image-generation/imageServiceErrors";
 import { createLogger } from "./logger";
 
-export const OPENAI_IMAGES_PROVIDER = "openai-images" as const;
+const OPENAI_IMAGES_PROVIDER = "openai-images" as const;
 
 export type ImageProvider = typeof OPENAI_IMAGES_PROVIDER;
 
