@@ -1,23 +1,10 @@
+import { ensureRedisReady, getRedisClient, isRedisEnabled } from "./redis";
+
 const DEFAULT_REPLAY_TTL_SECONDS = 300;
 const DEFAULT_MAX_REPLAY_KEYS = 10000;
 const REPLAY_KEY_PREFIX = "webhook-replay:";
 
-type RedisLike = {
-  ping(): Promise<string>;
-  set(key: string, value: string, mode: "EX", seconds: number, condition: "NX"): Promise<"OK" | null>;
-};
-
-type RedisModule = {
-  default: new (url: string, ...args: unknown[]) => RedisLike;
-};
-
 const memoryReplayKeys = new Map<string, number>();
-
-let redisClientPromise: Promise<RedisLike> | null = null;
-
-function getRedisUrl(): string | null {
-  return process.env.REDIS_URL?.trim() || null;
-}
 
 function getReplayTtlSeconds(): number {
   const raw = Number(process.env.WEBHOOK_REPLAY_TTL_SECONDS);
@@ -26,28 +13,6 @@ function getReplayTtlSeconds(): number {
   }
 
   return DEFAULT_REPLAY_TTL_SECONDS;
-}
-
-async function importRedisModule(): Promise<RedisModule> {
-  return (await import("ioredis")) as unknown as RedisModule;
-}
-
-async function createRedisClient(): Promise<RedisLike> {
-  const redisUrl = getRedisUrl();
-  if (!redisUrl) {
-    throw new Error("REDIS_URL is not configured");
-  }
-
-  const { default: Redis } = await importRedisModule();
-  return new Redis(redisUrl);
-}
-
-async function getRedisClient(): Promise<RedisLike> {
-  if (!redisClientPromise) {
-    redisClientPromise = createRedisClient();
-  }
-
-  return redisClientPromise;
 }
 
 function pruneMemoryReplayKeys(now: number): void {
@@ -72,7 +37,7 @@ function toRedisReplayKey(key: string): string {
 }
 
 export function isRedisReplayProtectionEnabled(): boolean {
-  return Boolean(getRedisUrl());
+  return isRedisEnabled();
 }
 
 export function assertProductionWebhookReplayProtectionConfig(): void {
@@ -86,12 +51,7 @@ export function assertProductionWebhookReplayProtectionConfig(): void {
 }
 
 export async function ensureWebhookReplayProtectionReady(): Promise<void> {
-  if (!isRedisReplayProtectionEnabled()) {
-    return;
-  }
-
-  const redis = await getRedisClient();
-  await redis.ping();
+  await ensureRedisReady();
 }
 
 export async function claimWebhookReplayKey(key: string): Promise<boolean> {

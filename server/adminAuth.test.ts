@@ -3,12 +3,19 @@ import express from "express";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { bindTestHttpServer } from "./testHttpServer";
 
-const { safeLogMock } = vi.hoisted(() => ({
+const { getRedisClientMock, isRedisEnabledMock, safeLogMock } = vi.hoisted(() => ({
+  getRedisClientMock: vi.fn(),
+  isRedisEnabledMock: vi.fn(() => false),
   safeLogMock: vi.fn(),
 }));
 
 vi.mock("./_core/messengerApi", () => ({
   safeLog: safeLogMock,
+}));
+
+vi.mock("./_core/redis", () => ({
+  getRedisClient: getRedisClientMock,
+  isRedisEnabled: isRedisEnabledMock,
 }));
 
 import {
@@ -21,6 +28,9 @@ const originalAdminToken = process.env.ADMIN_TOKEN;
 
 afterEach(() => {
   resetAdminAuthRateLimiterForTests();
+  getRedisClientMock.mockReset();
+  isRedisEnabledMock.mockReset();
+  isRedisEnabledMock.mockReturnValue(false);
   safeLogMock.mockClear();
   if (originalAdminToken === undefined) {
     delete process.env.ADMIN_TOKEN;
@@ -86,6 +96,33 @@ describe("admin auth", () => {
       ]);
       expect(responses[5].status).toBe(429);
       expect(responses[5].headers.get("retry-after")).not.toBeNull();
+      expect(safeLogMock).toHaveBeenCalledWith("admin_test_rate_limited", {
+        reason: "rate_limited",
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("uses Redis for admin auth rate limits when Redis is configured", async () => {
+    const redis = {
+      expire: vi.fn(async () => 1),
+      incr: vi.fn(async () => 6),
+    };
+    isRedisEnabledMock.mockReturnValue(true);
+    getRedisClientMock.mockResolvedValue(redis);
+
+    const server = await startServer();
+
+    try {
+      const response = await fetch(`${server.baseUrl}/admin/test`);
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get("retry-after")).not.toBeNull();
+      expect(redis.incr).toHaveBeenCalledWith(
+        expect.stringContaining("admin-auth-rate-limit:GET:/admin/test:")
+      );
+      expect(redis.expire).not.toHaveBeenCalled();
       expect(safeLogMock).toHaveBeenCalledWith("admin_test_rate_limited", {
         reason: "rate_limited",
       });

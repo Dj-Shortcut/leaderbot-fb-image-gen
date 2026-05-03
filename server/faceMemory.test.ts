@@ -20,6 +20,7 @@ import {
   expireFaceMemory,
   updateConsentedFaceMemorySource,
 } from "./_core/faceMemory";
+import { getFaceMemoryRetentionDays } from "./_core/faceMemoryRetention";
 import {
   getState,
   rememberFaceSourceImage,
@@ -31,6 +32,7 @@ import { writeState } from "./_core/stateStore";
 describe("face memory deletion", () => {
   const originalPrivacyPepper = process.env.PRIVACY_PEPPER;
   const originalEnableFaceMemory = process.env.ENABLE_FACE_MEMORY;
+  const originalFaceMemoryRetentionDays = process.env.FACE_MEMORY_RETENTION_DAYS;
 
   beforeEach(() => {
     process.env.PRIVACY_PEPPER = "ci-test-pepper";
@@ -49,6 +51,11 @@ describe("face memory deletion", () => {
       delete process.env.ENABLE_FACE_MEMORY;
     } else {
       process.env.ENABLE_FACE_MEMORY = originalEnableFaceMemory;
+    }
+    if (originalFaceMemoryRetentionDays === undefined) {
+      delete process.env.FACE_MEMORY_RETENTION_DAYS;
+    } else {
+      process.env.FACE_MEMORY_RETENTION_DAYS = originalFaceMemoryRetentionDays;
     }
   });
 
@@ -128,6 +135,28 @@ describe("face memory deletion", () => {
     expect(storageDeleteMock).toHaveBeenCalledWith("generated/old-source.jpg");
     expect(state?.faceMemoryConsent).toBeNull();
     expect(state?.lastSourceImageUrl).toBeNull();
+  });
+
+  it("uses FACE_MEMORY_RETENTION_DAYS when expiring retained source data", async () => {
+    process.env.FACE_MEMORY_RETENTION_DAYS = "7";
+    const oldSourceUrl = "https://assets.example/generated/env-retention-source.jpg";
+    const now = Date.now();
+    writeState("user-env-retention", {
+      faceMemoryConsent: { given: true, timestamp: now, version: "v1" },
+      lastSourceImageUrl: oldSourceUrl,
+      lastSourceImageUpdatedAt: now - 8 * 24 * 60 * 60 * 1000,
+    });
+
+    const deleted = await expireFaceMemory(now);
+
+    expect(deleted).toBe(1);
+    expect(storageDeleteMock).toHaveBeenCalledWith("generated/env-retention-source.jpg");
+  });
+
+  it("falls back to 30 retention days for invalid FACE_MEMORY_RETENTION_DAYS", () => {
+    process.env.FACE_MEMORY_RETENTION_DAYS = "not-a-number";
+
+    expect(getFaceMemoryRetentionDays()).toBe(30);
   });
 
   it("clears consent-only records during match-all cleanup", async () => {
