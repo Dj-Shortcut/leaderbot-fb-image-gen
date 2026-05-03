@@ -151,6 +151,7 @@ afterEach(() => {
   delete process.env.OPENAI_API_KEY;
   delete process.env.APP_BASE_URL;
   delete process.env.SOURCE_IMAGE_ALLOWED_HOSTS;
+  delete process.env.ENABLE_FACE_MEMORY;
 });
 
 beforeEach(() => {
@@ -2286,6 +2287,114 @@ describe("disabled bot features stay out of the runtime flow", () => {
     expect(getState(anonymizePsid("style-preselect-user"))?.selectedStyle).toBe(
       "cyberpunk"
     );
+  });
+
+  it("continues generation after GDPR, style choice, photo upload, and face-memory consent", async () => {
+    process.env.ENABLE_FACE_MEMORY = "true";
+    const psid = "gdpr-style-photo-user";
+
+    await processFacebookWebhookPayloadBase({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-gdpr-style-photo-consent",
+                quick_reply: { payload: "GDPR_CONSENT_AGREE" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    await processFacebookWebhookPayloadBase({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              postback: { payload: "STYLE_CYBERPUNK" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(getState(anonymizePsid(psid))?.preselectedStyle).toBe("cyberpunk");
+
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+    installOpenAiSuccessFetchMock();
+
+    await processFacebookWebhookPayloadBase({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-gdpr-style-photo-upload",
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/source.jpg" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      psid,
+      expect.stringContaining("Mag ik je foto 30 dagen bewaren?"),
+      expect.arrayContaining([
+        expect.objectContaining({ payload: "CONSENT_FACE_YES" }),
+      ])
+    );
+
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+
+    await processFacebookWebhookPayloadBase({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-gdpr-style-photo-memory-yes",
+                quick_reply: { payload: "CONSENT_FACE_YES" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      psid,
+      "Ik maak nu je Cyberpunk-stijl."
+    );
+    expect(sendImageMock).toHaveBeenCalledWith(
+      psid,
+      expect.stringMatching(
+        /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+      )
+    );
+    expect(sendQuickRepliesMock).not.toHaveBeenCalledWith(
+      psid,
+      t("nl", "styleCategoryPicker"),
+      expect.any(Array)
+    );
+    expect(getState(anonymizePsid(psid))?.preselectedStyle).toBeNull();
+    expect(getState(anonymizePsid(psid))?.selectedStyle).toBe("cyberpunk");
   });
 
   it("does not auto-run a stale preselected style when a new photo replaces an older one", async () => {

@@ -1585,6 +1585,7 @@ export function createWebhookHandlers({
 
     await setChosenStyle(psid, selectedStyle);
     if (!state.lastPhotoUrl) {
+      await setPreselectedStyle(psid, selectedStyle);
       await setFlowState(psid, "AWAITING_PHOTO");
       return await sendLoggedText(psid, t(lang, "styleWithoutPhoto"), reqId);
     }
