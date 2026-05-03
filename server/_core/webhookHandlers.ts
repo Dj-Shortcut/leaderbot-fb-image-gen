@@ -718,6 +718,9 @@ async function tryHandleImageMessage(
     if (state.faceMemoryConsent?.given) {
       await updateConsentedFaceMemorySource(input.psid, storedSourceImageUrl);
     } else if (!state.faceMemoryConsent) {
+      if (imageDecision.action === "show_style_picker") {
+        await setPreselectedStyle(input.psid, null);
+      }
       await ctx.sendFaceMemoryConsentPrompt(input.psid, input.lang, input.reqId);
       return true;
     }

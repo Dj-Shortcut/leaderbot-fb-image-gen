@@ -2397,6 +2397,80 @@ describe("disabled bot features stay out of the runtime flow", () => {
     expect(getState(anonymizePsid(psid))?.selectedStyle).toBe("cyberpunk");
   });
 
+  it("does not resume a stale preselected style after face-memory consent for a replacement photo", async () => {
+    process.env.ENABLE_FACE_MEMORY = "true";
+    const psid = "face-memory-stale-preselect-user";
+    await setPendingImage(psid, "https://img.example/old-source.jpg");
+    await setPreselectedStyle(psid, "cyberpunk");
+
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-face-memory-stale-photo",
+                attachments: [
+                  {
+                    type: "image",
+                    payload: { url: "https://img.example/new-source.jpg" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      psid,
+      expect.stringContaining("Mag ik je foto 30 dagen bewaren?"),
+      expect.arrayContaining([
+        expect.objectContaining({ payload: "CONSENT_FACE_YES" }),
+      ])
+    );
+
+    sendImageMock.mockClear();
+    sendQuickRepliesMock.mockClear();
+    sendTextMock.mockClear();
+
+    await processFacebookWebhookPayload({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              message: {
+                mid: "mid-face-memory-stale-yes",
+                quick_reply: { payload: "CONSENT_FACE_YES" },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(sendImageMock).not.toHaveBeenCalled();
+    expect(sendTextMock).not.toHaveBeenCalledWith(
+      psid,
+      "Ik maak nu je Cyberpunk-stijl."
+    );
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      psid,
+      t("nl", "styleCategoryPicker"),
+      expect.arrayContaining([
+        expect.objectContaining({ payload: "STYLE_CATEGORY_ILLUSTRATED" }),
+      ])
+    );
+    expect(getState(anonymizePsid(psid))?.preselectedStyle).toBeNull();
+  });
+
   it("does not auto-run a stale preselected style when a new photo replaces an older one", async () => {
     await setPendingImage("stale-preselect-user", "https://img.example/old-source.jpg");
     await setPreselectedStyle("stale-preselect-user", "cyberpunk");
