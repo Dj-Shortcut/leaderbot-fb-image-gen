@@ -132,6 +132,73 @@ function installImageIngressFetchMock() {
   return fetchMock;
 }
 
+async function sendMessengerQuickReply(
+  processPayload: typeof processFacebookWebhookPayloadBase,
+  psid: string,
+  mid: string,
+  payload: string
+): Promise<void> {
+  await processPayload({
+    entry: [
+      {
+        messaging: [
+          {
+            sender: { id: psid },
+            message: {
+              mid,
+              quick_reply: { payload },
+            },
+          },
+        ],
+      },
+    ],
+  });
+}
+
+async function sendMessengerPhoto(
+  processPayload: typeof processFacebookWebhookPayloadBase,
+  psid: string,
+  mid: string,
+  imageUrl: string
+): Promise<void> {
+  await processPayload({
+    entry: [
+      {
+        messaging: [
+          {
+            sender: { id: psid },
+            message: {
+              mid,
+              attachments: [
+                {
+                  type: "image",
+                  payload: { url: imageUrl },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  });
+}
+
+function clearMessengerSendMocks(): void {
+  sendImageMock.mockClear();
+  sendQuickRepliesMock.mockClear();
+  sendTextMock.mockClear();
+}
+
+function expectFaceMemoryConsentPrompt(psid: string): void {
+  expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+    psid,
+    expect.stringContaining("Mag ik je foto 30 dagen bewaren?"),
+    expect.arrayContaining([
+      expect.objectContaining({ payload: "CONSENT_FACE_YES" }),
+    ])
+  );
+}
+
 beforeAll(() => {
   process.env.PRIVACY_PEPPER = TEST_PEPPER;
 });
@@ -151,6 +218,7 @@ afterEach(() => {
   delete process.env.OPENAI_API_KEY;
   delete process.env.APP_BASE_URL;
   delete process.env.SOURCE_IMAGE_ALLOWED_HOSTS;
+  delete process.env.ENABLE_FACE_MEMORY;
 });
 
 beforeEach(() => {
@@ -2286,6 +2354,114 @@ describe("disabled bot features stay out of the runtime flow", () => {
     expect(getState(anonymizePsid("style-preselect-user"))?.selectedStyle).toBe(
       "cyberpunk"
     );
+  });
+
+  it("continues generation after GDPR, style choice, photo upload, and face-memory consent", async () => {
+    process.env.ENABLE_FACE_MEMORY = "true";
+    const psid = "gdpr-style-photo-user";
+
+    await sendMessengerQuickReply(
+      processFacebookWebhookPayloadBase,
+      psid,
+      "mid-gdpr-style-photo-consent",
+      "GDPR_CONSENT_AGREE"
+    );
+
+    await processFacebookWebhookPayloadBase({
+      entry: [
+        {
+          messaging: [
+            {
+              sender: { id: psid },
+              postback: { payload: "STYLE_CYBERPUNK" },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(getState(anonymizePsid(psid))?.preselectedStyle).toBe("cyberpunk");
+
+    clearMessengerSendMocks();
+    installOpenAiSuccessFetchMock();
+
+    await sendMessengerPhoto(
+      processFacebookWebhookPayloadBase,
+      psid,
+      "mid-gdpr-style-photo-upload",
+      "https://img.example/source.jpg"
+    );
+
+    expectFaceMemoryConsentPrompt(psid);
+
+    clearMessengerSendMocks();
+
+    await sendMessengerQuickReply(
+      processFacebookWebhookPayloadBase,
+      psid,
+      "mid-gdpr-style-photo-memory-yes",
+      "CONSENT_FACE_YES"
+    );
+
+    expect(sendTextMock).toHaveBeenCalledWith(
+      psid,
+      "Ik maak nu je Cyberpunk-stijl."
+    );
+    expect(sendImageMock).toHaveBeenCalledWith(
+      psid,
+      expect.stringMatching(
+        /^https:\/\/leaderbot-fb-image-gen\.fly\.dev\/generated\/[0-9a-f-]+\.jpg$/
+      )
+    );
+    expect(sendQuickRepliesMock).not.toHaveBeenCalledWith(
+      psid,
+      t("nl", "styleCategoryPicker"),
+      expect.any(Array)
+    );
+    expect(getState(anonymizePsid(psid))?.preselectedStyle).toBeNull();
+    expect(getState(anonymizePsid(psid))?.selectedStyle).toBe("cyberpunk");
+  });
+
+  it("does not resume a stale preselected style after face-memory consent for a replacement photo", async () => {
+    process.env.ENABLE_FACE_MEMORY = "true";
+    const psid = "face-memory-stale-preselect-user";
+    await setPendingImage(psid, "https://img.example/old-source.jpg");
+    await setPreselectedStyle(psid, "cyberpunk");
+
+    clearMessengerSendMocks();
+
+    await sendMessengerPhoto(
+      processFacebookWebhookPayload,
+      psid,
+      "mid-face-memory-stale-photo",
+      "https://img.example/new-source.jpg"
+    );
+
+    expectFaceMemoryConsentPrompt(psid);
+
+    clearMessengerSendMocks();
+
+    await sendMessengerQuickReply(
+      processFacebookWebhookPayload,
+      psid,
+      "mid-face-memory-stale-yes",
+      "CONSENT_FACE_YES"
+    );
+
+    expect(sendImageMock).not.toHaveBeenCalled();
+    expect(sendTextMock).not.toHaveBeenCalledWith(
+      psid,
+      "Ik maak nu je Cyberpunk-stijl."
+    );
+    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+      psid,
+      t("nl", "styleCategoryPicker"),
+      expect.arrayContaining([
+        expect.objectContaining({ payload: "STYLE_CATEGORY_ILLUSTRATED" }),
+      ])
+    );
+    expect(getState(anonymizePsid(psid))?.preselectedStyle).toBeNull();
+    expect(getState(anonymizePsid(psid))?.stage).toBe("AWAITING_STYLE");
   });
 
   it("does not auto-run a stale preselected style when a new photo replaces an older one", async () => {

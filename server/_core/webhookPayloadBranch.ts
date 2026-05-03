@@ -16,7 +16,7 @@ import { getBotFeatures } from "./bot/features";
 import { handleMessengerPayload } from "./messengerPayloadRouting";
 import { safeLog } from "./messengerApi";
 import { toLogUser } from "./privacy";
-import type { FacebookWebhookEvent } from "./webhookHelpers";
+import { normalizeStyle, type FacebookWebhookEvent } from "./webhookHelpers";
 import type { HandlerContext } from "./webhookHandlers";
 import type { Lang } from "./i18n";
 
@@ -35,6 +35,28 @@ type PayloadFlowInput = {
   reqId: string;
   lang: Lang;
 };
+
+async function continueAfterFaceMemoryChoice(
+  ctx: HandlerContext,
+  input: PayloadFlowInput
+): Promise<void> {
+  const state = await getOrCreateState(input.psid);
+  const preselectedStyle = normalizeStyle(state.preselectedStyle ?? "");
+  if (preselectedStyle && state.lastPhotoUrl) {
+    await setPreselectedStyle(input.psid, null);
+    await ctx.handleStyleSelection(
+      input.psid,
+      input.userId,
+      preselectedStyle,
+      input.reqId,
+      input.lang
+    );
+    return;
+  }
+
+  await setFlowState(input.psid, "AWAITING_STYLE");
+  await ctx.sendPhotoReceivedPrompt(input.psid, input.lang, input.reqId);
+}
 
 export async function handlePostbackEvent(
   ctx: HandlerContext,
@@ -75,13 +97,13 @@ export async function handlePayload(
     } else {
       await setFaceMemoryConsentGiven(input.psid);
     }
-    await ctx.sendPhotoReceivedPrompt(input.psid, input.lang, input.reqId);
+    await continueAfterFaceMemoryChoice(ctx, input);
     return;
   }
 
   if (input.payload === FACE_MEMORY_CONSENT_NO) {
     await declineFaceMemory(input.psid);
-    await ctx.sendPhotoReceivedPrompt(input.psid, input.lang, input.reqId);
+    await continueAfterFaceMemoryChoice(ctx, input);
     return;
   }
 

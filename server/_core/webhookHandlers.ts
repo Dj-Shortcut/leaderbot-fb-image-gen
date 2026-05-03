@@ -718,6 +718,9 @@ async function tryHandleImageMessage(
     if (state.faceMemoryConsent?.given) {
       await updateConsentedFaceMemorySource(input.psid, storedSourceImageUrl);
     } else if (!state.faceMemoryConsent) {
+      if (imageDecision.action === "show_style_picker") {
+        await setPreselectedStyle(input.psid, null);
+      }
       await ctx.sendFaceMemoryConsentPrompt(input.psid, input.lang, input.reqId);
       return true;
     }
@@ -1585,6 +1588,7 @@ export function createWebhookHandlers({
 
     await setChosenStyle(psid, selectedStyle);
     if (!state.lastPhotoUrl) {
+      await setPreselectedStyle(psid, selectedStyle);
       await setFlowState(psid, "AWAITING_PHOTO");
       return await sendLoggedText(psid, t(lang, "styleWithoutPhoto"), reqId);
     }
