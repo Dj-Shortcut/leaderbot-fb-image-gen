@@ -19,6 +19,9 @@ query($owner: String!, $name: String!, $number: Int!) {
       title
       url
       comments(first: 100) {
+        pageInfo {
+          hasNextPage
+        }
         nodes {
           author { login }
           body
@@ -27,6 +30,9 @@ query($owner: String!, $name: String!, $number: Int!) {
         }
       }
       reviewThreads(first: 100) {
+        pageInfo {
+          hasNextPage
+        }
         nodes {
           id
           isResolved
@@ -37,6 +43,9 @@ query($owner: String!, $name: String!, $number: Int!) {
           originalLine
           originalStartLine
           comments(first: 100) {
+            pageInfo {
+              hasNextPage
+            }
             nodes {
               author { login }
               body
@@ -249,6 +258,31 @@ def print_review_threads(threads: list[dict[str, Any]]) -> None:
             print_block("", short_body(comment.get("body") or ""))
 
 
+def warn_if_partial(pr: dict[str, Any]) -> None:
+    warnings: list[str] = []
+    if pr.get("comments", {}).get("pageInfo", {}).get("hasNextPage"):
+        warnings.append("PR comments")
+    if pr.get("reviewThreads", {}).get("pageInfo", {}).get("hasNextPage"):
+        warnings.append("review threads")
+
+    partial_thread_comments = [
+        location_for_thread(thread)
+        for thread in pr.get("reviewThreads", {}).get("nodes", [])
+        if thread.get("comments", {}).get("pageInfo", {}).get("hasNextPage")
+    ]
+    if partial_thread_comments:
+        warnings.append(
+            "thread comments for " + ", ".join(partial_thread_comments[:5])
+        )
+
+    if warnings:
+        print(
+            "\nwarning: partial output; GitHub returned more results than this script fetched for "
+            + "; ".join(warnings)
+            + "."
+        )
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Fetch PR comments and review threads for the current branch."
@@ -270,6 +304,7 @@ def main(argv: list[str]) -> int:
 
     print(f"{owner}/{name} PR #{pr['number']}: {pr['title']}")
     print(pr["url"])
+    warn_if_partial(pr)
     print_pr_comments(pr.get("comments", {}).get("nodes", []))
     print_review_threads(pr.get("reviewThreads", {}).get("nodes", []))
     return 0
