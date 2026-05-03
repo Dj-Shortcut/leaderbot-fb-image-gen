@@ -1,4 +1,4 @@
-export type RedisLike = {
+type RedisLike = {
   ping(): Promise<string>;
   get(key: string): Promise<string | null>;
   scan(
@@ -24,7 +24,7 @@ type RedisModule = {
 
 let redisClientPromise: Promise<RedisLike> | null = null;
 
-export function getRedisUrl(): string | null {
+function getRedisUrl(): string | null {
   return process.env.REDIS_URL?.trim() || null;
 }
 

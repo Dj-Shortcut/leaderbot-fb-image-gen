@@ -26,6 +26,19 @@ function getAdminAuthRedisKey(req: express.Request): string {
   return `${ADMIN_AUTH_KEY_PREFIX}${getAdminAuthBucketKey(req)}`;
 }
 
+function sendAdminAuthRateLimitExceeded(
+  res: express.Response,
+  eventName: string,
+  retryAfterSeconds: number
+): void {
+  res.setHeader("Retry-After", String(retryAfterSeconds));
+  safeLog(eventName, { reason: "rate_limited" });
+  res.status(429).json({
+    error: "Too Many Requests",
+    message: "Admin authentication rate limit exceeded.",
+  });
+}
+
 function pruneAdminAuthBuckets(now: number): void {
   for (const [key, bucket] of adminAuthBuckets.entries()) {
     if (bucket.resetAt <= now) {
@@ -67,12 +80,7 @@ async function applyAdminAuthRateLimit(
           1,
           ttlSeconds > 0 ? ttlSeconds : Math.ceil(ADMIN_AUTH_WINDOW_MS / 1000)
         );
-        res.setHeader("Retry-After", String(retryAfterSeconds));
-        safeLog(eventName, { reason: "rate_limited" });
-        res.status(429).json({
-          error: "Too Many Requests",
-          message: "Admin authentication rate limit exceeded.",
-        });
+        sendAdminAuthRateLimitExceeded(res, eventName, retryAfterSeconds);
         return;
       }
 
@@ -99,12 +107,7 @@ async function applyAdminAuthRateLimit(
         1,
         Math.ceil((current.resetAt - now) / 1000)
       );
-      res.setHeader("Retry-After", String(retryAfterSeconds));
-      safeLog(eventName, { reason: "rate_limited" });
-      res.status(429).json({
-        error: "Too Many Requests",
-        message: "Admin authentication rate limit exceeded.",
-      });
+      sendAdminAuthRateLimitExceeded(res, eventName, retryAfterSeconds);
       return;
     }
 
