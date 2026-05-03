@@ -4,10 +4,17 @@
 > Audit-bestanden (`docs/security/AUDIT_REPORT.md`, `docs/security/CODE_AUDIT_REPORT.md`) zijn historisch; open punten daaruit worden hier beheerd.
 
 ## Verified snapshot
-- Last reviewed against code: **2026-03-07**
-- Verified commit: **`9380024`**
+- Last reviewed against code: **2026-05-03**
+- Verified commit: **`9380024`** (met focus op superseded audit items)
+- Zie ook: [AUDIT_REPORT_2026_05_03.md](./docs/audit/AUDIT_REPORT_2026_05_03.md)
 
 ## Actieve backlog (open)
+
+### Audit & Architectuur (Update 2026-05-03)
+- [ ] Centraliseer Redis client management (nu versnipperd over 4+ modules)
+- [ ] Maak Face Memory retentie (30 dagen) configureerbaar via ENV
+- [ ] Verplaats Admin Rate Limiting van memory naar Redis
+- [ ] Consolideer alle operationele logging naar `safeLog` / gestructureerde logger
 
 ### Product & bot-ervaring
 - [ ] Add seasonal filter rotation
