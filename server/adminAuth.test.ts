@@ -108,6 +108,7 @@ describe("admin auth", () => {
     const redis = {
       expire: vi.fn(async () => 1),
       incr: vi.fn(async () => 6),
+      ttl: vi.fn(async () => 600),
     };
     isRedisEnabledMock.mockReturnValue(true);
     getRedisClientMock.mockResolvedValue(redis);
@@ -118,11 +119,14 @@ describe("admin auth", () => {
       const response = await fetch(`${server.baseUrl}/admin/test`);
 
       expect(response.status).toBe(429);
-      expect(response.headers.get("retry-after")).not.toBeNull();
+      expect(response.headers.get("retry-after")).toBe("600");
       expect(redis.incr).toHaveBeenCalledWith(
         expect.stringContaining("admin-auth-rate-limit:GET:/admin/test:")
       );
       expect(redis.expire).not.toHaveBeenCalled();
+      expect(redis.ttl).toHaveBeenCalledWith(
+        expect.stringContaining("admin-auth-rate-limit:GET:/admin/test:")
+      );
       expect(safeLogMock).toHaveBeenCalledWith("admin_test_rate_limited", {
         reason: "rate_limited",
       });

@@ -22,9 +22,8 @@ function getAdminAuthBucketKey(req: express.Request): string {
   return `${req.method}:${req.path}:${getClientIp(req)}`;
 }
 
-function getAdminAuthRedisKey(req: express.Request, now: number): string {
-  const windowBucket = Math.floor(now / ADMIN_AUTH_WINDOW_MS);
-  return `${ADMIN_AUTH_KEY_PREFIX}${getAdminAuthBucketKey(req)}:${windowBucket}`;
+function getAdminAuthRedisKey(req: express.Request): string {
+  return `${ADMIN_AUTH_KEY_PREFIX}${getAdminAuthBucketKey(req)}`;
 }
 
 function pruneAdminAuthBuckets(now: number): void {
@@ -55,8 +54,7 @@ async function applyAdminAuthRateLimit(
 
     if (isRedisEnabled()) {
       const redis = await getRedisClient();
-      const windowBucket = Math.floor(now / ADMIN_AUTH_WINDOW_MS);
-      const key = getAdminAuthRedisKey(req, now);
+      const key = getAdminAuthRedisKey(req);
       const count = await redis.incr(key);
 
       if (count === 1) {
@@ -64,9 +62,10 @@ async function applyAdminAuthRateLimit(
       }
 
       if (count > ADMIN_AUTH_MAX_ATTEMPTS) {
+        const ttlSeconds = await redis.ttl(key);
         const retryAfterSeconds = Math.max(
           1,
-          Math.ceil(((windowBucket + 1) * ADMIN_AUTH_WINDOW_MS - now) / 1000)
+          ttlSeconds > 0 ? ttlSeconds : Math.ceil(ADMIN_AUTH_WINDOW_MS / 1000)
         );
         res.setHeader("Retry-After", String(retryAfterSeconds));
         safeLog(eventName, { reason: "rate_limited" });

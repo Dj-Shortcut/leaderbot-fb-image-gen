@@ -15,6 +15,7 @@ export type RedisLike = {
   rpush(key: string, value: string): Promise<number>;
   incr(key: string): Promise<number>;
   expire(key: string, seconds: number): Promise<number>;
+  ttl(key: string): Promise<number>;
 };
 
 type RedisModule = {
