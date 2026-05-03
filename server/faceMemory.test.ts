@@ -36,6 +36,7 @@ describe("face memory deletion", () => {
 
   beforeEach(() => {
     process.env.PRIVACY_PEPPER = "ci-test-pepper";
+    delete process.env.FACE_MEMORY_RETENTION_DAYS;
     resetStateStore();
     storageDeleteMock.mockClear();
   });

@@ -1,5 +1,5 @@
 import type express from "express";
-import { ensureRedisReady, getRedisClient, isRedisEnabled, resetRedisClientForTests } from "./redis";
+import { ensureRedisReady, getRedisClient, isRedisEnabled } from "./redis";
 
 const DEFAULT_WINDOW_MS = 60_000;
 const DEFAULT_MAX_REQUESTS = 120;
@@ -153,10 +153,6 @@ function resetGlobalHttpRateLimiter(): void {
 
 export async function ensureHttpRateLimiterReady(): Promise<void> {
   await ensureRedisReady();
-}
-
-function resetHttpRateLimiterRedisClient(): void {
-  resetRedisClientForTests();
 }
 
 export { DEFAULT_MAX_REQUESTS, DEFAULT_WINDOW_MS, isRedisHttpRateLimitEnabled };

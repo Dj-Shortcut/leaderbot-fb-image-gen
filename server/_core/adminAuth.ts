@@ -63,7 +63,6 @@ async function applyAdminAuthRateLimit(
 ): Promise<void> {
   try {
     const now = Date.now();
-    const resetAt = now + ADMIN_AUTH_WINDOW_MS;
 
     if (isRedisEnabled()) {
       const redis = await getRedisClient();

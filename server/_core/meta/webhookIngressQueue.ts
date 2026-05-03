@@ -13,13 +13,24 @@ type QueuedWebhookDelivery = {
 
 let drainPromise: Promise<void> | null = null;
 
+function serializeError(error: unknown): { message: string; stack?: string } {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  return { message: String(error) };
+}
+
 function processWhatsAppWebhookPayloadSafely(payload: unknown): void {
   void import("../whatsappWebhook")
     .then(module => module.processWhatsAppWebhookPayload(payload))
     .catch(error => {
       safeLog("webhook_async_processing_failed", {
         channel: "whatsapp",
-        error: error instanceof Error ? error.message : String(error),
+        error: serializeError(error),
       });
     });
 }
@@ -30,7 +41,7 @@ function processFacebookWebhookPayloadSafely(payload: unknown): void {
     .catch(error => {
       safeLog("webhook_async_processing_failed", {
         channel: "facebook",
-        error: error instanceof Error ? error.message : String(error),
+        error: serializeError(error),
       });
     });
 }
@@ -88,13 +99,13 @@ export function scheduleWebhookIngressDrain(): void {
             );
           } catch (error) {
             safeLog("webhook_queued_delivery_failed", {
-              error: error instanceof Error ? error.message : String(error),
+              error: serializeError(error),
             });
           }
         }
       } catch (error) {
         safeLog("webhook_ingress_queue_drain_failed", {
-          error: error instanceof Error ? error.message : String(error),
+          error: serializeError(error),
         });
       } finally {
         drainPromise = null;
