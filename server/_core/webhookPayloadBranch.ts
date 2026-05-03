@@ -54,6 +54,7 @@ async function continueAfterFaceMemoryChoice(
     return;
   }
 
+  await setFlowState(input.psid, "AWAITING_STYLE");
   await ctx.sendPhotoReceivedPrompt(input.psid, input.lang, input.reqId);
 }
 

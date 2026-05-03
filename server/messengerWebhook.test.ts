@@ -132,6 +132,73 @@ function installImageIngressFetchMock() {
   return fetchMock;
 }
 
+async function sendMessengerQuickReply(
+  processPayload: typeof processFacebookWebhookPayloadBase,
+  psid: string,
+  mid: string,
+  payload: string
+): Promise<void> {
+  await processPayload({
+    entry: [
+      {
+        messaging: [
+          {
+            sender: { id: psid },
+            message: {
+              mid,
+              quick_reply: { payload },
+            },
+          },
+        ],
+      },
+    ],
+  });
+}
+
+async function sendMessengerPhoto(
+  processPayload: typeof processFacebookWebhookPayloadBase,
+  psid: string,
+  mid: string,
+  imageUrl: string
+): Promise<void> {
+  await processPayload({
+    entry: [
+      {
+        messaging: [
+          {
+            sender: { id: psid },
+            message: {
+              mid,
+              attachments: [
+                {
+                  type: "image",
+                  payload: { url: imageUrl },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  });
+}
+
+function clearMessengerSendMocks(): void {
+  sendImageMock.mockClear();
+  sendQuickRepliesMock.mockClear();
+  sendTextMock.mockClear();
+}
+
+function expectFaceMemoryConsentPrompt(psid: string): void {
+  expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+    psid,
+    expect.stringContaining("Mag ik je foto 30 dagen bewaren?"),
+    expect.arrayContaining([
+      expect.objectContaining({ payload: "CONSENT_FACE_YES" }),
+    ])
+  );
+}
+
 beforeAll(() => {
   process.env.PRIVACY_PEPPER = TEST_PEPPER;
 });
@@ -2293,21 +2360,12 @@ describe("disabled bot features stay out of the runtime flow", () => {
     process.env.ENABLE_FACE_MEMORY = "true";
     const psid = "gdpr-style-photo-user";
 
-    await processFacebookWebhookPayloadBase({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: psid },
-              message: {
-                mid: "mid-gdpr-style-photo-consent",
-                quick_reply: { payload: "GDPR_CONSENT_AGREE" },
-              },
-            },
-          ],
-        },
-      ],
-    });
+    await sendMessengerQuickReply(
+      processFacebookWebhookPayloadBase,
+      psid,
+      "mid-gdpr-style-photo-consent",
+      "GDPR_CONSENT_AGREE"
+    );
 
     await processFacebookWebhookPayloadBase({
       entry: [
@@ -2324,59 +2382,26 @@ describe("disabled bot features stay out of the runtime flow", () => {
 
     expect(getState(anonymizePsid(psid))?.preselectedStyle).toBe("cyberpunk");
 
-    sendImageMock.mockClear();
-    sendQuickRepliesMock.mockClear();
-    sendTextMock.mockClear();
+    clearMessengerSendMocks();
     installOpenAiSuccessFetchMock();
 
-    await processFacebookWebhookPayloadBase({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: psid },
-              message: {
-                mid: "mid-gdpr-style-photo-upload",
-                attachments: [
-                  {
-                    type: "image",
-                    payload: { url: "https://img.example/source.jpg" },
-                  },
-                ],
-              },
-            },
-          ],
-        },
-      ],
-    });
-
-    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+    await sendMessengerPhoto(
+      processFacebookWebhookPayloadBase,
       psid,
-      expect.stringContaining("Mag ik je foto 30 dagen bewaren?"),
-      expect.arrayContaining([
-        expect.objectContaining({ payload: "CONSENT_FACE_YES" }),
-      ])
+      "mid-gdpr-style-photo-upload",
+      "https://img.example/source.jpg"
     );
 
-    sendImageMock.mockClear();
-    sendQuickRepliesMock.mockClear();
-    sendTextMock.mockClear();
+    expectFaceMemoryConsentPrompt(psid);
 
-    await processFacebookWebhookPayloadBase({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: psid },
-              message: {
-                mid: "mid-gdpr-style-photo-memory-yes",
-                quick_reply: { payload: "CONSENT_FACE_YES" },
-              },
-            },
-          ],
-        },
-      ],
-    });
+    clearMessengerSendMocks();
+
+    await sendMessengerQuickReply(
+      processFacebookWebhookPayloadBase,
+      psid,
+      "mid-gdpr-style-photo-memory-yes",
+      "CONSENT_FACE_YES"
+    );
 
     expect(sendTextMock).toHaveBeenCalledWith(
       psid,
@@ -2403,58 +2428,25 @@ describe("disabled bot features stay out of the runtime flow", () => {
     await setPendingImage(psid, "https://img.example/old-source.jpg");
     await setPreselectedStyle(psid, "cyberpunk");
 
-    sendImageMock.mockClear();
-    sendQuickRepliesMock.mockClear();
-    sendTextMock.mockClear();
+    clearMessengerSendMocks();
 
-    await processFacebookWebhookPayload({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: psid },
-              message: {
-                mid: "mid-face-memory-stale-photo",
-                attachments: [
-                  {
-                    type: "image",
-                    payload: { url: "https://img.example/new-source.jpg" },
-                  },
-                ],
-              },
-            },
-          ],
-        },
-      ],
-    });
-
-    expect(sendQuickRepliesMock).toHaveBeenCalledWith(
+    await sendMessengerPhoto(
+      processFacebookWebhookPayload,
       psid,
-      expect.stringContaining("Mag ik je foto 30 dagen bewaren?"),
-      expect.arrayContaining([
-        expect.objectContaining({ payload: "CONSENT_FACE_YES" }),
-      ])
+      "mid-face-memory-stale-photo",
+      "https://img.example/new-source.jpg"
     );
 
-    sendImageMock.mockClear();
-    sendQuickRepliesMock.mockClear();
-    sendTextMock.mockClear();
+    expectFaceMemoryConsentPrompt(psid);
 
-    await processFacebookWebhookPayload({
-      entry: [
-        {
-          messaging: [
-            {
-              sender: { id: psid },
-              message: {
-                mid: "mid-face-memory-stale-yes",
-                quick_reply: { payload: "CONSENT_FACE_YES" },
-              },
-            },
-          ],
-        },
-      ],
-    });
+    clearMessengerSendMocks();
+
+    await sendMessengerQuickReply(
+      processFacebookWebhookPayload,
+      psid,
+      "mid-face-memory-stale-yes",
+      "CONSENT_FACE_YES"
+    );
 
     expect(sendImageMock).not.toHaveBeenCalled();
     expect(sendTextMock).not.toHaveBeenCalledWith(
@@ -2469,6 +2461,7 @@ describe("disabled bot features stay out of the runtime flow", () => {
       ])
     );
     expect(getState(anonymizePsid(psid))?.preselectedStyle).toBeNull();
+    expect(getState(anonymizePsid(psid))?.stage).toBe("AWAITING_STYLE");
   });
 
   it("does not auto-run a stale preselected style when a new photo replaces an older one", async () => {
