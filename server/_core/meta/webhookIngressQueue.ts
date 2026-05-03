@@ -1,3 +1,6 @@
+import { ensureRedisReady, getRedisClient, isRedisEnabled, resetRedisClientForTests } from "../redis";
+import { safeLog } from "../messengerApi";
+
 const WEBHOOK_INGRESS_QUEUE_KEY = "meta-webhook-ingress";
 
 type WebhookChannel = "facebook" | "whatsapp";
@@ -8,51 +11,26 @@ type QueuedWebhookDelivery = {
   receivedAt: string;
 };
 
-type RedisLike = {
-  ping(): Promise<string>;
-  lpop(key: string): Promise<string | null>;
-  rpush(key: string, value: string): Promise<number>;
-};
-
-type RedisModule = {
-  default: new (url: string, ...args: unknown[]) => RedisLike;
-};
-
-let redisClientPromise: Promise<RedisLike> | null = null;
 let drainPromise: Promise<void> | null = null;
 
-function getRedisUrl(): string | null {
-  return process.env.REDIS_URL?.trim() || null;
-}
-
-async function importRedisModule(): Promise<RedisModule> {
-  return (await import("ioredis")) as unknown as RedisModule;
-}
-
-async function createRedisClient(): Promise<RedisLike> {
-  const redisUrl = getRedisUrl();
-  if (!redisUrl) {
-    throw new Error("REDIS_URL is not configured");
+function serializeError(error: unknown): { message: string; stack?: string } {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      stack: error.stack,
+    };
   }
 
-  const { default: Redis } = await importRedisModule();
-  return new Redis(redisUrl);
-}
-
-async function getRedisClient(): Promise<RedisLike> {
-  if (!redisClientPromise) {
-    redisClientPromise = createRedisClient();
-  }
-
-  return redisClientPromise;
+  return { message: String(error) };
 }
 
 function processWhatsAppWebhookPayloadSafely(payload: unknown): void {
   void import("../whatsappWebhook")
     .then(module => module.processWhatsAppWebhookPayload(payload))
     .catch(error => {
-      console.error("[whatsapp webhook] async processing failed", {
-        error: error instanceof Error ? error.message : String(error),
+      safeLog("webhook_async_processing_failed", {
+        channel: "whatsapp",
+        error: serializeError(error),
       });
     });
 }
@@ -61,8 +39,9 @@ function processFacebookWebhookPayloadSafely(payload: unknown): void {
   void import("../messengerWebhook")
     .then(module => module.processFacebookWebhookPayload(payload))
     .catch(error => {
-      console.error("[messenger webhook] async processing failed", {
-        error: error instanceof Error ? error.message : String(error),
+      safeLog("webhook_async_processing_failed", {
+        channel: "facebook",
+        error: serializeError(error),
       });
     });
 }
@@ -77,16 +56,11 @@ function processQueuedWebhookDelivery(delivery: QueuedWebhookDelivery): void {
 }
 
 export function isWebhookIngressQueueEnabled(): boolean {
-  return Boolean(getRedisUrl());
+  return isRedisEnabled();
 }
 
 export async function ensureWebhookIngressQueueReady(): Promise<void> {
-  if (!isWebhookIngressQueueEnabled()) {
-    return;
-  }
-
-  const redis = await getRedisClient();
-  await redis.ping();
+  await ensureRedisReady();
 }
 
 export async function enqueueWebhookIngressDelivery(
@@ -124,14 +98,14 @@ export function scheduleWebhookIngressDrain(): void {
               JSON.parse(rawDelivery) as QueuedWebhookDelivery,
             );
           } catch (error) {
-            console.error("[meta webhook] failed to process queued delivery", {
-              error: error instanceof Error ? error.message : String(error),
+            safeLog("webhook_queued_delivery_failed", {
+              error: serializeError(error),
             });
           }
         }
       } catch (error) {
-        console.error("[meta webhook] ingress queue drain failed", {
-          error: error instanceof Error ? error.message : String(error),
+        safeLog("webhook_ingress_queue_drain_failed", {
+          error: serializeError(error),
         });
       } finally {
         drainPromise = null;
@@ -154,6 +128,6 @@ export function processWebhookDeliveryInline(
 }
 
 export function resetWebhookIngressQueueForTests(): void {
-  redisClientPromise = null;
+  resetRedisClientForTests();
   drainPromise = null;
 }

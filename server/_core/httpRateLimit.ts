@@ -1,4 +1,5 @@
 import type express from "express";
+import { ensureRedisReady, getRedisClient, isRedisEnabled } from "./redis";
 
 const DEFAULT_WINDOW_MS = 60_000;
 const DEFAULT_MAX_REQUESTS = 120;
@@ -10,18 +11,7 @@ type RateLimitBucket = {
   resetAt: number;
 };
 
-type RedisLike = {
-  ping(): Promise<string>;
-  incr(key: string): Promise<number>;
-  expire(key: string, seconds: number): Promise<number>;
-};
-
-type RedisModule = {
-  default: new (url: string, ...args: unknown[]) => RedisLike;
-};
-
 const buckets = new Map<string, RateLimitBucket>();
-let redisClientPromise: Promise<RedisLike> | null = null;
 
 function getWindowMs(): number {
   const parsed = Number(process.env.HTTP_RATE_LIMIT_WINDOW_MS);
@@ -41,34 +31,8 @@ function getMaxRequests(): number {
   return DEFAULT_MAX_REQUESTS;
 }
 
-function getRedisUrl(): string | null {
-  return process.env.REDIS_URL?.trim() || null;
-}
-
 function isRedisHttpRateLimitEnabled(): boolean {
-  return Boolean(getRedisUrl());
-}
-
-async function importRedisModule(): Promise<RedisModule> {
-  return (await import("ioredis")) as unknown as RedisModule;
-}
-
-async function createRedisClient(): Promise<RedisLike> {
-  const redisUrl = getRedisUrl();
-  if (!redisUrl) {
-    throw new Error("REDIS_URL is not configured");
-  }
-
-  const { default: Redis } = await importRedisModule();
-  return new Redis(redisUrl);
-}
-
-async function getRedisClient(): Promise<RedisLike> {
-  if (!redisClientPromise) {
-    redisClientPromise = createRedisClient();
-  }
-
-  return redisClientPromise;
+  return isRedisEnabled();
 }
 
 function getClientIp(req: express.Request): string {
@@ -188,16 +152,7 @@ function resetGlobalHttpRateLimiter(): void {
 }
 
 export async function ensureHttpRateLimiterReady(): Promise<void> {
-  if (!isRedisHttpRateLimitEnabled()) {
-    return;
-  }
-
-  const redis = await getRedisClient();
-  await redis.ping();
-}
-
-function resetHttpRateLimiterRedisClient(): void {
-  redisClientPromise = null;
+  await ensureRedisReady();
 }
 
 export { DEFAULT_MAX_REQUESTS, DEFAULT_WINDOW_MS, isRedisHttpRateLimitEnabled };

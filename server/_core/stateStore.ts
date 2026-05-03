@@ -1,24 +1,7 @@
+import { ensureRedisReady, getRedisClient, isRedisEnabled } from "./redis";
+import { getFaceMemoryStateTtlSeconds } from "./faceMemoryRetention";
+
 const STATE_TTL_SECONDS = 172800;
-const FACE_MEMORY_STATE_TTL_SECONDS = 32 * 24 * 60 * 60;
-
-type RedisLike = {
-  ping(): Promise<string>;
-  get(key: string): Promise<string | null>;
-  scan(
-    cursor: string,
-    ...args: Array<string | number>
-  ): Promise<[string, string[]]>;
-  set(
-    key: string,
-    value: string,
-    ...args: Array<string | number>
-  ): Promise<unknown>;
-  del(key: string): Promise<number>;
-};
-
-type RedisModule = {
-  default: new (url: string, ...args: unknown[]) => RedisLike;
-};
 
 export type MaybePromise<T> = T | Promise<T>;
 
@@ -26,36 +9,8 @@ const memoryState = new Map<string, string>();
 const memoryStateExpiresAt = new Map<string, number>();
 const memoryEphemeral = new Map<string, number>();
 
-let redisClientPromise: Promise<RedisLike> | null = null;
-
-function getRedisUrl(): string | null {
-  return process.env.REDIS_URL?.trim() || null;
-}
-
 function isPromiseLike<T>(value: MaybePromise<T>): value is Promise<T> {
   return typeof (value as Promise<T> | undefined)?.then === "function";
-}
-
-async function importRedisModule(): Promise<RedisModule> {
-  return (await import("ioredis")) as unknown as RedisModule;
-}
-
-async function createRedisClient(): Promise<RedisLike> {
-  const redisUrl = getRedisUrl();
-  if (!redisUrl) {
-    throw new Error("REDIS_URL is not configured");
-  }
-
-  const { default: Redis } = await importRedisModule();
-  return new Redis(redisUrl);
-}
-
-async function getRedisClient(): Promise<RedisLike> {
-  if (!redisClientPromise) {
-    redisClientPromise = createRedisClient();
-  }
-
-  return redisClientPromise;
 }
 
 function getStateKey(psid: string): string {
@@ -67,7 +22,7 @@ function getScopedStateKey(scope: string, key: string): string {
 }
 
 export function isRedisStateStoreEnabled(): boolean {
-  return Boolean(getRedisUrl());
+  return isRedisEnabled();
 }
 
 export function assertProductionStateStoreConfig(): void {
@@ -81,12 +36,7 @@ export function assertProductionStateStoreConfig(): void {
 }
 
 export async function ensureStateStoreReady(): Promise<void> {
-  if (!isRedisStateStoreEnabled()) {
-    return;
-  }
-
-  const redis = await getRedisClient();
-  await redis.ping();
+  await ensureRedisReady();
 }
 
 function readRawState<T>(storageKey: string): MaybePromise<T | null> {
@@ -181,7 +131,7 @@ export function writeState<T>(psid: string, value: T): MaybePromise<void> {
   );
   const ttlSeconds =
     hasActiveFaceMemory || hasPendingSourceDelete
-      ? FACE_MEMORY_STATE_TTL_SECONDS
+      ? getFaceMemoryStateTtlSeconds()
       : STATE_TTL_SECONDS;
   return writeRawState(getStateKey(psid), value, ttlSeconds);
 }

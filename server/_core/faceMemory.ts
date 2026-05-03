@@ -10,11 +10,11 @@ import {
 import { forEachStoredState } from "./stateStore";
 import { storageDelete, storageKeyFromPublicUrl } from "../storage";
 import { createAdminAuthRateLimiter, verifyAdminToken } from "./adminAuth";
+import { getFaceMemoryRetentionMs } from "./faceMemoryRetention";
 import { safeLog } from "./messengerApi";
 
 export const FACE_MEMORY_CONSENT_YES = "CONSENT_FACE_YES";
 export const FACE_MEMORY_CONSENT_NO = "CONSENT_FACE_NO";
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 export function isFaceMemoryEnabled(): boolean {
   return process.env.ENABLE_FACE_MEMORY === "true";
@@ -34,7 +34,7 @@ async function deleteStoredImageUrl(imageUrl: string | null | undefined): Promis
     await storageDelete(key);
     return true;
   } catch (error) {
-    console.warn("face_memory_storage_delete_failed", {
+    safeLog("face_memory_storage_delete_failed", {
       key,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -71,7 +71,7 @@ export async function expireFaceMemory(
   const finiteNow = Number.isFinite(now) ? now : Date.now();
   const expiredBefore = options.matchAll
     ? Number.POSITIVE_INFINITY
-    : finiteNow - THIRTY_DAYS_MS;
+    : finiteNow - getFaceMemoryRetentionMs();
   let deletedCount = 0;
 
   await forEachStoredState<Partial<MessengerUserState>>(async (psid, state) => {
@@ -152,7 +152,7 @@ export function registerFaceMemoryAdminRoutes(app: express.Express): void {
 export function scheduleFaceMemoryExpiry(): void {
   const run = () => {
     expireFaceMemory().catch(error => {
-      console.warn("face_memory_expiry_failed", {
+      safeLog("face_memory_expiry_failed", {
         error: error instanceof Error ? error.message : String(error),
       });
     });
