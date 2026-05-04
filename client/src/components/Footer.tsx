@@ -1,6 +1,6 @@
 export default function Footer() {
   return (
-    <footer className="border-t border-slate-800/70 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 py-3 text-center text-xs text-slate-400">
+    <footer className="border-t border-slate-800/50 bg-transparent py-3 text-center text-xs text-slate-400">
       <a
         href="https://leaderbot.live/privacy"
         target="_blank"

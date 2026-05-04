@@ -11,7 +11,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const Terms = lazy(() => import("./pages/Terms"));
 
 function RouteFallback() {
-  return <div className="min-h-full bg-background" />;
+  return <div className="min-h-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950" />;
 }
 
 function Router() {
@@ -33,9 +33,9 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
-          <div className="min-h-screen flex flex-col bg-background text-foreground">
+          <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-foreground">
             <Toaster />
-            <div className="grow">
+            <div className="grow bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
               <Router />
             </div>
             <Footer />
