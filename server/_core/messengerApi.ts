@@ -31,6 +31,23 @@ type MessengerSendOutcome =
   | { sent: true }
   | { sent: false; reason: "response_window_closed" };
 
+type SendMessageOptions = {
+  maxRetries?: number;
+  retryBaseMs?: number;
+  onRetry?: (attempt: number, maxAttempts: number, error: Error) => void;
+  onFinalFailure?: (
+    attempts: number,
+    maxAttempts: number,
+    error: Error
+  ) => void;
+};
+
+type ResolvedRetryOptions = {
+  maxRetries: number;
+  retryBaseMs: number;
+  maxAttempts: number;
+};
+
 function getPageToken(): string {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
 
@@ -80,15 +97,110 @@ async function delay(milliseconds: number): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, milliseconds));
 }
 
+function resolveRetryOptions(options?: SendMessageOptions): ResolvedRetryOptions {
+  const maxRetries =
+    options?.maxRetries ?? parsePositiveInt("GRAPH_API_MAX_RETRIES", 3);
+  const retryBaseMs =
+    options?.retryBaseMs ?? parsePositiveInt("GRAPH_API_RETRY_BASE_MS", 300);
+
+  return {
+    maxRetries,
+    retryBaseMs,
+    maxAttempts: maxRetries + 1,
+  };
+}
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+async function postMessengerMessage(
+  psid: string,
+  message: Record<string, unknown>
+): Promise<Response> {
+  return await fetch(getSendApiUrl(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_type: "RESPONSE",
+      recipient: { id: psid },
+      message,
+    }),
+  });
+}
+
+async function waitBeforeRetry(
+  attempt: number,
+  retryBaseMs: number,
+  response?: Response
+): Promise<void> {
+  const retryAfterMs = response ? getRetryAfterMs(response) : null;
+  const exponentialBackoffMs = retryBaseMs * 2 ** attempt;
+  await delay(retryAfterMs ?? exponentialBackoffMs);
+}
+
+async function handleNetworkFailure(input: {
+  error: unknown;
+  attempt: number;
+  retry: ResolvedRetryOptions;
+  options?: SendMessageOptions;
+}): Promise<boolean> {
+  const retryError = toError(input.error);
+  const canRetry =
+    input.attempt < input.retry.maxRetries && isTransientNetworkError(input.error);
+
+  if (!canRetry) {
+    input.options?.onFinalFailure?.(
+      input.attempt + 1,
+      input.retry.maxAttempts,
+      retryError
+    );
+    throw input.error;
+  }
+
+  input.options?.onRetry?.(
+    input.attempt + 1,
+    input.retry.maxAttempts,
+    retryError
+  );
+  await waitBeforeRetry(input.attempt, input.retry.retryBaseMs);
+  return true;
+}
+
+async function handleErrorResponse(input: {
+  response: Response;
+  attempt: number;
+  retry: ResolvedRetryOptions;
+  options?: SendMessageOptions;
+}): Promise<void> {
+  const body = await input.response.text();
+  const error = new Error(`Messenger API error ${input.response.status}: ${body}`);
+  const canRetry =
+    input.attempt < input.retry.maxRetries && shouldRetry(input.response.status);
+
+  if (!canRetry) {
+    input.options?.onFinalFailure?.(
+      input.attempt + 1,
+      input.retry.maxAttempts,
+      error
+    );
+    throw error;
+  }
+
+  input.options?.onRetry?.(
+    input.attempt + 1,
+    input.retry.maxAttempts,
+    error
+  );
+  await waitBeforeRetry(input.attempt, input.retry.retryBaseMs, input.response);
+}
+
 async function sendMessage(
   psid: string,
   message: Record<string, unknown>,
-  options?: {
-    maxRetries?: number;
-    retryBaseMs?: number;
-    onRetry?: (attempt: number, maxAttempts: number, error: Error) => void;
-    onFinalFailure?: (attempts: number, error: Error) => void;
-  }
+  options?: SendMessageOptions
 ): Promise<MessengerSendOutcome> {
   const withinResponseWindow = await Promise.resolve(hasOpenMessengerResponseWindow(psid));
   if (!withinResponseWindow) {
@@ -96,37 +208,14 @@ async function sendMessage(
     return { sent: false, reason: "response_window_closed" };
   }
 
-  const maxRetries =
-    options?.maxRetries ?? parsePositiveInt("GRAPH_API_MAX_RETRIES", 3);
-  const retryBaseMs =
-    options?.retryBaseMs ?? parsePositiveInt("GRAPH_API_RETRY_BASE_MS", 300);
+  const retry = resolveRetryOptions(options);
 
-  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+  for (let attempt = 0; attempt <= retry.maxRetries; attempt += 1) {
     let response: Response;
     try {
-      response = await fetch(getSendApiUrl(), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messaging_type: "RESPONSE",
-          recipient: { id: psid },
-          message,
-        }),
-      });
+      response = await postMessengerMessage(psid, message);
     } catch (error) {
-      const canRetry = attempt < maxRetries && isTransientNetworkError(error);
-      if (!canRetry) {
-        const finalError = error instanceof Error ? error : new Error(String(error));
-        options?.onFinalFailure?.(maxRetries + 1, finalError);
-        throw error;
-      }
-
-      const retryError = error instanceof Error ? error : new Error(String(error));
-      options?.onRetry?.(attempt + 1, maxRetries + 1, retryError);
-      const waitMs = retryBaseMs * 2 ** attempt;
-      await delay(waitMs);
+      await handleNetworkFailure({ error, attempt, retry, options });
       continue;
     }
 
@@ -134,19 +223,7 @@ async function sendMessage(
       return { sent: true };
     }
 
-    const body = await response.text();
-    const canRetry = attempt < maxRetries && shouldRetry(response.status);
-    const error = new Error(`Messenger API error ${response.status}: ${body}`);
-    if (!canRetry) {
-      options?.onFinalFailure?.(maxRetries + 1, error);
-      throw error;
-    }
-
-    options?.onRetry?.(attempt + 1, maxRetries + 1, error);
-    const retryAfterMs = getRetryAfterMs(response);
-    const exponentialBackoffMs = retryBaseMs * 2 ** attempt;
-    const waitMs = retryAfterMs ?? exponentialBackoffMs;
-    await delay(waitMs);
+    await handleErrorResponse({ response, attempt, retry, options });
   }
 
   throw new Error("Messenger API error: retry loop exited unexpectedly");
@@ -278,7 +355,7 @@ export async function sendImage(
           })
         );
       },
-      onFinalFailure: (attempts, error) => {
+      onFinalFailure: (attempts, _maxAttempts, error) => {
         console.error(
           JSON.stringify({
             level: "error",

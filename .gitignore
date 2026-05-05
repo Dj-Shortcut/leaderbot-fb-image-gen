@@ -106,6 +106,8 @@ temp/
 .playwright-cli/
 .fallow/
 .worktrees/
+.agents/
+skills-lock.json
 
 # Database
 *.db

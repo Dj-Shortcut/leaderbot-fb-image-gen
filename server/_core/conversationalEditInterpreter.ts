@@ -58,49 +58,58 @@ async function sleep(ms: number): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function extractResponseText(raw: unknown): string | null {
-  if (!raw || typeof raw !== "object") {
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function trimmedText(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function textProperty(value: unknown, key: string): string | null {
+  return trimmedText(objectValue(value)?.[key]);
+}
+
+function extractContentText(item: unknown): string | null {
+  const content = objectValue(item)?.content;
+  if (!Array.isArray(content)) {
     return null;
   }
 
-  const outputText = (raw as { output_text?: unknown }).output_text;
-  if (typeof outputText === "string" && outputText.trim()) {
-    return outputText.trim();
+  for (const part of content) {
+    const text = textProperty(part, "text");
+    if (text) {
+      return text;
+    }
   }
 
-  const output = (raw as { output?: unknown }).output;
+  return null;
+}
+
+function extractOutputItemText(item: unknown): string | null {
+  return textProperty(item, "text") ?? extractContentText(item);
+}
+
+function extractOutputText(raw: unknown): string | null {
+  const output = objectValue(raw)?.output;
   if (!Array.isArray(output)) {
     return null;
   }
 
   for (const item of output) {
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-
-    const directText = (item as { text?: unknown }).text;
-    if (typeof directText === "string" && directText.trim()) {
-      return directText.trim();
-    }
-
-    const content = (item as { content?: unknown }).content;
-    if (!Array.isArray(content)) {
-      continue;
-    }
-
-    for (const part of content) {
-      if (!part || typeof part !== "object") {
-        continue;
-      }
-
-      const partText = (part as { text?: unknown }).text;
-      if (typeof partText === "string" && partText.trim()) {
-        return partText.trim();
-      }
+    const text = extractOutputItemText(item);
+    if (text) {
+      return text;
     }
   }
 
   return null;
+}
+
+function extractResponseText(raw: unknown): string | null {
+  return textProperty(raw, "output_text") ?? extractOutputText(raw);
 }
 
 async function callResponsesApi(
