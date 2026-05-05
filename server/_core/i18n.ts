@@ -43,6 +43,7 @@ type TranslationKey =
   | "generationTimeout"
   | "generationBudgetReached"
   | "generationGenericFailure"
+  | "errorFallback"
   | "unsupportedMedia";
 
 type TranslationValue = string | ((params: TranslationParams) => string);
@@ -102,6 +103,7 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
     generationBudgetReached:
       "⚠️ Even pauze — ons maandbudget is bereikt. Probeer later opnieuw.",
     generationGenericFailure: "I couldn’t generate that image right now.",
+    errorFallback: "Er liep iets mis aan mijn kant. Probeer gerust opnieuw.",
     unsupportedMedia:
       "Ik werk voorlopig alleen met foto's. Stuur een foto in plaats van een video of ander bestand.",
   },
@@ -159,6 +161,7 @@ const translations: Record<Lang, Record<TranslationKey, TranslationValue>> = {
     generationBudgetReached:
       "⚠️ Quick pause — our monthly budget has been reached. Please try again later.",
     generationGenericFailure: "I couldn’t generate that image right now.",
+    errorFallback: "Something went wrong on my side. Please try again.",
     unsupportedMedia:
       "I currently only work with photos. Please send a photo instead of a video or other file.",
   },

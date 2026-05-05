@@ -116,18 +116,17 @@ async function processSingleWhatsAppEvent(
 async function safelyProcessSingleWhatsAppEvent(
   event: NormalizedWhatsAppEvent
 ): Promise<void> {
+  const lang = DEFAULT_LANG;
   try {
     await processSingleWhatsAppEvent(event);
   } catch (error) {
     console.error("[whatsapp webhook] reply failed", {
-      to: event.senderId,
+      user: toLogUser(event.userId),
       error: error instanceof Error ? error.message : String(error),
     });
     await sendWhatsAppTextReply(
       event.senderId,
-      DEFAULT_LANG === "en"
-        ? "Something went wrong on my side. Please try again."
-        : "Er liep iets mis aan mijn kant. Probeer gerust opnieuw."
+      t(lang, "errorFallback")
     ).catch(() => undefined);
   }
 }
