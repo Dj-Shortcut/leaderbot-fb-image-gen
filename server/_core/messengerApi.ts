@@ -35,7 +35,11 @@ type SendMessageOptions = {
   maxRetries?: number;
   retryBaseMs?: number;
   onRetry?: (attempt: number, maxAttempts: number, error: Error) => void;
-  onFinalFailure?: (attempts: number, error: Error) => void;
+  onFinalFailure?: (
+    attempts: number,
+    maxAttempts: number,
+    error: Error
+  ) => void;
 };
 
 type ResolvedRetryOptions = {
@@ -148,7 +152,11 @@ async function handleNetworkFailure(input: {
     input.attempt < input.retry.maxRetries && isTransientNetworkError(input.error);
 
   if (!canRetry) {
-    input.options?.onFinalFailure?.(input.retry.maxAttempts, retryError);
+    input.options?.onFinalFailure?.(
+      input.attempt + 1,
+      input.retry.maxAttempts,
+      retryError
+    );
     throw input.error;
   }
 
@@ -173,7 +181,11 @@ async function handleErrorResponse(input: {
     input.attempt < input.retry.maxRetries && shouldRetry(input.response.status);
 
   if (!canRetry) {
-    input.options?.onFinalFailure?.(input.retry.maxAttempts, error);
+    input.options?.onFinalFailure?.(
+      input.attempt + 1,
+      input.retry.maxAttempts,
+      error
+    );
     throw error;
   }
 
@@ -343,7 +355,7 @@ export async function sendImage(
           })
         );
       },
-      onFinalFailure: (attempts, error) => {
+      onFinalFailure: (attempts, _maxAttempts, error) => {
         console.error(
           JSON.stringify({
             level: "error",

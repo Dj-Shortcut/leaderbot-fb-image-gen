@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto";
 import { normalizeLang, t } from "./i18n";
 import { getOrCreateState, setLastUserMessageAt } from "./messengerState";
 import { toLogUser } from "./privacy";
@@ -18,9 +19,17 @@ function normalizeWhatsAppEvents(payload: unknown): NormalizedWhatsAppEvent[] {
   );
 }
 
+function createNonReversibleReqId(event: NormalizedWhatsAppEvent): string {
+  const senderHash = createHash("sha256")
+    .update(event.senderId)
+    .digest("hex")
+    .slice(0, 12);
+  return `${senderHash}-${Date.now()}-${randomUUID()}`;
+}
+
 function createWhatsAppEventContext(event: NormalizedWhatsAppEvent) {
   return {
-    reqId: `${event.senderId}-${Date.now()}`,
+    reqId: createNonReversibleReqId(event),
     lang: DEFAULT_LANG,
   };
 }

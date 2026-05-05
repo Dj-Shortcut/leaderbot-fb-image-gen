@@ -119,17 +119,8 @@ async function sendBotResponse(
 
 export async function sendMessengerBotResponse(
   response: BotResponse | null,
-  options: {
-    replyState?: ConversationState;
-    sendText: (text: string) => Promise<void>;
+  options: BotResponseSendOptions & {
     sendStateText: (state: ConversationState, text: string) => Promise<void>;
-    sendOptionsPrompt?: (
-      prompt: string,
-      options: Array<{ id: string; title: string }>,
-      fallbackText?: string
-    ) => Promise<void>;
-    sendImage?: (imageUrl: string, caption?: string) => Promise<void>;
-    sendResultCard?: (card: Extract<BotResponse, { kind: "result_card" }>) => Promise<void>;
   }
 ): Promise<void> {
   await sendBotResponse(response, options);
@@ -137,18 +128,7 @@ export async function sendMessengerBotResponse(
 
 export async function sendWhatsAppBotResponse(
   response: BotResponse | null,
-  options: {
-    sendText: (text: string) => Promise<void>;
-    replyState?: ConversationState;
-    sendStateText?: (state: ConversationState, text: string) => Promise<void>;
-    sendOptionsPrompt?: (
-      prompt: string,
-      options: Array<{ id: string; title: string }>,
-      fallbackText?: string
-    ) => Promise<void>;
-    sendImage?: (imageUrl: string, caption?: string) => Promise<void>;
-    sendResultCard?: (card: Extract<BotResponse, { kind: "result_card" }>) => Promise<void>;
-  }
+  options: BotResponseSendOptions
 ): Promise<void> {
   await sendBotResponse(response, options);
 }
