@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { executeGenerationFlow } from "../generationFlow";
 import { getGenerationMetrics } from "../image-generation/openAiImageClient";
 import { t, type Lang } from "../i18n";
+import type { SourceImageOrigin } from "../messengerState";
 import type { Style } from "../messengerStyles";
 import { canGenerate, increment } from "../messengerQuota";
 import {
@@ -18,6 +19,19 @@ import {
   sendWhatsAppTextReply,
 } from "../whatsappResponseService";
 
+type StyleGenerationInput = {
+  senderId: string;
+  userId: string;
+  style: Style;
+  reqId: string;
+  lang: Lang;
+  sourceImageUrl?: string;
+  promptHint?: string;
+};
+
+type GenerationResult = Awaited<ReturnType<typeof executeGenerationFlow>>;
+type GenerationFailure = Extract<GenerationResult, { kind: "error" }>;
+
 function summarizeSensitiveUrl(url: string): { host: string; shortHash: string } {
   const shortHash = createHash("sha256").update(url).digest("hex").slice(0, 12);
   try {
@@ -27,55 +41,213 @@ function summarizeSensitiveUrl(url: string): { host: string; shortHash: string }
   }
 }
 
-export async function runWhatsAppStyleGeneration(input: {
-  senderId: string;
-  userId: string;
-  style: Style;
-  reqId: string;
-  lang: Lang;
-  sourceImageUrl?: string;
-  promptHint?: string;
-}): Promise<void> {
-  const { senderId, userId, style, reqId, lang, sourceImageUrl, promptHint } = input;
-  const allowed = await canGenerate(senderId);
-  if (!allowed) {
-    await sendWhatsAppTextReply(
-      senderId,
-      lang === "en"
-        ? "You used your free credits for today. Come back tomorrow."
-        : "Je hebt je gratis credits voor vandaag opgebruikt. Kom morgen terug."
-    );
-    await setFlowState(senderId, "AWAITING_STYLE");
-    return;
+function resolvedSourceHost(url?: string): string | undefined {
+  if (!url) {
+    return undefined;
   }
 
-  const state = await Promise.resolve(getOrCreateState(senderId));
-  const resolvedSourceImageUrl = sourceImageUrl ?? state.lastPhotoUrl ?? undefined;
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return undefined;
+  }
+}
+
+function logGenerationRequested(input: {
+  userId: string;
+  style: Style;
+  promptHint?: string;
+  resolvedSourceImageUrl?: string;
+  trustedSourceImageUrl: boolean;
+}): void {
   console.info("[whatsapp webhook] generation requested", {
-    user: userId,
-    style,
-    hasPromptHint: Boolean(promptHint?.trim()),
-    sourceImageUrlHost: resolvedSourceImageUrl
-      ? (() => {
-          try {
-            return new URL(resolvedSourceImageUrl).hostname.toLowerCase();
-          } catch {
-            return undefined;
-          }
-        })()
-      : undefined,
+    user: input.userId,
+    style: input.style,
+    hasPromptHint: Boolean(input.promptHint?.trim()),
+    sourceImageUrlHost: resolvedSourceHost(input.resolvedSourceImageUrl),
+    trustedSourceImageUrl: input.trustedSourceImageUrl,
+  });
+}
+
+async function sendQuotaExceededReply(
+  senderId: string,
+  lang: Lang
+): Promise<void> {
+  await sendWhatsAppTextReply(
+    senderId,
+    lang === "en"
+      ? "You used your free credits for today. Come back tomorrow."
+      : "Je hebt je gratis credits voor vandaag opgebruikt. Kom morgen terug."
+  );
+  await setFlowState(senderId, "AWAITING_STYLE");
+}
+
+async function prepareGeneration(input: StyleGenerationInput): Promise<{
+  lastPhotoUrl?: string | null;
+  lastPhotoSource?: SourceImageOrigin | null;
+}> {
+  const state = await Promise.resolve(getOrCreateState(input.senderId));
+  const resolvedSourceImageUrl = input.sourceImageUrl ?? state.lastPhotoUrl ?? undefined;
+
+  logGenerationRequested({
+    userId: input.userId,
+    style: input.style,
+    promptHint: input.promptHint,
+    resolvedSourceImageUrl,
     trustedSourceImageUrl:
       resolvedSourceImageUrl !== undefined &&
       resolvedSourceImageUrl === state.lastPhotoUrl &&
       state.lastPhotoSource === "stored",
   });
 
-  await setChosenStyle(senderId, style);
-  await setFlowState(senderId, "PROCESSING");
+  await setChosenStyle(input.senderId, input.style);
+  await setFlowState(input.senderId, "PROCESSING");
   await sendWhatsAppTextReply(
-    senderId,
-    t(lang, "generatingPrompt", { styleLabel: STYLE_LABELS[style] })
+    input.senderId,
+    t(input.lang, "generatingPrompt", { styleLabel: STYLE_LABELS[input.style] })
   );
+
+  return {
+    lastPhotoUrl: state.lastPhotoUrl,
+    lastPhotoSource: state.lastPhotoSource,
+  };
+}
+
+async function handleGenerationSuccess(input: {
+  senderId: string;
+  lang: Lang;
+  style: Style;
+  promptHint?: string;
+  imageUrl: string;
+}): Promise<void> {
+  await sendWhatsAppImageReply(input.senderId, input.imageUrl);
+  await increment(input.senderId);
+  await setLastGenerated(input.senderId, input.imageUrl);
+  await setLastGenerationContext(input.senderId, {
+    style: input.style,
+    prompt: input.promptHint,
+  });
+  await setFlowState(input.senderId, "RESULT_READY");
+  await sendWhatsAppTextReply(
+    input.senderId,
+    `${t(input.lang, "success")}\n${
+      input.lang === "en"
+        ? "Reply with 'new style' if you want another version."
+        : "Antwoord met 'nieuwe stijl' als je nog een versie wilt."
+    }`
+  );
+}
+
+function logGenerationFailure(input: {
+  userId: string;
+  style: Style;
+  result: GenerationFailure;
+}): void {
+  const metrics = input.result.metrics ?? getGenerationMetrics(input.result.error);
+  console.error("[whatsapp webhook] generation failed", {
+    user: input.userId,
+    style: input.style,
+    totalMs: metrics?.totalMs,
+    error:
+      input.result.error instanceof Error
+        ? input.result.error.message
+        : String(input.result.error),
+  });
+}
+
+function logRejectedSourceImage(input: {
+  userId: string;
+  style: Style;
+  result: GenerationFailure;
+}): void {
+  if (
+    input.result.errorKind !== "invalid_source_image" ||
+    !input.result.resolvedSourceImageUrl
+  ) {
+    return;
+  }
+
+  console.error("[whatsapp webhook] source image rejected", {
+    user: input.userId,
+    style: input.style,
+    sourceImageUrl: summarizeSensitiveUrl(input.result.resolvedSourceImageUrl),
+  });
+}
+
+async function resolveGenerationFailure(input: {
+  senderId: string;
+  userId: string;
+  style: Style;
+  lang: Lang;
+  sourceImageUrl?: string;
+  lastPhotoUrl?: string | null;
+  result: GenerationFailure;
+}): Promise<string> {
+  if (input.result.errorKind === "missing_source_image") {
+    await setFlowState(input.senderId, "AWAITING_PHOTO");
+    return t(input.lang, "styleWithoutPhoto");
+  }
+
+  if (
+    input.result.errorKind === "invalid_source_image" ||
+    input.result.errorKind === "missing_input_image"
+  ) {
+    if (
+      input.result.errorKind === "invalid_source_image" &&
+      (!input.sourceImageUrl ||
+        input.result.resolvedSourceImageUrl === input.lastPhotoUrl)
+    ) {
+      await clearPendingImageState(input.senderId);
+    }
+    await setFlowState(input.senderId, "AWAITING_PHOTO");
+    logRejectedSourceImage(input);
+    return t(input.lang, "missingInputImage");
+  }
+
+  if (input.result.errorKind === "generation_unavailable") {
+    await setFlowState(input.senderId, "AWAITING_STYLE");
+    return t(input.lang, "generationUnavailable");
+  }
+
+  if (input.result.errorKind === "generation_timeout") {
+    await setFlowState(input.senderId, "AWAITING_STYLE");
+    return t(input.lang, "generationTimeout");
+  }
+
+  if (input.result.errorKind === "generation_budget_reached") {
+    await setFlowState(input.senderId, "AWAITING_STYLE");
+    return t(input.lang, "generationBudgetReached");
+  }
+
+  await setFlowState(input.senderId, "FAILURE");
+  return t(input.lang, "generationGenericFailure");
+}
+
+async function handleGenerationFailure(input: {
+  senderId: string;
+  userId: string;
+  style: Style;
+  lang: Lang;
+  sourceImageUrl?: string;
+  lastPhotoUrl?: string | null;
+  result: GenerationFailure;
+}): Promise<void> {
+  logGenerationFailure(input);
+  const failureText = await resolveGenerationFailure(input);
+  await sendWhatsAppTextReply(input.senderId, failureText);
+}
+
+export async function runWhatsAppStyleGeneration(
+  input: StyleGenerationInput
+): Promise<void> {
+  const { senderId, userId, style, reqId, lang, sourceImageUrl, promptHint } = input;
+  const allowed = await canGenerate(senderId);
+  if (!allowed) {
+    await sendQuotaExceededReply(senderId, lang);
+    return;
+  }
+
+  const generationContext = await prepareGeneration(input);
 
   const result = await executeGenerationFlow({
     style,
@@ -83,70 +255,28 @@ export async function runWhatsAppStyleGeneration(input: {
     reqId,
     promptHint,
     sourceImageUrl,
-    lastPhotoUrl: state.lastPhotoUrl,
-    lastPhotoSource: state.lastPhotoSource,
+    lastPhotoUrl: generationContext.lastPhotoUrl,
+    lastPhotoSource: generationContext.lastPhotoSource,
   });
 
   if (result.kind === "success") {
-    await sendWhatsAppImageReply(senderId, result.imageUrl);
-    await increment(senderId);
-    await setLastGenerated(senderId, result.imageUrl);
-    await setLastGenerationContext(senderId, { style, prompt: promptHint });
-    await setFlowState(senderId, "RESULT_READY");
-    await sendWhatsAppTextReply(
+    await handleGenerationSuccess({
       senderId,
-      `${t(lang, "success")}\n${
-        lang === "en"
-          ? "Reply with 'new style' if you want another version."
-          : "Antwoord met 'nieuwe stijl' als je nog een versie wilt."
-      }`
-    );
+      lang,
+      style,
+      promptHint,
+      imageUrl: result.imageUrl,
+    });
     return;
   }
 
-  const metrics = result.metrics ?? getGenerationMetrics(result.error);
-  console.error("[whatsapp webhook] generation failed", {
-    user: userId,
+  await handleGenerationFailure({
+    senderId,
+    userId,
     style,
-    totalMs: metrics?.totalMs,
-    error: result.error instanceof Error ? result.error.message : String(result.error),
+    lang,
+    sourceImageUrl,
+    lastPhotoUrl: generationContext.lastPhotoUrl,
+    result,
   });
-
-  let failureText = t(lang, "generationGenericFailure");
-  if (result.errorKind === "missing_source_image") {
-    failureText = t(lang, "styleWithoutPhoto");
-    await setFlowState(senderId, "AWAITING_PHOTO");
-  } else if (
-    result.errorKind === "invalid_source_image" ||
-    result.errorKind === "missing_input_image"
-  ) {
-    failureText = t(lang, "missingInputImage");
-    if (
-      result.errorKind === "invalid_source_image" &&
-      (!sourceImageUrl || result.resolvedSourceImageUrl === state.lastPhotoUrl)
-    ) {
-      await clearPendingImageState(senderId);
-    }
-    await setFlowState(senderId, "AWAITING_PHOTO");
-    if (result.errorKind === "invalid_source_image" && result.resolvedSourceImageUrl) {
-      console.error("[whatsapp webhook] source image rejected", {
-        user: userId,
-        style,
-        sourceImageUrl: summarizeSensitiveUrl(result.resolvedSourceImageUrl),
-      });
-    }
-  } else if (result.errorKind === "generation_unavailable") {
-    failureText = t(lang, "generationUnavailable");
-    await setFlowState(senderId, "AWAITING_STYLE");
-  } else if (result.errorKind === "generation_timeout") {
-    failureText = t(lang, "generationTimeout");
-    await setFlowState(senderId, "AWAITING_STYLE");
-  } else if (result.errorKind === "generation_budget_reached") {
-    failureText = t(lang, "generationBudgetReached");
-    await setFlowState(senderId, "AWAITING_STYLE");
-  } else {
-    await setFlowState(senderId, "FAILURE");
-  }
-
-  await sendWhatsAppTextReply(senderId, failureText);
 }

@@ -31,135 +31,120 @@ export function logWhatsAppWebhookPayload(payload: unknown): void {
   console.log("[whatsapp webhook] inbound payload summary", summary);
 }
 
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function arrayProperty(value: unknown, key: string): unknown[] {
+  const object = objectValue(value);
+  return Array.isArray(object?.[key]) ? (object[key] as unknown[]) : [];
+}
+
+function stringProperty(value: unknown, key: string): string | null {
+  const object = objectValue(value);
+  const property = object?.[key];
+  return typeof property === "string" ? property : null;
+}
+
+function getNestedObject(
+  value: unknown,
+  key: string
+): Record<string, unknown> | null {
+  return objectValue(objectValue(value)?.[key]);
+}
+
+function firstString(...values: Array<string | null>): string | null {
+  return values.find((value): value is string => value !== null) ?? null;
+}
+
+function readInteractiveReply(message: unknown): {
+  id: string | null;
+  title: string | null;
+} {
+  const interactive = getNestedObject(message, "interactive");
+  const buttonReply = objectValue(interactive?.button_reply);
+  const listReply = objectValue(interactive?.list_reply);
+
+  return {
+    id: firstString(
+      stringProperty(buttonReply, "id"),
+      stringProperty(listReply, "id")
+    ),
+    title: firstString(
+      stringProperty(buttonReply, "title"),
+      stringProperty(listReply, "title")
+    ),
+  };
+}
+
+function readMessageTimestamp(message: unknown): number | undefined {
+  const rawTimestamp = stringProperty(message, "timestamp");
+  const timestamp = rawTimestamp ? Number(rawTimestamp) : null;
+  return Number.isFinite(timestamp) ? timestamp! * 1000 : undefined;
+}
+
+function normalizeMessageType(rawType: string): "text" | "image" | "unknown" {
+  if (rawType === "text" || rawType === "interactive") {
+    return "text";
+  }
+
+  return rawType === "image" ? "image" : "unknown";
+}
+
+function buildWhatsAppEvent(message: unknown): NormalizedInboundMessage | null {
+  const from = stringProperty(message, "from") ?? "";
+  if (!from) {
+    return null;
+  }
+
+  const rawMessageType = stringProperty(message, "type") ?? "unknown";
+  const textBody = stringProperty(getNestedObject(message, "text"), "body");
+  const interactiveReply = readInteractiveReply(message);
+  const imageId = stringProperty(getNestedObject(message, "image"), "id");
+
+  return {
+    channel: "whatsapp",
+    senderId: from,
+    userId: toUserKey(from),
+    channelCapabilities: {
+      quickReplies: false,
+      richTemplates: false,
+    },
+    rawMessageType,
+    messageType: normalizeMessageType(rawMessageType),
+    textBody:
+      interactiveReply.id ?? interactiveReply.title ?? textBody ?? undefined,
+    imageId: imageId ?? undefined,
+    timestamp: readMessageTimestamp(message),
+    ...(interactiveReply.id || interactiveReply.title
+      ? {
+          rawEventMeta: {
+            interactiveReplyId: interactiveReply.id ?? undefined,
+            interactiveReplyTitle: interactiveReply.title ?? undefined,
+          },
+        }
+      : {}),
+  };
+}
+
+function extractMessagesFromChange(change: unknown): NormalizedInboundMessage[] {
+  return arrayProperty(objectValue(change)?.value, "messages")
+    .map(buildWhatsAppEvent)
+    .filter((event): event is NormalizedInboundMessage => event !== null);
+}
+
+function extractMessagesFromEntry(entry: unknown): NormalizedInboundMessage[] {
+  return arrayProperty(entry, "changes").flatMap(extractMessagesFromChange);
+}
+
 export function extractWhatsAppEvents(
   payload: unknown
 ): NormalizedInboundMessage[] {
-  if (typeof payload !== "object" || payload === null) {
+  if (!objectValue(payload)) {
     return [];
   }
 
-  const entries = Array.isArray((payload as { entry?: unknown[] }).entry)
-    ? (payload as { entry: unknown[] }).entry
-    : [];
-
-  return entries.flatMap(entry => {
-    const changes = Array.isArray(
-      (entry as { changes?: unknown[] } | null)?.changes
-    )
-      ? ((entry as { changes: unknown[] }).changes ?? [])
-      : [];
-
-    return changes.flatMap(change => {
-      const value =
-        typeof change === "object" && change !== null
-          ? ((change as { value?: unknown }).value ?? null)
-          : null;
-      const messages = Array.isArray(
-        (value as { messages?: unknown[] } | null)?.messages
-      )
-        ? ((value as { messages: unknown[] }).messages ?? [])
-        : [];
-
-      return messages.flatMap(message => {
-        if (typeof message !== "object" || message === null) {
-          return [];
-        }
-
-        const from =
-          typeof (message as { from?: unknown }).from === "string"
-            ? (message as { from: string }).from
-            : "";
-        const messageType =
-          typeof (message as { type?: unknown }).type === "string"
-            ? (message as { type: string }).type
-            : "unknown";
-        const textBody =
-          typeof (message as { text?: { body?: unknown } }).text?.body ===
-          "string"
-            ? (message as { text: { body: string } }).text.body
-            : null;
-        const interactiveReplyId =
-          typeof (message as {
-            interactive?: {
-              button_reply?: { id?: unknown };
-              list_reply?: { id?: unknown };
-            };
-          }).interactive?.button_reply?.id === "string"
-            ? (message as {
-                interactive: { button_reply: { id: string } };
-              }).interactive.button_reply.id
-            : typeof (message as {
-                  interactive?: { list_reply?: { id?: unknown } };
-                }).interactive?.list_reply?.id === "string"
-              ? (message as {
-                  interactive: { list_reply: { id: string } };
-                }).interactive.list_reply.id
-              : null;
-        const interactiveReplyTitle =
-          typeof (message as {
-            interactive?: {
-              button_reply?: { title?: unknown };
-              list_reply?: { title?: unknown };
-            };
-          }).interactive?.button_reply?.title === "string"
-            ? (message as {
-                interactive: { button_reply: { title: string } };
-              }).interactive.button_reply.title
-            : typeof (message as {
-                  interactive?: { list_reply?: { title?: unknown } };
-                }).interactive?.list_reply?.title === "string"
-              ? (message as {
-                  interactive: { list_reply: { title: string } };
-                }).interactive.list_reply.title
-              : null;
-        const imageId =
-          typeof (message as { image?: { id?: unknown } }).image?.id ===
-          "string"
-            ? (message as { image: { id: string } }).image.id
-            : null;
-        const timestampRaw =
-          typeof (message as { timestamp?: unknown }).timestamp === "string"
-            ? Number((message as { timestamp: string }).timestamp)
-            : null;
-
-        if (!from) {
-          return [];
-        }
-
-        return [
-          {
-            channel: "whatsapp",
-            senderId: from,
-            userId: toUserKey(from),
-            channelCapabilities: {
-              quickReplies: false,
-              richTemplates: false,
-            },
-            rawMessageType: messageType,
-            messageType:
-              messageType === "text" || messageType === "interactive"
-                ? "text"
-                : messageType === "image"
-                  ? "image"
-                  : "unknown",
-            textBody:
-              interactiveReplyId ??
-              interactiveReplyTitle ??
-              textBody ??
-              undefined,
-            imageId: imageId ?? undefined,
-            timestamp: Number.isFinite(timestampRaw) ? timestampRaw! * 1000 : undefined,
-            ...(interactiveReplyId || interactiveReplyTitle
-              ? {
-                  rawEventMeta: {
-                    interactiveReplyId: interactiveReplyId ?? undefined,
-                    interactiveReplyTitle: interactiveReplyTitle ?? undefined,
-                  },
-                }
-              : {}),
-          },
-        ];
-      });
-    });
-  });
+  return arrayProperty(payload, "entry").flatMap(extractMessagesFromEntry);
 }

@@ -149,6 +149,86 @@ function isRouteableIdentityGameSession(session: IdentityGameSession): boolean {
   );
 }
 
+async function resolveActiveIdentityGameSession(
+  input: Omit<ExperienceRouterInput, "entryIntent">
+): Promise<IdentityGameSession | null> {
+  return await Promise.resolve(
+    input.state.activeExperience?.type === "identity_game"
+      ? getIdentityGameSessionByActiveExperience(input.state.activeExperience)
+      : getIdentityGameSessionByUserId(input.state.userKey)
+  );
+}
+
+async function clearStaleActiveExperience(
+  input: Omit<ExperienceRouterInput, "entryIntent">
+): Promise<void> {
+  if (input.state.activeExperience?.type === "identity_game") {
+    await input.setActiveExperience(null);
+  }
+}
+
+async function syncActiveExperience(
+  input: Omit<ExperienceRouterInput, "entryIntent">,
+  activeSession: IdentityGameSession
+): Promise<void> {
+  const activeExperience = input.state.activeExperience;
+  const needsSync =
+    !activeExperience ||
+    activeExperience.type !== "identity_game" ||
+    activeExperience.sessionId !== activeSession.sessionId ||
+    activeExperience.status !== activeSession.status ||
+    activeExperience.updatedAt !== activeSession.updatedAt;
+
+  if (needsSync) {
+    await input.setActiveExperience(toActiveExperience(activeSession));
+  }
+}
+
+function shouldPersistSession(
+  nextSession: IdentityGameSession,
+  activeSession: IdentityGameSession
+): boolean {
+  return (
+    nextSession.sessionId !== activeSession.sessionId ||
+    nextSession.status !== activeSession.status ||
+    nextSession.updatedAt !== activeSession.updatedAt
+  );
+}
+
+function finalizeResolvingSession(
+  session: IdentityGameSession | null | undefined,
+  hasAfterSend: boolean
+): IdentityGameSession | null | undefined {
+  if (session?.status !== "resolving" || !hasAfterSend) {
+    return session;
+  }
+
+  return {
+    ...session,
+    status: "completed",
+    updatedAt: Date.now(),
+  };
+}
+
+async function persistHandlerSession(input: {
+  routerInput: Omit<ExperienceRouterInput, "entryIntent">;
+  activeSession: IdentityGameSession;
+  session?: IdentityGameSession | null;
+  shouldClearActiveExperience: boolean;
+}): Promise<void> {
+  if (!input.session || !shouldPersistSession(input.session, input.activeSession)) {
+    return;
+  }
+
+  await Promise.resolve(upsertIdentityGameSession(input.session));
+  if (
+    input.session.status !== "resolving" &&
+    !input.shouldClearActiveExperience
+  ) {
+    await input.routerInput.setActiveExperience(toActiveExperience(input.session));
+  }
+}
+
 export async function routeEntryIntent(
   input: ExperienceRouterInput
 ): Promise<ExperienceRouteResult> {
@@ -192,29 +272,14 @@ export async function routeEntryIntent(
 export async function routeActiveExperience(
   input: Omit<ExperienceRouterInput, "entryIntent">
 ): Promise<ExperienceRouteResult> {
-  const activeExperience = input.state.activeExperience;
-  const activeSession = await Promise.resolve(
-    activeExperience?.type === "identity_game"
-      ? getIdentityGameSessionByActiveExperience(activeExperience)
-      : getIdentityGameSessionByUserId(input.state.userKey)
-  );
+  const activeSession = await resolveActiveIdentityGameSession(input);
 
   if (!activeSession || !isRouteableIdentityGameSession(activeSession)) {
-    if (activeExperience?.type === "identity_game") {
-      await input.setActiveExperience(null);
-    }
+    await clearStaleActiveExperience(input);
     return { handled: false };
   }
 
-  if (
-    !activeExperience ||
-    activeExperience.type !== "identity_game" ||
-    activeExperience.sessionId !== activeSession.sessionId ||
-    activeExperience.status !== activeSession.status ||
-    activeExperience.updatedAt !== activeSession.updatedAt
-  ) {
-    await input.setActiveExperience(toActiveExperience(activeSession));
-  }
+  await syncActiveExperience(input, activeSession);
 
   const action = normalizeAction(input.action);
   const controlAction = normalizeControlAction(action);
@@ -244,32 +309,19 @@ export async function routeActiveExperience(
   const shouldFinalizeBeforeAfterSend =
     handlerResult.session?.status === "resolving" &&
     typeof handlerResult.afterSend === "function";
-  const sessionToPersist =
-    shouldFinalizeBeforeAfterSend && handlerResult.session
-      ? ({
-          ...handlerResult.session,
-          status: "completed",
-          updatedAt: Date.now(),
-        } satisfies IdentityGameSession)
-      : handlerResult.session;
+  const sessionToPersist = finalizeResolvingSession(
+    handlerResult.session,
+    shouldFinalizeBeforeAfterSend
+  );
   const shouldClearActiveExperience =
     handlerResult.clearActiveExperience || shouldFinalizeBeforeAfterSend;
 
-  if (sessionToPersist) {
-    const sessionChanged =
-      sessionToPersist.sessionId !== activeSession.sessionId ||
-      sessionToPersist.status !== activeSession.status ||
-      sessionToPersist.updatedAt !== activeSession.updatedAt;
-    if (sessionChanged) {
-      await Promise.resolve(upsertIdentityGameSession(sessionToPersist));
-      if (
-        sessionToPersist.status !== "resolving" &&
-        !shouldClearActiveExperience
-      ) {
-        await input.setActiveExperience(toActiveExperience(sessionToPersist));
-      }
-    }
-  }
+  await persistHandlerSession({
+    routerInput: input,
+    activeSession,
+    session: sessionToPersist,
+    shouldClearActiveExperience,
+  });
 
   if (shouldClearActiveExperience) {
     await input.setActiveExperience(null);
