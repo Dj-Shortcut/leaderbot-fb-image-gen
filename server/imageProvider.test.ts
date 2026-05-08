@@ -43,6 +43,10 @@ async function promptFromRequest(init: RequestInit | undefined): Promise<string>
   return "";
 }
 
+function requestJson(init: RequestInit | undefined): unknown {
+  return typeof init?.body === "string" ? JSON.parse(init.body) : null;
+}
+
 describe("image provider boundary", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -209,5 +213,99 @@ describe("image provider boundary", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("analyzes the source photo before building an automatic director prompt", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      const resolved = toUrlString(url);
+
+      if (resolved === "https://api.openai.com/v1/responses") {
+        const payload = requestJson(init) as {
+          input?: Array<{ content?: Array<{ type?: string; image_url?: string }> }>;
+        };
+        const imagePart = payload.input?.[1]?.content?.find(
+          part => part.type === "input_image"
+        );
+        expect(imagePart?.image_url).toMatch(/^data:image\/jpeg;base64,/);
+
+        return {
+          ok: true,
+          json: async () => ({
+            output_text:
+              "Single subject, flat indoor lighting, cluttered background, centered selfie framing.",
+          }),
+        } as Response;
+      }
+
+      expect(resolved).toBe("https://api.openai.com/v1/images/edits");
+      expect(await promptFromRequest(init)).toContain(
+        "Single subject, flat indoor lighting, cluttered background, centered selfie framing."
+      );
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await generator.generate({
+      style: "cinematic",
+      sourceImageData: {
+        buffer: Buffer.alloc(7000, 8),
+        contentType: "image/jpeg",
+      },
+      directorMode: "vogue_editorial",
+      userKey: "user-1",
+      reqId: "req-director-analysis",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("continues director generation when photo analysis fails", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      const resolved = toUrlString(url);
+
+      if (resolved === "https://api.openai.com/v1/responses") {
+        return {
+          ok: false,
+          status: 500,
+        } as Response;
+      }
+
+      expect(resolved).toBe("https://api.openai.com/v1/images/edits");
+      expect(await promptFromRequest(init)).toContain("No photo analysis provided");
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await generator.generate({
+      style: "cinematic",
+      sourceImageData: {
+        buffer: Buffer.alloc(7000, 8),
+        contentType: "image/jpeg",
+      },
+      directorMode: "old_money",
+      userKey: "user-1",
+      reqId: "req-director-analysis-fail",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
