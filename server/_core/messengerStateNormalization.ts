@@ -68,6 +68,7 @@ export function createDefaultState(
     lastImageUrl: undefined,
     lastGeneratedUrl: null,
     lastStyle: undefined,
+    lastDirectorMode: undefined,
     lastPrompt: undefined,
     lastGeneratedAt: undefined,
     lastVariantCursor: undefined,

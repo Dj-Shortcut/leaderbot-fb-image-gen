@@ -1,6 +1,7 @@
 import { t, type Lang } from "../i18n";
 import {
   DIRECTOR_MODE_CONFIGS,
+  DIRECTOR_GENERATION_STYLE,
   directorPayloadToMode,
 } from "../image-generation/director/directorModes";
 import type { DirectorMode } from "../image-generation/director/directorTypes";
@@ -26,8 +27,6 @@ import {
 import { runWhatsAppStyleGeneration } from "./styleGenerationFlow";
 
 type WhatsAppStyleGroup = StyleCategory | "director";
-
-export const DIRECTOR_GENERATION_STYLE: Style = "cinematic";
 
 const WHATSAPP_CATEGORY_CHOICES = [
   { key: "1", category: "illustrated" as const, label: STYLE_CATEGORY_LABELS.illustrated },

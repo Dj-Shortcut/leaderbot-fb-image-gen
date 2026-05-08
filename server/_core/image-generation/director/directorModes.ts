@@ -1,4 +1,7 @@
 import type { DirectorMode, DirectorModeConfig } from "./directorTypes";
+import type { Style } from "../../messengerStyles";
+
+export const DIRECTOR_GENERATION_STYLE: Style = "cinematic";
 
 export const DIRECTOR_MODES = {
   midnight_luxury: {
@@ -6,7 +9,6 @@ export const DIRECTOR_MODES = {
     payload: "DIRECTOR_MIDNIGHT_LUXURY",
     label: "Midnight Luxury",
     description: "Premium nightlife glow-up",
-    label: "Midnight Luxury",
     vibe: "premium nightlife confidence with elegant tension, rich blacks, controlled glamour, and polished after-dark atmosphere",
     lighting: "cinematic flash accents, sculpted rim light, glossy highlights, and deep shadow separation",
     composition: "confident portrait-forward composition with the subject clearly framed as the hero",
@@ -20,7 +22,6 @@ export const DIRECTOR_MODES = {
     payload: "DIRECTOR_BERLIN_UNDERGROUND",
     label: "Berlin Underground",
     description: "Raw techno poster energy",
-    label: "Berlin Underground",
     vibe: "raw techno-club energy with hard flash, concrete texture, grain, and underground confidence",
     lighting: "direct flash, stark contrast, club spill light, and gritty shadows without losing facial clarity",
     composition: "poster-like framing with bold negative space and a strong central subject presence",
@@ -34,7 +35,6 @@ export const DIRECTOR_MODES = {
     payload: "DIRECTOR_VOGUE_EDITORIAL",
     label: "Vogue Editorial",
     description: "High-fashion magazine polish",
-    label: "Vogue Editorial",
     vibe: "high-fashion magazine presence with refined styling, poise, elegance, and premium visual restraint",
     lighting: "sculpted studio lighting, clean highlights, soft shadow shaping, and polished skin texture",
     composition: "fashion editorial framing with elongated lines, balanced posture, and confident subject hierarchy",
@@ -48,7 +48,6 @@ export const DIRECTOR_MODES = {
     payload: "DIRECTOR_HYPERPOP_IDOL",
     label: "Hyperpop Idol",
     description: "Glossy creator thumbnail color",
-    label: "Hyperpop Idol",
     vibe: "electric pop-star energy with glossy color, playful surreal detail, and confident creator charisma",
     lighting: "bright neon accents, glossy specular highlights, colorful rim light, and clean facial readability",
     composition: "dynamic idol framing with playful depth, energetic shapes, and a clear hero subject",
@@ -62,7 +61,6 @@ export const DIRECTOR_MODES = {
     payload: "DIRECTOR_OLD_MONEY",
     label: "Old Money",
     description: "Quiet luxury profile energy",
-    label: "Old Money",
     vibe: "quiet luxury, understated confidence, heritage elegance, and relaxed premium taste",
     lighting: "warm natural light, soft window glow, gentle highlights, and elegant shadow falloff",
     composition: "restrained portrait composition with calm posture, balanced spacing, and subtle status cues",
