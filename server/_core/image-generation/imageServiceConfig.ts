@@ -3,7 +3,7 @@ import {
   MissingObjectStorageConfigError,
 } from "./imageServiceErrors";
 
-export type OpenAiImageModelConfig = {
+type OpenAiImageModelConfig = {
   imageGenerationModel: string;
 };
 

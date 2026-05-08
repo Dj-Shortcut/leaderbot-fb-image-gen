@@ -48,6 +48,38 @@ function requestJson(init: RequestInit | undefined): unknown {
   return typeof init?.body === "string" ? JSON.parse(init.body) : null;
 }
 
+function configureOpenAiImagesEnv(imageModel?: string): void {
+  process.env.OPENAI_API_KEY = "dummy-key";
+  process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+
+  if (imageModel) {
+    process.env.OPENAI_IMAGE_MODEL = imageModel;
+  }
+}
+
+function createGeneratedImageResponse(): Response {
+  return {
+    ok: true,
+    json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+  } as Response;
+}
+
+function generateWithSourceImageData(
+  generator: OpenAiImageGenerator,
+  input: Omit<
+    Parameters<OpenAiImageGenerator["generate"]>[0],
+    "sourceImageData"
+  >
+) {
+  return generator.generate({
+    ...input,
+    sourceImageData: {
+      buffer: Buffer.alloc(7000, 8),
+      contentType: "image/jpeg",
+    },
+  });
+}
+
 describe("image provider boundary", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -82,8 +114,7 @@ describe("image provider boundary", () => {
   );
 
   it("logs the active provider once per generation even when OpenAI retries", async () => {
-    process.env.OPENAI_API_KEY = "dummy-key";
-    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    configureOpenAiImagesEnv();
     process.env.OPENAI_IMAGE_MAX_RETRIES = "1";
     process.env.OPENAI_IMAGE_RETRY_BASE_MS = "1";
 
@@ -104,21 +135,14 @@ describe("image provider boundary", () => {
         } as Response;
       }
 
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
+      return createGeneratedImageResponse();
     });
 
     vi.stubGlobal("fetch", fetchMock);
 
     const generator = new OpenAiImageGenerator();
-    const result = await generator.generate({
+    const result = await generateWithSourceImageData(generator, {
       style: "disco",
-      sourceImageData: {
-        buffer: Buffer.alloc(7000, 8),
-        contentType: "image/jpeg",
-      },
       userKey: "user-1",
       reqId: "req-provider-log",
     });
@@ -145,29 +169,21 @@ describe("image provider boundary", () => {
   });
 
   it("uses the existing style prompt when no director mode is provided", async () => {
-    process.env.OPENAI_API_KEY = "dummy-key";
-    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    configureOpenAiImagesEnv();
 
     const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) => {
       expect(await promptFromRequest(init)).toBe(
         buildStylePrompt("disco", "more glitter in the background")
       );
 
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
+      return createGeneratedImageResponse();
     });
 
     vi.stubGlobal("fetch", fetchMock);
 
     const generator = new OpenAiImageGenerator();
-    await generator.generate({
+    await generateWithSourceImageData(generator, {
       style: "disco",
-      sourceImageData: {
-        buffer: Buffer.alloc(7000, 8),
-        contentType: "image/jpeg",
-      },
       promptHint: "more glitter in the background",
       userKey: "user-1",
       reqId: "req-style-prompt",
@@ -177,18 +193,14 @@ describe("image provider boundary", () => {
   });
 
   it("uses gpt-image-1 as the default OpenAI image model", async () => {
-    process.env.OPENAI_API_KEY = "dummy-key";
-    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    configureOpenAiImagesEnv();
     delete process.env.OPENAI_IMAGE_MODEL;
 
     const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) => {
       const body = requestJson(init) as { model?: string };
       expect(body.model).toBe("gpt-image-1");
 
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
+      return createGeneratedImageResponse();
     });
 
     vi.stubGlobal("fetch", fetchMock);
@@ -204,18 +216,13 @@ describe("image provider boundary", () => {
   });
 
   it("uses OPENAI_IMAGE_MODEL when configured", async () => {
-    process.env.OPENAI_API_KEY = "dummy-key";
-    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
-    process.env.OPENAI_IMAGE_MODEL = "gpt-image-2";
+    configureOpenAiImagesEnv("gpt-image-2");
 
     const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) => {
       const body = requestJson(init) as { model?: string };
       expect(body.model).toBe("gpt-image-2");
 
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
+      return createGeneratedImageResponse();
     });
 
     vi.stubGlobal("fetch", fetchMock);
@@ -230,9 +237,31 @@ describe("image provider boundary", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("uses OPENAI_IMAGE_MODEL in OpenAI edits FormData when source image data is provided", async () => {
+    configureOpenAiImagesEnv("gpt-image-2");
+
+    const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) => {
+      const body = init?.body;
+      expect(body).toBeInstanceOf(FormData);
+      expect((body as FormData).get("model")).toBe("gpt-image-2");
+
+      return createGeneratedImageResponse();
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await generateWithSourceImageData(generator, {
+      style: "disco",
+      userKey: "user-form-data-model",
+      reqId: "req-form-data-model",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("sends a director prompt to OpenAI when director mode is provided", async () => {
-    process.env.OPENAI_API_KEY = "dummy-key";
-    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    configureOpenAiImagesEnv();
 
     const directorInput = {
       mode: "berlin_underground" as const,
@@ -245,21 +274,14 @@ describe("image provider boundary", () => {
         buildDirectorPrompt(directorInput)
       );
 
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
+      return createGeneratedImageResponse();
     });
 
     vi.stubGlobal("fetch", fetchMock);
 
     const generator = new OpenAiImageGenerator();
-    await generator.generate({
+    await generateWithSourceImageData(generator, {
       style: "cyberpunk",
-      sourceImageData: {
-        buffer: Buffer.alloc(7000, 8),
-        contentType: "image/jpeg",
-      },
       promptHint: "this should not be used for director prompts",
       directorMode: directorInput.mode,
       directorInstruction: directorInput.userInstruction,
@@ -272,8 +294,7 @@ describe("image provider boundary", () => {
   });
 
   it("analyzes the source photo before building an automatic director prompt", async () => {
-    process.env.OPENAI_API_KEY = "dummy-key";
-    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    configureOpenAiImagesEnv();
 
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
       const resolved = toUrlString(url);
@@ -301,21 +322,14 @@ describe("image provider boundary", () => {
         "Single subject, flat indoor lighting, cluttered background, centered selfie framing."
       );
 
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
+      return createGeneratedImageResponse();
     });
 
     vi.stubGlobal("fetch", fetchMock);
 
     const generator = new OpenAiImageGenerator();
-    await generator.generate({
+    await generateWithSourceImageData(generator, {
       style: "cinematic",
-      sourceImageData: {
-        buffer: Buffer.alloc(7000, 8),
-        contentType: "image/jpeg",
-      },
       directorMode: "vogue_editorial",
       userKey: "user-1",
       reqId: "req-director-analysis",
@@ -325,8 +339,7 @@ describe("image provider boundary", () => {
   });
 
   it("continues director generation when photo analysis fails", async () => {
-    process.env.OPENAI_API_KEY = "dummy-key";
-    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    configureOpenAiImagesEnv();
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
@@ -342,21 +355,14 @@ describe("image provider boundary", () => {
       expect(resolved).toBe("https://api.openai.com/v1/images/edits");
       expect(await promptFromRequest(init)).toContain("No photo analysis provided");
 
-      return {
-        ok: true,
-        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
-      } as Response;
+      return createGeneratedImageResponse();
     });
 
     vi.stubGlobal("fetch", fetchMock);
 
     const generator = new OpenAiImageGenerator();
-    await generator.generate({
+    await generateWithSourceImageData(generator, {
       style: "cinematic",
-      sourceImageData: {
-        buffer: Buffer.alloc(7000, 8),
-        contentType: "image/jpeg",
-      },
       directorMode: "old_money",
       userKey: "user-1",
       reqId: "req-director-analysis-fail",
