@@ -157,6 +157,44 @@ describe("generationFlow", () => {
     );
   });
 
+  it("threads optional director fields to the image generator", async () => {
+    const generateMock = vi.fn().mockResolvedValue({
+      imageUrl: "https://example.com/generated.jpg",
+      proof: {
+        incomingLen: 10,
+        incomingSha256: "in",
+        openaiInputLen: 10,
+        openaiInputSha256: "out",
+      },
+      metrics: { totalMs: 123 },
+    });
+    createImageGeneratorMock.mockReturnValue({
+      mode: "openai-images",
+      generator: { generate: generateMock },
+    });
+
+    const result = await executeGenerationFlow({
+      style: "cinematic",
+      userId: "user-1",
+      reqId: "req-1",
+      lastPhotoUrl: "https://stored.example/image.jpg",
+      lastPhotoSource: "stored",
+      directorMode: "midnight_luxury",
+      directorInstruction: "make it feel like an exclusive event portrait",
+      directorPhotoAnalysis: "The source image has low ambient light.",
+    });
+
+    expect(result).toMatchObject({ kind: "success" });
+    expect(generateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        style: "cinematic",
+        directorMode: "midnight_luxury",
+        directorInstruction: "make it feel like an exclusive event portrait",
+        directorPhotoAnalysis: "The source image has low ambient light.",
+      })
+    );
+  });
+
   it("does not trust stored source image URLs when no storage key can be derived", async () => {
     process.env.BUILT_IN_FORGE_API_URL = "https://forge.example";
 

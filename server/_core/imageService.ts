@@ -1,5 +1,7 @@
 import { type Style } from "./messengerStyles";
 import { safeLen, sha256 } from "./imageProof";
+import { buildDirectorPrompt } from "./image-generation/director/directorPromptBuilder";
+import type { DirectorMode } from "./image-generation/director/directorTypes";
 import {
   attachGenerationMetrics,
   buildOpenAiRequest,
@@ -42,6 +44,9 @@ interface ImageGenerator {
       contentType: string;
     };
     promptHint?: string;
+    directorMode?: DirectorMode;
+    directorInstruction?: string;
+    directorPhotoAnalysis?: string;
     userKey: string;
     reqId: string;
   }): Promise<{
@@ -66,6 +71,9 @@ type GeneratorInput = {
     contentType: string;
   };
   promptHint?: string;
+  directorMode?: DirectorMode;
+  directorInstruction?: string;
+  directorPhotoAnalysis?: string;
   userKey: string;
   reqId: string;
 };
@@ -117,7 +125,13 @@ async function prepareGenerationInput(
 
   return {
     hasSourceImage: computeHasSourceImage(input),
-    prompt: buildStylePrompt(input.style, input.promptHint),
+    prompt: input.directorMode
+      ? buildDirectorPrompt({
+          mode: input.directorMode,
+          userInstruction: input.directorInstruction,
+          photoAnalysis: input.directorPhotoAnalysis,
+        })
+      : buildStylePrompt(input.style, input.promptHint),
     sourceImage: await resolveStoredSourceImage(input),
   };
 }

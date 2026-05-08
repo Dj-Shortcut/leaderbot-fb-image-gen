@@ -18,6 +18,7 @@ import {
 } from "./image-generation/sourceImageFetcher";
 import type { SourceImageOrigin } from "./messengerState";
 import type { Style } from "./messengerStyles";
+import type { DirectorMode } from "./image-generation/director/directorTypes";
 import { storageGet, storageKeyFromPublicUrl } from "../storage";
 
 type GenerationProof = {
@@ -71,6 +72,9 @@ type ExecuteGenerationFlowInput = {
   userId: string;
   reqId: string;
   promptHint?: string;
+  directorMode?: DirectorMode;
+  directorInstruction?: string;
+  directorPhotoAnalysis?: string;
   sourceImageUrl?: string;
   lastPhotoUrl?: string | null;
   lastPhotoSource?: SourceImageOrigin | null;
@@ -195,6 +199,9 @@ export async function executeGenerationFlow(
       trustedSourceImageUrl,
       sourceImageProvenance: trustedSourceImageUrl ? "storeInbound" : undefined,
       promptHint: input.promptHint,
+      directorMode: input.directorMode,
+      directorInstruction: input.directorInstruction,
+      directorPhotoAnalysis: input.directorPhotoAnalysis,
       userKey: input.userId,
       reqId: input.reqId,
     });
