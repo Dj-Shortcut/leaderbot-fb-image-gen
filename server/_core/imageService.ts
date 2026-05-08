@@ -1,6 +1,7 @@
 import { type Style } from "./messengerStyles";
 import { safeLen, sha256 } from "./imageProof";
 import { buildDirectorPrompt } from "./image-generation/director/directorPromptBuilder";
+import { analyzeDirectorPhoto } from "./image-generation/director/directorPhotoAnalyzer";
 import type { DirectorMode } from "./image-generation/director/directorTypes";
 import {
   attachGenerationMetrics,
@@ -122,6 +123,11 @@ async function prepareGenerationInput(
 ): Promise<PreparedGenerationInput> {
   // TODO: collapse this orchestration into a dedicated ImageService once prompt and source-image paths are fully extracted.
   logSourceImageFetchStart(input);
+  const sourceImage = await resolveStoredSourceImage(input);
+  const photoAnalysis =
+    input.directorMode && !input.directorPhotoAnalysis
+      ? await analyzeDirectorPhoto(sourceImage, input.reqId)
+      : input.directorPhotoAnalysis;
 
   return {
     hasSourceImage: computeHasSourceImage(input),
@@ -129,10 +135,10 @@ async function prepareGenerationInput(
       ? buildDirectorPrompt({
           mode: input.directorMode,
           userInstruction: input.directorInstruction,
-          photoAnalysis: input.directorPhotoAnalysis,
+          photoAnalysis,
         })
       : buildStylePrompt(input.style, input.promptHint),
-    sourceImage: await resolveStoredSourceImage(input),
+    sourceImage,
   };
 }
 
