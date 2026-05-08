@@ -135,12 +135,15 @@ describe("whatsapp webhook flow", () => {
     expect(getState(anonymizePsid("wa-user-1"))?.lastPhotoSource).toBe(
       "stored"
     );
-    expect(sendWhatsAppButtonsMock).toHaveBeenCalledWith(
+    expect(sendWhatsAppListMock).toHaveBeenCalledWith(
       "wa-user-1",
       expect.stringContaining("stijlgroep"),
+      "Kies vibe",
       expect.arrayContaining([
         expect.objectContaining({ id: "WA_ILLUSTRATED", title: "Illustrated" }),
-      ])
+        expect.objectContaining({ id: "WA_DIRECTOR", title: "Director" }),
+      ]),
+      "Stijlgroepen"
     );
   });
 
@@ -291,6 +294,103 @@ describe("whatsapp webhook flow", () => {
     expect(getState(anonymizePsid("wa-user-3"))?.selectedStyle).toBe("disco");
   });
 
+  it("generates with a director prompt after the user picks a director vibe", async () => {
+    downloadWhatsAppMediaMock.mockResolvedValue({
+      buffer: Buffer.alloc(6000, 7),
+      contentType: "image/jpeg",
+    });
+
+    const generateSpy = vi
+      .spyOn(OpenAiImageGenerator.prototype, "generate")
+      .mockResolvedValue({
+        imageUrl: "https://leaderbot-fb-image-gen.fly.dev/generated/director.jpg",
+        proof: {
+          incomingLen: 6000,
+          incomingSha256: "abc",
+          openaiInputLen: 6000,
+          openaiInputSha256: "def",
+        },
+        metrics: { totalMs: 12 },
+      });
+
+    try {
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-director",
+          timestamp: "1710000030",
+          type: "image",
+          image: { id: "wamid-image-director" },
+        })
+      );
+
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-director",
+          timestamp: "1710000031",
+          type: "interactive",
+          interactive: {
+            type: "list_reply",
+            list_reply: { id: "WA_DIRECTOR", title: "Director" },
+          },
+        })
+      );
+
+      expect(getState(anonymizePsid("wa-user-director"))?.selectedStyleCategory).toBe(
+        "director"
+      );
+      expect(sendWhatsAppListMock).toHaveBeenCalledWith(
+        "wa-user-director",
+        "Kies een director-vibe.",
+        "Kies vibe",
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "DIRECTOR_BERLIN_UNDERGROUND",
+            title: "Berlin Underground",
+          }),
+        ]),
+        "Director"
+      );
+
+      sendWhatsAppTextMock.mockClear();
+      sendWhatsAppImageMock.mockClear();
+
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-director",
+          timestamp: "1710000032",
+          type: "interactive",
+          interactive: {
+            type: "list_reply",
+            list_reply: {
+              id: "DIRECTOR_BERLIN_UNDERGROUND",
+              title: "Berlin Underground",
+            },
+          },
+        })
+      );
+
+      expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+        "wa-user-director",
+        "Ik maak nu je Berlin Underground-stijl."
+      );
+      expect(generateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          style: "cinematic",
+          directorMode: "berlin_underground",
+        })
+      );
+      expect(sendWhatsAppImageMock).toHaveBeenCalledWith(
+        "wa-user-director",
+        "https://leaderbot-fb-image-gen.fly.dev/generated/director.jpg"
+      );
+      expect(getState(anonymizePsid("wa-user-director"))?.selectedStyle).toBe(
+        "cinematic"
+      );
+    } finally {
+      generateSpy.mockRestore();
+    }
+  });
+
   it("treats persisted WhatsApp source images as trusted during later style generation", async () => {
     downloadWhatsAppMediaMock.mockResolvedValue({
       buffer: Buffer.alloc(6000, 7),
@@ -326,8 +426,8 @@ describe("whatsapp webhook flow", () => {
           timestamp: "1710000016",
           type: "interactive",
           interactive: {
-            type: "button_reply",
-            button_reply: { id: "WA_BOLD", title: "Bold" },
+            type: "list_reply",
+            list_reply: { id: "WA_BOLD", title: "Bold" },
           },
         })
       );
@@ -389,8 +489,8 @@ describe("whatsapp webhook flow", () => {
           timestamp: "1710000021",
           type: "interactive",
           interactive: {
-            type: "button_reply",
-            button_reply: { id: "WA_BOLD", title: "Bold" },
+            type: "list_reply",
+            list_reply: { id: "WA_BOLD", title: "Bold" },
           },
         })
       );
@@ -442,12 +542,14 @@ describe("whatsapp webhook flow", () => {
       })
     );
 
-    expect(sendWhatsAppButtonsMock).toHaveBeenCalledWith(
+    expect(sendWhatsAppListMock).toHaveBeenCalledWith(
       "wa-user-4",
       expect.any(String),
+      "Kies vibe",
       expect.arrayContaining([
         expect.objectContaining({ id: "WA_ILLUSTRATED" }),
-      ])
+      ]),
+      "Stijlgroepen"
     );
     expect(getState(anonymizePsid("wa-user-4"))?.stage).toBe("AWAITING_STYLE");
   });

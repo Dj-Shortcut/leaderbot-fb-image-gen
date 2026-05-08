@@ -7,7 +7,9 @@ export type DirectorMode =
 
 export type DirectorModeConfig = {
   mode: DirectorMode;
+  payload: string;
   label: string;
+  description: string;
   vibe: string;
   lighting: string;
   composition: string;

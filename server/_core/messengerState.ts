@@ -53,7 +53,7 @@ export type MessengerUserState = {
   lastPhotoSource?: SourceImageOrigin | null;
   selectedStyle: string | null;
   chosenStyle: string | null;
-  selectedStyleCategory?: StyleCategory | null;
+  selectedStyleCategory?: StyleCategory | "director" | null;
   preselectedStyle?: string | null;
   preferredLang?: Lang;
   consentGiven: boolean;
@@ -421,7 +421,7 @@ export function setChosenStyle(psid: string, style: string, now = Date.now()): M
 
 export function setSelectedStyleCategory(
   psid: string,
-  category: StyleCategory | null,
+  category: StyleCategory | "director" | null,
   now = Date.now()
 ): MaybePromise<void> {
   const result = patchState(

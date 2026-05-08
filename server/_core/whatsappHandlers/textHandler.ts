@@ -9,8 +9,10 @@ import { resolveStateReplyPayload } from "../stateResponseText";
 import { toLogUser } from "../privacy";
 import { sendWhatsAppBotStateResponse } from "../whatsappResponseService";
 import {
+  DIRECTOR_GENERATION_STYLE,
   handleWhatsAppPayloadSelection,
   parseWhatsAppCategorySelection,
+  parseWhatsAppDirectorSelection,
   parseWhatsAppStyleSelection,
   sendWhatsAppStyleCategoryPrompt,
   sendWhatsAppStyleOptions,
@@ -59,7 +61,32 @@ export async function handleWhatsAppTextEvent(
       return;
     }
 
-    const selectedStyle = parseWhatsAppStyleSelection(textBody, selectedCategory);
+    const selectedDirectorMode = parseWhatsAppDirectorSelection(
+      textBody,
+      selectedCategory
+    );
+    if (selectedDirectorMode && state.lastPhotoUrl) {
+      console.info("[whatsapp webhook] director mode selected", {
+        user: toLogUser(event.userId),
+        directorMode: selectedDirectorMode,
+        selectedCategory,
+        textBody,
+      });
+      await runWhatsAppStyleGeneration({
+        senderId: event.senderId,
+        userId: event.userId,
+        style: DIRECTOR_GENERATION_STYLE,
+        directorMode: selectedDirectorMode,
+        reqId: context.reqId,
+        lang: context.lang,
+      });
+      return;
+    }
+
+    const selectedStyle = parseWhatsAppStyleSelection(
+      textBody,
+      selectedCategory === "director" ? null : selectedCategory
+    );
     if (selectedStyle && state.lastPhotoUrl) {
       console.info("[whatsapp webhook] style selected", {
         user: toLogUser(event.userId),
