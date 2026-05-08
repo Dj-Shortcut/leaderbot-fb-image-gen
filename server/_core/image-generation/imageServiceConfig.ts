@@ -3,6 +3,23 @@ import {
   MissingObjectStorageConfigError,
 } from "./imageServiceErrors";
 
+export type OpenAiImageModelConfig = {
+  imageGenerationModel: string;
+};
+
+const DEFAULT_OPENAI_IMAGE_GENERATION_MODEL = "gpt-image-1";
+
+export function getOpenAiImageModelConfig(): OpenAiImageModelConfig {
+  const imageGenerationModel = process.env.OPENAI_IMAGE_MODEL?.trim();
+
+  return {
+    imageGenerationModel:
+      imageGenerationModel && imageGenerationModel.length > 0
+        ? imageGenerationModel
+        : DEFAULT_OPENAI_IMAGE_GENERATION_MODEL,
+  };
+}
+
 export function getConfiguredBaseUrl(): string | undefined {
   const configuredBaseUrl = process.env.APP_BASE_URL?.trim()
     ? process.env.APP_BASE_URL.trim()

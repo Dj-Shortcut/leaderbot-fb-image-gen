@@ -14,6 +14,7 @@ const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
 const originalAppBaseUrl = process.env.APP_BASE_URL;
 const originalOpenAiImageMaxRetries = process.env.OPENAI_IMAGE_MAX_RETRIES;
 const originalOpenAiImageRetryBaseMs = process.env.OPENAI_IMAGE_RETRY_BASE_MS;
+const originalOpenAiImageModel = process.env.OPENAI_IMAGE_MODEL;
 
 function restoreEnv(name: string, value: string | undefined): void {
   if (value === undefined) {
@@ -56,6 +57,7 @@ describe("image provider boundary", () => {
     restoreEnv("APP_BASE_URL", originalAppBaseUrl);
     restoreEnv("OPENAI_IMAGE_MAX_RETRIES", originalOpenAiImageMaxRetries);
     restoreEnv("OPENAI_IMAGE_RETRY_BASE_MS", originalOpenAiImageRetryBaseMs);
+    restoreEnv("OPENAI_IMAGE_MODEL", originalOpenAiImageModel);
   });
 
   it("defaults to the current OpenAI Images provider", () => {
@@ -169,6 +171,60 @@ describe("image provider boundary", () => {
       promptHint: "more glitter in the background",
       userKey: "user-1",
       reqId: "req-style-prompt",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses gpt-image-1 as the default OpenAI image model", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    delete process.env.OPENAI_IMAGE_MODEL;
+
+    const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) => {
+      const body = requestJson(init) as { model?: string };
+      expect(body.model).toBe("gpt-image-1");
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await generator.generate({
+      style: "disco",
+      userKey: "user-default-model",
+      reqId: "req-default-model",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses OPENAI_IMAGE_MODEL when configured", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+    process.env.OPENAI_IMAGE_MODEL = "gpt-image-2";
+
+    const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) => {
+      const body = requestJson(init) as { model?: string };
+      expect(body.model).toBe("gpt-image-2");
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await generator.generate({
+      style: "storybook-anime",
+      userKey: "user-configured-model",
+      reqId: "req-configured-model",
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
