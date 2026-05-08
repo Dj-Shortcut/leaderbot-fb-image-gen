@@ -4,6 +4,8 @@ import {
   getGeneratorStartupConfig,
   OpenAiImageGenerator,
 } from "./_core/imageService";
+import { buildDirectorPrompt } from "./_core/image-generation/director/directorPromptBuilder";
+import { buildStylePrompt } from "./_core/image-generation/promptBuilder";
 
 const GENERATED_IMAGE_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=";
@@ -24,6 +26,21 @@ function restoreEnv(name: string, value: string | undefined): void {
 
 function toUrlString(url: string | URL): string {
   return typeof url === "string" ? url : url.toString();
+}
+
+async function promptFromRequest(init: RequestInit | undefined): Promise<string> {
+  const body = init?.body;
+
+  if (body instanceof FormData) {
+    const prompt = body.get("prompt");
+    return typeof prompt === "string" ? prompt : "";
+  }
+
+  if (typeof body === "string") {
+    return (JSON.parse(body) as { prompt?: string }).prompt ?? "";
+  }
+
+  return "";
 }
 
 describe("image provider boundary", () => {
@@ -119,5 +136,78 @@ describe("image provider boundary", () => {
         hasSourceImage: true,
       },
     ]);
+  });
+
+  it("uses the existing style prompt when no director mode is provided", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+
+    const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) => {
+      expect(await promptFromRequest(init)).toBe(
+        buildStylePrompt("disco", "more glitter in the background")
+      );
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await generator.generate({
+      style: "disco",
+      sourceImageData: {
+        buffer: Buffer.alloc(7000, 8),
+        contentType: "image/jpeg",
+      },
+      promptHint: "more glitter in the background",
+      userKey: "user-1",
+      reqId: "req-style-prompt",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends a director prompt to OpenAI when director mode is provided", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+    process.env.APP_BASE_URL = "https://leaderbot-fb-image-gen.fly.dev";
+
+    const directorInput = {
+      mode: "berlin_underground" as const,
+      userInstruction: "make it feel like a late-night event poster",
+      photoAnalysis: "The source photo is a mirror selfie with flat lighting.",
+    };
+
+    const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) => {
+      expect(await promptFromRequest(init)).toBe(
+        buildDirectorPrompt(directorInput)
+      );
+
+      return {
+        ok: true,
+        json: async () => ({ data: [{ b64_json: GENERATED_IMAGE_BASE64 }] }),
+      } as Response;
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const generator = new OpenAiImageGenerator();
+    await generator.generate({
+      style: "cyberpunk",
+      sourceImageData: {
+        buffer: Buffer.alloc(7000, 8),
+        contentType: "image/jpeg",
+      },
+      promptHint: "this should not be used for director prompts",
+      directorMode: directorInput.mode,
+      directorInstruction: directorInput.userInstruction,
+      directorPhotoAnalysis: directorInput.photoAnalysis,
+      userKey: "user-1",
+      reqId: "req-director-prompt",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
