@@ -138,6 +138,7 @@ async function handleGenerationSuccess(input: {
   await setLastGenerated(input.senderId, input.imageUrl);
   await setLastGenerationContext(input.senderId, {
     style: input.style,
+    directorMode: input.directorMode,
     prompt: input.directorMode
       ? getDirectorModeConfig(input.directorMode).label
       : input.promptHint,

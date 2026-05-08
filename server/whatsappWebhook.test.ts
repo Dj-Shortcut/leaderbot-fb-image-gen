@@ -391,6 +391,117 @@ describe("whatsapp webhook flow", () => {
     }
   });
 
+  it("refines the latest director result with conversational text", async () => {
+    downloadWhatsAppMediaMock.mockResolvedValue({
+      buffer: Buffer.alloc(6000, 7),
+      contentType: "image/jpeg",
+    });
+    process.env.OPENAI_API_KEY = "dummy-key";
+
+    const generateSpy = vi
+      .spyOn(OpenAiImageGenerator.prototype, "generate")
+      .mockResolvedValueOnce({
+        imageUrl: "https://leaderbot-fb-image-gen.fly.dev/generated/director-first.jpg",
+        proof: {
+          incomingLen: 6000,
+          incomingSha256: "abc",
+          openaiInputLen: 6000,
+          openaiInputSha256: "def",
+        },
+        metrics: { totalMs: 12 },
+      })
+      .mockResolvedValueOnce({
+        imageUrl: "https://leaderbot-fb-image-gen.fly.dev/generated/director-refined.jpg",
+        proof: {
+          incomingLen: 6000,
+          incomingSha256: "abc",
+          openaiInputLen: 6000,
+          openaiInputSha256: "def",
+        },
+        metrics: { totalMs: 12 },
+      });
+
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output_text:
+            '{"shouldEdit":true,"style":null,"directorMode":"berlin_underground","promptHint":"make it less fake and keep the face closer to the original"}',
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-director-refine",
+          timestamp: "1710000040",
+          type: "image",
+          image: { id: "wamid-image-director-refine" },
+        })
+      );
+
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-director-refine",
+          timestamp: "1710000041",
+          type: "interactive",
+          interactive: {
+            type: "list_reply",
+            list_reply: { id: "WA_DIRECTOR", title: "Director" },
+          },
+        })
+      );
+
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-director-refine",
+          timestamp: "1710000042",
+          type: "interactive",
+          interactive: {
+            type: "list_reply",
+            list_reply: {
+              id: "DIRECTOR_BERLIN_UNDERGROUND",
+              title: "Berlin Underground",
+            },
+          },
+        })
+      );
+
+      sendWhatsAppTextMock.mockClear();
+      sendWhatsAppImageMock.mockClear();
+
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-director-refine",
+          timestamp: "1710000043",
+          type: "text",
+          text: { body: "make it less fake and keep my face closer" },
+        })
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(generateSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          style: "cinematic",
+          directorMode: "berlin_underground",
+          promptHint:
+            "Berlin Underground | make it less fake and keep the face closer to the original",
+        })
+      );
+      expect(sendWhatsAppImageMock).toHaveBeenCalledWith(
+        "wa-user-director-refine",
+        "https://leaderbot-fb-image-gen.fly.dev/generated/director-refined.jpg"
+      );
+      expect(getState(anonymizePsid("wa-user-director-refine"))?.lastDirectorMode).toBe(
+        "berlin_underground"
+      );
+    } finally {
+      generateSpy.mockRestore();
+    }
+  });
+
   it("treats persisted WhatsApp source images as trusted during later style generation", async () => {
     downloadWhatsAppMediaMock.mockResolvedValue({
       buffer: Buffer.alloc(6000, 7),

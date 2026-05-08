@@ -1,5 +1,6 @@
 import type { BotFeature } from "../features";
 import { t } from "../../i18n";
+import { DIRECTOR_GENERATION_STYLE } from "../../image-generation/director/directorModes";
 import { normalizeStyle } from "../../webhookHelpers";
 import { interpretConversationalEdit } from "../../conversationalEditInterpreter";
 
@@ -27,6 +28,7 @@ export const conversationalEditingFeature: BotFeature = {
       text: ctx.messageText,
       lang: ctx.lang,
       lastStyle: normalizeStyle(ctx.state.selectedStyle ?? "") ?? ctx.state.lastStyle,
+      lastDirectorMode: ctx.state.lastDirectorMode,
     });
     if (!decision?.shouldEdit) {
       return { handled: false };
@@ -36,6 +38,7 @@ export const conversationalEditingFeature: BotFeature = {
       decision.style ??
       normalizeStyle(ctx.state.selectedStyle ?? "") ??
       ctx.state.lastStyle;
+    const directorMode = decision.directorMode ?? ctx.state.lastDirectorMode;
     if (!style) {
       await ctx.sendStateQuickReplies("AWAITING_STYLE", t(ctx.lang, "stylePicker"));
       return { handled: true };
@@ -48,13 +51,15 @@ export const conversationalEditingFeature: BotFeature = {
 
     ctx.logger.info("bot_feature_conversational_edit", {
       style,
+      directorMode,
       hasPromptHint: Boolean(decision.promptHint),
     });
 
     await ctx.runStyleGeneration(
-      style,
+      directorMode ? DIRECTOR_GENERATION_STYLE : style,
       sourcePhotoUrl,
       combinedPrompt || ctx.state.lastPrompt,
+      directorMode,
     );
     return { handled: true };
   },

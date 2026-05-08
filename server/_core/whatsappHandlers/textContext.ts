@@ -61,7 +61,7 @@ export function createWhatsAppTextContext(
         reqId: context.reqId,
         lang: context.lang,
       }),
-    runStyleGeneration: (style, sourceImageUrl, promptHint) =>
+    runStyleGeneration: (style, sourceImageUrl, promptHint, directorMode) =>
       runWhatsAppStyleGeneration({
         senderId: event.senderId,
         userId: event.userId,
@@ -70,6 +70,7 @@ export function createWhatsAppTextContext(
         lang: context.lang,
         sourceImageUrl,
         promptHint,
+        directorMode,
       }),
     getRuntimeStats: () => getTodayRuntimeStats(),
     logger: createWhatsAppFeatureLogger(event.userId),

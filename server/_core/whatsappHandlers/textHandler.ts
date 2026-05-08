@@ -8,8 +8,8 @@ import {
 import { resolveStateReplyPayload } from "../stateResponseText";
 import { toLogUser } from "../privacy";
 import { sendWhatsAppBotStateResponse } from "../whatsappResponseService";
+import { DIRECTOR_GENERATION_STYLE } from "../image-generation/director/directorModes";
 import {
-  DIRECTOR_GENERATION_STYLE,
   handleWhatsAppPayloadSelection,
   parseWhatsAppCategorySelection,
   parseWhatsAppDirectorSelection,

@@ -5,6 +5,7 @@ import {
 } from "./messengerStyles";
 import type { ActiveExperience } from "./activeExperience";
 import type { EntryIntent } from "./entryIntent";
+import type { DirectorMode } from "./image-generation/director/directorTypes";
 import type { Lang } from "./i18n";
 import {
   clearStateStore,
@@ -73,6 +74,7 @@ export type MessengerUserState = {
   lastImageUrl?: string;
   lastGeneratedUrl?: string | null;
   lastStyle?: Style;
+  lastDirectorMode?: DirectorMode;
   lastPrompt?: string;
   lastGeneratedAt?: number;
   lastVariantCursor?: number;
@@ -514,13 +516,14 @@ export function setLastGenerated(psid: string, resultImageUrl: string, now = Dat
 
 export function setLastGenerationContext(
   psid: string,
-  context: { style?: Style; prompt?: string },
+  context: { style?: Style; directorMode?: DirectorMode; prompt?: string },
   now = Date.now()
 ): MaybePromise<void> {
   const result = patchState(
     psid,
     {
       lastStyle: context.style,
+      lastDirectorMode: context.directorMode,
       lastPrompt: context.prompt,
     },
     now,

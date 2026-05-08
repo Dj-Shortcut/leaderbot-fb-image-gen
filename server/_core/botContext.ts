@@ -10,6 +10,7 @@ import type {
 import type { QuickReply } from "./messengerApi";
 import type { Style } from "./messengerStyles";
 import type { GenerationStatsSnapshot } from "./botRuntimeStats";
+import type { DirectorMode } from "./image-generation/director/directorTypes";
 
 export type FeatureResult = { handled: true } | { handled: false };
 
@@ -40,7 +41,8 @@ type BotContextBase = {
   runStyleGeneration(
     style: Style,
     sourceImageUrl?: string,
-    promptHint?: string
+    promptHint?: string,
+    directorMode?: DirectorMode
   ): Promise<void>;
   getRuntimeStats(): GenerationStatsSnapshot;
   logger: BotLogger;
