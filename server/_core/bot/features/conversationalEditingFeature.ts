@@ -34,11 +34,11 @@ export const conversationalEditingFeature: BotFeature = {
       return { handled: false };
     }
 
-    const style =
-      decision.style ??
-      normalizeStyle(ctx.state.selectedStyle ?? "") ??
-      ctx.state.lastStyle;
-    const directorMode = decision.directorMode ?? ctx.state.lastDirectorMode;
+    const selectedStyle = normalizeStyle(ctx.state.selectedStyle ?? "");
+    const style = decision.style ?? selectedStyle ?? ctx.state.lastStyle;
+    const directorMode =
+      decision.directorMode ??
+      (decision.style ? undefined : ctx.state.lastDirectorMode);
     if (!style) {
       await ctx.sendStateQuickReplies("AWAITING_STYLE", t(ctx.lang, "stylePicker"));
       return { handled: true };

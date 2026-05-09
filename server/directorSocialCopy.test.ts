@@ -56,8 +56,10 @@ describe("director social copy", () => {
     });
 
     const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {
+      store: boolean;
       input: Array<{ content: string }>;
     };
+    expect(body.store).toBe(false);
     expect(body.input[0]?.content).toContain("Return only JSON");
     expect(body.input[1]?.content).toContain("Midnight Luxury");
   });

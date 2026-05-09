@@ -4,6 +4,7 @@ import type { Lang } from "../../i18n";
 
 type ResponsesApiPayload = {
   model: string;
+  store: false;
   input: Array<{ role: "system" | "user"; content: string }>;
   temperature: number;
   max_output_tokens: number;
@@ -142,6 +143,7 @@ function buildPayload(input: {
 
   return {
     model: getModel(),
+    store: false,
     input: [
       {
         role: "system",

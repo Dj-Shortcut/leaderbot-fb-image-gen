@@ -86,6 +86,7 @@ import type {
   BotTextContext,
   BotImageContext,
 } from "./botContext";
+import type { DirectorMode } from "./image-generation/director/directorTypes";
 import { createTrackedHandlerContext } from "./webhookTrackedContext";
 import {
   handlePayload,
@@ -219,7 +220,8 @@ export type HandlerContext = {
     reqId: string,
     lang: Lang,
     sourceImageUrl?: string,
-    promptHint?: string
+    promptHint?: string,
+    directorMode?: DirectorMode
   ) => Promise<MessengerSendOutcome>;
   sendFaceMemoryConsentPrompt: (
     psid: string,
@@ -1155,7 +1157,7 @@ export function createWebhookHandlers({
       chooseStyle: async style => {
         await handleStyleSelection(psid, userId, style, reqId, lang);
       },
-      runStyleGeneration: async (style, sourceImageUrl, promptHint) => {
+      runStyleGeneration: async (style, sourceImageUrl, promptHint, directorMode) => {
         await runStyleGeneration(
           psid,
           userId,
@@ -1163,7 +1165,8 @@ export function createWebhookHandlers({
           reqId,
           lang,
           sourceImageUrl,
-          promptHint
+          promptHint,
+          directorMode
         );
       },
       getRuntimeStats: () => getTodayRuntimeStats(),
@@ -1370,7 +1373,8 @@ export function createWebhookHandlers({
     reqId: string,
     lang: Lang,
     sourceImageUrl?: string,
-    promptHint?: string
+    promptHint?: string,
+    directorMode?: DirectorMode
   ): Promise<MessengerSendOutcome> {
     let sendOutcome: MessengerSendOutcome = MESSENGER_SEND_SKIPPED;
     const rememberSendOutcome = (outcome: MessengerSendOutcome) => {
@@ -1421,6 +1425,7 @@ export function createWebhookHandlers({
         userId,
         reqId,
         promptHint,
+        directorMode,
         sourceImageUrl,
         lastPhotoUrl: state.lastPhotoUrl,
         lastPhotoSource: state.lastPhotoSource,
@@ -1474,7 +1479,7 @@ export function createWebhookHandlers({
         rememberSendOutcome(await sendLoggedImage(psid, imageUrl, reqId));
         await increment(psid);
         await setLastGenerated(psid, imageUrl);
-        await setLastGenerationContext(psid, { style, prompt: promptHint });
+        await setLastGenerationContext(psid, { style, directorMode, prompt: promptHint });
         recordGenerationSuccess(style, metrics.totalMs);
         rememberSendOutcome(await sendStateQuickReplies(
           psid,
