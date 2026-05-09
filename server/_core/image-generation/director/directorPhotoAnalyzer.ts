@@ -1,5 +1,6 @@
 import type { DownloadedSourceImage } from "../sourceImageFetcher";
 import { extractResponseText } from "../../openai/responseText";
+import { postResponsesPayload } from "../../openai/responsesClient";
 
 type ResponsesApiPayload = {
   model: string;
@@ -16,7 +17,6 @@ type ResponsesApiPayload = {
   max_output_tokens: number;
 };
 
-const RESPONSES_API_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_MODEL = "gpt-4.1-mini";
 const DEFAULT_TIMEOUT_MS = 5_000;
 const MAX_ANALYSIS_LENGTH = 700;
@@ -79,24 +79,12 @@ export async function analyzeDirectorPhoto(
   sourceImage: DownloadedSourceImage,
   reqId: string
 ): Promise<string | undefined> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) {
-    return undefined;
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), getTimeoutMs());
-
   try {
-    const response = await fetch(RESPONSES_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(buildAnalysisPayload(sourceImage)),
-      signal: controller.signal,
+    const response = await postResponsesPayload({
+      payload: buildAnalysisPayload(sourceImage),
+      timeoutMs: getTimeoutMs(),
     });
+    if (!response) return undefined;
 
     if (!response.ok) {
       console.warn("director_photo_analysis_failed", {
@@ -114,7 +102,5 @@ export async function analyzeDirectorPhoto(
       error: error instanceof Error ? error.message : String(error),
     });
     return undefined;
-  } finally {
-    clearTimeout(timeout);
   }
 }

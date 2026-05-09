@@ -5,6 +5,7 @@ import {
   extractResponseText,
   trimmedText,
 } from "../../openai/responseText";
+import { postResponsesPayload } from "../../openai/responsesClient";
 
 type ResponsesApiPayload = {
   model: string;
@@ -19,7 +20,6 @@ type DirectorSocialCopy = {
   hashtags: string[];
 };
 
-const RESPONSES_API_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_MODEL = "gpt-4.1-mini";
 const DEFAULT_TIMEOUT_MS = 5_000;
 const MAX_CAPTION_LENGTH = 220;
@@ -127,25 +127,17 @@ export async function generateDirectorSocialCopy(input: {
   promptHint?: string;
   reqId: string;
 }): Promise<DirectorSocialCopy | undefined> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
   const directorMode = input.directorMode;
-  if (!apiKey || !directorMode) {
+  if (!directorMode) {
     return undefined;
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), getTimeoutMs());
-
   try {
-    const response = await fetch(RESPONSES_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(buildPayload({ ...input, directorMode })),
-      signal: controller.signal,
+    const response = await postResponsesPayload({
+      payload: buildPayload({ ...input, directorMode }),
+      timeoutMs: getTimeoutMs(),
     });
+    if (!response) return undefined;
 
     if (!response.ok) {
       console.warn("director_social_copy_failed", {
@@ -163,8 +155,6 @@ export async function generateDirectorSocialCopy(input: {
       error: error instanceof Error ? error.message : String(error),
     });
     return undefined;
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
