@@ -1,6 +1,10 @@
 import { getDirectorModeConfig } from "./directorModes";
 import type { DirectorMode } from "./directorTypes";
 import type { Lang } from "../../i18n";
+import {
+  extractResponseText,
+  trimmedText,
+} from "../../openai/responseText";
 
 type ResponsesApiPayload = {
   model: string;
@@ -32,39 +36,6 @@ function getTimeoutMs(): number {
   }
 
   return DEFAULT_TIMEOUT_MS;
-}
-
-function objectValue(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function trimmedText(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function extractResponseText(raw: unknown): string | null {
-  const response = objectValue(raw);
-  const outputText = trimmedText(response?.output_text);
-  if (outputText) {
-    return outputText;
-  }
-
-  return Array.isArray(response?.output)
-    ? response.output
-        .flatMap(item => {
-          const outputItem = objectValue(item);
-          return [
-            outputItem?.text,
-            ...(Array.isArray(outputItem?.content)
-              ? outputItem.content.map(part => objectValue(part)?.text)
-              : []),
-          ];
-        })
-        .map(trimmedText)
-        .find(Boolean) ?? null
-    : null;
 }
 
 function sanitizeCaption(value: unknown): string | undefined {
