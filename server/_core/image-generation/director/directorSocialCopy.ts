@@ -10,7 +10,7 @@ type ResponsesApiPayload = {
   max_output_tokens: number;
 };
 
-export type DirectorSocialCopy = {
+type DirectorSocialCopy = {
   caption: string;
   hashtags: string[];
 };
@@ -44,49 +44,27 @@ function trimmedText(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function textProperty(value: unknown, key: string): string | null {
-  return trimmedText(objectValue(value)?.[key]);
-}
-
-function extractContentText(item: unknown): string | null {
-  const content = objectValue(item)?.content;
-  if (!Array.isArray(content)) {
-    return null;
-  }
-
-  for (const part of content) {
-    const text = textProperty(part, "text");
-    if (text) {
-      return text;
-    }
-  }
-
-  return null;
-}
-
-function extractOutputItemText(item: unknown): string | null {
-  return textProperty(item, "text") ?? extractContentText(item);
-}
-
 function extractResponseText(raw: unknown): string | null {
-  const outputText = textProperty(raw, "output_text");
+  const response = objectValue(raw);
+  const outputText = trimmedText(response?.output_text);
   if (outputText) {
     return outputText;
   }
 
-  const output = objectValue(raw)?.output;
-  if (!Array.isArray(output)) {
-    return null;
-  }
-
-  for (const item of output) {
-    const text = extractOutputItemText(item);
-    if (text) {
-      return text;
-    }
-  }
-
-  return null;
+  return Array.isArray(response?.output)
+    ? response.output
+        .flatMap(item => {
+          const outputItem = objectValue(item);
+          return [
+            outputItem?.text,
+            ...(Array.isArray(outputItem?.content)
+              ? outputItem.content.map(part => objectValue(part)?.text)
+              : []),
+          ];
+        })
+        .map(trimmedText)
+        .find(Boolean) ?? null
+    : null;
 }
 
 function sanitizeCaption(value: unknown): string | undefined {
