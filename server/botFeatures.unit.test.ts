@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ensureDefaultBotFeaturesRegistered } from "./_core/bot/defaultFeatures";
 import { assistantCommandsFeature } from "./_core/bot/features/assistantCommandsFeature";
+import { conversationalEditingFeature } from "./_core/bot/features/conversationalEditingFeature";
 import { rateLimitFeature } from "./_core/bot/features/rateLimitFeature";
 import { statsFeature } from "./_core/bot/features/statsFeature";
 import { styleCommandsFeature } from "./_core/bot/features/styleCommandsFeature";
@@ -213,6 +214,58 @@ describe("rateLimitFeature", () => {
       expect(sendText).not.toHaveBeenCalled();
     } finally {
       nowSpy.mockRestore();
+    }
+  });
+});
+
+describe("conversationalEditingFeature", () => {
+  it("does not reuse the previous director mode when the edit chooses a normal style", async () => {
+    const originalApiKey = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = "test-key";
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        output_text: JSON.stringify({
+          shouldEdit: true,
+          style: "disco",
+          directorMode: null,
+          promptHint: "make it disco",
+        }),
+      }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const runStyleGeneration = vi.fn(async () => undefined);
+
+    try {
+      const result = await conversationalEditingFeature.onText?.(
+        makeContext({
+          messageText: "make it disco",
+          normalizedText: "make it disco",
+          runStyleGeneration,
+          state: makeState({
+            lastGeneratedUrl: "https://img.example/generated.jpg",
+            lastPhotoUrl: "https://img.example/source.jpg",
+            lastDirectorMode: "midnight_luxury",
+            selectedStyle: "cinematic",
+          }),
+        })
+      );
+
+      expect(result).toEqual({ handled: true });
+      expect(runStyleGeneration).toHaveBeenCalledWith(
+        "disco",
+        "https://img.example/source.jpg",
+        "make it disco",
+        undefined
+      );
+    } finally {
+      if (originalApiKey === undefined) {
+        delete process.env.OPENAI_API_KEY;
+      } else {
+        process.env.OPENAI_API_KEY = originalApiKey;
+      }
+      vi.unstubAllGlobals();
     }
   });
 });

@@ -312,6 +312,16 @@ describe("whatsapp webhook flow", () => {
         },
         metrics: { totalMs: 12 },
       });
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output_text:
+            '{"caption":"Raw energy for the night.","hashtags":["#Berlin","#Nightlife"]}',
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
 
     try {
       await processWhatsAppWebhookPayload(
@@ -383,6 +393,10 @@ describe("whatsapp webhook flow", () => {
         "wa-user-director",
         "https://leaderbot-fb-image-gen.fly.dev/generated/director.jpg"
       );
+      expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+        "wa-user-director",
+        "Raw energy for the night.\n#Berlin #Nightlife"
+      );
       expect(getState(anonymizePsid("wa-user-director"))?.selectedStyle).toBe(
         "cinematic"
       );
@@ -421,15 +435,20 @@ describe("whatsapp webhook flow", () => {
         metrics: { totalMs: 12 },
       });
 
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          output_text:
-            '{"shouldEdit":true,"style":null,"directorMode":"berlin_underground","promptHint":"make it less fake and keep the face closer to the original"}',
-        }),
-        { status: 200 }
-      )
-    );
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      const request = fetchMock.mock.calls.at(-1)?.[1] as RequestInit | undefined;
+      const body = JSON.parse(String(request?.body)) as {
+        input?: Array<{ content?: string }>;
+      };
+      const systemPrompt = body.input?.[0]?.content ?? "";
+      const outputText = systemPrompt.includes("social copy")
+        ? '{"caption":"Raw energy for the night.","hashtags":["#Berlin"]}'
+        : '{"shouldEdit":true,"style":null,"directorMode":"berlin_underground","promptHint":"make it less fake and keep the face closer to the original"}';
+
+      return new Response(JSON.stringify({ output_text: outputText }), {
+        status: 200,
+      });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     try {
@@ -481,7 +500,7 @@ describe("whatsapp webhook flow", () => {
         })
       );
 
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
       expect(generateSpy).toHaveBeenLastCalledWith(
         expect.objectContaining({
           style: "cinematic",
@@ -496,6 +515,86 @@ describe("whatsapp webhook flow", () => {
       );
       expect(getState(anonymizePsid("wa-user-director-refine"))?.lastDirectorMode).toBe(
         "berlin_underground"
+      );
+    } finally {
+      generateSpy.mockRestore();
+    }
+  });
+
+  it("keeps director image delivery successful when social copy generation fails", async () => {
+    downloadWhatsAppMediaMock.mockResolvedValue({
+      buffer: Buffer.alloc(6000, 7),
+      contentType: "image/jpeg",
+    });
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const generateSpy = vi
+      .spyOn(OpenAiImageGenerator.prototype, "generate")
+      .mockResolvedValue({
+        imageUrl: "https://leaderbot-fb-image-gen.fly.dev/generated/director-no-copy.jpg",
+        proof: {
+          incomingLen: 6000,
+          incomingSha256: "abc",
+          openaiInputLen: 6000,
+          openaiInputSha256: "def",
+        },
+        metrics: { totalMs: 12 },
+      });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(new Response("error", { status: 500 }))
+    );
+
+    try {
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-director-copy-fail",
+          timestamp: "1710000050",
+          type: "image",
+          image: { id: "wamid-image-director-copy-fail" },
+        })
+      );
+
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-director-copy-fail",
+          timestamp: "1710000051",
+          type: "interactive",
+          interactive: {
+            type: "list_reply",
+            list_reply: { id: "WA_DIRECTOR", title: "Director" },
+          },
+        })
+      );
+
+      sendWhatsAppTextMock.mockClear();
+      sendWhatsAppImageMock.mockClear();
+
+      await processWhatsAppWebhookPayload(
+        createWhatsAppPayload({
+          from: "wa-user-director-copy-fail",
+          timestamp: "1710000052",
+          type: "interactive",
+          interactive: {
+            type: "list_reply",
+            list_reply: {
+              id: "DIRECTOR_MIDNIGHT_LUXURY",
+              title: "Midnight Luxury",
+            },
+          },
+        })
+      );
+
+      expect(generateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ directorMode: "midnight_luxury" })
+      );
+      expect(sendWhatsAppImageMock).toHaveBeenCalledWith(
+        "wa-user-director-copy-fail",
+        "https://leaderbot-fb-image-gen.fly.dev/generated/director-no-copy.jpg"
+      );
+      expect(sendWhatsAppTextMock).toHaveBeenCalledWith(
+        "wa-user-director-copy-fail",
+        expect.stringContaining("Klaar")
       );
     } finally {
       generateSpy.mockRestore();

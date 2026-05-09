@@ -5,6 +5,7 @@ import {
 } from "./image-generation/director/directorModes";
 import type { DirectorMode } from "./image-generation/director/directorTypes";
 import type { Style } from "./messengerStyles";
+import { extractResponseText } from "./openai/responseText";
 
 type ResponsesApiPayload = {
   model: string;
@@ -62,60 +63,6 @@ function getRetryDelayMs(attempt: number): number {
 
 async function sleep(ms: number): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function objectValue(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function trimmedText(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function textProperty(value: unknown, key: string): string | null {
-  return trimmedText(objectValue(value)?.[key]);
-}
-
-function extractContentText(item: unknown): string | null {
-  const content = objectValue(item)?.content;
-  if (!Array.isArray(content)) {
-    return null;
-  }
-
-  for (const part of content) {
-    const text = textProperty(part, "text");
-    if (text) {
-      return text;
-    }
-  }
-
-  return null;
-}
-
-function extractOutputItemText(item: unknown): string | null {
-  return textProperty(item, "text") ?? extractContentText(item);
-}
-
-function extractOutputText(raw: unknown): string | null {
-  const output = objectValue(raw)?.output;
-  if (!Array.isArray(output)) {
-    return null;
-  }
-
-  for (const item of output) {
-    const text = extractOutputItemText(item);
-    if (text) {
-      return text;
-    }
-  }
-
-  return null;
-}
-
-function extractResponseText(raw: unknown): string | null {
-  return textProperty(raw, "output_text") ?? extractOutputText(raw);
 }
 
 async function callResponsesApi(

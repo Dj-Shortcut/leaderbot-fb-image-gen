@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
 import { executeGenerationFlow } from "../generationFlow";
+import {
+  formatDirectorSocialCopy,
+  generateDirectorSocialCopy,
+} from "../image-generation/director/directorSocialCopy";
 import { getDirectorModeConfig } from "../image-generation/director/directorModes";
 import type { DirectorMode } from "../image-generation/director/directorTypes";
 import { getGenerationMetrics } from "../image-generation/openAiImageClient";
@@ -132,8 +136,18 @@ async function handleGenerationSuccess(input: {
   directorMode?: DirectorMode;
   promptHint?: string;
   imageUrl: string;
+  reqId: string;
 }): Promise<void> {
   await sendWhatsAppImageReply(input.senderId, input.imageUrl);
+  const socialCopy = await generateDirectorSocialCopy({
+    lang: input.lang,
+    directorMode: input.directorMode,
+    promptHint: input.promptHint,
+    reqId: input.reqId,
+  });
+  if (socialCopy) {
+    await sendWhatsAppTextReply(input.senderId, formatDirectorSocialCopy(socialCopy));
+  }
   await increment(input.senderId);
   await setLastGenerated(input.senderId, input.imageUrl);
   await setLastGenerationContext(input.senderId, {
@@ -297,6 +311,7 @@ export async function runWhatsAppStyleGeneration(
       directorMode,
       promptHint,
       imageUrl: result.imageUrl,
+      reqId,
     });
     return;
   }
