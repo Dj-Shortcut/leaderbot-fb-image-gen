@@ -435,22 +435,20 @@ describe("whatsapp webhook flow", () => {
         metrics: { totalMs: 12 },
       });
 
-    const fetchMock = vi.fn<typeof fetch>(async () =>
-      {
-        const request = fetchMock.mock.calls.at(-1)?.[1] as RequestInit | undefined;
-        const body = JSON.parse(String(request?.body)) as {
-          input?: Array<{ content?: string }>;
-        };
-        const systemPrompt = body.input?.[0]?.content ?? "";
-        const outputText = systemPrompt.includes("social copy")
-          ? '{"caption":"Raw energy for the night.","hashtags":["#Berlin"]}'
-          : '{"shouldEdit":true,"style":null,"directorMode":"berlin_underground","promptHint":"make it less fake and keep the face closer to the original"}';
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      const request = fetchMock.mock.calls.at(-1)?.[1] as RequestInit | undefined;
+      const body = JSON.parse(String(request?.body)) as {
+        input?: Array<{ content?: string }>;
+      };
+      const systemPrompt = body.input?.[0]?.content ?? "";
+      const outputText = systemPrompt.includes("social copy")
+        ? '{"caption":"Raw energy for the night.","hashtags":["#Berlin"]}'
+        : '{"shouldEdit":true,"style":null,"directorMode":"berlin_underground","promptHint":"make it less fake and keep the face closer to the original"}';
 
-        return new Response(JSON.stringify({ output_text: outputText }), {
-          status: 200,
-        });
-      }
-    );
+      return new Response(JSON.stringify({ output_text: outputText }), {
+        status: 200,
+      });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     try {

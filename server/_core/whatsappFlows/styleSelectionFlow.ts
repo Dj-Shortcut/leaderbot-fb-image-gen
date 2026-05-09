@@ -1,6 +1,7 @@
 import { t, type Lang } from "../i18n";
 import {
   DIRECTOR_MODE_CONFIGS,
+  DIRECTOR_GENERATION_STYLE,
   directorPayloadToMode,
 } from "../image-generation/director/directorModes";
 import type { DirectorMode } from "../image-generation/director/directorTypes";
