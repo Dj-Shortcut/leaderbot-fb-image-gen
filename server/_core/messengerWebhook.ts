@@ -20,3 +20,13 @@ export async function processFacebookWebhookPayload(
 ): Promise<void> {
   await handlers.processFacebookWebhookPayload(payload);
 }
+
+export async function processInternalMessengerImageRequest(input: {
+  psid: string;
+  prompt: string;
+  reqId: string;
+  lang?: Lang;
+  timestamp?: number;
+}): Promise<void> {
+  await handlers.processInternalMessengerImageRequest(input);
+}
