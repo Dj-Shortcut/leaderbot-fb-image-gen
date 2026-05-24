@@ -19,8 +19,22 @@ function getInternalImageRequestToken(): string {
 }
 
 function readBearerToken(header: string | undefined): string {
-  const match = /^Bearer\s+(.+)$/i.exec(header?.trim() ?? "");
-  return match?.[1]?.trim() ?? "";
+  const value = header?.trim() ?? "";
+  const spaceIndex = value.indexOf(" ");
+  
+
+  if (spaceIndex === -1) {
+    return "";
+  }
+
+  const scheme = value.slice(0, spaceIndex);
+  const token = value.slice(spaceIndex + 1).trim();
+
+  if (scheme.toLowerCase() !== "bearer" || !token) {
+    return "";
+  }
+
+  return token;
 }
 
 export function registerInternalImageRequestRoutes(app: Express): void {
@@ -39,10 +53,11 @@ export function registerInternalImageRequestRoutes(app: Express): void {
     }
 
     res.status(202).json({ status: "queued" });
-    void processInternalMessengerImageRequest(parsed.data).catch((error: unknown) => {
-      console.error("[internal image request] failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    });
-  });
-}
+     void processInternalMessengerImageRequest(parsed.data).catch(
+      (error: unknown) => {
+        console.error("[internal image request] failed", {
+          error:
+            error instanceof Error ? error.message : String(error),
+        });
+      }
+    );
