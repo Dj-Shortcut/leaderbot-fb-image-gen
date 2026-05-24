@@ -129,4 +129,41 @@ describe("conversational edit interpreter", () => {
     expect(body.input[0]?.content).toContain('"storybook-anime"');
     expect(body.input[0]?.content).toContain('Treat "ghibli"');
   });
+
+  it("parses director mode decisions and sends director context to the model", async () => {
+    process.env.OPENAI_API_KEY = "dummy-key";
+
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output_text:
+            '{"shouldEdit":true,"style":null,"directorMode":"old_money","promptHint":"make it less fake and more quiet luxury"}',
+        }),
+        { status: 200 }
+      )
+    );
+
+    global.fetch = fetchMock;
+
+    const result = await interpretConversationalEdit({
+      text: "make it less fake and more luxury",
+      lang: "en",
+      lastStyle: "cinematic",
+      lastDirectorMode: "midnight_luxury",
+    });
+
+    expect(result).toEqual({
+      shouldEdit: true,
+      directorMode: "old_money",
+      promptHint: "make it less fake and more quiet luxury",
+    });
+
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(request.body)) as {
+      input: Array<{ role: string; content: string }>;
+    };
+    expect(body.input[0]?.content).toContain("last known director mode");
+    expect(body.input[0]?.content).toContain("midnight_luxury");
+    expect(body.input[0]?.content).toContain("old_money");
+  });
 });

@@ -1,3 +1,5 @@
+import { getOpenAiImageModelConfig } from "./imageServiceConfig";
+
 class OpenAiGenerationError extends Error {}
 export class OpenAiBudgetExceededError extends Error {}
 
@@ -171,9 +173,11 @@ async function fetchWithTimeout(
 export function buildOpenAiRequest(
   input: OpenAiRequestInput
 ): OpenAiRequestContext {
+  const { imageGenerationModel } = getOpenAiImageModelConfig();
+
   if (input.hasSourceImage) {
     const formData = new FormData();
-    formData.set("model", "gpt-image-1");
+    formData.set("model", imageGenerationModel);
     formData.set("prompt", input.prompt);
     formData.set("size", "1024x1024");
     formData.set("output_format", "jpeg");
@@ -206,7 +210,7 @@ export function buildOpenAiRequest(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-image-1",
+        model: imageGenerationModel,
         prompt: input.prompt,
         size: "1024x1024",
         output_format: "jpeg",

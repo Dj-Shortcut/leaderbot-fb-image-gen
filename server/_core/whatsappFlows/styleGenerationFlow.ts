@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
 import { executeGenerationFlow } from "../generationFlow";
+import {
+  formatDirectorSocialCopy,
+  generateDirectorSocialCopy,
+} from "../image-generation/director/directorSocialCopy";
+import { getDirectorModeConfig } from "../image-generation/director/directorModes";
+import type { DirectorMode } from "../image-generation/director/directorTypes";
 import { getGenerationMetrics } from "../image-generation/openAiImageClient";
 import { t, type Lang } from "../i18n";
 import type { SourceImageOrigin } from "../messengerState";
@@ -27,6 +33,9 @@ type StyleGenerationInput = {
   lang: Lang;
   sourceImageUrl?: string;
   promptHint?: string;
+  directorMode?: DirectorMode;
+  directorInstruction?: string;
+  directorPhotoAnalysis?: string;
 };
 
 type GenerationResult = Awaited<ReturnType<typeof executeGenerationFlow>>;
@@ -56,6 +65,7 @@ function resolvedSourceHost(url?: string): string | undefined {
 function logGenerationRequested(input: {
   userId: string;
   style: Style;
+  directorMode?: DirectorMode;
   promptHint?: string;
   resolvedSourceImageUrl?: string;
   trustedSourceImageUrl: boolean;
@@ -63,6 +73,7 @@ function logGenerationRequested(input: {
   console.info("[whatsapp webhook] generation requested", {
     user: input.userId,
     style: input.style,
+    directorMode: input.directorMode,
     hasPromptHint: Boolean(input.promptHint?.trim()),
     sourceImageUrlHost: resolvedSourceHost(input.resolvedSourceImageUrl),
     trustedSourceImageUrl: input.trustedSourceImageUrl,
@@ -92,6 +103,7 @@ async function prepareGeneration(input: StyleGenerationInput): Promise<{
   logGenerationRequested({
     userId: input.userId,
     style: input.style,
+    directorMode: input.directorMode,
     promptHint: input.promptHint,
     resolvedSourceImageUrl,
     trustedSourceImageUrl:
@@ -104,7 +116,11 @@ async function prepareGeneration(input: StyleGenerationInput): Promise<{
   await setFlowState(input.senderId, "PROCESSING");
   await sendWhatsAppTextReply(
     input.senderId,
-    t(input.lang, "generatingPrompt", { styleLabel: STYLE_LABELS[input.style] })
+    t(input.lang, "generatingPrompt", {
+      styleLabel: input.directorMode
+        ? getDirectorModeConfig(input.directorMode).label
+        : STYLE_LABELS[input.style],
+    })
   );
 
   return {
@@ -117,15 +133,29 @@ async function handleGenerationSuccess(input: {
   senderId: string;
   lang: Lang;
   style: Style;
+  directorMode?: DirectorMode;
   promptHint?: string;
   imageUrl: string;
+  reqId: string;
 }): Promise<void> {
   await sendWhatsAppImageReply(input.senderId, input.imageUrl);
+  const socialCopy = await generateDirectorSocialCopy({
+    lang: input.lang,
+    directorMode: input.directorMode,
+    promptHint: input.promptHint,
+    reqId: input.reqId,
+  });
+  if (socialCopy) {
+    await sendWhatsAppTextReply(input.senderId, formatDirectorSocialCopy(socialCopy));
+  }
   await increment(input.senderId);
   await setLastGenerated(input.senderId, input.imageUrl);
   await setLastGenerationContext(input.senderId, {
     style: input.style,
-    prompt: input.promptHint,
+    directorMode: input.directorMode,
+    prompt: input.directorMode
+      ? getDirectorModeConfig(input.directorMode).label
+      : input.promptHint,
   });
   await setFlowState(input.senderId, "RESULT_READY");
   await sendWhatsAppTextReply(
@@ -240,7 +270,18 @@ async function handleGenerationFailure(input: {
 export async function runWhatsAppStyleGeneration(
   input: StyleGenerationInput
 ): Promise<void> {
-  const { senderId, userId, style, reqId, lang, sourceImageUrl, promptHint } = input;
+  const {
+    senderId,
+    userId,
+    style,
+    reqId,
+    lang,
+    sourceImageUrl,
+    promptHint,
+    directorMode,
+    directorInstruction,
+    directorPhotoAnalysis,
+  } = input;
   const allowed = await canGenerate(senderId);
   if (!allowed) {
     await sendQuotaExceededReply(senderId, lang);
@@ -254,6 +295,9 @@ export async function runWhatsAppStyleGeneration(
     userId,
     reqId,
     promptHint,
+    directorMode,
+    directorInstruction,
+    directorPhotoAnalysis,
     sourceImageUrl,
     lastPhotoUrl: generationContext.lastPhotoUrl,
     lastPhotoSource: generationContext.lastPhotoSource,
@@ -264,8 +308,10 @@ export async function runWhatsAppStyleGeneration(
       senderId,
       lang,
       style,
+      directorMode,
       promptHint,
       imageUrl: result.imageUrl,
+      reqId,
     });
     return;
   }
