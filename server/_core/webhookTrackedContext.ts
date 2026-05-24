@@ -50,7 +50,7 @@ function decorateFeatureContext<TContext extends FeatureContext>(
         userLang
       );
     },
-    runStyleGeneration: async (style, sourceImageUrl, promptHint) => {
+    runStyleGeneration: async (style, sourceImageUrl, promptHint, directorMode) => {
       await trackedCtx.runStyleGeneration(
         userPsid,
         featureUserId,
@@ -58,7 +58,8 @@ function decorateFeatureContext<TContext extends FeatureContext>(
         requestId,
         userLang,
         sourceImageUrl,
-        promptHint
+        promptHint,
+        directorMode
       );
     },
   };
@@ -182,7 +183,8 @@ export function createTrackedHandlerContext(
       requestId,
       userLang,
       sourceImageUrl,
-      promptHint
+      promptHint,
+      directorMode
     ) => {
       const outcome = await ctx.runStyleGeneration(
         userPsid,
@@ -191,7 +193,8 @@ export function createTrackedHandlerContext(
         requestId,
         userLang,
         sourceImageUrl,
-        promptHint
+        promptHint,
+        directorMode
       );
       markResponseSentFromOutcome(outcome);
       return outcome;
