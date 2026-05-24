@@ -58,6 +58,7 @@ export function registerInternalImageRequestRoutes(app: Express): void {
         console.error("[internal image request] failed", {
           error:
             error instanceof Error ? error.message : String(error),
-        });
       }
     );
+  });
+}
