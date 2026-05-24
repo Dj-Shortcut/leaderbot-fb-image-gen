@@ -21,7 +21,6 @@ function getInternalImageRequestToken(): string {
 function readBearerToken(header: string | undefined): string {
   const value = header?.trim() ?? "";
   const spaceIndex = value.indexOf(" ");
-  
 
   if (spaceIndex === -1) {
     return "";
@@ -41,23 +40,27 @@ export function registerInternalImageRequestRoutes(app: Express): void {
   app.post("/internal/messenger/image-request", async (req, res) => {
     const expectedToken = getInternalImageRequestToken();
     const providedToken = readBearerToken(req.header("authorization"));
+
     if (!expectedToken || providedToken !== expectedToken) {
       res.sendStatus(403);
       return;
     }
 
     const parsed = internalImageRequestSchema.safeParse(req.body);
+
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid image request payload" });
       return;
     }
 
     res.status(202).json({ status: "queued" });
-     void processInternalMessengerImageRequest(parsed.data).catch(
+
+    void processInternalMessengerImageRequest(parsed.data).catch(
       (error: unknown) => {
         console.error("[internal image request] failed", {
-          error:
-            error instanceof Error ? error.message : String(error),
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     );
   });
+}
