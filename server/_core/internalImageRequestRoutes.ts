@@ -61,4 +61,3 @@ export function registerInternalImageRequestRoutes(app: Express): void {
       }
     );
   });
-}
