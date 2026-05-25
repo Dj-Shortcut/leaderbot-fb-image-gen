@@ -7,6 +7,7 @@ const internalImageRequestSchema = z.object({
   prompt: z.string().trim().min(1).max(2_000),
   reqId: z.string().trim().min(1).max(128),
   lang: z.enum(["nl", "en"]).optional(),
+  sourceImageUrl: z.string().trim().url().max(4096).optional(),
   timestamp: z.number().int().positive().optional(),
 });
 

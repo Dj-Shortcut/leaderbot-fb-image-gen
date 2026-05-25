@@ -107,6 +107,7 @@ type InternalMessengerImageRequestInput = {
   reqId: string;
   lang?: Lang;
   style?: Style;
+  sourceImageUrl?: string;
   timestamp?: number;
 };
 
@@ -1792,7 +1793,24 @@ export function createWebhookHandlers({
         : MESSENGER_SEND_SKIPPED;
     }
 
-    if (!state.lastPhotoUrl) {
+    let sourceImageUrl: string | undefined;
+    if (input.sourceImageUrl?.trim()) {
+      const storedSourceImageUrl = await normalizeMessengerInboundImage({
+        inboundImageUrl: input.sourceImageUrl,
+        psidHash: anonymizePsid(input.psid).slice(0, 12),
+        reqId: input.reqId,
+      });
+      if (!storedSourceImageUrl) {
+        await clearPendingImageState(input.psid);
+        await setFlowState(input.psid, "AWAITING_PHOTO");
+        return await sendLoggedText(input.psid, t(lang, "missingInputImage"), input.reqId);
+      }
+      await setPendingStoredImage(input.psid, storedSourceImageUrl);
+      sourceImageUrl = storedSourceImageUrl;
+    }
+
+    const latestState = sourceImageUrl ? await getOrCreateState(input.psid) : state;
+    if (!sourceImageUrl && !latestState.lastPhotoUrl) {
       await setPreselectedStyle(input.psid, style);
       await setFlowState(input.psid, "AWAITING_PHOTO");
       return await sendLoggedText(input.psid, t(lang, "styleWithoutPhoto"), input.reqId);
@@ -1805,7 +1823,7 @@ export function createWebhookHandlers({
       style,
       input.reqId,
       lang,
-      undefined,
+      sourceImageUrl,
       input.prompt
     );
   }
