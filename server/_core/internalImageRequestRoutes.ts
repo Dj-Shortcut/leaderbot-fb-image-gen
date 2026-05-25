@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import {
   processFacebookWebhookPayload,
@@ -49,13 +49,21 @@ function readBearerToken(header: string | undefined): string {
   return token;
 }
 
+function authorizeInternalRequest(req: Request, res: Response): boolean {
+  const expectedToken = getInternalImageRequestToken();
+  const providedToken = readBearerToken(req.header("authorization"));
+
+  if (!expectedToken || providedToken !== expectedToken) {
+    res.sendStatus(403);
+    return false;
+  }
+
+  return true;
+}
+
 export function registerInternalImageRequestRoutes(app: Express): void {
   app.post("/internal/messenger/image-request", async (req, res) => {
-    const expectedToken = getInternalImageRequestToken();
-    const providedToken = readBearerToken(req.header("authorization"));
-
-    if (!expectedToken || providedToken !== expectedToken) {
-      res.sendStatus(403);
+    if (!authorizeInternalRequest(req, res)) {
       return;
     }
 
@@ -78,11 +86,7 @@ export function registerInternalImageRequestRoutes(app: Express): void {
   });
 
   app.post("/internal/messenger/webhook-event", async (req, res) => {
-    const expectedToken = getInternalImageRequestToken();
-    const providedToken = readBearerToken(req.header("authorization"));
-
-    if (!expectedToken || providedToken !== expectedToken) {
-      res.sendStatus(403);
+    if (!authorizeInternalRequest(req, res)) {
       return;
     }
 
