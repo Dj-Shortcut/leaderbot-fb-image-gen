@@ -1,6 +1,9 @@
 import type { Express } from "express";
 import { z } from "zod";
-import { processInternalMessengerImageRequest } from "./messengerWebhook";
+import {
+  processFacebookWebhookPayload,
+  processInternalMessengerImageRequest,
+} from "./messengerWebhook";
 
 const internalImageRequestSchema = z.object({
   psid: z.string().trim().min(1),
@@ -8,6 +11,16 @@ const internalImageRequestSchema = z.object({
   reqId: z.string().trim().min(1).max(128),
   lang: z.enum(["nl", "en"]).optional(),
   timestamp: z.number().int().positive().optional(),
+});
+
+const internalMessengerEventSchema = z.object({
+  event: z
+    .object({
+      sender: z.object({ id: z.string().trim().min(1) }).optional(),
+      recipient: z.object({ id: z.string().trim().min(1) }).optional(),
+      timestamp: z.number().int().positive().optional(),
+    })
+    .passthrough(),
 });
 
 function getInternalImageRequestToken(): string {
@@ -62,5 +75,42 @@ export function registerInternalImageRequestRoutes(app: Express): void {
         });
       }
     );
+  });
+
+  app.post("/internal/messenger/webhook-event", async (req, res) => {
+    const expectedToken = getInternalImageRequestToken();
+    const providedToken = readBearerToken(req.header("authorization"));
+
+    if (!expectedToken || providedToken !== expectedToken) {
+      res.sendStatus(403);
+      return;
+    }
+
+    const parsed = internalMessengerEventSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid messenger event payload" });
+      return;
+    }
+
+    const event = parsed.data.event;
+    const pageId = event.recipient?.id ?? process.env.MESSENGER_PAGE_ID ?? "";
+
+    res.status(202).json({ status: "queued" });
+
+    void processFacebookWebhookPayload({
+      object: "page",
+      entry: [
+        {
+          id: pageId,
+          time: event.timestamp,
+          messaging: [event],
+        },
+      ],
+    }).catch((error: unknown) => {
+      console.error("[internal messenger event] failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
   });
 }
