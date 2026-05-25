@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import {
   processFacebookWebhookPayload,
@@ -21,6 +22,13 @@ const internalMessengerEventSchema = z.object({
       timestamp: z.number().int().positive().optional(),
     })
     .passthrough(),
+});
+
+const internalMessengerRequestLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 1_000,
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 function getInternalImageRequestToken(): string {
@@ -62,59 +70,67 @@ function authorizeInternalRequest(req: Request, res: Response): boolean {
 }
 
 export function registerInternalImageRequestRoutes(app: Express): void {
-  app.post("/internal/messenger/image-request", async (req, res) => {
-    if (!authorizeInternalRequest(req, res)) {
-      return;
+  app.post(
+    "/internal/messenger/image-request",
+    internalMessengerRequestLimiter,
+    async (req, res) => {
+      if (!authorizeInternalRequest(req, res)) {
+        return;
+      }
+
+      const parsed = internalImageRequestSchema.safeParse(req.body);
+
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid image request payload" });
+        return;
+      }
+
+      res.status(202).json({ status: "queued" });
+
+      void processInternalMessengerImageRequest(parsed.data).catch(
+        (error: unknown) => {
+          console.error("[internal image request] failed", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      );
     }
+  );
 
-    const parsed = internalImageRequestSchema.safeParse(req.body);
+  app.post(
+    "/internal/messenger/webhook-event",
+    internalMessengerRequestLimiter,
+    async (req, res) => {
+      if (!authorizeInternalRequest(req, res)) {
+        return;
+      }
 
-    if (!parsed.success) {
-      res.status(400).json({ error: "Invalid image request payload" });
-      return;
-    }
+      const parsed = internalMessengerEventSchema.safeParse(req.body);
 
-    res.status(202).json({ status: "queued" });
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid messenger event payload" });
+        return;
+      }
 
-    void processInternalMessengerImageRequest(parsed.data).catch(
-      (error: unknown) => {
-        console.error("[internal image request] failed", {
+      const event = parsed.data.event;
+      const pageId = event.recipient?.id ?? process.env.MESSENGER_PAGE_ID ?? "";
+
+      res.status(202).json({ status: "queued" });
+
+      void processFacebookWebhookPayload({
+        object: "page",
+        entry: [
+          {
+            id: pageId,
+            time: event.timestamp,
+            messaging: [event],
+          },
+        ],
+      }).catch((error: unknown) => {
+        console.error("[internal messenger event] failed", {
           error: error instanceof Error ? error.message : String(error),
         });
-      }
-    );
-  });
-
-  app.post("/internal/messenger/webhook-event", async (req, res) => {
-    if (!authorizeInternalRequest(req, res)) {
-      return;
-    }
-
-    const parsed = internalMessengerEventSchema.safeParse(req.body);
-
-    if (!parsed.success) {
-      res.status(400).json({ error: "Invalid messenger event payload" });
-      return;
-    }
-
-    const event = parsed.data.event;
-    const pageId = event.recipient?.id ?? process.env.MESSENGER_PAGE_ID ?? "";
-
-    res.status(202).json({ status: "queued" });
-
-    void processFacebookWebhookPayload({
-      object: "page",
-      entry: [
-        {
-          id: pageId,
-          time: event.timestamp,
-          messaging: [event],
-        },
-      ],
-    }).catch((error: unknown) => {
-      console.error("[internal messenger event] failed", {
-        error: error instanceof Error ? error.message : String(error),
       });
-    });
-  });
+    }
+  );
 }
