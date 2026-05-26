@@ -1805,7 +1805,7 @@ export function createWebhookHandlers({
       style,
       input.reqId,
       lang,
-      sourceImageUrl,
+      state.lastPhotoUrl,
       input.prompt
     );
   }
