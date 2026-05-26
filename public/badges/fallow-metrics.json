@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-05-18T10:20:35.251Z",
+  "generatedAt": "2026-05-25T10:24:40.448Z",
   "fallowVersion": "2.27.0",
   "totalIssues": 71,
   "functionsAboveThreshold": 2,
-  "functionsAnalyzed": 2117,
-  "filesScored": 178,
+  "functionsAnalyzed": 2126,
+  "filesScored": 179,
   "coverageModel": "static_estimated",
   "maintainabilityScore": 88.9,
   "formula": "native Fallow average_maintainability",
@@ -25,12 +25,12 @@
     "boundary_violations": 0
   },
   "healthSummary": {
-    "files_analyzed": 201,
-    "functions_analyzed": 2117,
+    "files_analyzed": 202,
+    "functions_analyzed": 2126,
     "functions_above_threshold": 2,
     "max_cyclomatic_threshold": 20,
     "max_cognitive_threshold": 15,
-    "files_scored": 178,
+    "files_scored": 179,
     "average_maintainability": 88.9,
     "coverage_model": "static_estimated"
   }

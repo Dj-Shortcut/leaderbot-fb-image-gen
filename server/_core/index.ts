@@ -59,6 +59,7 @@ import {
   scheduleFaceMemoryExpiry,
 } from "./faceMemory";
 import { createAdminAuthRateLimiter, verifyAdminToken } from "./adminAuth";
+import { registerInternalImageRequestRoutes } from "./internalImageRequestRoutes";
 
 const gitSha = process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "dev";
 const bootTimestamp = new Date().toISOString();
@@ -360,6 +361,7 @@ async function startServer() {
   // Register webhook routes AFTER signature verification middleware
   // but BEFORE static files and catch-all routes.
   registerBotRoutes(app);
+  registerInternalImageRequestRoutes(app);
   scheduleWebhookIngressDrain();
 
   app.use((req, res, next) => {
