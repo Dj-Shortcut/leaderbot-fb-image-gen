@@ -22,6 +22,7 @@ import {
   setPreselectedStyle,
   setPreferredLang,
   setActiveExperience,
+  setLastUserMessageAt,
   markIntroSeen,
   anonymizePsid,
   type ConversationState,
@@ -53,8 +54,10 @@ import {
   getEventDedupeKey,
   getGreetingResponse,
   parseReferralStyle,
+  parseStyle,
   STYLE_CATEGORY_LABELS,
   STYLE_LABELS,
+  STYLE_OPTIONS,
   toMessengerReplies,
   toMessengerStyleReplies,
 } from "./webhookHelpers";
@@ -98,6 +101,15 @@ type HandlerDeps = {
   privacyPolicyUrl: string;
 };
 
+type InternalMessengerImageRequestInput = {
+  psid: string;
+  prompt: string;
+  reqId: string;
+  lang?: Lang;
+  style?: Style;
+  timestamp?: number;
+};
+
 type FacebookWebhookMessage = NonNullable<FacebookWebhookEvent["message"]>;
 type FeatureContextBase = Omit<
   BotPayloadContext,
@@ -135,6 +147,54 @@ function combineMessengerSendOutcomes(
   return outcomes.some(outcome => outcome.sent)
     ? { sent: true }
     : MESSENGER_SEND_SKIPPED;
+}
+
+function normalizeImageRequestText(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function inferStyleFromImageRequest(text: string): Style {
+  const direct = parseStyle(text);
+  if (direct) {
+    return direct;
+  }
+
+  const normalized = normalizeImageRequestText(text);
+  for (const style of STYLE_OPTIONS) {
+    const styleLabel = normalizeImageRequestText(STYLE_LABELS[style]);
+    const styleId = normalizeImageRequestText(style);
+    if (normalized.includes(styleLabel) || normalized.includes(styleId)) {
+      return style;
+    }
+  }
+
+  if (/\b(cyber|neon|future|futuristisch)\b/.test(normalized)) {
+    return "cyberpunk";
+  }
+  if (/\b(cinema|cinematic|film|movie|dramatisch)\b/.test(normalized)) {
+    return "cinematic";
+  }
+  if (/\b(olie|oil|painting|schilderij)\b/.test(normalized)) {
+    return "oil-paint";
+  }
+  if (/\b(gold|goud|luxury|luxe)\b/.test(normalized)) {
+    return "gold";
+  }
+  if (/\b(disco|glow|party)\b/.test(normalized)) {
+    return "disco";
+  }
+  if (/\b(wolk|cloud|clouds|hemel)\b/.test(normalized)) {
+    return "clouds";
+  }
+  if (/\b(caricature|karikatuur)\b/.test(normalized)) {
+    return "caricature";
+  }
+
+  return "storybook-anime";
 }
 
 export type HandlerContext = {
@@ -1709,5 +1769,49 @@ export function createWebhookHandlers({
     }
   }
 
-  return { processFacebookWebhookPayload };
+  async function processInternalMessengerImageRequest(
+    input: InternalMessengerImageRequestInput
+  ): Promise<MessengerSendOutcome> {
+    const lang = input.lang ?? defaultLang;
+    const userId = toUserKey(input.psid);
+    const style = input.style ?? inferStyleFromImageRequest(input.prompt);
+    await setLastUserMessageAt(input.psid, input.timestamp ?? Date.now());
+
+    safeLog("internal_image_request_received", {
+      reqId: input.reqId,
+      user: toLogUser(userId),
+      psidHash: anonymizePsid(input.psid).slice(0, 12),
+      style,
+    });
+
+    const state = await getOrCreateState(input.psid);
+    if (state.stage === "PROCESSING") {
+      const result = await maybeSendInFlightMessage(input.psid, input.reqId);
+      return "outcome" in result && result.outcome
+        ? result.outcome
+        : MESSENGER_SEND_SKIPPED;
+    }
+
+    if (!state.lastPhotoUrl) {
+      await setPreselectedStyle(input.psid, style);
+      await setFlowState(input.psid, "AWAITING_PHOTO");
+      return await sendLoggedText(input.psid, t(lang, "styleWithoutPhoto"), input.reqId);
+    }
+
+    await setChosenStyle(input.psid, style);
+    return await runStyleGeneration(
+      input.psid,
+      userId,
+      style,
+      input.reqId,
+      lang,
+      sourceImageUrl,
+      input.prompt
+    );
+  }
+
+  return {
+    processFacebookWebhookPayload,
+    processInternalMessengerImageRequest,
+  };
 }
